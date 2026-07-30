@@ -140,14 +140,20 @@ def construir_catalogo_texto(servicios, productos, ambientaciones=None):
             'AMBIENTACIONES (decoración opcional que acompaña una tina o experiencia; se '
             'prepara para la MISMA hora de la tina, no tiene horario propio):\n'
             + '\n'.join(amb_lineas)
-            + '\nSi el cliente pregunta por ambientaciones/decoración, menciona SOLO estas '
-              'opciones con su precio (información REAL del catálogo — no inventes otras ni '
-              'describas qué incluyen si no lo sabes). Si el cliente CONFIRMA que quiere una '
-              '(la nombra o acepta una concreta), agrégala con agregar_servicio_carrito: pasa '
-              'nombre_servicio EXACTO como aparece en esta lista, cantidad_personas=1 (es UNA '
-              'decoración por tina — NUNCA 2 aunque sean 2 personas) y la MISMA fecha y hora '
-              'de la tina del carrito. Si aún no hay tina elegida, primero definan la tina: '
-              'la ambientación la acompaña.'
+            + '\nPROTOCOLO DE VENTA (H-082 — una opción a la vez, como todo lo demás): si el '
+              'cliente pregunta genérico por ambientaciones, NO listes todas: pregunta primero '
+              'la ocasión en una frase ("¿Es para algo romántico, un cumpleaños, o un detalle '
+              'dulce?"). Con la ocasión clara, ofrece UNA sola — la de MENOR precio de esa '
+              'ocasión, con su precio REAL de esta lista — y menciona en la misma frase que '
+              'hay una versión superior si quiere algo más especial (sin detallar las demás). '
+              'Usa SOLO nombres y precios de ESTA lista; no inventes qué incluyen. Si ya hay '
+              'una ambientación en el carrito, reconócelo y ofrece cambiarla o complementarla. '
+              'Si el cliente CONFIRMA una (la nombra o acepta), agrégala con '
+              'agregar_servicio_carrito: nombre_servicio EXACTO de esta lista, '
+              'cantidad_personas=1 (es UNA decoración por tina — NUNCA 2 aunque sean 2 '
+              'personas) y la MISMA fecha y hora de la tina del carrito. Si aún no hay tina '
+              'elegida, primero definan la tina: la ambientación la acompaña. NUNCA la '
+              'agregues sin esa confirmación explícita.'
         )
 
     prod_lineas = formatear_productos(productos)
