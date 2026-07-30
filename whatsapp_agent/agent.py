@@ -18,7 +18,7 @@ import logging
 
 from django.utils import timezone
 
-from . import escalation, grounding, prompt as prompt_mod
+from . import escalation, grounding, prompt as prompt_mod, rollback
 from .models import SugerenciaAgenteWhatsApp, WhatsAppAgentConfig
 
 logger = logging.getLogger(__name__)
@@ -191,6 +191,40 @@ _TOOLS = [{
                 'fecha_salida': {'type': 'string', 'description': 'Check-out (alternativa si no tienes noches). PASÁ EL TEXTO LITERAL del cliente; NO calcules el día.'},
             },
             'required': ['fecha_llegada', 'personas'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'alternativas_experiencia',
+        'description': (
+            'COTIZADOR OFICIAL de experiencias (H-078): pausa (tina+masaje) | tina_sola | '
+            'masaje_solo | noche_aguas_calientes (cabaña+tina) | ritual | refugio. Devuelve '
+            'alternativas REALES armadas por código: horarios válidos (agregables al carrito '
+            'después), precio con descuento ya calculado y un `texto_sugerido` listo para el '
+            'cliente. Para COTIZAR u ofrecer horarios de una experiencia usa SIEMPRE esta '
+            'herramienta y presenta las opciones TAL CUAL (mismas horas y precios; ideal: usa '
+            'su `texto_sugerido`). NUNCA armes tú una combinación tina+masaje ni inventes un '
+            'horario: si una hora no vino de esta herramienta, NO existe. `fecha` acepta el '
+            'texto literal del cliente ("el próximo miércoles"); usa SIEMPRE el `dia_semana` '
+            'devuelto. ⚠️ `personas` es OBLIGATORIO: si no lo sabes, pregúntalo ANTES de llamar '
+            '(NUNCA asumas 1). Ritual y Refugio son siempre para 2.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'tipo': {'type': 'string',
+                         'enum': ['pausa', 'tina_sola', 'masaje_solo',
+                                  'noche_aguas_calientes', 'ritual', 'refugio'],
+                         'description': 'Tipo de experiencia a cotizar.'},
+                'fecha': {'type': 'string',
+                          'description': 'Fecha TAL CUAL la dijo el cliente ("el sábado", '
+                                         '"5 de agosto" o YYYY-MM-DD); se resuelve internamente.'},
+                'personas': {'type': 'integer',
+                             'description': 'Cantidad EXACTA de personas que dijo el cliente. '
+                                            'NO la inventes ni asumas 1.'},
+            },
+            'required': ['tipo', 'fecha', 'personas'],
         },
     },
 }, {
@@ -794,7 +828,98 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
     return ''
 
 
-def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp'):
+# Tope de alternativas devueltas al modelo (contexto acotado; las demás se informan
+# por `total_alternativas` y el modelo puede ofrecer "hay más horarios si prefieres").
+_MAX_ALTERNATIVAS_TOOL = 8
+
+
+def _tool_alternativas_experiencia(args):
+    """Handler de la tool `alternativas_experiencia` (H-078).
+
+    Cotiza una experiencia con el MISMO motor H-061 de las "olitas" de la bandeja
+    (whatsapp_agent/alternativas.py). Las horas salen de la misma grilla que valida
+    `agregar_servicio_carrito` (`extraer_slots_para_fecha`) → todo lo que se ofrece
+    acá es agregable al carrito después. Caso real que motiva esto (2026-07-29): el
+    modelo redactó "masaje a las 16:45" en el texto de opciones — hora inventada que
+    el validador del carrito rechazó recién al intentar agregarla.
+    """
+    from . import alternativas as alternativas_mod
+    from .availability import resolver_fecha
+
+    args = args or {}
+    tipo = (str(args.get('tipo') or '')).strip().lower()
+
+    try:
+        personas = int(args.get('personas'))
+    except (TypeError, ValueError):
+        personas = 0
+    if personas < 1:
+        return {'success': False, 'error': 'falta_personas',
+                'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente '
+                           'antes de cotizar. NO asumas 1.'}
+
+    r = resolver_fecha((str(args.get('fecha') or '')).strip())
+    if not r or r.get('error') or not r.get('fecha_iso'):
+        return {'success': False, 'error': 'fecha_invalida',
+                'mensaje': (r or {}).get('error')
+                or 'No pude resolver la fecha. Pídele al cliente la fecha exacta.'}
+    if r.get('ambiguo'):
+        return {'success': False, 'error': 'fecha_ambigua',
+                'mensaje': 'La fecha es ambigua (el día de la semana no calza con el número). '
+                           'Confírmala con el cliente antes de cotizar.'}
+
+    res = alternativas_mod.construir_alternativas(tipo, r['fecha_iso'], personas)
+    if res.get('error'):
+        return {'success': False, 'error': 'alternativas_invalidas', 'mensaje': res['error']}
+
+    alts = list(res.get('alternativas') or [])
+    return {
+        'success': True,
+        'tipo': res.get('tipo'),
+        'nombre_experiencia': res.get('nombre_experiencia'),
+        'fecha': r['fecha_iso'],
+        'dia_semana': r.get('dia_semana'),
+        'personas': personas,
+        'total_alternativas': len(alts),
+        'alternativas': alts[:_MAX_ALTERNATIVAS_TOOL],
+        'instruccion': ('Ofrece EXACTAMENTE estas opciones (usa `texto_sugerido`; mismas horas '
+                        'y precios; usa el `dia_semana` devuelto). Si la lista está vacía, no '
+                        'hay disponibilidad ese día: ofrece consultar otra fecha. NUNCA '
+                        'inventes horarios que no estén acá.'),
+    }
+
+
+def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='',
+                       datos_cliente=None, phone='', canal='whatsapp'):
+    """Wrapper H-078 sobre `_producir_borrador_inner`: si el turno ESCALA (el texto se
+    frena y no llega al cliente), revierte las mutaciones de carrito/propuesta que las
+    tools de ese mismo turno alcanzaron a hacer — un turno sin mensaje no deja residuo
+    (caso real 2026-07-29: tina fantasma en el carrito tras un turno frenado por H-045).
+    """
+    ident = (phone or '').strip()
+    snap = None
+    if ident:
+        try:
+            snap = rollback.snapshot_estado_venta(canal, ident)
+        except Exception:  # noqa: BLE001 — sin snapshot igual se produce el borrador
+            logger.exception('[Agente WA] H-078: no se pudo capturar el snapshot pre-turno')
+    try:
+        d = _producir_borrador_inner(
+            config, mensaje, historial=historial, saludo_estado=saludo_estado,
+            saludo_nombre=saludo_nombre, datos_cliente=datos_cliente, phone=phone, canal=canal)
+    except Exception:
+        # Turno reventado = tampoco salió mensaje → mismo invariante que escalar.
+        if snap is not None and rollback.restaurar_estado_venta(canal, ident, snap):
+            logger.warning('[Agente WA] H-078: excepción en el turno → estado de venta restaurado')
+        raise
+    if d.get('escalar') and snap is not None:
+        if rollback.restaurar_estado_venta(canal, ident, snap):
+            logger.warning('[Agente WA] H-078: turno escalado → carrito/propuesta restaurados '
+                           'al estado pre-turno')
+    return d
+
+
+def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp'):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
     Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
@@ -1043,6 +1168,13 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool preparar_reserva EXCEPCIÓN: %s', exc)
                 return {'error': f'no se pudo preparar reserva: {str(exc)[:100]}'}
+        if name == 'alternativas_experiencia':
+            # H-078: cotizador oficial — el motor arma las opciones, el modelo solo las presenta.
+            try:
+                return _tool_alternativas_experiencia(args)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool alternativas_experiencia falló: %s', exc)
+                return {'error': f'no se pudo cotizar la experiencia: {str(exc)[:100]}'}
         if name == 'agregar_servicio_carrito':
             # H-029 FASE 2: agregar servicio al carrito
             from carrito_reservas.services import CarritoService

@@ -1,0 +1,149 @@
+"""Tests H-078: rollback del estado de venta en turnos escalados + tool cotizadora.
+
+NOTA: la suite local no puede correr mientras exista el drift AR-033/AR-034 (crear el
+test DB revienta al re-aplicar migraciones). Estos tests documentan el contrato y
+quedan listos para cuando eso se resuelva / para CI.
+"""
+from decimal import Decimal
+from unittest import mock
+
+from django.test import TestCase
+
+from carrito_reservas.models import CarritoReserva
+from whatsapp_agent import rollback
+from whatsapp_agent.agent import _tool_alternativas_experiencia
+from whatsapp_agent.models import PropuestaReserva
+
+
+CANAL = 'whatsapp'
+PHONE = '+56900000078'
+
+
+class RollbackCarritoTests(TestCase):
+    def test_turno_crea_carrito_que_no_existia_se_elimina(self):
+        snap = rollback.snapshot_estado_venta(CANAL, PHONE)  # no existe nada aún
+        CarritoReserva.objects.create(canal=CANAL, external_id=PHONE, items=[
+            {'tipo': 'servicio', 'id': 9, 'nombre': 'Tina Hornopiren',
+             'fecha': '2026-08-05', 'hora': '14:30', 'cantidad_personas': 2,
+             'precio_unitario': 25000.0, 'subtotal': 50000.0},
+        ])
+        self.assertTrue(rollback.restaurar_estado_venta(CANAL, PHONE, snap))
+        self.assertFalse(
+            CarritoReserva.objects.filter(canal=CANAL, external_id=PHONE).exists())
+
+    def test_items_agregados_en_el_turno_se_revierten(self):
+        carrito = CarritoReserva.objects.create(
+            canal=CANAL, external_id=PHONE,
+            items=[{'tipo': 'producto', 'id': 3, 'nombre': 'Tabla Quesos',
+                    'cantidad': 1, 'precio_unitario': 20000.0, 'subtotal': 20000.0}],
+            subtotal_productos=Decimal('20000'), total=Decimal('20000'))
+        snap = rollback.snapshot_estado_venta(CANAL, PHONE)
+
+        carrito.items = carrito.items + [
+            {'tipo': 'servicio', 'id': 9, 'nombre': 'Tina Hornopiren',
+             'fecha': '2026-08-05', 'hora': '14:30', 'cantidad_personas': 2,
+             'precio_unitario': 25000.0, 'subtotal': 50000.0}]
+        carrito.subtotal_servicios = Decimal('50000')
+        carrito.total = Decimal('70000')
+        carrito.save()
+
+        self.assertTrue(rollback.restaurar_estado_venta(CANAL, PHONE, snap))
+        carrito.refresh_from_db()
+        self.assertEqual(len(carrito.items), 1)
+        self.assertEqual(carrito.items[0]['nombre'], 'Tabla Quesos')
+        self.assertEqual(carrito.total, Decimal('20000'))
+
+    def test_sin_cambios_no_toca_nada(self):
+        CarritoReserva.objects.create(canal=CANAL, external_id=PHONE, items=[])
+        snap = rollback.snapshot_estado_venta(CANAL, PHONE)
+        self.assertFalse(rollback.restaurar_estado_venta(CANAL, PHONE, snap))
+
+
+class RollbackPropuestaTests(TestCase):
+    def _propuesta(self, **kwargs):
+        base = dict(
+            propuesta_id=f'test-{PropuestaReserva.objects.count() + 1}',
+            canal=CANAL, external_id=PHONE, estado='pendiente',
+            payload={'servicios': [], 'productos': []}, servicios=[],
+            total=Decimal('0'), resumen_texto='')
+        base.update(kwargs)
+        return PropuestaReserva.objects.create(**base)
+
+    def test_propuesta_creada_en_el_turno_se_descarta(self):
+        snap = rollback.snapshot_estado_venta(CANAL, PHONE)  # sin propuesta previa
+        p = self._propuesta()
+        self.assertTrue(rollback.restaurar_estado_venta(CANAL, PHONE, snap))
+        p.refresh_from_db()
+        self.assertEqual(p.estado, 'descartada')
+
+    def test_edicion_de_propuesta_en_el_turno_se_revierte(self):
+        p = self._propuesta(
+            payload={'servicios': [{'servicio_id': 1}], 'productos': []},
+            servicios=[{'servicio_id': 1}], total=Decimal('50000'), resumen_texto='1x Tina')
+        snap = rollback.snapshot_estado_venta(CANAL, PHONE)
+
+        p.servicios = [{'servicio_id': 1}, {'servicio_id': 2}]
+        p.total = Decimal('130000')
+        p.resumen_texto = '1x Tina + 1x Masaje'
+        p.save()
+
+        self.assertTrue(rollback.restaurar_estado_venta(CANAL, PHONE, snap))
+        p.refresh_from_db()
+        self.assertEqual(p.servicios, [{'servicio_id': 1}])
+        self.assertEqual(p.total, Decimal('50000'))
+        self.assertEqual(p.resumen_texto, '1x Tina')
+        self.assertEqual(p.estado, 'pendiente')
+
+
+class ToolAlternativasExperienciaTests(TestCase):
+    """La tool cotizadora: validaciones deterministas + passthrough del motor H-061."""
+
+    def test_exige_personas(self):
+        out = _tool_alternativas_experiencia({'tipo': 'pausa', 'fecha': '2026-08-05'})
+        self.assertFalse(out['success'])
+        self.assertEqual(out['error'], 'falta_personas')
+
+    @mock.patch('whatsapp_agent.availability.resolver_fecha')
+    def test_fecha_ambigua_no_cotiza(self, m_fecha):
+        m_fecha.return_value = {'fecha_iso': '2026-08-05', 'dia_semana': 'miércoles',
+                                'ambiguo': True, 'error': None}
+        out = _tool_alternativas_experiencia(
+            {'tipo': 'pausa', 'fecha': 'domingo 5', 'personas': 2})
+        self.assertFalse(out['success'])
+        self.assertEqual(out['error'], 'fecha_ambigua')
+
+    @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
+    @mock.patch('whatsapp_agent.availability.resolver_fecha')
+    def test_passthrough_del_motor_con_tope(self, m_fecha, m_alts):
+        m_fecha.return_value = {'fecha_iso': '2026-08-05', 'dia_semana': 'miércoles',
+                                'ambiguo': False, 'error': None}
+        alternativa = {
+            'titulo': 'Tina Hornopiren · 14:30', 'precio_total': 130000,
+            'precio_con_descuento': 110000, 'hay_descuento': True,
+            'texto_sugerido': 'Tina Hornopiren 14:30 + masaje 16:00 → $110.000',
+            'itinerario': [{'servicio': 'Tina Hornopiren', 'hora': '14:30'},
+                           {'servicio': 'Masaje', 'hora': '16:00'}],
+        }
+        m_alts.return_value = {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2,
+                               'nombre_experiencia': 'Pausa junto al río',
+                               'alternativas': [alternativa] * 12}
+        out = _tool_alternativas_experiencia(
+            {'tipo': 'pausa', 'fecha': 'el próximo miércoles', 'personas': 2})
+        self.assertTrue(out['success'])
+        m_alts.assert_called_once_with('pausa', '2026-08-05', 2)
+        self.assertEqual(out['dia_semana'], 'miércoles')
+        self.assertEqual(out['total_alternativas'], 12)
+        self.assertEqual(len(out['alternativas']), 8)  # tope de contexto
+        # El texto que el modelo debe usar viene del MOTOR, no de su pluma.
+        self.assertIn('texto_sugerido', out['alternativas'][0])
+
+    @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
+    @mock.patch('whatsapp_agent.availability.resolver_fecha')
+    def test_tipo_invalido_propaga_error(self, m_fecha, m_alts):
+        m_fecha.return_value = {'fecha_iso': '2026-08-05', 'dia_semana': 'miércoles',
+                                'ambiguo': False, 'error': None}
+        m_alts.return_value = {'error': "tipo inválido: 'spa_day'"}
+        out = _tool_alternativas_experiencia(
+            {'tipo': 'spa_day', 'fecha': '2026-08-05', 'personas': 2})
+        self.assertFalse(out['success'])
+        self.assertEqual(out['error'], 'alternativas_invalidas')
