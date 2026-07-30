@@ -864,6 +864,47 @@ def _es_ambientacion(servicio_id):
         id=servicio_id, categoria__nombre__iexact='Ambientaciones').exists()
 
 
+def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
+    """H-080: agrega una ambientación (servicio) con las guardias deterministas:
+    cantidad SIEMPRE 1 (su precio es por unidad; el motor multiplica base × cantidad)
+    y fecha/hora HEREDADAS de la primera línea de servicio con fecha (la tina) — de la
+    propuesta vigente si existe (H-043), si no del carrito. Sin tina aún → sin fecha
+    (Deborah la ajusta con el lápiz del cajón).
+
+    La usa el cross-fix del handler de agregar_producto_carrito: el modelo tiende a
+    tratar la ambientación como "producto" (es un add-on, igual que tablas/jugos)."""
+    from .models import PropuestaReserva
+    from .reserva_service import agregar_servicio_a_propuesta
+
+    fecha = hora = None
+    prop = (PropuestaReserva.objects
+            .filter(canal=canal, external_id=external_id, estado='pendiente')
+            .order_by('-created_at').first())
+    if prop is not None and prop.esta_vigente():
+        candidatos = (prop.payload or {}).get('servicios') or []
+        for s in candidatos:
+            if s.get('fecha'):
+                fecha, hora = s.get('fecha'), s.get('hora')
+                break
+    else:
+        from carrito_reservas.models import CarritoReserva
+        carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+        for it in (carrito.items if carrito else None) or []:
+            if it.get('tipo') != 'producto' and it.get('fecha'):
+                fecha, hora = it.get('fecha'), it.get('hora')
+                break
+
+    actualizado = agregar_servicio_a_propuesta(
+        canal=canal, external_id=external_id, servicio_id=servicio_id,
+        fecha=fecha, hora=hora, cantidad_personas=1)
+    if actualizado is not None:
+        return actualizado
+    from carrito_reservas.services import CarritoService
+    return CarritoService.agregar_servicio(
+        canal=canal, external_id=external_id, servicio_id=servicio_id,
+        fecha=fecha, hora=hora, cantidad_personas=1)
+
+
 def _tool_alternativas_experiencia(args):
     """Handler de la tool `alternativas_experiencia` (H-078).
 
@@ -1322,6 +1363,17 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                         return {'success': False, 'error': 'producto_ambiguo',
                                 'mensaje': f'Hay varios productos que coinciden con "{nombre_producto}"; pedí al cliente que precise cuál.'}
                 if not producto_id:
+                    # H-080: el modelo suele tratar una AMBIENTACIÓN como "producto" (es un
+                    # add-on, igual que tablas/jugos — caso real: "reservame la R1" llegó por
+                    # esta tool). Si el nombre resuelve a UNA ambientación, se agrega como
+                    # SERVICIO (cantidad 1, fecha/hora heredadas de la tina) en vez de fallar.
+                    amb_id = _resolver_ambientacion(nombre_producto)
+                    if amb_id is not None:
+                        logger.info(
+                            '[agregar_producto_carrito] "%s" resuelto como AMBIENTACIÓN (servicio %s) → cross-add',
+                            nombre_producto, amb_id)
+                        return _agregar_ambientacion_al_carrito(
+                            canal, phone if phone else 'desconocido', amb_id)
                     return {'success': False, 'error': 'producto_no_resuelto',
                             'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
                 external_id = phone if phone else 'desconocido'
