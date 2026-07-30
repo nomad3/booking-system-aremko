@@ -14,6 +14,7 @@ from django.test import TestCase
 from ventas.models import CategoriaServicio, Servicio
 from whatsapp_agent.agent import (
     _cliente_confirmo_ambientacion,
+    _cliente_eligio_producto,
     _es_ambientacion,
     _resolver_ambientacion,
 )
@@ -89,3 +90,41 @@ class ClienteConfirmoAmbientacionTests(TestCase):
     def test_vacio_no_confirma(self):
         self.assertFalse(_cliente_confirmo_ambientacion('', self.R1))
         self.assertFalse(_cliente_confirmo_ambientacion(None, self.R1))
+
+
+class ClienteEligioProductoTests(TestCase):
+    """H-084: gate anti "variante elegida por el modelo" (función PURA, candidatos
+    inyectados — sin DB). Caso real 2026-07-30: "Si un jugo" → el modelo agregó
+    Frambuesa al carrito Y preguntó el sabor en el mismo turno."""
+
+    CAT = [
+        (107, 'Jugo Natural Arandanos'), (108, 'Jugo Natural de Frambuesa'),
+        (109, 'Jugo Natural de Melon'), (9, 'Jugos Naturales'),
+        (3, 'Tabla Quesos'), (123, 'Tabla Mixta de Quesos y Jamones'),
+        (111, 'Cafe Marley Americano Mediano'), (112, 'Cafe Marley Americano Grande'),
+    ]
+    H_MELON = '[Aremko]: ¿Te agrego el jugo natural de melón para acompañar?'
+    H_DOBLE = '[Aremko]: ¿Te gustaría sumar una tabla de quesos o un jugo natural?'
+
+    def _ok(self, mensaje, historial, target):
+        return _cliente_eligio_producto(mensaje, historial, target, candidatos=self.CAT)[0]
+
+    def test_generico_bloquea(self):
+        self.assertFalse(self._ok('Si un jugo', self.H_DOBLE, 108))  # el bug real
+        self.assertFalse(self._ok('un cafe americano', '', 112))     # ¿mediano o grande?
+
+    def test_variante_nombrada_pasa(self):
+        self.assertTrue(self._ok('quiero jugo de frambuesa', '', 108))
+        self.assertTrue(self._ok('cafe americano grande', '', 112))
+        # cobertura: "tabla de quesos" es la Tabla Quesos, no la Mixta
+        self.assertTrue(self._ok('una tabla de quesos porfa', '', 3))
+
+    def test_asentimiento_a_oferta_especifica_pasa(self):
+        self.assertTrue(self._ok('sí', self.H_MELON, 109))
+
+    def test_asentimiento_a_oferta_doble_bloquea(self):
+        self.assertFalse(self._ok('sí', self.H_DOBLE, 3))
+
+    def test_producto_distinto_al_pedido_bloquea(self):
+        # Cliente pidió melón; el modelo intenta agregar frambuesa → bloqueado.
+        self.assertFalse(self._ok('jugo de melon', '', 108))

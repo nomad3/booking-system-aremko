@@ -16,6 +16,7 @@ Diseño F1:
 
 import logging
 import re
+import unicodedata
 
 from django.utils import timezone
 
@@ -918,6 +919,98 @@ def _cliente_confirmo_ambientacion(mensaje, nombre_ambientacion):
     return _RE_ASENTIMIENTO_AMB.search(m) is not None
 
 
+# ============================================================================
+# H-084 — gate anti "variante elegida por el modelo" (productos)
+# ----------------------------------------------------------------------------
+# Caso real 2026-07-30: cliente "Si un jugo" → el modelo agregó "Jugo Natural de
+# Frambuesa" al carrito Y ADEMÁS redactó "¿de qué sabor te gustaría?" (H-082):
+# texto y acción contradictorios. El texto lo arregló la instrucción; la acción
+# solo se arregla en código: un producto entra al carrito únicamente si el
+# CONTEXTO del cliente lo desambigua (su mensaje o, si solo asintió, la última
+# oferta de Aremko en el historial). Empate entre variantes → se bloquea y se le
+# ordena al modelo preguntar cuál.
+# ============================================================================
+
+_STOP_PROD = {
+    'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas',
+    'y', 'o', 'u', 'con', 'sin', 'para', 'por', 'en', 'al', 'a',
+}
+
+
+def _normalizar_txt(s):
+    """minúsculas + sin tildes (para comparar 'melón' con 'melon')."""
+    s = unicodedata.normalize('NFD', (s or '').lower())
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+
+def _palabras_significativas_producto(nombre):
+    return [w for w in re.split(r'[^0-9a-zñ]+', _normalizar_txt(nombre))
+            if len(w) >= 2 and w not in _STOP_PROD]
+
+
+def _token_en_texto(palabra, texto_norm):
+    """Match por palabra completa, tolerando singular/plural del español:
+    jugo↔jugos, natural↔naturales, jamón↔jamones."""
+    variantes = {palabra, palabra + 's', palabra + 'es'}
+    if len(palabra) >= 4 and palabra.endswith('es'):
+        variantes.add(palabra[:-2])
+    if len(palabra) >= 3 and palabra.endswith('s'):
+        variantes.add(palabra[:-1])
+    return any(re.search(r'\b' + re.escape(v) + r'\b', texto_norm) for v in variantes)
+
+
+def _elegir_producto_por_contexto(contexto_norm, candidatos):
+    """PURA. candidatos: [(id, nombre)]. Puntúa cada producto por cuántas palabras
+    significativas de su nombre aparecen en el contexto (y qué fracción de su nombre
+    queda cubierta — así "tabla de quesos" le gana a "Tabla Mixta de Quesos y
+    Jamones"). Devuelve (id_único_mejor | None, [nombres_empatados])."""
+    puntajes = []
+    for pid, nombre in candidatos:
+        palabras = _palabras_significativas_producto(nombre)
+        if not palabras:
+            continue
+        hits = sum(1 for w in palabras if _token_en_texto(w, contexto_norm))
+        if hits:
+            puntajes.append((hits, hits / len(palabras), pid, nombre))
+    if not puntajes:
+        return None, []
+    puntajes.sort(key=lambda t: (-t[0], -t[1]))
+    tope = (puntajes[0][0], puntajes[0][1])
+    top = [t for t in puntajes if (t[0], t[1]) == tope]
+    if len(top) == 1:
+        return top[0][2], []
+    return None, [t[3] for t in top[:4]]
+
+
+def _cliente_eligio_producto(mensaje, historial, producto_id, candidatos=None):
+    """H-084: True si el contexto del cliente desambigua EXACTAMENTE producto_id.
+
+    Contexto = su último mensaje; si ahí no menciona ningún producto (asentimiento
+    puro tipo "sí"), se usa la última línea de Aremko del historial (la oferta a la
+    que asintió). `candidatos` inyectable para tests; en producción se leen de la BD
+    (mismo filtro que la resolución por nombre del handler).
+
+    Devuelve (ok, texto_opciones_para_preguntar)."""
+    if candidatos is None:
+        from ventas.models import Producto
+        candidatos = list(
+            Producto.objects.filter(publicado_web=True, cantidad_disponible__gt=0)
+            .values_list('id', 'nombre'))
+
+    elegido, empatados = _elegir_producto_por_contexto(_normalizar_txt(mensaje or ''), candidatos)
+    if elegido is None and not empatados:
+        ultima = ''
+        for linea in reversed((historial or '').splitlines()):
+            if linea.startswith('[Aremko]:'):
+                ultima = linea
+                break
+        if ultima:
+            elegido, empatados = _elegir_producto_por_contexto(_normalizar_txt(ultima), candidatos)
+    if elegido == producto_id:
+        return True, ''
+    return False, ', '.join(empatados) if empatados else 'varias opciones similares'
+
+
 def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
     """H-080: agrega una ambientación (servicio) con las guardias deterministas:
     cantidad SIEMPRE 1 (su precio es por unidad; el motor multiplica base × cantidad)
@@ -1488,6 +1581,20 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                             canal, phone if phone else 'desconocido', amb_id)
                     return {'success': False, 'error': 'producto_no_resuelto',
                             'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
+                # H-084: gate anti variante-elegida-por-el-modelo (espejo del H-083 de
+                # ambientaciones). "Si un jugo" NO autoriza a elegir el sabor: el producto
+                # entra solo si el contexto del cliente lo desambigua.
+                ok_variante, opciones_txt = _cliente_eligio_producto(mensaje, historial, producto_id)
+                if not ok_variante:
+                    logger.info(
+                        '[agregar_producto_carrito] H-084: producto %s sin desambiguar por el '
+                        'cliente (mensaje %r) → bloqueado; opciones: %s',
+                        producto_id, (mensaje or '')[:80], opciones_txt)
+                    return {'success': False, 'error': 'variante_no_confirmada',
+                            'mensaje': (f'El cliente aún no especificó cuál quiere: hay varias '
+                                        f'opciones parecidas ({opciones_txt}). Pregúntale cuál '
+                                        f'prefiere en UNA frase (variantes inline, sin viñetas). '
+                                        f'NO elijas tú por él.')}
                 external_id = phone if phone else 'desconocido'
                 # H-040 #1: si ya hay una propuesta vigente (Ritual/Refugio/pack ya cotizado),
                 # sumar el producto a ESA propuesta (no abrir un carrito separado que la pisaría).
