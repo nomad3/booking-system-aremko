@@ -15,6 +15,7 @@ Diseño F1:
 """
 
 import logging
+import re
 
 from django.utils import timezone
 
@@ -876,6 +877,47 @@ def _es_ambientacion(servicio_id):
         id=servicio_id, categoria__nombre__iexact='Ambientaciones').exists()
 
 
+# H-083: palabras de un nombre de ambientación que NO cuentan como "el cliente la
+# nombró" (genéricas — con solo esto no hay confirmación de UNA en particular).
+_PALABRAS_GENERICAS_AMB = {
+    'ambientacion', 'ambientación', 'ambientaciones', 'decoracion', 'decoración',
+    'decoraciones', 'servicio', 'de', 'con', 'la', 'el', 'los', 'las', 'para', 'y', 'o',
+}
+_RE_ASENTIMIENTO_AMB = re.compile(
+    r'\b(s[ií]|ya|dale|ok(ey)?|bueno|claro|obvio|perfect[oa]|genial|'
+    r'me (gusta|encanta|sirve)|(la|lo|esa|ese) quiero|quiero (esa|ese|una|uno|la|el)|'
+    r'esa( misma)?|ese( mismo)?|agr[eé]g\w*|s[uú]m[ae]\w*|an[oó]t\w*|reserv\w*|'
+    r'pon(me|le|la|lo)?|porfa\w*|por favor)\b'
+)
+
+
+def _cliente_confirmo_ambientacion(mensaje, nombre_ambientacion):
+    """H-083: gate determinista anti agregado prematuro de ambientaciones.
+
+    True SOLO si el mensaje del cliente (el que este turno responde) NOMBRA la
+    ambientación (alguna palabra significativa de su nombre) o trae un ASENTIMIENTO
+    explícito sin negación ("sí", "esa", "agrégala", "resérvame la R1"...).
+
+    Una pregunta informativa ("¿tienes ambientaciones?") devuelve False — caso real
+    2026-07-30: ante esa pregunta el modelo agregó la R1 al carrito de inmediato,
+    saltándose la instrucción de confirmar (las instrucciones no bastan; esto lo
+    fuerza el código). Función PURA: testeable sin DB.
+    """
+    m = (mensaje or '').lower()
+    if not m.strip():
+        return False
+    # (a) La nombra: alguna palabra significativa del nombre aparece en el mensaje.
+    for palabra in re.split(r'[^0-9a-záéíóúñü]+', (nombre_ambientacion or '').lower()):
+        if len(palabra) >= 2 and palabra not in _PALABRAS_GENERICAS_AMB:
+            if re.search(r'\b' + re.escape(palabra) + r'\b', m):
+                return True
+    # (b) Negación explícita → jamás es confirmación ("no, esa no", "todavía no").
+    if re.search(r'\bno\b', m):
+        return False
+    # (c) Asentimiento corto ("sí", "dale", "esa", "agrégala"...).
+    return _RE_ASENTIMIENTO_AMB.search(m) is not None
+
+
 def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
     """H-080: agrega una ambientación (servicio) con las guardias deterministas:
     cantidad SIEMPRE 1 (su precio es por unidad; el motor multiplica base × cantidad)
@@ -1333,6 +1375,20 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 # duplicaría). Se fuerza 1 en código, pase lo que pase el modelo.
                 es_ambientacion = servicio_id is not None and _es_ambientacion(servicio_id)
                 if es_ambientacion:
+                    # H-083: gate anti agregado prematuro — solo entra si el cliente la
+                    # nombró o la aceptó en SU último mensaje (no basta la instrucción).
+                    from ventas.models import Servicio as _ServH083
+                    nombre_amb = (_ServH083.objects.filter(id=servicio_id)
+                                  .values_list('nombre', flat=True).first()) or ''
+                    if not _cliente_confirmo_ambientacion(mensaje, nombre_amb):
+                        logger.info(
+                            '[agregar_servicio_carrito] H-083: ambientación "%s" SIN confirmación '
+                            'del cliente (mensaje: %r) → bloqueada', nombre_amb, (mensaje or '')[:80])
+                        return {'success': False, 'error': 'requiere_confirmacion',
+                                'mensaje': (f'El cliente aún NO ha confirmado la ambientación '
+                                            f'"{nombre_amb}". NO la agregues todavía: responde su '
+                                            f'pregunta u ofrécesela, y agrégala SOLO cuando él la '
+                                            f'nombre o la acepte explícitamente.')}
                     cantidad = 1
                 else:
                     # NO defaultear a 1 persona (el precio es POR PERSONA): exigir la cantidad
@@ -1412,6 +1468,19 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                     # SERVICIO (cantidad 1, fecha/hora heredadas de la tina) en vez de fallar.
                     amb_id = _resolver_ambientacion(nombre_producto)
                     if amb_id is not None:
+                        # H-083: mismo gate anti agregado prematuro que en el camino de servicio.
+                        from ventas.models import Servicio as _ServH083b
+                        nombre_amb = (_ServH083b.objects.filter(id=amb_id)
+                                      .values_list('nombre', flat=True).first()) or nombre_producto
+                        if not _cliente_confirmo_ambientacion(mensaje, nombre_amb):
+                            logger.info(
+                                '[agregar_producto_carrito] H-083: ambientación "%s" SIN confirmación '
+                                'del cliente (mensaje: %r) → bloqueada', nombre_amb, (mensaje or '')[:80])
+                            return {'success': False, 'error': 'requiere_confirmacion',
+                                    'mensaje': (f'El cliente aún NO ha confirmado la ambientación '
+                                                f'"{nombre_amb}". NO la agregues todavía: responde su '
+                                                f'pregunta u ofrécesela, y agrégala SOLO cuando él la '
+                                                f'nombre o la acepte explícitamente.')}
                         logger.info(
                             '[agregar_producto_carrito] "%s" resuelto como AMBIENTACIÓN (servicio %s) → cross-add',
                             nombre_producto, amb_id)

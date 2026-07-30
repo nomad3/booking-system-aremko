@@ -12,7 +12,11 @@ para CI / cuando eso se resuelva.
 from django.test import TestCase
 
 from ventas.models import CategoriaServicio, Servicio
-from whatsapp_agent.agent import _es_ambientacion, _resolver_ambientacion
+from whatsapp_agent.agent import (
+    _cliente_confirmo_ambientacion,
+    _es_ambientacion,
+    _resolver_ambientacion,
+)
 
 
 class ResolverAmbientacionTests(TestCase):
@@ -50,3 +54,38 @@ class ResolverAmbientacionTests(TestCase):
         self.assertTrue(_es_ambientacion(self.r1.id))
         self.assertFalse(_es_ambientacion(self.tina.id))
         self.assertFalse(_es_ambientacion(9999999))
+
+
+class ClienteConfirmoAmbientacionTests(TestCase):
+    """H-083: gate anti agregado prematuro (función PURA, sin DB).
+
+    Caso real 2026-07-30: "¿Tienes ambientaciones?" → el modelo agregó la R1 al
+    carrito de inmediato. Este gate lo hace imposible en código."""
+
+    R1 = 'Ambientación romántica R1'
+
+    def test_pregunta_generica_no_confirma(self):
+        self.assertFalse(_cliente_confirmo_ambientacion('Tienes ambientaciones ?', self.R1))
+        self.assertFalse(_cliente_confirmo_ambientacion('y que ambientaciones tienes', self.R1))
+        self.assertFalse(_cliente_confirmo_ambientacion(
+            'quisiera saber qué incluye la decoración', self.R1))
+
+    def test_nombrarla_confirma(self):
+        self.assertTrue(_cliente_confirmo_ambientacion('reservame la R1 de 32.000', self.R1))
+        self.assertTrue(_cliente_confirmo_ambientacion('quiero la romántica', self.R1))
+        self.assertTrue(_cliente_confirmo_ambientacion(
+            'el azul porfa', 'Decoración Simple · Azul'))
+
+    def test_asentimiento_confirma(self):
+        self.assertTrue(_cliente_confirmo_ambientacion('sí', self.R1))
+        self.assertTrue(_cliente_confirmo_ambientacion('dale, agrégala', self.R1))
+        self.assertTrue(_cliente_confirmo_ambientacion('esa misma', self.R1))
+
+    def test_negacion_nunca_confirma(self):
+        self.assertFalse(_cliente_confirmo_ambientacion('no, esa no', self.R1))
+        self.assertFalse(_cliente_confirmo_ambientacion('todavía no', self.R1))
+        self.assertFalse(_cliente_confirmo_ambientacion('no quiero ambientación', self.R1))
+
+    def test_vacio_no_confirma(self):
+        self.assertFalse(_cliente_confirmo_ambientacion('', self.R1))
+        self.assertFalse(_cliente_confirmo_ambientacion(None, self.R1))
