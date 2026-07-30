@@ -16,6 +16,8 @@ from whatsapp_agent.agent import (
     _cliente_confirmo_ambientacion,
     _cliente_eligio_producto,
     _es_ambientacion,
+    _es_asentimiento_puro,
+    _personas_declaradas_por_cliente,
     _resolver_ambientacion,
 )
 
@@ -128,3 +130,34 @@ class ClienteEligioProductoTests(TestCase):
     def test_producto_distinto_al_pedido_bloquea(self):
         # Cliente pidió melón; el modelo intenta agregar frambuesa → bloqueado.
         self.assertFalse(self._ok('jugo de melon', '', 108))
+
+
+class PersonasEnAsentimientoTests(TestCase):
+    """H-085: en un turno de asentimiento puro ("sí"), las personas del servicio son
+    las que DECLARÓ el cliente — el modelo no puede pasarle otra cantidad (caso real
+    2026-07-30: "Si" a la Pausa para 2 → agregó tina y masaje para 1, $65.000 sin
+    descuento de pack). Funciones PURAS."""
+
+    H = ('[Aremko]: ¿Para cuántas personas sería la Experiencia Pausa?\n'
+         '[Cliente]: 2\n'
+         '[Aremko]: Te ofrezco la Pausa con Tina Hornopiren a las 17:00...\n')
+
+    def test_asentimiento_puro(self):
+        self.assertTrue(_es_asentimiento_puro('Si'))
+        self.assertTrue(_es_asentimiento_puro('sí, esa'))
+        self.assertTrue(_es_asentimiento_puro('dale'))
+        # Con datos nuevos, negación o largo → NO es puro (no se fuerza nada).
+        self.assertFalse(_es_asentimiento_puro('si, pero para 3'))
+        self.assertFalse(_es_asentimiento_puro('no'))
+        self.assertFalse(_es_asentimiento_puro('quiero también un jugo'))
+        self.assertFalse(_es_asentimiento_puro(''))
+
+    def test_personas_declaradas(self):
+        self.assertEqual(_personas_declaradas_por_cliente(self.H), 2)
+        self.assertEqual(_personas_declaradas_por_cliente('[Cliente]: somos 4\n'), 4)
+        self.assertEqual(_personas_declaradas_por_cliente('[Cliente]: para dos\n'), 2)
+        self.assertIsNone(_personas_declaradas_por_cliente('[Cliente]: quiero 2 jugos\n'))
+        self.assertIsNone(_personas_declaradas_por_cliente('[Cliente]: hola\n'))
+        # La declaración más reciente gana.
+        self.assertEqual(_personas_declaradas_por_cliente(
+            '[Cliente]: 3\n[Aremko]: ok\n[Cliente]: mejor 2 personas\n'), 2)

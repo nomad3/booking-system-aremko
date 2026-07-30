@@ -936,6 +936,49 @@ _STOP_PROD = {
     'y', 'o', 'u', 'con', 'sin', 'para', 'por', 'en', 'al', 'a',
 }
 
+# H-085: número de personas en palabras (respuestas típicas del cliente).
+_PERSONAS_PALABRA = {'una': 1, 'dos': 2, 'tres': 3, 'cuatro': 4, 'cinco': 5, 'seis': 6}
+
+
+def _es_asentimiento_puro(mensaje):
+    """True si el mensaje es SOLO un asentimiento corto ("sí", "dale", "ok") sin
+    datos nuevos (sin números, sin negación, corto). En un turno así, el cliente
+    acepta lo YA ofrecido — no pudo haber cambiado personas/fecha/servicio."""
+    m = _normalizar_txt(mensaje).strip()
+    if not m or len(m) > 25 or re.search(r'\d', m) or re.search(r'\bno\b', m):
+        return False
+    return _RE_ASENTIMIENTO_AMB.search(m) is not None
+
+
+def _personas_declaradas_por_cliente(historial):
+    """Última cantidad de personas que DECLARÓ el cliente en el historial (líneas
+    `[Cliente]:`): respuesta suelta ("2"), "2 personas", "para dos", "somos 4".
+    None si nunca la declaró. Rango sano 1..10."""
+    for linea in reversed((historial or '').splitlines()):
+        if not linea.startswith('[Cliente]:'):
+            continue
+        cuerpo = _normalizar_txt(linea[len('[Cliente]:'):]).strip()
+        n = None
+        m = re.fullmatch(r'(\d{1,2})', cuerpo)
+        if m:
+            n = int(m.group(1))
+        if n is None:
+            m = re.search(r'\b(\d{1,2})\s*personas?\b', cuerpo)
+            if m:
+                n = int(m.group(1))
+        if n is None:
+            m = re.search(r'\b(?:para|somos)\s+(\d{1,2})\b', cuerpo)
+            if m:
+                n = int(m.group(1))
+        if n is None:
+            m = (re.fullmatch(r'(una|dos|tres|cuatro|cinco|seis)', cuerpo)
+                 or re.search(r'\b(?:para|somos)\s+(una|dos|tres|cuatro|cinco|seis)\b', cuerpo))
+            if m:
+                n = _PERSONAS_PALABRA.get(m.group(1))
+        if n is not None and 1 <= n <= 10:
+            return n
+    return None
+
 
 def _normalizar_txt(s):
     """minúsculas + sin tildes (para comparar 'melón' con 'melon')."""
@@ -1129,7 +1172,8 @@ def _tool_alternativas_experiencia(args):
         'recomendada': alts[0],
         'otras_alternativas': alts[1:1 + _MAX_ALTERNATIVAS_TOOL],
         'instruccion': ('Ofrece SOLO la `recomendada`, redactada NATURAL en 1-2 frases (usa su '
-                        '`texto_sugerido` como base, con sus horas y precios EXACTOS y el '
+                        '`texto_sugerido` como base, con sus horas y precios EXACTOS, '
+                        'mencionando para cuántas personas es, y el '
                         '`dia_semana` devuelto). PROHIBIDO listar varias opciones o usar '
                         'asteriscos/viñetas. Cierra preguntando si le acomoda o si prefiere '
                         'otro horario u otra tina. Si el cliente pide algo distinto (más '
@@ -1493,6 +1537,19 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                     if cantidad < 1:
                         return {'success': False, 'error': 'falta_personas',
                                 'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
+                    # H-085: en un turno de ASENTIMIENTO PURO ("sí") el cliente acepta lo
+                    # YA ofrecido — no pudo haber cambiado las personas. Si declaró N en
+                    # la conversación y el modelo pasa otra cosa, gana el cliente (caso
+                    # real 2026-07-30: "Si" a la Pausa para 2 → el modelo agregó tina y
+                    # masaje para 1 → $65.000 sin descuento de pack).
+                    if _es_asentimiento_puro(mensaje):
+                        declaradas = _personas_declaradas_por_cliente(historial)
+                        if declaradas is not None and declaradas != cantidad:
+                            logger.info(
+                                '[agregar_servicio_carrito] H-085: personas %s → %s '
+                                '(asentimiento puro; el cliente declaró %s)',
+                                cantidad, declaradas, declaradas)
+                            cantidad = declaradas
                 # Defensa en código: el modelo liviano a veces inventa una hora que no
                 # es un slot real (ej. 16:30). No agregar al carrito si la hora no existe.
                 from .availability import validar_hora_es_slot
