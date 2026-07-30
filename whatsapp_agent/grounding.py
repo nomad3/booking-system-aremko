@@ -7,6 +7,7 @@ El agente solo puede hablar de:
 Precios y disponibilidad salen siempre de la BD en vivo, nunca hardcodeados.
 Las funciones de formato son puras (sin DB) para poder testearlas aisladas.
 """
+import re
 
 
 def formatear_precio(valor):
@@ -23,6 +24,32 @@ def _recortar(texto, limite=160):
     if len(texto) <= limite:
         return texto
     return texto[:limite].rstrip() + '…'
+
+
+def normalizar_detalle_ambientacion(texto, limite=400):
+    """H-086: aplana la `descripcion_web` de una ambientación para el prompt.
+
+    Esas descripciones vienen redactadas para la WEB: párrafo de marketing + "Incluye:"
+    + lista con viñetas (`*`, `-`, `•`) y saltos de línea. Dos problemas si entra cruda:
+    (1) las viñetas con asterisco se le pegan al modelo, que TIENE PROHIBIDO usarlas en
+    los mensajes (una opción a la vez, sin listas); (2) el límite de 140 de los
+    servicios principales cortaría justo antes del "Incluye:", que es lo que el cliente
+    realmente pregunta. Acá: viñetas → separador ' · ', todo en una línea, límite amplio.
+    """
+    t = (texto or '').strip()
+    if not t:
+        return ''
+    t = re.sub(r'[\r\n]+', '\n', t)
+    # Viñetas al inicio de línea → separador inline (no se pierde el ítem).
+    t = re.sub(r'\n\s*[\*\-•·–]+\s*', ' · ', t)
+    t = t.replace('\n', ' ')
+    # Asteriscos sueltos (negritas de markdown o viñetas inline) fuera.
+    t = re.sub(r'\*+', '', t)
+    t = re.sub(r'\s{2,}', ' ', t).strip()
+    t = re.sub(r'(\s·){2,}', ' ·', t)
+    if len(t) > limite:
+        t = t[:limite].rstrip() + '…'
+    return t
 
 
 def formatear_duracion(minutos):
@@ -134,7 +161,15 @@ def construir_catalogo_texto(servicios, productos, ambientaciones=None):
     for a in (ambientaciones or []):
         nombre = (a.get('nombre') or '').strip()
         if nombre:
-            amb_lineas.append(f'• {nombre} — ' + formatear_precio(a.get('precio_base')))
+            linea = f'• {nombre} — ' + formatear_precio(a.get('precio_base'))
+            # H-086: qué incluye (de `descripcion_web` del admin, normalizada). Sin esto
+            # Luna solo sabía nombre+precio y ante "¿qué incluye la R1?" no tenía datos.
+            detalle = normalizar_detalle_ambientacion(a.get('descripcion_web'))
+            if not detalle:
+                detalle = normalizar_detalle_ambientacion(a.get('informacion_adicional'))
+            if detalle:
+                linea += f'. {detalle}'
+            amb_lineas.append(linea)
     if amb_lineas:
         bloques.append(
             'AMBIENTACIONES (decoración opcional que acompaña una tina o experiencia; se '
@@ -146,7 +181,12 @@ def construir_catalogo_texto(servicios, productos, ambientaciones=None):
               'dulce?"). Con la ocasión clara, ofrece UNA sola — la de MENOR precio de esa '
               'ocasión, con su precio REAL de esta lista — y menciona en la misma frase que '
               'hay una versión superior si quiere algo más especial (sin detallar las demás). '
-              'Usa SOLO nombres y precios de ESTA lista; no inventes qué incluyen. Si ya hay '
+              'Si el cliente pregunta QUÉ INCLUYE o QUÉ CONTIENE una ambientación, responde '
+              'con el detalle que acompaña a su nombre en esta lista, redactado natural y en '
+              'PROSA (nunca como lista con viñetas ni asteriscos); si esa ambientación no '
+              'trae detalle acá, dile con calidez que le confirmas los detalles con el equipo '
+              '— NUNCA inventes qué incluye ni lo deduzcas del nombre. '
+              'Usa SOLO nombres, precios y detalles de ESTA lista. Si ya hay '
               'una ambientación en el carrito, reconócelo y ofrece cambiarla o complementarla. '
               'Si el cliente CONFIRMA una (la nombra o acepta), agrégala con '
               'agregar_servicio_carrito: nombre_servicio EXACTO de esta lista, '
@@ -197,6 +237,8 @@ def catalogo_vivo():
         Servicio.objects
         .filter(activo=True, categoria__nombre__iexact='Ambientaciones', precio_base__gt=1)
         .order_by('nombre')
-        .values('nombre', 'precio_base')
+        # H-086: descripcion_web/informacion_adicional traen el "Incluye:" que el cliente
+        # pregunta ("¿qué contiene la R1?"). Se normalizan antes de entrar al prompt.
+        .values('nombre', 'precio_base', 'descripcion_web', 'informacion_adicional')
     )
     return construir_catalogo_texto(servicios, productos, ambientaciones)
