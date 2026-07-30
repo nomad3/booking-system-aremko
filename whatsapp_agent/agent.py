@@ -833,6 +833,37 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
 _MAX_ALTERNATIVAS_TOOL = 8
 
 
+def _resolver_ambientacion(nombre_servicio):
+    """H-080: resuelve el ID de una ambientación por nombre (determinista).
+
+    El override por nombre de agregar_servicio_carrito solo mira TIPOS_PRINCIPALES,
+    así que "Ambientación romántica R1" no resolvía a nada: el modelo conocía la
+    lista (catálogo H-079) pero no tenía CÓMO agregarla y se auto-escalaba con
+    "producto no encontrado en el catálogo" (caso real 2026-07-29, "reservame la
+    R1 de 32.000"). Mismo filtro que el catálogo/picker: activa + precio real.
+
+    Devuelve el id si el nombre matchea UNA sola ambientación; None si 0 o 2+.
+    """
+    nombre = (nombre_servicio or '').strip()
+    if not nombre:
+        return None
+    from ventas.models import Servicio
+    matches = list(Servicio.objects.filter(
+        activo=True,
+        categoria__nombre__iexact='Ambientaciones',
+        precio_base__gt=1,
+        nombre__icontains=nombre,
+    ).values_list('id', flat=True)[:2])
+    return matches[0] if len(matches) == 1 else None
+
+
+def _es_ambientacion(servicio_id):
+    """True si el servicio pertenece a la categoría Ambientaciones."""
+    from ventas.models import Servicio
+    return Servicio.objects.filter(
+        id=servicio_id, categoria__nombre__iexact='Ambientaciones').exists()
+
+
 def _tool_alternativas_experiencia(args):
     """Handler de la tool `alternativas_experiencia` (H-078).
 
@@ -1205,15 +1236,30 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                         logger.info('[agregar_servicio_carrito] override por nombre "%s": id %s → %s',
                                     nombre_servicio, servicio_id, matches[0])
                         servicio_id = matches[0]
-                # NO defaultear a 1 persona (el precio es POR PERSONA): exigir la cantidad
-                # real del cliente. Si falta, Luna debe preguntarla antes de agregar.
-                try:
-                    cantidad = int(args.get('cantidad_personas'))
-                except (TypeError, ValueError):
-                    cantidad = 0
-                if cantidad < 1:
-                    return {'success': False, 'error': 'falta_personas',
-                            'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
+                    elif len(matches) != 1:
+                        # H-080: el nombre no resolvió a un principal → probar ambientaciones
+                        # (categoría propia, tipo 'otro'; el catálogo H-079 las lista por nombre).
+                        amb_id = _resolver_ambientacion(nombre_servicio)
+                        if amb_id is not None and amb_id != servicio_id:
+                            logger.info('[agregar_servicio_carrito] override ambientación "%s": id %s → %s',
+                                        nombre_servicio, servicio_id, amb_id)
+                            servicio_id = amb_id
+                # H-080: una ambientación es UNA decoración por tina — su precio es por
+                # unidad, no por persona (precio = base × cantidad_personas: con 2 se
+                # duplicaría). Se fuerza 1 en código, pase lo que pase el modelo.
+                es_ambientacion = servicio_id is not None and _es_ambientacion(servicio_id)
+                if es_ambientacion:
+                    cantidad = 1
+                else:
+                    # NO defaultear a 1 persona (el precio es POR PERSONA): exigir la cantidad
+                    # real del cliente. Si falta, Luna debe preguntarla antes de agregar.
+                    try:
+                        cantidad = int(args.get('cantidad_personas'))
+                    except (TypeError, ValueError):
+                        cantidad = 0
+                    if cantidad < 1:
+                        return {'success': False, 'error': 'falta_personas',
+                                'mensaje': 'Necesito saber para cuántas personas es. Pregúntale al cliente antes de agregar al carrito. NO asumas 1.'}
                 # Defensa en código: el modelo liviano a veces inventa una hora que no
                 # es un slot real (ej. 16:30). No agregar al carrito si la hora no existe.
                 from .availability import validar_hora_es_slot

@@ -142,8 +142,12 @@ def construir_catalogo_texto(servicios, productos, ambientaciones=None):
             + '\n'.join(amb_lineas)
             + '\nSi el cliente pregunta por ambientaciones/decoración, menciona SOLO estas '
               'opciones con su precio (información REAL del catálogo — no inventes otras ni '
-              'describas qué incluyen si no lo sabes). Si el cliente quiere una, dile que el '
-              'equipo la suma a su cotización — NO la agregues tú al carrito.'
+              'describas qué incluyen si no lo sabes). Si el cliente CONFIRMA que quiere una '
+              '(la nombra o acepta una concreta), agrégala con agregar_servicio_carrito: pasa '
+              'nombre_servicio EXACTO como aparece en esta lista, cantidad_personas=1 (es UNA '
+              'decoración por tina — NUNCA 2 aunque sean 2 personas) y la MISMA fecha y hora '
+              'de la tina del carrito. Si aún no hay tina elegida, primero definan la tina: '
+              'la ambientación la acompaña.'
         )
 
     prod_lineas = formatear_productos(productos)
