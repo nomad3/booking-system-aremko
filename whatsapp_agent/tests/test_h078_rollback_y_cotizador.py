@@ -133,9 +133,49 @@ class ToolAlternativasExperienciaTests(TestCase):
         m_alts.assert_called_once_with('pausa', '2026-08-05', 2)
         self.assertEqual(out['dia_semana'], 'miércoles')
         self.assertEqual(out['total_alternativas'], 12)
-        self.assertEqual(len(out['alternativas']), 8)  # tope de contexto
-        # El texto que el modelo debe usar viene del MOTOR, no de su pluma.
-        self.assertIn('texto_sugerido', out['alternativas'][0])
+        # H-081: UNA recomendada + respaldo topeado (contexto acotado).
+        self.assertIn('texto_sugerido', out['recomendada'])
+        self.assertEqual(len(out['otras_alternativas']), 8)
+
+    @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
+    @mock.patch('whatsapp_agent.availability.resolver_fecha')
+    def test_recomendada_mas_barata_y_a_igual_precio_mas_tarde(self, m_fecha, m_alts):
+        """H-081 (decisión Jorge 2026-07-30): la recomendada es la MÁS BARATA (precio
+        final, luego normal); a igual precio, el horario MÁS TARDE."""
+        m_fecha.return_value = {'fecha_iso': '2026-08-05', 'dia_semana': 'miércoles',
+                                'ambiguo': False, 'error': None}
+
+        def alt(nombre, hora, total, desc):
+            return {'titulo': f'{nombre} · {hora}', 'precio_total': total,
+                    'precio_con_descuento': desc, 'hay_descuento': total != desc,
+                    'texto_sugerido': f'{nombre} {hora}',
+                    'itinerario': [{'servicio': nombre, 'hora': hora}]}
+
+        cara_temprano = alt('Tina Hidromasaje Llaima', '14:00', 140000, 110000)
+        barata_temprano = alt('Tina Hornopiren', '14:30', 130000, 110000)
+        barata_tarde = alt('Tina Hornopiren', '17:00', 130000, 110000)
+        m_alts.return_value = {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2,
+                               'nombre_experiencia': 'Pausa junto al río',
+                               'alternativas': [cara_temprano, barata_temprano, barata_tarde]}
+        out = _tool_alternativas_experiencia(
+            {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2})
+        # Más barata (precio normal 130k) y, entre las dos baratas, la MÁS TARDE (17:00).
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 17:00')
+        self.assertEqual([a['titulo'] for a in out['otras_alternativas']],
+                         ['Tina Hornopiren · 14:30', 'Tina Hidromasaje Llaima · 14:00'])
+
+    @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
+    @mock.patch('whatsapp_agent.availability.resolver_fecha')
+    def test_sin_disponibilidad_recomendada_none(self, m_fecha, m_alts):
+        m_fecha.return_value = {'fecha_iso': '2026-08-05', 'dia_semana': 'miércoles',
+                                'ambiguo': False, 'error': None}
+        m_alts.return_value = {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2,
+                               'nombre_experiencia': 'Pausa junto al río', 'alternativas': []}
+        out = _tool_alternativas_experiencia(
+            {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2})
+        self.assertTrue(out['success'])
+        self.assertIsNone(out['recomendada'])
+        self.assertEqual(out['total_alternativas'], 0)
 
     @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
     @mock.patch('whatsapp_agent.availability.resolver_fecha')

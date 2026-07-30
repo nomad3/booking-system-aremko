@@ -198,17 +198,17 @@ _TOOLS = [{
     'function': {
         'name': 'alternativas_experiencia',
         'description': (
-            'COTIZADOR OFICIAL de experiencias (H-078): pausa (tina+masaje) | tina_sola | '
-            'masaje_solo | noche_aguas_calientes (cabaña+tina) | ritual | refugio. Devuelve '
-            'alternativas REALES armadas por código: horarios válidos (agregables al carrito '
-            'después), precio con descuento ya calculado y un `texto_sugerido` listo para el '
-            'cliente. Para COTIZAR u ofrecer horarios de una experiencia usa SIEMPRE esta '
-            'herramienta y presenta las opciones TAL CUAL (mismas horas y precios; ideal: usa '
-            'su `texto_sugerido`). NUNCA armes tú una combinación tina+masaje ni inventes un '
-            'horario: si una hora no vino de esta herramienta, NO existe. `fecha` acepta el '
-            'texto literal del cliente ("el próximo miércoles"); usa SIEMPRE el `dia_semana` '
-            'devuelto. ⚠️ `personas` es OBLIGATORIO: si no lo sabes, pregúntalo ANTES de llamar '
-            '(NUNCA asumas 1). Ritual y Refugio son siempre para 2.'
+            'COTIZADOR OFICIAL de experiencias (H-078/H-081): pausa (tina+masaje) | tina_sola | '
+            'masaje_solo | noche_aguas_calientes (cabaña+tina) | ritual | refugio. Devuelve UNA '
+            'opción `recomendada` (la más conveniente, armada por código con horarios válidos y '
+            'precio con descuento) + `otras_alternativas` de respaldo. Ofrece SOLO la '
+            'recomendada, redactada natural — NUNCA una lista de opciones. Si el cliente pide '
+            'otro horario u otra tina, ofrece UNA de las otras (la que mejor calce). NUNCA '
+            'armes tú una combinación tina+masaje ni inventes un horario: si una hora no vino '
+            'de esta herramienta, NO existe. `fecha` acepta el texto literal del cliente ("el '
+            'próximo miércoles"); usa SIEMPRE el `dia_semana` devuelto. ⚠️ `personas` es '
+            'OBLIGATORIO: si no lo sabes, pregúntalo ANTES de llamar (NUNCA asumas 1). Ritual '
+            'y Refugio son siempre para 2.'
         ),
         'parameters': {
             'type': 'object',
@@ -828,9 +828,21 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
     return ''
 
 
-# Tope de alternativas devueltas al modelo (contexto acotado; las demás se informan
-# por `total_alternativas` y el modelo puede ofrecer "hay más horarios si prefieres").
+# Tope de alternativas de RESPALDO devueltas al modelo además de la recomendada
+# (contexto acotado; el total real viaja en `total_alternativas`).
 _MAX_ALTERNATIVAS_TOOL = 8
+
+
+def _hora_itinerario_min(alt):
+    """Minutos desde medianoche de la primera hora del itinerario (0 si no parsea).
+    Para el desempate de orden H-081: a igual precio, el horario MÁS TARDE primero."""
+    try:
+        itin = alt.get('itinerario') or []
+        h = (itin[0].get('hora') or '') if itin else ''
+        hh, mm = h.split(':')
+        return int(hh) * 60 + int(mm)
+    except Exception:  # noqa: BLE001 — orden best-effort, nunca romper la tool
+        return 0
 
 
 def _resolver_ambientacion(nombre_servicio):
@@ -944,7 +956,33 @@ def _tool_alternativas_experiencia(args):
     if res.get('error'):
         return {'success': False, 'error': 'alternativas_invalidas', 'mensaje': res['error']}
 
-    alts = list(res.get('alternativas') or [])
+    # H-081 (decisión de Jorge 2026-07-30): Luna ofrece UNA sola opción a la vez — las
+    # listas de 3-4 combos con asteriscos se ven "de robot". Orden determinista: la MÁS
+    # BARATA primero (precio final, luego precio normal) y, a igual precio, el horario
+    # MÁS TARDE (regla de la casa: deja el día libre). Las demás viajan como respaldo
+    # para cuando el cliente pida "otro horario" / "otra tina".
+    alts = sorted(
+        list(res.get('alternativas') or []),
+        key=lambda a: (
+            a.get('precio_con_descuento') or 0,
+            a.get('precio_total') or 0,
+            -_hora_itinerario_min(a),
+        ),
+    )
+    if not alts:
+        return {
+            'success': True,
+            'tipo': res.get('tipo'),
+            'nombre_experiencia': res.get('nombre_experiencia'),
+            'fecha': r['fecha_iso'],
+            'dia_semana': r.get('dia_semana'),
+            'personas': personas,
+            'total_alternativas': 0,
+            'recomendada': None,
+            'otras_alternativas': [],
+            'instruccion': ('No hay disponibilidad ese día para esta experiencia: dilo con '
+                            'calidez y ofrece consultar otra fecha. NUNCA inventes horarios.'),
+        }
     return {
         'success': True,
         'tipo': res.get('tipo'),
@@ -953,11 +991,16 @@ def _tool_alternativas_experiencia(args):
         'dia_semana': r.get('dia_semana'),
         'personas': personas,
         'total_alternativas': len(alts),
-        'alternativas': alts[:_MAX_ALTERNATIVAS_TOOL],
-        'instruccion': ('Ofrece EXACTAMENTE estas opciones (usa `texto_sugerido`; mismas horas '
-                        'y precios; usa el `dia_semana` devuelto). Si la lista está vacía, no '
-                        'hay disponibilidad ese día: ofrece consultar otra fecha. NUNCA '
-                        'inventes horarios que no estén acá.'),
+        'recomendada': alts[0],
+        'otras_alternativas': alts[1:1 + _MAX_ALTERNATIVAS_TOOL],
+        'instruccion': ('Ofrece SOLO la `recomendada`, redactada NATURAL en 1-2 frases (usa su '
+                        '`texto_sugerido` como base, con sus horas y precios EXACTOS y el '
+                        '`dia_semana` devuelto). PROHIBIDO listar varias opciones o usar '
+                        'asteriscos/viñetas. Cierra preguntando si le acomoda o si prefiere '
+                        'otro horario u otra tina. Si el cliente pide algo distinto (más '
+                        'tarde, más temprano, con/sin hidromasaje), ofrece UNA sola de '
+                        '`otras_alternativas` — la que mejor calce con lo pedido — nunca la '
+                        'lista completa. Si ninguna calza, dilo y ofrece otra fecha.'),
     }
 
 
