@@ -1656,6 +1656,100 @@ def catalogo_agregables(request):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def editar_carrito_endpoint(request):
+    """H-079 (H-046 Fase 2): edita el CARRITO EN CURSO desde la bandeja, ANTES de que
+    exista cotización. Mismo contrato que editar_propuesta: REEMPLAZO TOTAL de
+    servicios + productos; los precios se re-leen del catálogo (nunca del input).
+
+    POST /api/luna/carrito/editar/
+    Header: X-API-Key
+    Body:
+    {
+        "canal": "whatsapp",              # whatsapp | instagram | messenger
+        "external_id": "+56912345678",    # phone (WA) / IGSID (IG) / PSID (Msgr)
+        "servicios": [{"servicio_id": 9, "fecha": "2026-08-05", "hora": "14:30", "cantidad_personas": 2}, ...],
+        "productos": [{"producto_id": 3, "cantidad": 1}, ...]   # opcional
+    }
+    Ambas listas vacías → se ELIMINA el carrito (queda como si no se hubiera armado).
+    Respuesta: {success, items_count, total} | {success, vacio: true}
+    """
+    try:
+        from carrito_reservas.models import CarritoReserva
+        from carrito_reservas.services import CarritoService
+
+        canal = (request.data.get('canal') or 'whatsapp').strip()
+        external_id = (request.data.get('external_id') or '').strip()
+        if not external_id:
+            return Response({'success': False, 'error': 'validation_error',
+                             'mensaje': 'external_id requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        servicios = request.data.get('servicios', None)
+        if servicios is None:
+            return Response({'success': False, 'error': 'validation_error',
+                             'mensaje': 'servicios requerido (lista COMPLETA final; puede ser vacía)'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        productos = request.data.get('productos', []) or []
+
+        carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+        if carrito is None:
+            return Response({'success': False, 'error': 'carrito_not_found',
+                             'mensaje': 'No hay carrito en curso para esta conversación'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Rearmar items releyendo el catálogo (fuente única de precios).
+        items = []
+        for s in servicios:
+            servicio = Servicio.objects.filter(id=s.get('servicio_id')).first()
+            if servicio is None:
+                return Response({'success': False, 'error': 'service_not_found',
+                                 'mensaje': f"Servicio {s.get('servicio_id')} no existe"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            personas = max(1, int(s.get('cantidad_personas') or 1))
+            precio = float(servicio.precio_base)
+            items.append({
+                'tipo': 'servicio', 'servicio_id': servicio.id, 'nombre': servicio.nombre,
+                'fecha': s.get('fecha'), 'hora': s.get('hora'),
+                'cantidad_personas': personas,
+                'precio_unitario': precio, 'subtotal': precio * personas,
+            })
+        for p in productos:
+            producto = Producto.objects.filter(id=p.get('producto_id')).first()
+            if producto is None:
+                return Response({'success': False, 'error': 'product_not_found',
+                                 'mensaje': f"Producto {p.get('producto_id')} no existe"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            cantidad = max(1, int(p.get('cantidad') or 1))
+            items.append({
+                'tipo': 'producto', 'producto_id': producto.id, 'nombre': producto.nombre,
+                'cantidad': cantidad,
+                'precio_unitario': float(producto.precio_base),
+                'subtotal': float(producto.precio_base) * cantidad,
+            })
+
+        if not items:
+            carrito.delete()
+            logger.info(f'[Bandeja] carrito {canal}:{external_id} VACIADO por edición (H-079)')
+            return Response({'success': True, 'vacio': True, 'mensaje': 'Carrito vaciado'})
+
+        carrito.items = items
+        carrito.save(update_fields=['items', 'updated_at'])
+        # Recalcula subtotales + descuento de pack con la fuente única del carrito.
+        CarritoService._recalcular_totales(carrito)
+        carrito.refresh_from_db()
+        logger.info(
+            f'[Bandeja] carrito {canal}:{external_id} EDITADO (H-079): '
+            f'{len(items)} items → total ${int(carrito.total or 0):,}')
+        return Response({'success': True, 'items_count': len(items),
+                         'total': int(carrito.total or 0)})
+
+    except Exception as e:
+        logger.error(f'[Luna API] Error en editar_carrito_endpoint: {str(e)}', exc_info=True)
+        return Response({'success': False, 'error': 'internal_error',
+                         'mensaje': 'Error al editar el carrito'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ============================================================================
 # ADMIN: LIMPIAR CONVERSACIÓN
 # ============================================================================

@@ -234,7 +234,9 @@ def _carrito_en_curso(canal, external_id):
         return {
             'servicios': servicios,
             'total': int(carrito.total or 0),
-            'editable': False,  # Fase 1 = solo lectura; Fase 2 habilita editar + "pasar a cotización"
+            # H-079 (Fase 2): la bandeja puede CORREGIR el carrito en curso (agregar/quitar/
+            # cantidades) vía POST /api/luna/carrito/editar/ — mismo editor del cajón.
+            'editable': True,
         }
     except Exception:  # noqa: BLE001 — es contexto, nunca debe tumbar la conversación
         logger.exception(f'Error obteniendo carrito_en_curso para {canal}/{external_id}')

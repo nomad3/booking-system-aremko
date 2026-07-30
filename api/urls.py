@@ -47,6 +47,9 @@ urlpatterns = [
     # Catálogo de ítems agregables a una cotización (picker del cajón, bandeja aremko-cli)
     path('luna/catalogo-agregables/', luna_api_views.catalogo_agregables, name='luna-catalogo-agregables'),
 
+    # H-079 (H-046 F2): editar el carrito EN CURSO desde la bandeja (pre-cotización)
+    path('luna/carrito/editar/', luna_api_views.editar_carrito_endpoint, name='luna-editar-carrito'),
+
     # Admin endpoints (testing/debug)
     path('luna/admin/limpiar-conversacion/', luna_api_views.limpiar_conversacion_endpoint, name='luna-limpiar-conversacion'),
 ]

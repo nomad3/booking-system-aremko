@@ -115,7 +115,7 @@ def formatear_productos(productos):
     return lineas
 
 
-def construir_catalogo_texto(servicios, productos):
+def construir_catalogo_texto(servicios, productos, ambientaciones=None):
     """Arma el bloque de catálogo (texto) a partir de los dicts ya filtrados.
 
     Función PURA: recibe listas de dicts, devuelve string. Testeable sin DB.
@@ -126,6 +126,25 @@ def construir_catalogo_texto(servicios, productos):
         bloques.append('SERVICIOS PUBLICADOS:\n' + '\n'.join(serv_lineas))
     else:
         bloques.append('SERVICIOS PUBLICADOS:\n(sin servicios publicados en este momento)')
+
+    # H-079: ambientaciones como sección INFORMATIVA. Antes de esto, Luna no sabía
+    # que existían (catalogo_vivo solo trae TIPOS_PRINCIPALES) y ante "¿qué
+    # ambientaciones tienen?" inventaba poesía (caso real 2026-07-29).
+    amb_lineas = []
+    for a in (ambientaciones or []):
+        nombre = (a.get('nombre') or '').strip()
+        if nombre:
+            amb_lineas.append(f'• {nombre} — ' + formatear_precio(a.get('precio_base')))
+    if amb_lineas:
+        bloques.append(
+            'AMBIENTACIONES (decoración opcional que acompaña una tina o experiencia; se '
+            'prepara para la MISMA hora de la tina, no tiene horario propio):\n'
+            + '\n'.join(amb_lineas)
+            + '\nSi el cliente pregunta por ambientaciones/decoración, menciona SOLO estas '
+              'opciones con su precio (información REAL del catálogo — no inventes otras ni '
+              'describas qué incluyen si no lo sabes). Si el cliente quiere una, dile que el '
+              'equipo la suma a su cotización — NO la agregues tú al carrito.'
+        )
 
     prod_lineas = formatear_productos(productos)
     if prod_lineas:
@@ -160,4 +179,14 @@ def catalogo_vivo():
         .order_by('orden', 'nombre')
         .values('nombre', 'precio_base', 'descripcion_web')
     )
-    return construir_catalogo_texto(servicios, productos)
+    # H-079: ambientaciones activas con precio real (>1 excluye cortesías $0 y
+    # centinelas $1) — mismo criterio que el picker del cajón (H-077). Van aparte
+    # de `servicios` (son tipo 'otro', nunca chocan con TIPOS_PRINCIPALES) y a
+    # propósito NO se filtra publicado_web: son complementos internos, no oferta web.
+    ambientaciones = list(
+        Servicio.objects
+        .filter(activo=True, categoria__nombre__iexact='Ambientaciones', precio_base__gt=1)
+        .order_by('nombre')
+        .values('nombre', 'precio_base')
+    )
+    return construir_catalogo_texto(servicios, productos, ambientaciones)
