@@ -1606,12 +1606,23 @@ def descartar_propuesta_endpoint(request):
 # CATÁLOGO AGREGABLE (picker "+ Agregar ítem" del cajón de cotización)
 # ============================================================================
 
+# H-087: categorías de Producto que NO son vendibles al cliente (contabilidad, insumos
+# y consumos internos). Se EXCLUYEN en vez de mantener una lista blanca: así cualquier
+# producto vendible nuevo aparece solo en el picker, sin tocar código (mismo criterio
+# que las ambientaciones). Gift Cards queda fuera porque tiene su propio flujo de venta.
+CATEGORIAS_PRODUCTO_INTERNAS = [
+    'Descuento', 'Insumos Masaje', 'Insumos Planta Agua Potable', 'Sueldos',
+    'Impuestos', 'Lavanderia', 'Combustible - Reparto', 'Gift Cards',
+]
+
+
 @api_view(['GET'])
 @authentication_classes([LunaAPIKeyAuthentication])
 def catalogo_agregables(request):
     """Catálogo de ítems que se pueden AGREGAR a una cotización desde el cajón de la
     bandeja (aremko-cli): ambientaciones (servicios de la categoría Ambientaciones)
-    + productos vendibles (Comestibles / Bebestibles: tablas, jugos, café, torta...).
+    + productos vendibles (todo salvo las categorías internas: tablas, jugos, café,
+    torta, ramos de flores, batas, souvenirs...).
 
     GET /api/luna/catalogo-agregables/
     Header: X-API-Key
@@ -1643,10 +1654,10 @@ def catalogo_agregables(request):
                 'precio': int(p.precio_base),
                 'categoria': p.categoria.nombre if p.categoria else '',
             }
-            for p in Producto.objects.select_related('categoria').filter(
-                categoria__nombre__in=['Comestibles', 'Bebestibles'],
-                precio_base__gt=1,
-            ).order_by('categoria__nombre', 'nombre')
+            for p in Producto.objects.select_related('categoria')
+            .filter(precio_base__gt=1)
+            .exclude(categoria__nombre__in=CATEGORIAS_PRODUCTO_INTERNAS)
+            .order_by('categoria__nombre', 'nombre')
         ]
         return Response({'success': True, 'ambientaciones': ambientaciones, 'productos': productos})
     except Exception as e:

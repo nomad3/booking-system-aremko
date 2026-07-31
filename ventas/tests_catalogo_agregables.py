@@ -5,8 +5,9 @@ Reglas que se prueban:
 - Requiere X-API-Key (LunaAPIKeyAuthentication).
 - Ambientaciones: solo servicios de la categoría "Ambientaciones", activos y con
   precio real (>1) — quedan fuera cortesías en $0 y servicios de otras categorías.
-- Productos: solo Comestibles/Bebestibles con precio real (>1) — quedan fuera las
-  categorías internas (Sueldos, Insumos...) y los centinelas en $1.
+- Productos: todo lo vendible con precio real (>1). Se EXCLUYEN las categorías
+  internas (Sueldos, Insumos, Descuento...) y los centinelas en $1; cualquier
+  categoría vendible nueva entra sola (H-087).
 """
 
 from django.test import TestCase, override_settings
@@ -46,6 +47,7 @@ class CatalogoAgregablesTests(TestCase):
         cat_com = CategoriaProducto.objects.create(nombre='Comestibles')
         cat_beb = CategoriaProducto.objects.create(nombre='Bebestibles')
         cat_sueldos = CategoriaProducto.objects.create(nombre='Sueldos')
+        cat_artes = CategoriaProducto.objects.create(nombre='Artesanias')
 
         def producto(nombre, precio, categoria):
             return Producto.objects.create(
@@ -57,6 +59,9 @@ class CatalogoAgregablesTests(TestCase):
 
         cls.prod_tabla = producto('Tabla Quesos', 20000, cat_com)
         cls.prod_jugo = producto('Jugo Natural de Piña', 3500, cat_beb)
+        # H-087: categoría vendible NO listada explícitamente → debe entrar igual
+        # (el filtro excluye internas, no incluye una lista blanca).
+        cls.prod_ramo = producto('Ramo de flores', 38000, cat_artes)
         producto('Frutos Seco Tabla', 0, cat_com)   # $0 insumo → fuera
         producto('Fruta', 1, cat_com)               # centinela $1 → fuera
         producto('Sueldos', 1000000, cat_sueldos)   # categoría interna → fuera
@@ -83,9 +88,12 @@ class CatalogoAgregablesTests(TestCase):
 
         productos = data['productos']
         nombres_prod = [p['nombre'] for p in productos]
-        # Bebestibles ordena antes que Comestibles (orden por categoría, luego nombre).
-        self.assertEqual(nombres_prod, ['Jugo Natural de Piña', 'Tabla Quesos'])
+        # Orden por categoría, luego nombre: Artesanias < Bebestibles < Comestibles.
+        self.assertEqual(nombres_prod, ['Ramo de flores', 'Jugo Natural de Piña', 'Tabla Quesos'])
         por_nombre = {p['nombre']: p for p in productos}
         self.assertEqual(por_nombre['Tabla Quesos']['producto_id'], self.prod_tabla.id)
         self.assertEqual(por_nombre['Tabla Quesos']['categoria'], 'Comestibles')
         self.assertEqual(por_nombre['Jugo Natural de Piña']['precio'], 3500)
+        # H-087: el ramo (Artesanias) entra sin estar en ninguna lista blanca.
+        self.assertEqual(por_nombre['Ramo de flores']['producto_id'], self.prod_ramo.id)
+        self.assertEqual(por_nombre['Ramo de flores']['categoria'], 'Artesanias')
