@@ -176,6 +176,40 @@ def hay_contradiccion_exito_vs_texto(texto, tool_calls_executed):
     )
 
 
+# H-090: el espejo del guardia anterior. Ahí el texto negaba una tool exitosa; acá
+# AFIRMA una acción que NINGUNA tool hizo. Caso real (Jorge 2026-08-01): tras
+# aceptar cambiar la R1 por la R2, Luna escribió "La Ambientación romántica R2 ha
+# sido agregada a tu carrito" sin haber llamado una sola herramienta — el carrito
+# seguía con la R1. Si nadie mira el panel, Deborah manda una cotización que NO
+# coincide con lo que el cliente cree que aceptó.
+# La TILDE es la que decide, y no es un detalle: "agregué" (lo hice) vs "agregue"
+# (subjuntivo: "¿quieres que la agregue?"). Sin exigirla, la red escalaba una de las
+# frases más comunes de Luna — lo cazó su propio test.
+_PATRON_AFIRMA_MUTACION = re.compile(
+    r'\b(ha sido|han sido|fue|fueron|qued[óo]|quedaron)\s+'
+    r'(agregad|a[ñn]adid|sumad|incorporad|cambiad|actualizad|quitad|eliminad)|'
+    r'\b(agregué|añadí|anadí|sumé|cambié|actualicé|quité|eliminé)\b|'
+    r'\b(agregad|a[ñn]adid|sumad|cambiad)[oa]s?\s+(a|en)\s+tu\s+(carrito|reserva)',
+    re.IGNORECASE,
+)
+
+
+def afirma_mutacion_sin_tool(texto, tool_calls_executed):
+    """True si el texto dice que algo se agregó/cambió pero ninguna tool lo hizo.
+
+    Solo dispara cuando NINGUNA tool que muta el carrito corrió con éxito en este
+    turno: si alguna sí corrió, la afirmación es legítima y no se toca. Es una red
+    de seguridad, no un detector de intenciones — ante la duda, deja pasar.
+    """
+    if not _PATRON_AFIRMA_MUTACION.search(texto or ''):
+        return False
+    hubo_mutacion = any(
+        tc.get('name') in TOOLS_MUTAN_CARRITO and tool_result_ok(tc.get('result'))
+        for tc in (tool_calls_executed or [])
+    )
+    return not hubo_mutacion
+
+
 def sanear_salida(texto):
     """Limpia y acota el texto del modelo antes de exponerlo como borrador."""
     t = (texto or '').strip()

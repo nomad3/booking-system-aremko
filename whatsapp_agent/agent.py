@@ -1141,6 +1141,82 @@ def upgrade_por_extra(mensaje, items_carrito):
     return None
 
 
+def acepto_el_cambio(mensaje, historial, nombre_destino):
+    """True si el cliente asiente Y el último mensaje de Luna ofreció ESE cambio.
+
+    Función PURA. Pide las dos señales juntas a propósito: un "claro" suelto no
+    alcanza (podría estar aceptando otra cosa), y que Luna haya ofrecido el cambio
+    tampoco (el cliente pudo no contestar). Solo las dos juntas autorizan a mover
+    el carrito sin preguntar de nuevo.
+    """
+    if not nombre_destino or not _es_asentimiento_puro(mensaje):
+        return False
+    ultima = ''
+    for linea in reversed((historial or '').splitlines()):
+        if linea.startswith('[Aremko]:'):
+            ultima = _normalizar_txt(linea)
+            break
+    if not ultima:
+        return False
+    return _normalizar_txt(nombre_destino) in ultima and 'cambi' in ultima
+
+
+def aplicar_upgrade_si_acepto(canal, phone, mensaje, historial):
+    """Ejecuta el cambio de ambientación EN CÓDIGO cuando el cliente lo acepta.
+
+    Nace del caso real del 2026-08-01: Luna ofreció cambiar la R1 por la R2, Jorge
+    dijo "claro", y ella respondió "ha sido agregada" SIN llamar una sola
+    herramienta — el carrito quedó con la R1. El motivo de fondo: la instrucción
+    con el índice y las tools viajaba en el RESULTADO de la tool del turno
+    anterior, y en el turno del "claro" el modelo ya no la tiene: solo ve el
+    historial de texto. Pedirle que recuerde y encadene dos llamadas era pedirle
+    justo lo que este agente hace mal.
+
+    Devuelve el texto de confirmación (hecho consumado) o '' si no aplica.
+    """
+    try:
+        from carrito_reservas.services import CarritoService
+        externo = phone or 'desconocido'
+        items = (CarritoService.ver_carrito(canal=canal, external_id=externo)
+                 or {}).get('items') or []
+    except Exception:  # noqa: BLE001
+        return ''
+
+    from ventas.models import Servicio
+    for indice, item in enumerate(items):
+        if (item or {}).get('tipo') != 'servicio':
+            continue
+        try:
+            sid = int(item.get('servicio_id'))
+        except (TypeError, ValueError):
+            continue
+        regla = _UPGRADE_AMBIENTACION.get(sid)
+        if not regla:
+            continue
+        destino = Servicio.objects.filter(id=regla['destino_id'], activo=True).first()
+        if destino is None or not acepto_el_cambio(mensaje, historial, destino.nombre):
+            continue
+
+        # Orden: quitar primero. Si el agregado fallara, el carrito queda SIN la
+        # ambientación (visible en el panel) en vez de con las dos cobradas.
+        try:
+            CarritoService.quitar_item(canal=canal, external_id=externo, indice=indice)
+            res = _agregar_ambientacion_al_carrito(canal, externo, destino.id)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('[H-090] falló el cambio de ambientación: %s', exc)
+            return ''
+        if not escalation.tool_result_ok(res):
+            logger.error('[H-090] el agregado de la ambientación superior no fue ok: %s', res)
+            return ''
+
+        precio = f'{int(destino.precio_base):,}'.replace(',', '.')
+        logger.info('[H-090] cambio de ambientación aplicado en código: %s → %s',
+                    sid, destino.id)
+        return (f'¡Listo! Cambié tu ambientación por la {destino.nombre}, que ya incluye '
+                f'todo eso, por ${precio}. ¿Te envío la cotización para que la revises?')
+    return ''
+
+
 def oferta_upgrade_ambientacion(canal, phone, texto):
     """Respuesta lista para ofrecer el cambio, o None si no aplica.
 
@@ -1334,6 +1410,19 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
     motivo_pre = escalation.pre_escalar(mensaje)
     if motivo_pre:
         return _borrador_escala(motivo_pre)
+
+    # 1b) H-090: si el cliente acaba de aceptar un cambio de ambientación, lo hace
+    # el CÓDIGO y el CÓDIGO redacta la confirmación. No se le pide al modelo que
+    # encadene quitar+agregar: ya se comprobó que en ese turno narra en vez de
+    # ejecutar. Corta el turno acá — la acción ya pasó y el texto la refleja.
+    try:
+        confirmacion = aplicar_upgrade_si_acepto(canal, phone, mensaje, historial)
+    except Exception as exc:  # noqa: BLE001 — nunca romper el turno por esto
+        logger.exception('[H-090] error evaluando el cambio de ambientación: %s', exc)
+        confirmacion = ''
+    if confirmacion:
+        return {'escalar': False, 'motivo': '', 'texto': confirmacion, 'modelo': 'codigo',
+                'error': '', 'input_tokens': 0, 'output_tokens': 0, 'latency_ms': 0}
 
     # 2) Catálogo vivo (grounding).
     try:
@@ -2340,6 +2429,16 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
             texto[:200])
         return _borrador_escala(
             'posible contradicción: el texto niega algo que una tool ya confirmó exitoso',
+            modelo=modelo, tokens=tokens)
+
+    # H-090: el espejo del anterior — el texto AFIRMA una mutación que ninguna tool
+    # hizo. Sin esto, el cliente cree que su carrito cambió y no cambió.
+    if escalation.afirma_mutacion_sin_tool(texto, resultado.tool_calls_executed):
+        logger.warning(
+            '[Agente WA] H-090: el texto afirma un cambio de carrito que NINGUNA tool hizo '
+            '→ escalar. Texto: %s', texto[:200])
+        return _borrador_escala(
+            'el texto dice que se agregó/cambió algo, pero ninguna herramienta tocó el carrito',
             modelo=modelo, tokens=tokens)
 
     return {
