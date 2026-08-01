@@ -1106,6 +1106,40 @@ def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
 # `consultar_disponibilidad` al tipo de experiencia equivalente.
 _TIPO_A_EXPERIENCIA = {'tina': 'tina_sola', 'masaje': 'masaje_solo'}
 
+# H-089: qué agrega cada ambientación superior sobre su base. Mapeo por ID, igual
+# que el resto de la taxonomía: los NOMBRES no dicen "ramo", así que un match por
+# texto sobre el nombre no encontraría nada.
+#   R1 (id 22, $32.000) + ramo de flores = R2 (id 23, $68.000).
+# Sin esto, pedir "un ramo" sobre una R1 terminaba vendiendo el Producto suelto
+# ($38.000) → $70.000, MÁS caro que la R2 que ya incluye exactamente eso.
+_UPGRADE_AMBIENTACION = {
+    22: {'destino_id': 23, 'extra': ('ramo', 'ramos', 'flor', 'flores')},
+}
+
+
+def upgrade_por_extra(mensaje, items_carrito):
+    """Detecta que el cliente pide un extra ya incluido en una versión superior.
+
+    Devuelve {'indice', 'base_id', 'destino_id'} del ítem del carrito que conviene
+    cambiar, o None si no aplica. Función PURA: no toca el carrito ni decide
+    precios — solo detecta la oportunidad. Ofrecer y confirmar sigue el flujo
+    normal (H-083: nada entra al carrito sin que el cliente lo acepte).
+    """
+    txt = _normalizar_txt(mensaje or '')
+    if not txt:
+        return None
+    for indice, item in enumerate(items_carrito or []):
+        if (item or {}).get('tipo') != 'servicio':
+            continue
+        try:
+            sid = int(item.get('servicio_id'))
+        except (TypeError, ValueError):
+            continue
+        regla = _UPGRADE_AMBIENTACION.get(sid)
+        if regla and any(palabra in txt for palabra in regla['extra']):
+            return {'indice': indice, 'base_id': sid, 'destino_id': regla['destino_id']}
+    return None
+
 
 def ruta_una_recomendacion(tipo, fecha):
     """Tipo de experiencia si esta consulta debe salir como UNA recomendación, o None.
@@ -1675,6 +1709,49 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                             nombre_producto, amb_id)
                         return _agregar_ambientacion_al_carrito(
                             canal, phone if phone else 'desconocido', amb_id)
+                    # H-089: antes de rendirse, ver si eso que pide YA VIENE en la
+                    # versión superior de una ambientación que tiene en el carrito.
+                    # Caso real (Jorge 2026-08-01): con la R1 puesta pidió "un ramo de
+                    # flores" → el Producto existe pero no está publicado_web, así que
+                    # Luna escaló "producto no disponible". Publicarlo tampoco era la
+                    # respuesta: R1 + ramo suelto = $70.000, cuando la R2 (que es
+                    # exactamente R1 + ramo) cuesta $68.000.
+                    try:
+                        from carrito_reservas.services import CarritoService as _CarrH089
+                        _items = (_CarrH089.ver_carrito(
+                            canal=canal, external_id=phone if phone else 'desconocido',
+                        ) or {}).get('items') or []
+                    except Exception:  # noqa: BLE001 — sin carrito legible se sigue de largo
+                        _items = []
+                    _up = upgrade_por_extra(f'{nombre_producto} {mensaje}', _items)
+                    if _up:
+                        from ventas.models import Servicio as _ServH089
+                        _servs = {
+                            s.id: s for s in _ServH089.objects.filter(
+                                id__in=[_up['base_id'], _up['destino_id']])
+                        }
+                        _base = _servs.get(_up['base_id'])
+                        _dest = _servs.get(_up['destino_id'])
+                        logger.info(
+                            '[agregar_producto_carrito] H-089: "%s" ya viene en la ambientación '
+                            'superior (%s → %s) → se ofrece el cambio, no el extra suelto',
+                            nombre_producto, _up['base_id'], _up['destino_id'])
+                        return {
+                            'success': False,
+                            'error': 'conviene_upgrade_ambientacion',
+                            'upgrade': {
+                                'indice_a_quitar': _up['indice'],
+                                'ambientacion_actual': getattr(_base, 'nombre', ''),
+                                'ambientacion_sugerida': getattr(_dest, 'nombre', ''),
+                                'precio_sugerida': int(_dest.precio_base) if _dest else None,
+                            },
+                            'mensaje': (
+                                f'Eso ya viene incluido en "{getattr(_dest, "nombre", "")}". NO lo '
+                                f'agregues como producto aparte: ofrécele en UNA frase cambiar su '
+                                f'"{getattr(_base, "nombre", "")}" por esa, diciendo el precio de la '
+                                f'nueva. Si acepta, llama `quitar_item_carrito` con '
+                                f'indice={_up["indice"]} y después agrega la sugerida.'),
+                        }
                     return {'success': False, 'error': 'producto_no_resuelto',
                             'mensaje': f'No encontré el producto "{nombre_producto}" en el catálogo disponible.'}
                 # H-084: gate anti variante-elegida-por-el-modelo (espejo del H-083 de
