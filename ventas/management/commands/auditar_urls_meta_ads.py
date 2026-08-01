@@ -74,24 +74,47 @@ STORY_FIELDS = 'permalink_url,message,attachments{url,unshimmed_url,target,subat
 STORY_FIELDS_MINIMO = 'permalink_url,message'
 
 
-def _urls_en(nodo):
-    """Todas las URLs dentro de una estructura anidada, sin asumir su forma."""
-    encontradas = []
+def _urls_con_campo(nodo, ruta=''):
+    """Pares (campo, url) — de DÓNDE salió cada URL, no solo cuál es.
+
+    El campo importa para decidir si hay algo que arreglar: una URL en
+    `message` es el PIE DE FOTO de la publicación (en Instagram el texto no es
+    clickeable: nadie hace clic ahí), mientras que una en `attachments…url` sí
+    es el destino real del anuncio. Sin esta distinción, "arreglar el link"
+    podría terminar editando el texto de una publicación ya publicada.
+    """
+    hallados = []
     if isinstance(nodo, str):
         # Primero se desenvuelven los links de Meta (queda el destino real y ya
         # desencodeado), y recién ahí se buscan URLs.
         texto = RE_SHIM.sub(lambda m: unquote(m.group(1)), nodo)
-        encontradas.extend(RE_URL.findall(texto))
+        urls = list(RE_URL.findall(texto))
         plano = unquote(texto)
         if plano != texto:
-            encontradas.extend(RE_URL.findall(plano))
+            urls.extend(RE_URL.findall(plano))
+        hallados.extend((ruta or '(raíz)', u) for u in urls)
     elif isinstance(nodo, dict):
-        for valor in nodo.values():
-            encontradas.extend(_urls_en(valor))
+        for clave, valor in nodo.items():
+            hallados.extend(_urls_con_campo(valor, f'{ruta}.{clave}' if ruta else clave))
     elif isinstance(nodo, (list, tuple)):
-        for valor in nodo:
-            encontradas.extend(_urls_en(valor))
-    return encontradas
+        for i, valor in enumerate(nodo):
+            hallados.extend(_urls_con_campo(valor, f'{ruta}[{i}]'))
+    return hallados
+
+
+def _urls_en(nodo):
+    """Solo las URLs, sin el campo (se conserva por comodidad de los tests)."""
+    return [u for _, u in _urls_con_campo(nodo)]
+
+
+def es_clickeable(campo):
+    """True si ese campo es un DESTINO del anuncio y no texto redactado.
+
+    `message`/`caption`/`description` son texto que ve el usuario; el resto
+    (link, url, website_url, unshimmed_url…) son destinos de verdad.
+    """
+    ultimo = campo.rsplit('.', 1)[-1].split('[')[0].lower()
+    return ultimo not in ('message', 'caption', 'description', 'name', 'title')
 
 
 def _paginar(path, params, max_paginas=20):
@@ -213,25 +236,37 @@ class Command(BaseCommand):
             for ad in anuncios:
                 total_anuncios += 1
                 creativo = ad.get('creative') or {}
-                urls = [u for u in _urls_en(creativo) if dominio in u.lower()]
+                hallazgos = [(c, u) for c, u in _urls_con_campo(creativo)
+                             if dominio in u.lower()]
                 origen = 'creativo'
 
                 # Boost sin link en el creativo → el destino vive en el POST.
                 story_id = creativo.get('effective_object_story_id')
-                if not urls and resolver_posts and story_id:
+                if not hallazgos and resolver_posts and story_id:
                     post = self._post(story_id)
                     if post:
                         self._posts_resueltos += 1
-                        urls = [u for u in _urls_en(post) if dominio in u.lower()]
+                        hallazgos = [(c, u) for c, u in _urls_con_campo(post)
+                                     if dominio in u.lower()]
                         origen = 'post'
 
-                if not urls:
+                if not hallazgos:
                     continue
 
                 campana = (ad.get('campaign') or {}).get('name', '?')
                 estado = ad.get('effective_status', '?')
-                for url in sorted(set(urls)):
+                # Una misma URL puede salir de varios campos: se queda el más
+                # "fuerte" (un destino clickeable manda sobre el mismo link
+                # mencionado de paso en el texto).
+                por_url = {}
+                for campo, url in hallazgos:
+                    if url not in por_url or (es_clickeable(campo)
+                                              and not es_clickeable(por_url[url])):
+                        por_url[url] = campo
+
+                for url, campo in sorted(por_url.items()):
                     ruta = url.lower()
+                    clic = es_clickeable(campo)
                     if RUTA_ROMANTICA in ruta:
                         alertas += 1
                         marca, estilo = '🚨 ROMÁNTICA', self.style.ERROR
@@ -239,9 +274,11 @@ class Command(BaseCommand):
                         marca, estilo = '✅ CELEBRACIONES', self.style.SUCCESS
                     else:
                         marca, estilo = '  ', self.style.NOTICE
+                    tipo = 'DESTINO' if clic else 'solo texto'
                     self.stdout.write(estilo(
-                        f'   {marca} [{estado}] {campana} › {ad.get("name", "?")} ({origen})\n'
-                        f'        {url}'))
+                        f'   {marca} [{estado}] {campana} › {ad.get("name", "?")}\n'
+                        f'        {url}\n'
+                        f'        ↳ {tipo} · {origen}.{campo} · ad {ad.get("id", "?")}'))
 
         self.stdout.write('\n' + '─' * 60)
         self.stdout.write(f'Anuncios revisados: {total_anuncios}')
