@@ -36,13 +36,17 @@ from urllib.parse import unquote
 
 from django.core.management.base import BaseCommand
 
-from ventas.services.meta_reporter import _get, list_accessible_ad_accounts
+from ventas.services.meta_reporter import (
+    _get, get_page_access_token, list_accessible_ad_accounts,
+)
 
 # Campos del creativo donde Meta puede esconder el destino. Se piden todos y
 # después se escanea el JSON completo: más barato que mantener rutas a mano.
+# `object_url` es el destino de varios formatos viejos de boost y se lee con el
+# mismo permiso de anuncios — o sea, gratis y sin depender de la API de Páginas.
 CREATIVE_FIELDS = (
     'object_story_spec,asset_feed_spec,link_destination_display_url,'
-    'template_url,url_tags,effective_object_story_id,name'
+    'template_url,url_tags,effective_object_story_id,object_url,object_type,name'
 )
 
 # El esquema es OPCIONAL a propósito: `link_destination_display_url` llega como
@@ -115,6 +119,22 @@ class Command(BaseCommand):
                             help='Dominio a vigilar. Default: aremko.cl')
 
     # -- resolución de posts (boosts) -------------------------------------
+    def _token_de_pagina(self, page_id):
+        """Page Access Token de esa página, cacheado. None si no se puede.
+
+        Los posts de una Página NO se leen con el token de sistema (devuelve
+        error #10 pidiendo `pages_read_engagement`): hay que usar el token de la
+        página, que el system user hereda si tiene acceso a ella.
+        """
+        if page_id in self._cache_tokens:
+            return self._cache_tokens[page_id]
+        try:
+            token = get_page_access_token(page_id)
+        except Exception:  # noqa: BLE001 — página ajena o sin permisos
+            token = None
+        self._cache_tokens[page_id] = token
+        return token
+
     def _post(self, story_id):
         """Post de un boost, cacheado. Devuelve {} si no se pudo leer.
 
@@ -124,15 +144,20 @@ class Command(BaseCommand):
         if story_id in self._cache_posts:
             return self._cache_posts[story_id]
 
-        post = {}
+        # El story_id es "{page_id}_{post_id}": de ahí sale a qué página pedirle
+        # el token. Si no se consigue, se intenta igual con el de sistema.
+        page_id = story_id.split('_')[0] if '_' in story_id else None
+        token = self._token_de_pagina(page_id) if page_id else None
+
+        post, ultimo_error = {}, 'sin intentos'
         for campos in (STORY_FIELDS, STORY_FIELDS_MINIMO):
             try:
-                post = _get(f'/{story_id}', {'fields': campos})
+                post = _get(f'/{story_id}', {'fields': campos}, token=token)
                 break
             except Exception as exc:  # noqa: BLE001 — se reintenta y si no, se cuenta
-                ultimo_error = exc
+                ultimo_error = str(exc)
         else:
-            self._posts_ilegibles.append((story_id, str(ultimo_error)[:120]))
+            self._posts_ilegibles.append((story_id, ultimo_error))
 
         self._cache_posts[story_id] = post
         return post
@@ -142,6 +167,7 @@ class Command(BaseCommand):
         solo_activos = not opts['todos']
         resolver_posts = not opts['rapido']
         self._cache_posts = {}
+        self._cache_tokens = {}
         self._posts_ilegibles = []
         self._posts_resueltos = 0
 
@@ -228,11 +254,21 @@ class Command(BaseCommand):
             if self._posts_ilegibles:
                 self.stdout.write(self.style.WARNING(
                     f'⚠️  {len(self._posts_ilegibles)} post(s) NO se pudieron leer — '
-                    f'ahí queda un hueco en la auditoría:'))
-                for story_id, error in self._posts_ilegibles[:10]:
-                    self.stdout.write(f'     {story_id}: {error}')
-                if len(self._posts_ilegibles) > 10:
-                    self.stdout.write(f'     … y {len(self._posts_ilegibles) - 10} más')
+                    f'ahí queda un hueco en la auditoría. Motivos:'))
+                # Agrupado por causa: 300 líneas del mismo error no dicen más que una.
+                por_causa = {}
+                for story_id, error in self._posts_ilegibles:
+                    causa = error[:110]
+                    por_causa.setdefault(causa, []).append(story_id)
+                for causa, ids in sorted(por_causa.items(), key=lambda x: -len(x[1])):
+                    self.stdout.write(f'     [{len(ids)}] {causa}')
+                    self.stdout.write(f'          ej: {ids[0]}')
+                if any('pages_read_engagement' in c or 'Page Public Content' in c
+                       for c in por_causa):
+                    self.stdout.write(self.style.WARNING(
+                        '     → Falta permiso de LECTURA DE PÁGINA para el system user. '
+                        'Se arregla en Business Manager (Configuración → Usuarios del '
+                        'sistema → asignar la Página con acceso de Contenido), no en código.'))
         else:
             self.stdout.write(self.style.WARNING(
                 '⚠️  Modo --rapido: NO se resolvieron los posts de los boosts, '
