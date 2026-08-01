@@ -21,8 +21,11 @@ cliente lo acepte).
 Ejecutar:
     python manage.py test whatsapp_agent.tests.test_h089_upgrade_ambientacion
 """
+import inspect
+
 from django.test import SimpleTestCase
 
+from whatsapp_agent import agent as agente_mod
 from whatsapp_agent.agent import upgrade_por_extra
 
 R1, R2 = 22, 23
@@ -81,3 +84,37 @@ class UpgradePorExtraTest(SimpleTestCase):
                    None, _item_servicio(R1)]
         up = upgrade_por_extra('un ramo', carrito)
         self.assertEqual((up or {}).get('base_id'), R1)
+
+
+class UpgradeSeEvaluaAntesDeResolverTest(SimpleTestCase):
+    """El orden importa, y ya nos mordió una vez.
+
+    La primera versión chequeaba el upgrade DENTRO de "si el producto no resuelve".
+    Cuando Jorge publicó el "Ramo de flores" (2026-08-01), el producto pasó a
+    resolver → el chequeo dejó de ejecutarse y Luna habría vendido R1 + ramo
+    ($70.000) en vez de ofrecer la R2 ($68.000). Un cambio de DATOS desactivó un
+    fix de código en silencio.
+
+    Se fija por inspección del fuente: el upgrade tiene que evaluarse ANTES del
+    filtro `publicado_web` que resuelve el producto.
+    """
+
+    def _cuerpo_del_handler(self):
+        fuente = inspect.getsource(agente_mod)
+        ini = fuente.index("if name == 'agregar_producto_carrito'")
+        fin = fuente.index("if name == 'ver_carrito'", ini)
+        return fuente[ini:fin]
+
+    def test_el_upgrade_va_antes_de_resolver_el_producto(self):
+        cuerpo = self._cuerpo_del_handler()
+        pos_upgrade = cuerpo.index('oferta_upgrade_ambientacion(')
+        pos_resolucion = cuerpo.index('publicado_web=True')
+        self.assertLess(
+            pos_upgrade, pos_resolucion,
+            'El upgrade debe evaluarse ANTES de resolver el producto: si no, publicar '
+            'el extra suelto desactiva el fix sin que nadie se entere.')
+
+    def test_no_quedo_duplicado_el_bloque(self):
+        # Hubo un momento con dos copias (una inline y el helper): una sola fuente.
+        self.assertEqual(
+            inspect.getsource(agente_mod).count("'error': 'conviene_upgrade_ambientacion'"), 1)
