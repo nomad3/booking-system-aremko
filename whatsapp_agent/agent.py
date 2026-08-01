@@ -70,8 +70,14 @@ _TOOLS = [{
         'name': 'consultar_disponibilidad',
         'description': (
             'Consulta servicios (tinas/masajes/cabañas) con su PRECIO TOTAL ya calculado y, si das '
-            'fecha, sus HORARIOS libres. Úsala SIEMPRE para responder precio o disponibilidad — NO '
-            'calcules precios tú. ⚠️ `personas` es OBLIGATORIO y debe ser la cantidad EXACTA que el '
+            'fecha, sus HORARIOS libres. Úsala para responder PRECIO ("¿cuánto vale una tina?") y '
+            'para disponibilidad de CABAÑAS — NO calcules precios tú. '
+            '⚠️ EXCEPCIÓN (H-081/H-088): para ofrecer HORARIOS de una TINA o un MASAJE en una fecha '
+            'concreta usa `alternativas_experiencia`, que devuelve UNA recomendación en vez de una '
+            'lista. Si igual llamas aquí con `fecha` + `tipo` tina/masaje, esta herramienta te '
+            'devolverá esa MISMA recomendación única (`recomendada` + `otras_alternativas`), no el '
+            'listado: ofrece solo la recomendada, sin viñetas. '
+            '⚠️ `personas` es OBLIGATORIO y debe ser la cantidad EXACTA que el '
             'cliente te dijo: si NO sabes cuántas personas son, NO llames esta herramienta — primero '
             'PREGÚNTALE al cliente cuántas personas. NUNCA asumas 1. La cantidad filtra los servicios '
             '(las cabañas y las tinas admiten máx 2 personas; con 3+ esos servicios NO aplican y la '
@@ -1095,6 +1101,24 @@ def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
         fecha=fecha, hora=hora, cantidad_personas=1)
 
 
+# H-088: "tina/masaje + fecha" es una pregunta de HORARIOS, y esas se responden con
+# UNA recomendación (H-081), no con la lista completa. Mapea el `tipo` de
+# `consultar_disponibilidad` al tipo de experiencia equivalente.
+_TIPO_A_EXPERIENCIA = {'tina': 'tina_sola', 'masaje': 'masaje_solo'}
+
+
+def ruta_una_recomendacion(tipo, fecha):
+    """Tipo de experiencia si esta consulta debe salir como UNA recomendación, o None.
+
+    SÍ (una sola opción): tina o masaje CON fecha → el cliente pregunta horarios.
+    NO (listado normal): sin fecha (es pregunta de precio), cabañas, o sin tipo
+    (es el menú, que legítimamente enumera).
+    """
+    if not fecha:
+        return None
+    return _TIPO_A_EXPERIENCIA.get((str(tipo or '')).strip().lower())
+
+
 def _tool_alternativas_experiencia(args):
     """Handler de la tool `alternativas_experiencia` (H-078).
 
@@ -1274,7 +1298,22 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if personas < 1:
                     return {'error': 'falta_personas',
                             'mensaje': 'Antes de consultar disponibilidad, pregúntale al cliente para cuántas personas será. NO asumas 1.'}
-                return disponibilidad(args.get('fecha'), personas, args.get('tipo'))
+                # H-088 (Jorge 2026-08-01: "ofrece 2 alternativas cuando dijimos que
+                # ofreciera solo una"). La REGLA DURA H-081 mandaba usar
+                # `alternativas_experiencia` para horarios de tina/masaje, pero la
+                # DESCRIPCIÓN de esta herramienta decía "úsala SIEMPRE para precio o
+                # disponibilidad": dos "siempre" contradictorios, y ganó el que está
+                # pegado a la decisión de llamar la función. Además esta devolvía
+                # TODAS las tinas con TODOS sus slots — la forma del dato ERA una
+                # lista, así que el modelo la listó. Se fuerza en CÓDIGO: horarios de
+                # tina/masaje en una fecha salen con la misma forma de UNA
+                # recomendación. Si el dato no viene como lista, no se puede listar.
+                fecha = args.get('fecha')
+                tipo_exp = ruta_una_recomendacion(args.get('tipo'), fecha)
+                if tipo_exp:
+                    return _tool_alternativas_experiencia(
+                        {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas})
+                return disponibilidad(fecha, personas, args.get('tipo'))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad'}
