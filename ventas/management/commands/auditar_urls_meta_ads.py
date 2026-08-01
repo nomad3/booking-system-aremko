@@ -13,12 +13,26 @@ Meta guardan el destino en lugares distintos según el tipo (link_data, video_da
 asset_feed_spec, call_to_action…), así que pide el creativo completo y BUSCA
 RECURSIVAMENTE cualquier string que parezca URL. Así ningún formato se escapa.
 
+Los BOOSTS de publicación son el caso difícil: su creativo suele traer solo un
+`effective_object_story_id` y el destino real vive en el POST. Por eso, cuando el
+creativo no revela ninguna URL, se resuelve también el post. Sin esto quedaba un
+hueco: en la primera corrida (2026-07-31) 420 de 431 anuncios no exponían link.
+
+Dos trampas ya resueltas acá:
+  · Meta ENVUELVE los links (`l.facebook.com/l.php?u=<url-encodeada>`), así que
+    todo texto se escanea además desencodeado — si no, el destino real sale
+    ilegible o directamente no matchea.
+  · Muchos anuncios comparten el mismo post → los posts se cachean por id, o
+    serían cientos de llamadas repetidas.
+
 Uso:
     python manage.py auditar_urls_meta_ads                  # solo anuncios ACTIVE
     python manage.py auditar_urls_meta_ads --todos          # incluye pausados
+    python manage.py auditar_urls_meta_ads --rapido         # NO resuelve posts
     python manage.py auditar_urls_meta_ads --dominio otra.cl
 """
 import re
+from urllib.parse import unquote
 
 from django.core.management.base import BaseCommand
 
@@ -37,16 +51,36 @@ CREATIVE_FIELDS = (
 # coincidencias que contienen el dominio vigilado.
 RE_URL = re.compile(r'(?:https?://)?[\w.-]+\.[a-z]{2,}(?:/[^\s"\'<>\\),]*)?', re.IGNORECASE)
 
+# Meta envuelve los destinos: l.facebook.com/l.php?u=<destino-encodeado>&h=<hash>.
+# Se captura el destino y se consumen los params que le siguen; si no, el `&h=…`
+# se pega al final de la URL desenvuelta. Sin esto el reporte muestra el
+# envoltorio en vez del link real y cuenta la misma URL varias veces.
+RE_SHIM = re.compile(
+    r'https?://(?:l|lm|www)\.facebook\.com/l\.php\?u=([^&\s"\'<>]+)(?:&[^\s"\'<>]*)?',
+    re.IGNORECASE)
+
 # Rutas que este comando vigila (las dos puertas de H-087).
 RUTA_ROMANTICA = '/experiencia-romantica'
 RUTA_CELEBRACIONES = '/celebraciones'
+
+# Campos del POST de una publicación impulsada. Se piden en dos tandas: si Meta
+# rechaza los campos ricos (varía según tipo de post y permisos), se reintenta con
+# el mínimo en vez de perder el anuncio entero.
+STORY_FIELDS = 'permalink_url,message,attachments{url,unshimmed_url,target,subattachments}'
+STORY_FIELDS_MINIMO = 'permalink_url,message'
 
 
 def _urls_en(nodo):
     """Todas las URLs dentro de una estructura anidada, sin asumir su forma."""
     encontradas = []
     if isinstance(nodo, str):
-        encontradas.extend(RE_URL.findall(nodo))
+        # Primero se desenvuelven los links de Meta (queda el destino real y ya
+        # desencodeado), y recién ahí se buscan URLs.
+        texto = RE_SHIM.sub(lambda m: unquote(m.group(1)), nodo)
+        encontradas.extend(RE_URL.findall(texto))
+        plano = unquote(texto)
+        if plano != texto:
+            encontradas.extend(RE_URL.findall(plano))
     elif isinstance(nodo, dict):
         for valor in nodo.values():
             encontradas.extend(_urls_en(valor))
@@ -75,12 +109,41 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--todos', action='store_true',
                             help='Incluye anuncios pausados/archivados (default: solo ACTIVE).')
+        parser.add_argument('--rapido', action='store_true',
+                            help='NO resuelve el post de los boosts (más rápido, pero deja huecos).')
         parser.add_argument('--dominio', default='aremko.cl',
                             help='Dominio a vigilar. Default: aremko.cl')
+
+    # -- resolución de posts (boosts) -------------------------------------
+    def _post(self, story_id):
+        """Post de un boost, cacheado. Devuelve {} si no se pudo leer.
+
+        Registra los fallos en vez de tragárselos: un post ilegible es un hueco
+        en la auditoría y tiene que salir en el resumen, no desaparecer.
+        """
+        if story_id in self._cache_posts:
+            return self._cache_posts[story_id]
+
+        post = {}
+        for campos in (STORY_FIELDS, STORY_FIELDS_MINIMO):
+            try:
+                post = _get(f'/{story_id}', {'fields': campos})
+                break
+            except Exception as exc:  # noqa: BLE001 — se reintenta y si no, se cuenta
+                ultimo_error = exc
+        else:
+            self._posts_ilegibles.append((story_id, str(ultimo_error)[:120]))
+
+        self._cache_posts[story_id] = post
+        return post
 
     def handle(self, *args, **opts):
         dominio = opts['dominio'].lower()
         solo_activos = not opts['todos']
+        resolver_posts = not opts['rapido']
+        self._cache_posts = {}
+        self._posts_ilegibles = []
+        self._posts_resueltos = 0
 
         self.stdout.write(self.style.SUCCESS(
             f"\n🔎 URLs de {dominio} en los anuncios de Meta "
@@ -123,7 +186,19 @@ class Command(BaseCommand):
 
             for ad in anuncios:
                 total_anuncios += 1
-                urls = [u for u in _urls_en(ad.get('creative') or {}) if dominio in u.lower()]
+                creativo = ad.get('creative') or {}
+                urls = [u for u in _urls_en(creativo) if dominio in u.lower()]
+                origen = 'creativo'
+
+                # Boost sin link en el creativo → el destino vive en el POST.
+                story_id = creativo.get('effective_object_story_id')
+                if not urls and resolver_posts and story_id:
+                    post = self._post(story_id)
+                    if post:
+                        self._posts_resueltos += 1
+                        urls = [u for u in _urls_en(post) if dominio in u.lower()]
+                        origen = 'post'
+
                 if not urls:
                     continue
 
@@ -139,16 +214,39 @@ class Command(BaseCommand):
                     else:
                         marca, estilo = '  ', self.style.NOTICE
                     self.stdout.write(estilo(
-                        f'   {marca} [{estado}] {campana} › {ad.get("name", "?")}\n'
+                        f'   {marca} [{estado}] {campana} › {ad.get("name", "?")} ({origen})\n'
                         f'        {url}'))
 
         self.stdout.write('\n' + '─' * 60)
         self.stdout.write(f'Anuncios revisados: {total_anuncios}')
+
+        # Cobertura: sin esto, "no encontré nada" se confunde con "no pude mirar".
+        if resolver_posts:
+            self.stdout.write(
+                f'Publicaciones impulsadas resueltas: {self._posts_resueltos} '
+                f'({len(self._cache_posts)} posts únicos consultados)')
+            if self._posts_ilegibles:
+                self.stdout.write(self.style.WARNING(
+                    f'⚠️  {len(self._posts_ilegibles)} post(s) NO se pudieron leer — '
+                    f'ahí queda un hueco en la auditoría:'))
+                for story_id, error in self._posts_ilegibles[:10]:
+                    self.stdout.write(f'     {story_id}: {error}')
+                if len(self._posts_ilegibles) > 10:
+                    self.stdout.write(f'     … y {len(self._posts_ilegibles) - 10} más')
+        else:
+            self.stdout.write(self.style.WARNING(
+                '⚠️  Modo --rapido: NO se resolvieron los posts de los boosts, '
+                'así que un destino escondido en la publicación no se vería.'))
+
         if alertas:
             self.stdout.write(self.style.ERROR(
                 f'🚨 {alertas} link(s) a {RUTA_ROMANTICA}/ — revisar si venden cumpleaños '
                 f'o despedidas: esa landing ya solo ofrece la experiencia de pareja. '
                 f'Si es el caso, apuntarlos a {RUTA_CELEBRACIONES}/.'))
+        elif resolver_posts and not self._posts_ilegibles:
+            self.stdout.write(self.style.SUCCESS(
+                f'✅ Ningún anuncio apunta a {RUTA_ROMANTICA}/ — creativos Y publicaciones '
+                f'impulsadas revisados, sin huecos.'))
         else:
             self.stdout.write(self.style.SUCCESS(
-                f'✅ Ningún anuncio apunta a {RUTA_ROMANTICA}/ — nada que corregir.'))
+                f'✅ Ningún anuncio apunta a {RUTA_ROMANTICA}/ entre los que se pudieron leer.'))
