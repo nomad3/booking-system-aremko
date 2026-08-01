@@ -1217,6 +1217,49 @@ def aplicar_upgrade_si_acepto(canal, phone, mensaje, historial):
     return ''
 
 
+def instruccion_sin_reservas(hay_cotizacion, hay_carrito):
+    """Qué decirle al modelo cuando el cliente NO tiene reservas ya creadas.
+
+    Caso real (Jorge 2026-08-01): con una COTIZACIÓN en curso aceptó una
+    ambientación y Luna escaló *"no se encontró la reserva para agregar la
+    ambientación"*. `buscar_reservas_cliente` devolvía `reservas: []` sin decir
+    nada más, y el modelo leyó ese vacío como un callejón sin salida.
+
+    Pero una cotización vigente NO es un callejón: se le suma con las tools del
+    carrito. Devolver el vacío a secas era esconderle la salida.
+    """
+    if hay_cotizacion or hay_carrito:
+        donde = 'una cotización en curso' if hay_cotizacion else 'un carrito armándose'
+        return (
+            f'El cliente NO tiene reservas ya creadas, pero SÍ tiene {donde}. '
+            f'Para sumarle algo usa `agregar_servicio_carrito` o '
+            f'`agregar_producto_carrito` (esas suman a lo que ya está armado). '
+            f'NO escales ni le digas que no encontraste su reserva.')
+    return ('El cliente no tiene reservas creadas ni nada armado. Si quiere algo, '
+            'empieza una reserva nueva con las tools del carrito.')
+
+
+def _estado_cotizacion_carrito(canal, external_id):
+    """(hay_cotizacion_vigente, hay_carrito_con_items). Best-effort."""
+    hay_cot = hay_carrito = False
+    try:
+        from .models import PropuestaReserva
+        prop = (PropuestaReserva.objects
+                .filter(canal=canal, external_id=external_id, estado='pendiente')
+                .order_by('-created_at').first())
+        hay_cot = bool(prop is not None and prop.esta_vigente())
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from carrito_reservas.models import CarritoReserva
+        carrito = CarritoReserva.objects.filter(
+            canal=canal, external_id=external_id).first()
+        hay_carrito = bool(carrito and (carrito.items or []))
+    except Exception:  # noqa: BLE001
+        pass
+    return hay_cot, hay_carrito
+
+
 def oferta_upgrade_ambientacion(canal, phone, texto):
     """Respuesta lista para ofrecer el cambio, o None si no aplica.
 
@@ -2261,6 +2304,17 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                     'estado_pago': r['estado_pago'],
                     'total': r['total'],
                 } for r in elegibles]
+                # H-091: sin reservas NO es callejón sin salida si hay una cotización
+                # o un carrito en curso — hay que decírselo, o escala.
+                if not reservas:
+                    hay_cot, hay_carrito = _estado_cotizacion_carrito(canal, external_id)
+                    logger.info(
+                        '[buscar_reservas_cliente] 0 reservas para %s · cotización=%s carrito=%s',
+                        telefono, hay_cot, hay_carrito)
+                    return {'success': True, 'reservas': [],
+                            'instruccion': instruccion_sin_reservas(hay_cot, hay_carrito)}
+                logger.info('[buscar_reservas_cliente] %s reserva(s) elegibles para %s',
+                            len(reservas), telefono)
                 return {'success': True, 'reservas': reservas}
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool buscar_reservas_cliente falló: %s', exc)
@@ -2275,6 +2329,15 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
             try:
                 args = args or {}
                 reserva_id = args.get('reserva_id')
+                # H-091: este camino no dejaba NINGÚN rastro en los logs. Al
+                # diagnosticar el caso del 2026-08-01 no se pudo distinguir "no lo
+                # llamó" de "lo llamó y falló" — un agujero de observabilidad que
+                # costó una ronda entera de ida y vuelta.
+                logger.info(
+                    '[agregar_servicio_a_reserva_existente] reserva_id=%s servicio_id=%s '
+                    'nombre=%r fecha=%s hora=%s',
+                    reserva_id, args.get('servicio_id'), args.get('nombre_servicio'),
+                    args.get('fecha'), args.get('hora'))
                 if not reserva_id:
                     return {'success': False, 'error': 'falta_reserva_id',
                             'mensaje': 'Falta el ID de la reserva; llamá primero buscar_reservas_cliente.'}

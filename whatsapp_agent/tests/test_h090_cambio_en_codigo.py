@@ -23,7 +23,7 @@ Ejecutar:
 """
 from django.test import SimpleTestCase
 
-from whatsapp_agent.agent import acepto_el_cambio
+from whatsapp_agent.agent import acepto_el_cambio, instruccion_sin_reservas
 from whatsapp_agent.escalation import afirma_mutacion_sin_tool
 
 R2_NOMBRE = 'Ambientación romántica R2'
@@ -122,3 +122,34 @@ class AfirmaMutacionSinToolTest(SimpleTestCase):
     def test_texto_vacio_no_rompe(self):
         self.assertFalse(afirma_mutacion_sin_tool('', []))
         self.assertFalse(afirma_mutacion_sin_tool(None, None))
+
+
+class InstruccionSinReservasTest(SimpleTestCase):
+    """H-091: 'no tienes reservas' no es un callejón si hay algo armándose.
+
+    Caso real (Jorge, 2026-08-01): con una COTIZACIÓN en curso aceptó una
+    ambientación y Luna escaló "no se encontró la reserva para agregar la
+    ambientación". `buscar_reservas_cliente` devolvía `reservas: []` a secas, y el
+    modelo leyó ese vacío como que no había nada que hacer — cuando la salida
+    existía: sumarlo a la cotización con las tools del carrito.
+    """
+
+    def test_con_cotizacion_manda_al_carrito_y_prohibe_escalar(self):
+        txt = instruccion_sin_reservas(hay_cotizacion=True, hay_carrito=False)
+        self.assertIn('cotización en curso', txt)
+        self.assertIn('agregar_servicio_carrito', txt)
+        self.assertIn('NO escales', txt)
+
+    def test_con_carrito_tambien_da_salida(self):
+        txt = instruccion_sin_reservas(hay_cotizacion=False, hay_carrito=True)
+        self.assertIn('carrito', txt)
+        self.assertIn('NO escales', txt)
+
+    def test_la_cotizacion_manda_sobre_el_carrito(self):
+        txt = instruccion_sin_reservas(hay_cotizacion=True, hay_carrito=True)
+        self.assertIn('cotización en curso', txt)
+
+    def test_sin_nada_ofrece_empezar_de_cero(self):
+        txt = instruccion_sin_reservas(hay_cotizacion=False, hay_carrito=False)
+        self.assertIn('no tiene reservas creadas ni nada armado', txt)
+        self.assertNotIn('NO escales', txt)
