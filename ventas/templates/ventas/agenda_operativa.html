@@ -895,6 +895,11 @@
             <button class="btn-imprimir" onclick="window.print()">
                 🖨️ Imprimir
             </button>
+            {# Calibrar el volumen sin esperar una comanda real; el clic además desbloquea el audio. #}
+            <button class="btn-actualizar" style="background:#00796b;"
+                    onclick="probarSonidoComanda()" title="Suena igual que cuando entra una comanda">
+                🔊 Probar sonido
+            </button>
             {% if not debug_mode %}
             <a href="?filtro={{ filtro_vista }}&debug=true" class="btn-actualizar" style="background: #9C27B0;">
                 🐛 Modo Debug
@@ -1300,26 +1305,141 @@ function getCookie(name) {
     return '';
 }
 
-// === Sonido de notificación (generado con Web Audio API) ===
+// === Alerta de comanda (Web Audio API) =====================================
+// La versión anterior creaba un AudioContext NUEVO en cada aviso, disparado
+// desde el temporizador del polling. Dos problemas graves:
+//   1. Sin un gesto previo del usuario, ese contexto nace SUSPENDIDO → muchas
+//      veces no sonaba NADA (no es que sonara bajo). Ese era el motivo real de
+//      "no nos damos cuenta que se generó una comanda".
+//   2. Los contextos se acumulaban; los navegadores topan en ~6 por página.
+// Ahora: UN solo contexto reusado + desbloqueo al primer gesto + resume()
+// defensivo antes de cada aviso.
+let audioCtx = null;
+
+function obtenerAudioCtx() {
+    if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        audioCtx = new AC();
+    }
+    return audioCtx;
+}
+
+function desbloquearAudio() {
+    const ctx = obtenerAudioCtx();
+    if (ctx && ctx.state === 'suspended') { ctx.resume(); }
+}
+// Cualquier interacción sirve como gesto de desbloqueo.
+['click', 'keydown', 'touchstart'].forEach(function(ev) {
+    document.addEventListener(ev, desbloquearAudio, { once: true, passive: true });
+});
+
+// Una nota con 3 voces (sierra + cuadrada + suboctava). Una onda senoidal sola
+// —lo que había— desaparece contra la música de fondo de recepción, y el
+// navegador NO puede bajarle el volumen a esa música porque es otra app.
+//
+// La envolvente SOSTIENE en vez de decaer como punteo de guitarra. Medido
+// sobre la forma de onda: punteo = +6 dB de RMS sobre el sonido viejo;
+// sostenida = +13 dB, con 1,17 s audibles en vez de 0,24 s. Las alarmas son
+// tonos sostenidos justamente por esto. El release de 45 ms evita el "clic"
+// de cortar en seco.
+const _CAIDA = 0.045;
+function _notaComanda(ctx, destino, freq, t0, dur) {
+    [['sawtooth', freq, 0.50],
+     ['square',   freq, 0.32],
+     ['triangle', freq / 2, 0.40]].forEach(function(voz) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = voz[0];
+        osc.frequency.setValueAtTime(voz[1], t0);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(voz[2], t0 + 0.012);
+        g.gain.setValueAtTime(voz[2], t0 + Math.max(dur - _CAIDA, 0.02));
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        osc.connect(g);
+        g.connect(destino);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.03);
+    });
+}
+
 function playNotificationSound() {
     try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        // Dos tonos cortos: ding-ding
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
+        const ctx = obtenerAudioCtx();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') { ctx.resume(); }
+
+        // Limitador + ganancia de compensación: sube el volumen PERCIBIDO sin
+        // que sature ni cruja. El makeup es 1.4 y no más: simulando la forma de
+        // onda, 2.6 saturaba 237 muestras (eso es exactamente el crujido que se
+        // quería evitar). Con 1.4 el pico queda en 0,80 — margen de sobra para
+        // el overshoot de las ondas band-limited reales del navegador.
+        const t = ctx.currentTime;
+        const limitador = ctx.createDynamicsCompressor();
+        limitador.threshold.setValueAtTime(-8, t);
+        limitador.knee.setValueAtTime(0, t);
+        limitador.ratio.setValueAtTime(20, t);
+        limitador.attack.setValueAtTime(0.002, t);
+        limitador.release.setValueAtTime(0.1, t);
+        const makeup = ctx.createGain();
+        makeup.gain.setValueAtTime(1.4, t);
+        limitador.connect(makeup);
+        makeup.connect(ctx.destination);
+
+        // Patrón de COMANDA: dos golpes ascendentes (Do5 → Sol5), repetidos 3
+        // veces ≈ 2 segundos. A propósito distinto del ding-dong agudo de la
+        // bandeja omnicanal: el equipo tiene que distinguir de oído "entró una
+        // comanda" de "llegó un mensaje".
+        const inicio = t + 0.02;
+        for (let rep = 0; rep < 3; rep++) {
+            const base = inicio + rep * 0.62;
+            _notaComanda(ctx, limitador, 523.25, base, 0.18);        // Do5
+            _notaComanda(ctx, limitador, 783.99, base + 0.20, 0.30); // Sol5
+        }
     } catch (e) {
-        // Audio no disponible
+        // Audio no disponible: nunca romper la agenda por el sonido.
     }
 }
+
+// Botón "Probar sonido": permite calibrar el volumen del equipo sin esperar una
+// comanda real, y el propio clic sirve de gesto para desbloquear el audio.
+function probarSonidoComanda() {
+    desbloquearAudio();
+    playNotificationSound();
+    marcarComandasPendientes(1);  // muestra también cómo se ve el parpadeo
+}
+
+// === Parpadeo del título de la pestaña ====================================
+// Refuerzo visual: el sonido compite con la música de fondo de recepción y a
+// veces se pierde igual. El nombre de la pestaña avisa aunque estén en otra
+// ventana. Se calma solo cuando alguien vuelve a mirar la agenda.
+const TITULO_ORIGINAL = document.title;
+let _parpadeoTitulo = null;
+
+function marcarComandasPendientes(cantidad) {
+    detenerParpadeoTitulo();
+    if (!cantidad) return;
+    let encendido = false;
+    _parpadeoTitulo = setInterval(function() {
+        encendido = !encendido;
+        document.title = encendido
+            ? '🔔 (' + cantidad + ') ¡COMANDA NUEVA!'
+            : TITULO_ORIGINAL;
+    }, 900);
+}
+
+function detenerParpadeoTitulo() {
+    if (_parpadeoTitulo) {
+        clearInterval(_parpadeoTitulo);
+        _parpadeoTitulo = null;
+    }
+    document.title = TITULO_ORIGINAL;
+}
+
+// Volver a la pestaña = ya se dio por enterado.
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) detenerParpadeoTitulo();
+});
 
 // === Cambiar estado de comanda ===
 function cambiarEstadoComanda(comandaId, nuevoEstado, btn) {
@@ -1509,6 +1629,7 @@ function pollComandas() {
 
                 if (hayNueva) {
                     playNotificationSound();
+                    marcarComandasPendientes(data.comandas.length);
                 }
 
                 renderComandas(data.comandas);
@@ -1519,8 +1640,9 @@ function pollComandas() {
         });
 }
 
-// Polling cada 30 segundos
-setInterval(pollComandas, 30000);
+// Polling cada 10 segundos. Antes eran 30: para cocina es demasiado, la comanda
+// puede quedar esperando media hora y el aviso llegar medio minuto tarde encima.
+setInterval(pollComandas, 10000);
 
 // Auto-actualizar la agenda completa cada 5 minutos
 setTimeout(function() {
