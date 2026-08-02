@@ -13,7 +13,114 @@ from django.utils import timezone
 from datetime import datetime, time, timedelta
 from collections import defaultdict
 import json
+import logging
 from ..models import ReservaServicio, ReservaProducto, VentaReserva, Comanda, DetalleComanda
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Checkout: quién se va hoy y cuánto debe
+# ---------------------------------------------------------------------------
+# Una estadía NO tiene "fecha de salida" en la BD: se guarda una ReservaServicio
+# POR NOCHE, con la misma cabaña en fechas consecutivas. La salida es una
+# DERIVACIÓN: última noche + 1 día.
+#
+# Por eso la consulta obvia ("cabañas con fecha_agendamiento = ayer") está mal:
+# también agarra a quien LLEGÓ ayer y se queda 2 noches — ese sale mañana y
+# todavía está alojado. La regla correcta es que esa reserva no tenga NINGUNA
+# noche de cabaña de hoy en adelante.
+DIAS_REZAGADOS_CHECKOUT = 3  # se arrastran salidas viejas SOLO si quedaron debiendo
+
+
+def _clp(n):
+    """15000 → '15.000'. Se formatea acá y no con `floatformat` en el template:
+    el separador de miles depende del locale y `es-CL` ya rompió números antes
+    (ver el fix de {% localize off %} en el JSON-LD)."""
+    return f"{int(n or 0):,}".replace(",", ".")
+
+
+def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
+    """Reservas que hacen checkout hoy + las que salieron antes debiendo.
+
+    Devuelve una lista de dicts ordenada: primero las que deben (mayor saldo
+    arriba), después las pagadas. Cada dict trae total/pagado/saldo por separado
+    a propósito: `saldo_pendiente` es un campo ALMACENADO y ya hubo un bug en
+    `actualizar_saldo` (H-060) — mostrando los tres juntos, una inconsistencia
+    salta a la vista en vez de esconderse en un solo número.
+    """
+    desde = hoy - timedelta(days=dias_rezagados)
+    ayer = hoy - timedelta(days=1)
+
+    # Noches de cabaña en la ventana (la última de cada reserva define la salida).
+    noches = ReservaServicio.objects.filter(
+        servicio__tipo_servicio='cabana',
+        fecha_agendamiento__gte=desde,
+        fecha_agendamiento__lte=ayer,
+        venta_reserva__isnull=False,
+    ).exclude(
+        venta_reserva__estado_reserva='cancelada'
+    ).select_related('servicio', 'venta_reserva__cliente')
+
+    # Agrupar por reserva: fecha de llegada, de última noche y qué cabañas.
+    por_reserva = {}
+    for n in noches:
+        v = n.venta_reserva
+        d = por_reserva.setdefault(v.id, {
+            'venta': v, 'primera_noche': n.fecha_agendamiento,
+            'ultima_noche': n.fecha_agendamiento, 'cabanas': set(), 'noches': 0,
+        })
+        d['primera_noche'] = min(d['primera_noche'], n.fecha_agendamiento)
+        d['ultima_noche'] = max(d['ultima_noche'], n.fecha_agendamiento)
+        d['cabanas'].add(n.servicio.nombre)
+        d['noches'] += 1
+
+    if not por_reserva:
+        return []
+
+    # ¿Sigue alojado? Si la reserva tiene una noche de cabaña de HOY en adelante,
+    # todavía no se va — no importa que también tenga noches viejas.
+    siguen = set(
+        ReservaServicio.objects.filter(
+            servicio__tipo_servicio='cabana',
+            fecha_agendamiento__gte=hoy,
+            venta_reserva_id__in=list(por_reserva.keys()),
+        ).values_list('venta_reserva_id', flat=True)
+    )
+
+    salidas = []
+    for venta_id, d in por_reserva.items():
+        if venta_id in siguen:
+            continue  # sigue alojado: su checkout es otro día
+        v = d['venta']
+        saldo = int(v.saldo_pendiente or 0)
+        salida = d['ultima_noche'] + timedelta(days=1)
+        dias_atras = (hoy - salida).days
+        # Las viejas solo interesan si quedaron debiendo; las de hoy, siempre.
+        if dias_atras > 0 and saldo <= 0:
+            continue
+        salidas.append({
+            'reserva_id': venta_id,
+            'cliente': getattr(v.cliente, 'nombre', '') or 'Sin nombre',
+            'telefono': getattr(v.cliente, 'telefono', '') or '',
+            'cabanas': ', '.join(sorted(d['cabanas'])),
+            'noches': d['noches'],
+            'llegada': d['primera_noche'],
+            'salida': salida,
+            'dias_atras': dias_atras,      # 0 = se va hoy; >0 = rezagado
+            'total': int(v.total or 0),
+            'pagado': int(v.pagado or 0),
+            'saldo': saldo,
+            'total_fmt': _clp(v.total),
+            'pagado_fmt': _clp(v.pagado),
+            'saldo_fmt': _clp(saldo),
+            'estado_pago': v.estado_pago,
+            'debe': saldo > 0,
+        })
+
+    # Deudores primero (mayor saldo arriba), después las pagadas por hora natural.
+    salidas.sort(key=lambda s: (not s['debe'], -s['saldo'], s['salida']))
+    return salidas
 
 
 # ---------------------------------------------------------------------------
@@ -157,14 +264,16 @@ def agenda_operativa(request):
 
     # Filtro de vista: actual (desde hora actual), todos (todo el día), pasados (anteriores a hora actual), pendientes_pago
     filtro_vista = request.GET.get('filtro', 'actual')
-    if filtro_vista not in ['actual', 'todos', 'pasados', 'pendientes_pago']:
+    if filtro_vista not in ['actual', 'todos', 'pasados', 'pendientes_pago', 'checkout']:
         filtro_vista = 'actual'  # Default seguro
 
     # Aplicar filtro
     hora_filtro_inicio = hora_actual
     hora_filtro_fin = time(23, 59)
 
-    if filtro_vista == 'todos':
+    if filtro_vista in ('todos', 'checkout'):
+        # Checkout es una tarea de CIERRE: debajo del panel conviene ver el día
+        # completo, no solo lo que queda desde la hora actual.
         hora_filtro_inicio = time(0, 0)  # Desde las 00:00
         hora_filtro_fin = time(23, 59)
     elif filtro_vista == 'pasados':
@@ -741,6 +850,17 @@ def agenda_operativa(request):
             'destino_razon': destino['razon_verificar'],
         })
 
+    # Checkout: quién se va hoy y cuánto debe. Se calcula SIEMPRE (es barato) para
+    # poder mostrar el contador en el botón aunque el filtro activo sea otro.
+    try:
+        checkouts = salidas_para_checkout(hoy)
+    except Exception:  # noqa: BLE001 — la agenda nunca se cae por este bloque
+        logger.exception('Agenda operativa: falló el cálculo de checkouts')
+        checkouts = []
+    checkout_deudores = [c for c in checkouts if c['debe']]
+    checkout_por_cobrar = _clp(sum(c['saldo'] for c in checkout_deudores))
+    checkout_salen_hoy = sum(1 for c in checkouts if c['dias_atras'] == 0)
+
     context = {
         'agenda': agenda_ordenada,
         'fecha_actual': hoy.strftime('%d/%m/%Y'),
@@ -757,6 +877,10 @@ def agenda_operativa(request):
         'debug_info': debug_info,
         'filtro_vista': filtro_vista,
         'comandas_pendientes': comandas_data,
+        'checkouts': checkouts,
+        'checkout_por_cobrar': checkout_por_cobrar,
+        'checkout_deudores': checkout_deudores,
+        'checkout_salen_hoy': checkout_salen_hoy,
     }
 
     return render(request, 'ventas/agenda_operativa.html', context)

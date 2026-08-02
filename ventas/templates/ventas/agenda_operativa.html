@@ -555,6 +555,47 @@
     }
 
     /* --- Comandas pendientes --- */
+    /* ── CHECKOUT ── verde petróleo para no competir con el morado de comandas
+       ni con el rojo de pagos pendientes. */
+    .checkout-section {
+        background: linear-gradient(135deg, #00796b 0%, #004d40 100%);
+        border-radius: 8px; padding: 20px; margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,121,107,.3); color: #fff;
+    }
+    .checkout-header { margin-bottom: 14px; }
+    .checkout-title { font-size: 20px; font-weight: 700; }
+    .checkout-resumen { font-size: 14px; opacity: .92; margin-top: 4px; }
+    .checkout-alerta { color: #ffe082; }
+    .checkout-card {
+        background: #fff; color: #333; border-radius: 8px; padding: 14px 16px;
+        margin-bottom: 10px; display: flex; gap: 16px; align-items: center;
+        justify-content: space-between; flex-wrap: wrap;
+    }
+    .checkout-card.checkout-debe { border-left: 5px solid #e53935; }
+    .checkout-card.checkout-ok { border-left: 5px solid #43a047; opacity: .82; }
+    .checkout-card-main { flex: 1; min-width: 240px; }
+    .checkout-cliente { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .checkout-badge-rezagado {
+        background: #fff3e0; color: #e65100; border: 1px solid #ffcc80;
+        border-radius: 10px; padding: 2px 8px; font-size: 12px; font-weight: 600;
+        margin-left: 6px;
+    }
+    .checkout-detalle { font-size: 14px; color: #555; }
+    .checkout-montos { font-size: 12.5px; color: #888; margin-top: 3px; }
+    .checkout-card-accion { text-align: right; }
+    .checkout-saldo { font-size: 19px; font-weight: 800; color: #c62828; }
+    .checkout-pagado { font-size: 14px; font-weight: 700; color: #2e7d32; }
+    .checkout-btn {
+        display: inline-block; margin-top: 6px; padding: 8px 14px; border-radius: 6px;
+        background: #eceff1; color: #37474f; text-decoration: none;
+        font-size: 13.5px; font-weight: 600;
+    }
+    .checkout-btn.checkout-btn-cobrar { background: #e53935; color: #fff; }
+    .checkout-vacio {
+        background: rgba(255,255,255,.15); border-radius: 8px; padding: 18px;
+        text-align: center; font-size: 15px;
+    }
+
     .comandas-section {
         background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
         border-radius: 8px;
@@ -839,6 +880,12 @@
                    style="{% if filtro_vista == 'pendientes_pago' %}background: #f44336;{% else %}background: #ffebee; color: #c62828;{% endif %}">
                     💳 Pagos Pendientes
                 </a>
+                {# Checkout: quién se va HOY (más los que salieron debiendo). #}
+                <a href="?filtro=checkout{% if debug_mode %}&debug=true{% endif %}"
+                   class="btn-filter {% if filtro_vista == 'checkout' %}active{% endif %}"
+                   style="{% if filtro_vista == 'checkout' %}background: #00796b;{% else %}background: #e0f2f1; color: #00695c;{% endif %}">
+                    🔑 Checkout{% if checkouts %} ({{ checkouts|length }}){% endif %}
+                </a>
             </div>
 
             <!-- Botones de Acción -->
@@ -859,6 +906,65 @@
             {% endif %}
         </div>
     </div>
+
+    {# ── CHECKOUT ────────────────────────────────────────────────────────────
+       Solo con el filtro activo: es una lista operativa de cierre, no algo que
+       deba competir con la agenda del día. Deudores primero (los pinta el
+       backend en ese orden), pagadas abajo en gris. #}
+    {% if filtro_vista == 'checkout' %}
+    <div class="checkout-section">
+        <div class="checkout-header">
+            <div class="checkout-title">🔑 Checkout · salidas de hoy</div>
+            <div class="checkout-resumen">
+                {{ checkout_salen_hoy }} salida{{ checkout_salen_hoy|pluralize:"s" }} hoy
+                {% if checkout_deudores %}
+                · <b class="checkout-alerta">{{ checkout_deudores|length }} con saldo: ${{ checkout_por_cobrar }}</b>
+                {% else %}· todo cobrado{% endif %}
+            </div>
+        </div>
+
+        {% for c in checkouts %}
+        <div class="checkout-card {% if c.debe %}checkout-debe{% else %}checkout-ok{% endif %}">
+            <div class="checkout-card-main">
+                <div class="checkout-cliente">
+                    {{ c.cliente }}
+                    {% if c.dias_atras > 0 %}
+                    <span class="checkout-badge-rezagado">
+                        salió hace {{ c.dias_atras }} día{{ c.dias_atras|pluralize:"s" }}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="checkout-detalle">
+                    🏡 {{ c.cabanas }} · {{ c.noches }} noche{{ c.noches|pluralize:"s" }}
+                    · {{ c.llegada|date:"d/m" }} → <b>{{ c.salida|date:"d/m" }}</b>
+                    {% if c.telefono %}· 📞 {{ c.telefono }}{% endif %}
+                </div>
+                {# Total y pagado van SIEMPRE junto al saldo: `saldo_pendiente` es un
+                   campo almacenado, y si alguna vez queda desfasado hay que poder
+                   verlo acá y no descubrirlo cobrando de más o de menos. #}
+                <div class="checkout-montos">
+                    Total ${{ c.total_fmt }} · Pagado ${{ c.pagado_fmt }}
+                </div>
+            </div>
+            <div class="checkout-card-accion">
+                {% if c.debe %}
+                <div class="checkout-saldo">Debe ${{ c.saldo_fmt }}</div>
+                {% else %}
+                <div class="checkout-pagado">✓ Pagado</div>
+                {% endif %}
+                <a href="/admin/ventas/ventareserva/{{ c.reserva_id }}/change/" target="_blank"
+                   class="checkout-btn {% if c.debe %}checkout-btn-cobrar{% endif %}">
+                    {% if c.debe %}💰 Cobrar{% else %}Ver{% endif %} · Reserva #{{ c.reserva_id }}
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="checkout-vacio">
+            No hay salidas de cabaña hoy ni cobros pendientes de días anteriores. 🎉
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Comandas Pendientes de Clientes -->
     <div class="comandas-section" id="comandasSection" style="{% if not comandas_pendientes %}display:none{% endif %}">
