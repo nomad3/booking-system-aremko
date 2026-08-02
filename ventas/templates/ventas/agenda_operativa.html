@@ -972,6 +972,23 @@
     </div>
     {% endif %}
 
+    {% comment %}
+    Aviso de comandas que quedaron fuera de HOY. Una comanda que no aparece y
+    tampoco avisa es indistinguible de una que se perdió — que es exactamente
+    lo que pasó con la reserva 6479: dos pedidos confirmados, invisibles y en
+    silencio. Si el número no calza con lo esperado, esto lo delata.
+    {% endcomment %}
+    {% if comandas_otro_dia %}
+    <div style="background:#fff8e1; border-left:4px solid #ffa000; border-radius:8px;
+                padding:10px 14px; margin-bottom:12px; color:#795548; font-size:14px;">
+        ⏳ Hay <strong>{{ comandas_otro_dia }}</strong>
+        comanda{{ comandas_otro_dia|pluralize:",s" }} pendiente{{ comandas_otro_dia|pluralize:",s" }}
+        de <strong>otros días</strong> (no se preparan hoy).
+        <a href="/admin/ventas/comanda/?estado__exact=pendiente" target="_blank"
+           style="color:#e65100;">Ver en el admin →</a>
+    </div>
+    {% endif %}
+
     <!-- Comandas Pendientes de Clientes -->
     <div class="comandas-section" id="comandasSection" style="{% if not comandas_pendientes %}display:none{% endif %}">
         <div class="comandas-section-header">

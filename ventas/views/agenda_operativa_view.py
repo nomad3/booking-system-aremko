@@ -33,6 +33,69 @@ logger = logging.getLogger(__name__)
 DIAS_REZAGADOS_CHECKOUT = 3  # se arrastran salidas viejas SOLO si quedaron debiendo
 
 
+# ---------------------------------------------------------------------------
+# Qué comandas tiene que ver cocina HOY
+# ---------------------------------------------------------------------------
+# Caso real (Jorge 2026-08-02, reserva 6479): confirmó dos pedidos, quedaron
+# bien guardados en 'pendiente'... y no aparecieron en la agenda ni sonó nada.
+#
+# La regla anterior tenía dos casos y le faltaba el tercero:
+#   1. fecha_entrega_objetivo definida → debe caer HOY.
+#   2. Sin fecha objetivo → algún ReservaServicio de la reserva debe ser HOY.
+# La 6479 no tenía NINGÚN servicio, así que el caso 2 no podía cumplirse jamás:
+# comandas HUÉRFANAS, sin fecha propia y sin un servicio del cual colgarse.
+# Invisibles para siempre, no solo ese día. De ahí el caso 3.
+#
+# Además se cayó el filtro `creada_por_cliente=True`: a cocina le importa el
+# ESTADO del pedido, no quién lo tecleó. Ese filtro dejaba invisibles todas las
+# comandas que el admin crea solo (`_asegurar_comanda_de_productos` no marca ese
+# campo — y hace bien, porque NO las creó el cliente): el 2026-08-02 se perdieron
+# así las #701, #702 y #705.
+#
+# Vive en UNA función porque la página y el polling del sonido consumen lo mismo.
+# Antes era la misma consulta copiada en dos lugares, que es exactamente cómo un
+# arreglo se aplica a medias.
+ESTADOS_COCINA = ('pendiente', 'procesando')
+
+
+def comandas_para_cocina(hoy):
+    """Comandas que hay que preparar HOY, vengan de donde vengan."""
+    sin_objetivo = Q(fecha_entrega_objetivo__isnull=True)
+    return (
+        Comanda.objects.filter(estado__in=ESTADOS_COCINA)
+        .filter(
+            # 1. Tiene fecha de entrega propia y es hoy.
+            Q(fecha_entrega_objetivo__date=hoy)
+            # 2. Sin fecha propia: se cuelga de un servicio de hoy.
+            | (sin_objetivo & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy))
+            # 3. Sin fecha propia y la reserva NO tiene servicios: no hay de qué
+            #    colgarse, así que manda el día en que se pidió. Sin esto, el
+            #    pedido no aparece NUNCA.
+            | (sin_objetivo
+               & Q(venta_reserva__reservaservicios__isnull=True)
+               & Q(fecha_solicitud__date=hoy))
+        )
+        .distinct()
+        .select_related('venta_reserva__cliente', 'usuario_procesa')
+        # Etapa destino-comanda: prefetch servicios para calcular destino sin N+1
+        .prefetch_related('detalles__producto', 'venta_reserva__reservaservicios__servicio')
+        .order_by('fecha_solicitud')
+    )
+
+
+def comandas_fuera_de_hoy(hoy):
+    """Pendientes que NO entran hoy (quedan para otro día).
+
+    Se muestran como contador en la agenda: una comanda que no aparece y no
+    avisa es indistinguible de una que se perdió — que es justo lo que pasó.
+    """
+    return (
+        Comanda.objects.filter(estado__in=ESTADOS_COCINA)
+        .exclude(pk__in=comandas_para_cocina(hoy).values('pk'))
+        .count()
+    )
+
+
 def _clp(n):
     """15000 → '15.000'. Se formatea acá y no con `floatformat` en el template:
     el separador de miles depende del locale y `es-CL` ya rompió números antes
@@ -796,31 +859,8 @@ def agenda_operativa(request):
             'fecha_hoy': hoy.strftime('%Y-%m-%d')
         }
 
-    # --- Comandas pendientes de clientes (para sección destacada) ---
-    # Filtro: solo mostrar comandas cuyos servicios asociados son HOY,
-    # para que cocina no prepare pedidos de reservas que llegan en días siguientes.
-    # Regla:
-    #   - Si fecha_entrega_objetivo está definida → debe caer en HOY.
-    #   - Si fecha_entrega_objetivo es NULL → al menos un ReservaServicio
-    #     de la venta_reserva debe tener fecha_agendamiento = HOY.
-    comandas_pendientes = (
-        Comanda.objects.filter(
-            estado__in=['pendiente', 'procesando'],
-            creada_por_cliente=True,
-        )
-        .filter(
-            Q(fecha_entrega_objetivo__date=hoy)
-            | (
-                Q(fecha_entrega_objetivo__isnull=True)
-                & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy)
-            )
-        )
-        .distinct()
-        .select_related('venta_reserva__cliente', 'usuario_procesa')
-        # Etapa destino-comanda: prefetch servicios para calcular destino sin N+1
-        .prefetch_related('detalles__producto', 'venta_reserva__reservaservicios__servicio')
-        .order_by('fecha_solicitud')
-    )
+    # --- Comandas que cocina tiene que preparar hoy (sección destacada) ---
+    comandas_pendientes = comandas_para_cocina(hoy)
 
     comandas_data = []
     for c in comandas_pendientes:
@@ -877,6 +917,7 @@ def agenda_operativa(request):
         'debug_info': debug_info,
         'filtro_vista': filtro_vista,
         'comandas_pendientes': comandas_data,
+        'comandas_otro_dia': comandas_fuera_de_hoy(hoy),
         'checkouts': checkouts,
         'checkout_por_cobrar': checkout_por_cobrar,
         'checkout_deudores': checkout_deudores,
@@ -893,30 +934,14 @@ def agenda_operativa(request):
 @staff_required
 @require_http_methods(["GET"])
 def comandas_pendientes_api(request):
-    """Devuelve comandas pendientes/procesando de clientes (para polling).
+    """Comandas por preparar hoy (polling del aviso sonoro).
 
-    Filtra para mostrar solo comandas cuyos servicios asociados son HOY,
-    consistente con la vista agenda_operativa.
+    Usa la MISMA función que la página, a propósito: si el sonido y la pantalla
+    consultaran distinto, cocina oiría avisos de comandas que no puede ver.
     """
     hoy = timezone.localtime(timezone.now()).date()
 
-    comandas = (
-        Comanda.objects.filter(
-            estado__in=['pendiente', 'procesando'],
-            creada_por_cliente=True,
-        )
-        .filter(
-            Q(fecha_entrega_objetivo__date=hoy)
-            | (
-                Q(fecha_entrega_objetivo__isnull=True)
-                & Q(venta_reserva__reservaservicios__fecha_agendamiento=hoy)
-            )
-        )
-        .distinct()
-        .select_related('venta_reserva__cliente', 'usuario_procesa')
-        .prefetch_related('detalles__producto', 'venta_reserva__reservaservicios__servicio')
-        .order_by('fecha_solicitud')
-    )
+    comandas = comandas_para_cocina(hoy)
 
     data = []
     for c in comandas:
@@ -967,7 +992,10 @@ def comanda_cambiar_estado_api(request):
         if nuevo_estado not in ('procesando', 'entregada'):
             return JsonResponse({'success': False, 'error': 'Estado no válido'}, status=400)
 
-        comanda = Comanda.objects.get(id=comanda_id, creada_por_cliente=True)
+        # Sin filtrar por `creada_por_cliente`: la agenda ahora muestra también
+        # las comandas que crea el admin, y los botones tienen que funcionar
+        # sobre TODO lo que se muestra. El acceso ya lo cuida @staff_required.
+        comanda = Comanda.objects.get(id=comanda_id)
 
         if nuevo_estado == 'procesando':
             comanda.estado = 'procesando'

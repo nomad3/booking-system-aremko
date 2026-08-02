@@ -10,6 +10,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
+from django.utils import timezone
+from datetime import datetime, time
 import json
 import logging
 
@@ -21,6 +23,31 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _fecha_objetivo_de(venta_reserva):
+    """Cuándo debe cocina preparar este pedido.
+
+    El primer servicio agendado de la reserva — así el pedido de una estadía
+    del sábado aparece el sábado y no hoy. Si la reserva no tiene servicios no
+    hay de qué colgarse, y entonces manda AHORA: alguien está pidiendo en este
+    momento y el pedido tiene que verse. Dejarlo en NULL era condenarlo a no
+    aparecer nunca (caso real: reserva 6479, 2026-08-02).
+    """
+    if not venta_reserva:
+        return timezone.now()
+    primero = (venta_reserva.reservaservicios
+               .order_by('fecha_agendamiento', 'hora_inicio').first())
+    if not primero or not primero.fecha_agendamiento:
+        return timezone.now()
+    try:
+        return timezone.make_aware(datetime.combine(
+            primero.fecha_agendamiento,
+            datetime.strptime(str(primero.hora_inicio or '12:00')[:5], '%H:%M').time(),
+        ))
+    except (ValueError, TypeError):
+        # Hora rara: basta con el día correcto — la agenda filtra por fecha.
+        return timezone.make_aware(datetime.combine(primero.fecha_agendamiento, time(12, 0)))
+
 
 def _get_comanda_or_error(token):
     """Valida token y expiración.  Devuelve (comanda, error_response)."""
@@ -284,6 +311,12 @@ def comanda_cliente_finalizar(request, token):
 
             comanda.estado = 'pendiente'
             comanda.token_acceso = None  # Liberar token
+            # El día en que cocina debe verla queda FIJADO acá. Antes se dejaba
+            # en NULL y la agenda tenía que deducirlo desde los servicios de la
+            # reserva; si la reserva no tenía servicios (caso real 6479), el
+            # pedido no aparecía nunca. Ahora nace anclado.
+            if comanda.fecha_entrega_objetivo is None:
+                comanda.fecha_entrega_objetivo = _fecha_objetivo_de(comanda.venta_reserva)
             comanda.save()
 
             # 3. Crear nueva comanda borrador con el mismo token (para siguiente pedido)
@@ -302,6 +335,16 @@ def comanda_cliente_finalizar(request, token):
             for d in comanda.detalles.select_related('producto').all()
         ]
         total = sum(i['subtotal'] for i in items)
+
+        # El camino FELIZ también se loguea. Antes solo escribían los `except`,
+        # así que un pedido que se confirmaba bien y no llegaba a cocina era
+        # indistinguible de uno que nunca se confirmó: hubo que ir a consultar
+        # la base para saberlo (caso 6479). Lo que no loguea no se diagnostica.
+        logger.info(
+            "Comanda confirmada #%s reserva=%s items=%s entrega_objetivo=%s",
+            comanda.id, comanda.venta_reserva_id, len(items),
+            comanda.fecha_entrega_objetivo,
+        )
 
         return JsonResponse({
             'success': True,
