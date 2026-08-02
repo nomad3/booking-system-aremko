@@ -51,16 +51,19 @@ class _BaseCheckout(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.hoy = date(2026, 8, 2)
-        cls.cat_cab = CategoriaServicio.objects.create(nombre='Cabañas')
-        cls.cat_tinas = CategoriaServicio.objects.create(nombre='Tinas')
+        # IDs altos EXPLÍCITOS: insertar con PK explícita no avanza la secuencia de
+        # Postgres, así que dejar que estos se autoasignen consumía 1,2,3… hasta
+        # chocar con el id=22 que otras suites reservan a mano.
+        cls.cat_cab = CategoriaServicio.objects.create(id=9101, nombre='Cabañas')
+        cls.cat_tinas = CategoriaServicio.objects.create(id=9102, nombre='Tinas')
         cls.cabana = Servicio.objects.create(
-            nombre='Cabaña Torre', categoria=cls.cat_cab, tipo_servicio='cabana',
+            id=9111, nombre='Cabaña Torre', categoria=cls.cat_cab, tipo_servicio='cabana',
             precio_base=Decimal('80000'), duracion=60, activo=True)
         cls.cabana2 = Servicio.objects.create(
-            nombre='Cabaña Río', categoria=cls.cat_cab, tipo_servicio='cabana',
+            id=9112, nombre='Cabaña Río', categoria=cls.cat_cab, tipo_servicio='cabana',
             precio_base=Decimal('90000'), duracion=60, activo=True)
         cls.tina = Servicio.objects.create(
-            nombre='Tina Hornopirén', categoria=cls.cat_tinas, tipo_servicio='tina',
+            id=9113, nombre='Tina Hornopirén', categoria=cls.cat_tinas, tipo_servicio='tina',
             precio_base=Decimal('25000'), duracion=60, activo=True)
 
     # -- helpers ------------------------------------------------------------

@@ -1550,6 +1550,43 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
             });
     }
 
+    // Día cerrado/bloqueado en servicios de HORA FIJA (cabañas y decoraciones).
+    // Ahí el cliente no elige hora, así que un desplegable vacío no lo frena: hay
+    // que preguntar igual y bloquear el botón. Caso real: Aremko cierra los martes
+    // (sin slots configurados) y las cabañas se seguían pudiendo reservar.
+    function verificarDiaHoraFija(servicioId, fecha) {
+        const addBtn = document.getElementById('addToCartBtn');
+        const horaSelect = document.getElementById('hora');
+        const avisoPrevio = document.getElementById('avisoDiaCerrado');
+        if (avisoPrevio) avisoPrevio.remove();
+        if (addBtn) addBtn.disabled = true;
+
+        fetch(`{% url 'ventas:get_available_hours' %}?servicio_id=${servicioId}&fecha=${fecha}`)
+            .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+            .then(data => {
+                const hay = data.success && (data.horas_disponibles || []).length > 0;
+                if (hay) {
+                    // El día opera: que el chequeo normal decida por la hora concreta.
+                    validateSelectedSlot();
+                    return;
+                }
+                const aviso = document.createElement('small');
+                aviso.id = 'avisoDiaCerrado';
+                aviso.className = 'text-danger d-block mt-1';
+                aviso.textContent = data.bloqueado
+                    ? 'No disponible en esa fecha.'
+                    : 'Ese día no atendemos. Elige otra fecha.';
+                if (horaSelect && horaSelect.parentNode) horaSelect.parentNode.appendChild(aviso);
+                if (addBtn) addBtn.disabled = true;
+            })
+            .catch(err => {
+                // Si no se pudo consultar, NO habilitamos a ciegas: que el servidor
+                // decida cuando el cliente intente agregar.
+                console.error('Error verificando el día:', err);
+                validateSelectedSlot();
+            });
+    }
+
     // Function to update total price
     function updatePrecioTotal() {
         const cantidadPersonasSelect = document.getElementById('cantidadPersonas');
@@ -1837,14 +1874,12 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                         const horaSel = document.getElementById('hora');
                         const horaFijaActiva = horaSel && horaSel.value === '16:00' && horaSel.options.length === 1;
                         if (currentServicioTipo === 'cabana' || horaFijaActiva) {
-                            // Hora fija (cabaña o decoración): no cargamos slots.
+                            // Hora fija (cabaña o decoración): la hora no se elige,
+                            // pero el DÍA igual puede estar cerrado (Aremko no abre
+                            // los martes) o bloqueado. Antes se saltaba la consulta y
+                            // el martes quedaba reservable.
                             if (horaSel) { horaSel.value = '16:00'; }
-                            if (typeof validateSelectedSlot === 'function') {
-                                validateSelectedSlot();
-                            } else {
-                                const addBtn = document.getElementById('addToCartBtn');
-                                if (addBtn) addBtn.disabled = false;
-                            }
+                            verificarDiaHoraFija(currentServicioId, dateStr);
                         } else {
                             loadAvailableHours(currentServicioId, dateStr);
                         }

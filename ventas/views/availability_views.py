@@ -4,6 +4,43 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from ..models import Servicio, ReservaServicio, ServicioBloqueo # Relative imports
 
+def _hhmm(valor):
+    """'16:00:00' / time(16,0) / '16:00' → '16:00'. '' si no se puede."""
+    if valor is None:
+        return ''
+    txt = str(valor).strip()
+    partes = txt.split(':')
+    if len(partes) >= 2 and partes[0].isdigit() and partes[1][:2].isdigit():
+        return f'{int(partes[0]):02d}:{partes[1][:2]}'
+    return txt
+
+
+def hora_es_slot_del_dia(servicio, fecha, hora):
+    """¿Esa hora existe en la grilla configurada para ESE día de la semana?
+
+    Aremko cierra los MARTES: las tinas y cabañas simplemente no tienen slots
+    configurados para ese día. Sin esta verificación, cualquier hora pasaba con
+    tal de que nadie más la hubiera reservado — y como los martes no reserva
+    nadie, el martes siempre figuraba libre (caso real reportado por Jorge el
+    2026-08-02 con la Cabaña Arrayán).
+
+    Permisivo a propósito cuando el servicio NO define horarios en absoluto: hay
+    servicios que se venden sin grilla, y rechazarlos los dejaría invendibles.
+    Lo que se rechaza es el caso claro: el servicio SÍ declara horarios, pero
+    ninguno para ese día (o la hora pedida no está entre ellos).
+    """
+    from ventas.views.calendario_matriz_view import extraer_slots_para_fecha
+
+    if not servicio.slots_disponibles:
+        return True  # sin grilla configurada: no hay nada contra qué validar
+
+    slots_del_dia = extraer_slots_para_fecha(servicio.slots_disponibles, fecha)
+    if not slots_del_dia:
+        return False  # el servicio tiene horarios, pero NO para este día → cerrado
+
+    return _hhmm(hora) in {_hhmm(s) for s in slots_del_dia}
+
+
 # Helper function to check slot availability (used internally or by other views)
 def is_slot_available(servicio, fecha, hora):
     """Checks if a specific service slot (date and time) is available."""
@@ -15,6 +52,12 @@ def is_slot_available(servicio, fecha, hora):
 
     # CRITICAL 2: Check if the specific SLOT is blocked (bloqueo de slot individual)
     if ServicioSlotBloqueo.slot_bloqueado(servicio.id, fecha, hora):
+        return False
+
+    # CRITICAL 3: la hora tiene que EXISTIR en la grilla de ese día de la semana.
+    # Faltaba, y era el agujero del martes: el día cerrado no tiene slots, pero
+    # como tampoco tiene reservas, todo pasaba como "disponible".
+    if not hora_es_slot_del_dia(servicio, fecha, hora):
         return False
 
     # Check if there are any existing reservations for this service, date and time
