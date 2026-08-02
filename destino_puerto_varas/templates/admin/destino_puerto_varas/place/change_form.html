@@ -25,9 +25,11 @@
             </div>
 
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #f5d77a;">
-                {# Botones con formaction → cada uno redirige el submit del form admin
-                   a su propia URL. formnovalidate evita que la validación HTML5 del form
-                   bloquee el submit cuando short_description aún está vacío. #}
+                {% comment %}
+                Botones con formaction → cada uno redirige el submit del form admin a su
+                propia URL. formnovalidate evita que la validación HTML5 bloquee el submit
+                cuando short_description aún está vacío.
+                {% endcomment %}
                 <button type="submit"
                         formaction="{{ pending_draft_apply_url }}"
                         formmethod="post"

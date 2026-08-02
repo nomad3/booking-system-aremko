@@ -907,10 +907,13 @@
         </div>
     </div>
 
-    {# ── CHECKOUT ────────────────────────────────────────────────────────────
-       Solo con el filtro activo: es una lista operativa de cierre, no algo que
-       deba competir con la agenda del día. Deudores primero (los pinta el
-       backend en ese orden), pagadas abajo en gris. #}
+    {% comment %}
+    CHECKOUT — solo con el filtro activo: es una lista operativa de cierre, no
+    algo que deba competir con la agenda del día. Deudores primero (los ordena
+    el backend), pagadas abajo en gris.
+    OJO: acá va {% comment %} y NO {# #}, porque el comentario de almohadilla en
+    Django es de UNA SOLA LÍNEA — multilínea se imprime tal cual en pantalla.
+    {% endcomment %}
     {% if filtro_vista == 'checkout' %}
     <div class="checkout-section">
         <div class="checkout-header">
@@ -939,9 +942,7 @@
                     · {{ c.llegada|date:"d/m" }} → <b>{{ c.salida|date:"d/m" }}</b>
                     {% if c.telefono %}· 📞 {{ c.telefono }}{% endif %}
                 </div>
-                {# Total y pagado van SIEMPRE junto al saldo: `saldo_pendiente` es un
-                   campo almacenado, y si alguna vez queda desfasado hay que poder
-                   verlo acá y no descubrirlo cobrando de más o de menos. #}
+                {# Total y pagado van junto al saldo: saldo_pendiente es un campo almacenado (ver H-060). #}
                 <div class="checkout-montos">
                     Total ${{ c.total_fmt }} · Pagado ${{ c.pagado_fmt }}
                 </div>

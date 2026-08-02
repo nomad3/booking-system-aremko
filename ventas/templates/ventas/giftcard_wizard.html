@@ -515,9 +515,11 @@
                  regalan experiencias completas — sin grupos por categoría) -->
             <div class="experience-grid" id="experienceGrid">
                 {% for exp in experiencias %}
-                {# V-04: los 8 niveles de Velada van OCULTOS (exp-oculta) — siguen en el DOM
-                   para que la preselección desde el elegidor los encuentre, pero no ensucian
-                   la grilla en frío. La card visible "Velada Sorpresa" (abajo) lleva al elegidor. #}
+                {% comment %}
+                V-04: los 8 niveles de Velada van OCULTOS (exp-oculta) — siguen en el DOM
+                para que la preselección desde el elegidor los encuentre, pero no ensucian
+                la grilla en frío. La card visible "Velada Sorpresa" (abajo) lleva al elegidor.
+                {% endcomment %}
                 <div class="experience-card exp-card{% if 'velada_' in exp.id %} exp-oculta{% endif %}" data-experience="{{ exp.id }}" data-exp-id="{{ exp.id }}"
                     data-monto="{{ exp.monto_fijo|default:0 }}" onclick="selectExperience('{{ exp.id }}')">
                     {% if exp.imagen %}

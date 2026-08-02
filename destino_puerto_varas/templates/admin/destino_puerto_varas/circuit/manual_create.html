@@ -3,9 +3,10 @@
 
 {% block extrahead %}
     {{ block.super }}
-    {# jQuery + Django admin init (define django.jQuery). Necesario porque esta
-       vista no es un changelist/change_form, así que el bundle de admin no
-       se carga automáticamente. #}
+    {% comment %}
+    jQuery + Django admin init (define django.jQuery). Necesario porque esta vista
+    no es un changelist/change_form, así que el bundle de admin no se carga solo.
+    {% endcomment %}
     <script src="{% static 'admin/js/vendor/jquery/jquery.js' %}"></script>
     <script src="{% static 'admin/js/jquery.init.js' %}"></script>
     {# jQuery UI desde CDN para .sortable() — Django no lo incluye en static. #}
