@@ -132,3 +132,21 @@ class EndpointCheckAvailabilityTest(TestCase):
         r = self.client.get(reverse('ventas:get_available_hours'),
                             {'servicio_id': self.arrayan.id, 'fecha': MARTES.isoformat()})
         self.assertEqual(r.json()['horas_disponibles'], [])
+
+
+class FiltroDiasCerradosTest(TestCase):
+    """El filtro que alimenta el calendario del modal (día no elegible)."""
+
+    def test_cabana_sin_martes_devuelve_el_indice_js_del_martes(self):
+        from ventas.templatetags.ventas_extras import dias_cerrados_js
+        # flatpickr usa Date.getDay(): 0=domingo … 2=martes.
+        self.assertEqual(dias_cerrados_js(SLOTS_CABANA), '2')
+
+    def test_sin_grilla_no_desactiva_nada(self):
+        from ventas.templatetags.ventas_extras import dias_cerrados_js
+        for valor in ({}, None, ['16:00']):
+            self.assertEqual(dias_cerrados_js(valor), '', repr(valor))
+
+    def test_abierto_todos_los_dias_no_desactiva_nada(self):
+        from ventas.templatetags.ventas_extras import dias_cerrados_js
+        self.assertEqual(dias_cerrados_js(dict(SLOTS_CABANA, tuesday=['16:00'])), '')

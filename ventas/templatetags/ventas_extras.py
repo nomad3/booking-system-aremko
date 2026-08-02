@@ -375,3 +375,31 @@ def optimizada(image_field, width=900):
     except (ValueError, TypeError):
         width = 900
     return url.replace('/upload/', f'/upload/f_auto,q_auto,c_limit,w_{width}/', 1)
+
+
+# Días de la semana SIN slots configurados, en el índice que usa JavaScript
+# (Date.getDay(): 0=domingo … 6=sábado). Se calcula en el servidor para poder
+# DESACTIVARLOS en el calendario del modal: bloquear el botón después de elegir
+# el día no alcanza — el cliente elige un martes, presiona "Agregar" y no pasa
+# nada (caso real reportado por Jorge el 2026-08-02). Mejor que no sea elegible.
+_DIA_A_JS = {
+    'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+    'thursday': 4, 'friday': 5, 'saturday': 6,
+}
+
+
+@register.filter
+def dias_cerrados_js(slots_disponibles):
+    """"2" para un servicio sin martes; "" si no hay nada que desactivar.
+
+    Devuelve vacío cuando el servicio NO declara grilla (mismo criterio permisivo
+    que `hora_es_slot_del_dia`: hay servicios que se venden sin horarios) o cuando
+    la grilla es una lista simple (mismos horarios todos los días).
+    """
+    if not slots_disponibles or not isinstance(slots_disponibles, dict):
+        return ''
+    cerrados = [
+        str(js) for nombre, js in sorted(_DIA_A_JS.items(), key=lambda x: x[1])
+        if not (slots_disponibles.get(nombre) or [])
+    ]
+    return ','.join(cerrados)

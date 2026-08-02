@@ -893,7 +893,8 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
-                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
                         </div>
@@ -983,7 +984,8 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
-                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
                         </div>
@@ -1035,7 +1037,8 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
-                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
                         </div>
@@ -1077,6 +1080,7 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                     data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}"
                                     data-servicio-requiere-tina="true">
                                 <i class="fas fa-plus me-2"></i>Agregar a mi reserva
                             </button>
@@ -1140,7 +1144,8 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                     data-servicio-precio="{{ servicio.precio_base }}"
                                     data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
-                                    data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                    data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}">
                                 <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                             </button>
                         </div>
@@ -1189,7 +1194,8 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                 data-servicio-precio="{{ servicio.precio_base }}"
                                 data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
-                                data-servicio-tipo="{{ servicio.tipo_servicio }}">
+                                data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}">
                             <i class="fas fa-calendar-plus me-2"></i>Reservar ahora
                         </button>
                         {% else %}
@@ -1206,6 +1212,7 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                                 data-servicio-capacidad="{{ servicio.capacidad_maxima }}"
                                     data-servicio-min="{{ servicio.capacidad_minima|default:1 }}"
                                 data-servicio-tipo="{{ servicio.tipo_servicio }}"
+                                    data-dias-cerrados="{{ servicio.slots_disponibles|dias_cerrados_js }}"
                                 data-readonly="true">
                                 <i class="fas fa-calendar me-2"></i>Ver disponibilidad
                             </button>
@@ -1518,6 +1525,11 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
     let currentServicioNombre = null;
     let currentServicioPrecio = 0;
     let currentServicioTipo = 'otro';
+    // Días que el servicio NO atiende (índices JS: 0=domingo … 6=sábado).
+    // Aremko cierra los martes; se desactivan en el calendario para que el
+    // cliente no pueda siquiera elegirlos.
+    let currentDiasCerrados = [];
+    let fechaPicker = null;
     let currentServicioCapacidad = 1;
     let currentServicioMin = 1;
 
@@ -1550,6 +1562,26 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
             });
     }
 
+    // Desactiva en el calendario los días que el servicio no atiende, para que el
+    // martes (Aremko cerrado) ni siquiera se pueda elegir. Antes se podía elegir,
+    // el botón quedaba deshabilitado sin explicación y parecía que la página se
+    // colgaba — el campo de hora, donde iba el aviso, está OCULTO en cabañas.
+    function aplicarDiasCerrados() {
+        if (!fechaPicker) return;
+        const cerrados = currentDiasCerrados;
+        fechaPicker.set('disable', cerrados.length
+            ? [function(date) { return cerrados.indexOf(date.getDay()) !== -1; }]
+            : []);
+        // Si venía una fecha elegida que ahora es inválida, se limpia: dejarla
+        // puesta mostraría un día que el calendario ya marca como no disponible.
+        const actual = fechaPicker.selectedDates && fechaPicker.selectedDates[0];
+        if (actual && cerrados.indexOf(actual.getDay()) !== -1) {
+            fechaPicker.clear();
+            const addBtn = document.getElementById('addToCartBtn');
+            if (addBtn) addBtn.disabled = true;
+        }
+    }
+
     // Día cerrado/bloqueado en servicios de HORA FIJA (cabañas y decoraciones).
     // Ahí el cliente no elige hora, así que un desplegable vacío no lo frena: hay
     // que preguntar igual y bloquear el botón. Caso real: Aremko cierra los martes
@@ -1576,7 +1608,12 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                 aviso.textContent = data.bloqueado
                     ? 'No disponible en esa fecha.'
                     : 'Ese día no atendemos. Elige otra fecha.';
-                if (horaSelect && horaSelect.parentNode) horaSelect.parentNode.appendChild(aviso);
+                // Junto a la FECHA, no a la hora: en cabañas el campo de hora está
+                // oculto, y ahí el aviso quedaba invisible (parecía que se colgaba).
+                const fechaEl = document.getElementById('fecha');
+                const destino = (fechaEl && fechaEl.parentNode) ? fechaEl.parentNode
+                              : (horaSelect && horaSelect.parentNode);
+                if (destino) destino.appendChild(aviso);
                 if (addBtn) addBtn.disabled = true;
             })
             .catch(err => {
@@ -1694,6 +1731,9 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
                 currentServicioNombre = this.dataset.servicioNombre;
                 currentServicioPrecio = parseFloat(this.dataset.servicioPrecio);
                 currentServicioTipo = this.dataset.servicioTipo || 'otro';
+                currentDiasCerrados = (this.dataset.diasCerrados || '')
+                    .split(',').filter(x => x !== '').map(Number);
+                aplicarDiasCerrados();
                 currentServicioCapacidad = parseInt(this.dataset.servicioCapacidad) || 1;
                 currentServicioMin = parseInt(this.dataset.servicioMin) || 1;
                 const isReadonly = this.dataset.readonly === 'true'; // Check if in readonly mode
@@ -1865,7 +1905,7 @@ body,.content-text,.card-text{font-family:'Inter',system-ui,sans-serif}
         // Flatpickr for date picker
         const fechaInput = document.getElementById('fecha');
         if (fechaInput) {
-            flatpickr(fechaInput, {
+            fechaPicker = flatpickr(fechaInput, {
                 minDate: "today",
                 dateFormat: "Y-m-d",
                 locale: "es",
