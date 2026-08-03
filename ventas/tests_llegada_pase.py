@@ -35,7 +35,7 @@ from django.utils import timezone
 from control_gestion.signals import react_to_reserva_change
 
 from .llegadas import (TIPO_LLEGADA, VIA_MANUAL, VIA_QR, hora_local,
-                       llegadas_de, registrar_llegada, ya_llego)
+                       llegadas_de, marcar_checkin, registrar_llegada, ya_llego)
 from .models import (CategoriaServicio, Cliente, MovimientoCliente, Servicio,
                      VentaReserva)
 from .signals.main_signals import actualizar_tramo_y_premios_on_pago
@@ -394,3 +394,55 @@ class ElPaseEntraEnElResumenTest(_Base):
         # cliente tiene que guardar, así que cierra el mensaje.
         texto = self._resumen()
         self.assertGreater(texto.index('Tu Pase para Aremko'), len(texto) * 0.5)
+
+
+class LlegadaMueveElCheckinTest(_Base):
+    """Jorge, 2026-08-03, viendo la agenda tras la primera prueba: "junto con
+    registrar el Llegó a la hora que indica, debe cambiar el estado de Pendiente
+    a Checkin también".
+
+    Tenía razón, y es más que comodidad: el huésped llegado y la reserva en
+    'Pendiente' son la misma realidad contada de dos formas. Que no calcen
+    obliga a recepción a hacer dos gestos por un solo hecho — y tarde o temprano
+    hace uno y olvida el otro.
+    """
+
+    def test_registrar_llegada_deja_la_reserva_en_checkin(self):
+        self.assertEqual(self.venta.estado_reserva, 'pendiente')
+        registrar_llegada(self.venta, via=VIA_QR)
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_reserva, 'checkin')
+
+    def test_NO_reabre_una_reserva_ya_cerrada(self):
+        """Si alguien ya hizo checkout y el cliente vuelve a mostrar el QR, la
+        reserva NO puede volver a check-in: reabriría la comanda de alguien que
+        se fue."""
+        self.venta.estado_reserva = 'checkout'
+        self.venta.save(update_fields=['estado_reserva'])
+        registrar_llegada(self.venta, via=VIA_QR)
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_reserva, 'checkout')
+
+    def test_REPARA_las_que_quedaron_desalineadas(self):
+        """Caso real #6485: registró llegada antes de que esto existiera y quedó
+        en 'Pendiente'. Volver a escanear la alinea sola."""
+        registrar_llegada(self.venta, via=VIA_QR)
+        self.venta.estado_reserva = 'pendiente'      # el desalineado de prod
+        self.venta.save(update_fields=['estado_reserva'])
+
+        cuando, recien = registrar_llegada(self.venta, via=VIA_QR)
+        self.assertFalse(recien)                      # la llegada no se duplica
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_reserva, 'checkin')   # pero se corrige
+
+    def test_el_boton_manual_tambien_lo_mueve_y_lo_informa(self):
+        self._staff()
+        r = self.client.post(reverse('ventas:marcar_llegada_api'),
+                             data='{"reserva_id": %d}' % self.venta.id,
+                             content_type='application/json')
+        self.assertEqual(r.json()['estado_reserva'], 'checkin')
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_reserva, 'checkin')
+
+    def test_marcar_checkin_es_seguro_con_basura(self):
+        self.assertFalse(marcar_checkin(None))

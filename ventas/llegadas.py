@@ -58,8 +58,31 @@ def ya_llego(venta_id):
     return llegadas_de([venta_id]).get(int(venta_id or 0))
 
 
+def marcar_checkin(venta):
+    """Pone la reserva en 'checkin' si estaba pendiente. Devuelve si cambió.
+
+    El huésped llegado y la reserva en 'Pendiente' son la misma realidad contada
+    de dos formas; que no calcen obliga a recepción a hacer dos gestos para un
+    solo hecho, y tarde o temprano hace uno y olvida el otro.
+
+    **NO toca las que ya están en 'checkout'**: esa reserva ya se cerró y
+    devolverla a check-in reabriría la comanda de alguien que se fue.
+    """
+    if not venta or getattr(venta, 'estado_reserva', None) != 'pendiente':
+        return False
+    try:
+        venta.estado_reserva = 'checkin'
+        venta.save(update_fields=['estado_reserva'])
+        return True
+    except Exception:  # noqa: BLE001 — la llegada ya quedó registrada igual
+        logger.exception('[llegada] no se pudo poner en checkin (reserva %s)', venta.pk)
+        return False
+
+
 def registrar_llegada(venta, usuario=None, via=VIA_QR):
-    """Marca la llegada. IDEMPOTENTE: escanear dos veces no duplica ni pisa la hora.
+    """Marca la llegada y deja la reserva en check-in.
+
+    IDEMPOTENTE: escanear dos veces no duplica ni pisa la hora.
 
     Devuelve (cuando, recien_marcada).
     """
@@ -72,6 +95,11 @@ def registrar_llegada(venta, usuario=None, via=VIA_QR):
     if previa:
         # Escanear de nuevo NO es un error: pasa cuando el cliente muestra el
         # QR dos veces o vuelve a recepción. Se responde igual de bien.
+        # Y de paso REPARA: las reservas que registraron llegada antes de que
+        # esto existiera quedaron en 'pendiente'; volver a escanear las alinea.
+        if marcar_checkin(venta):
+            logger.info('[llegada] reserva %s ya había llegado — se corrigió a checkin',
+                        venta.pk)
         return previa, False
 
     if not getattr(venta, 'cliente_id', None):
@@ -90,9 +118,13 @@ def registrar_llegada(venta, usuario=None, via=VIA_QR):
         logger.exception('[llegada] no se pudo registrar (reserva %s)', venta.pk)
         return None, False
 
-    logger.info('[llegada] reserva=%s via=%s usuario=%s saldo=%s',
+    # El check-in va DESPUÉS y por separado a propósito: si fallara, la llegada
+    # ya quedó registrada (visible y corregible) en vez de perderse entera.
+    paso_a_checkin = marcar_checkin(venta)
+
+    logger.info('[llegada] reserva=%s via=%s usuario=%s saldo=%s checkin=%s',
                 venta.pk, via, getattr(usuario, 'username', '-'),
-                getattr(venta, 'saldo_pendiente', '?'))
+                getattr(venta, 'saldo_pendiente', '?'), paso_a_checkin)
     return mov.fecha_movimiento, True
 
 

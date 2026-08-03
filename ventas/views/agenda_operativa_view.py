@@ -1028,8 +1028,10 @@ def marcar_llegada_api(request):
                             status=500)
     # `recien=False` (ya estaba marcada) NO es un error: la respuesta es exitosa
     # igual, con la hora real de llegada.
+    venta.refresh_from_db(fields=['estado_reserva'])
     return JsonResponse({'success': True, 'recien': recien,
-                         'hora': hora_local(cuando)})
+                         'hora': hora_local(cuando),
+                         'estado_reserva': venta.estado_reserva})
 
 
 # ---------------------------------------------------------------------------

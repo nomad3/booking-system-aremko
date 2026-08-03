@@ -1233,7 +1233,8 @@
                             <span>{{ item.cantidad_personas }} persona{% if item.cantidad_personas > 1 %}s{% endif %}</span>
                         </div>
                         {% if item.estado_reserva %}
-                        <div class="detalle-item">
+                        {# id para que marcar la llegada mueva este badge sin recargar la página #}
+                        <div class="detalle-item" id="estado-{{ item.reserva_id }}">
                             <span>🏠</span>
                             {% if item.estado_reserva == 'pendiente' %}
                                 <span style="background: #FF9800; color: white; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">
@@ -1465,6 +1466,17 @@ function marcarLlegada(reservaId) {
         if (celda) {
             celda.innerHTML = '<span>✅</span>' +
                 '<span style="color:#2E7D32;font-weight:600">Llegó ' + data.hora + '</span>';
+        }
+        // El huésped llegado y la reserva en "Pendiente" son la misma realidad
+        // contada de dos formas. Si el badge no se mueve con la llegada,
+        // recepción tiene que hacer dos gestos para un solo hecho.
+        if (data.estado_reserva === 'checkin') {
+            const badge = document.getElementById('estado-' + reservaId);
+            if (badge) {
+                badge.innerHTML = '<span>🏠</span>' +
+                    '<span style="background:#2196F3;color:white;padding:3px 10px;' +
+                    'border-radius:4px;font-size:12px;font-weight:600">Check-in</span>';
+            }
         }
     })
     .catch(function(e) {
