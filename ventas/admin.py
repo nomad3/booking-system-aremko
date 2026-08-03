@@ -549,6 +549,7 @@ class VentaReservaAdmin(admin.ModelAdmin):
         'total_productos', 'total_servicios', 'agregar_comanda_button',
         'link_comanda_whatsapp_detalle',
         'cliente_ficha_360_display',
+        'pase_guion_display',
     )
     fieldsets = (
         (None, {
@@ -566,6 +567,11 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }),
         ('Detalles', {
             'fields': ('comentarios',)
+        }),
+        ('🔑 El Pase del cliente', {
+            'fields': ('pase_guion_display',),
+            'description': 'Mándaselo apenas pague y recórrelo con él. Ahí es cuando '
+                           'está mirando el teléfono — después ya no lo abre.',
         }),
         ('📱 Comanda del Cliente (WhatsApp)', {
             'fields': ('link_comanda_whatsapp_detalle',),
@@ -1006,6 +1012,109 @@ class VentaReservaAdmin(admin.ModelAdmin):
         url = url_ficha_reserva(obj.pk)
         return format_html('<a class="button" href="{}" target="_blank">🌙 Ficha</a>', url)
     ficha_cliente_link.short_description = 'Ficha cliente'
+
+    def pase_guion_display(self, obj):
+        """El Pase + el guion de la conversación, en el mismo lugar y momento.
+
+        Nace de una escena de recepción (Jorge, 2026-08-03): los clientes
+        llegaban sin saber que El Pase existía. Cuando alguien se los abría y
+        se los recorría —el wifi, cómo llegar, la comanda— decían "ah, qué
+        bueno". La conversación funciona; lo que faltaba era que ocurriera
+        siempre, y no solo cuando alguien se acordaba.
+
+        Por eso el guion vive ACÁ y no en un manual: un sábado con seis
+        llegadas, lo que no está delante de los ojos no pasa. Es la misma
+        lección que ya nos costó un bug esta semana — los guardias van en el
+        camino principal, no en una rama que a veces se ejecuta.
+
+        La línea del masaje aparece SOLO si la reserva tiene masajes: un guion
+        con pasos que no aplican se empieza a saltar entero.
+        """
+        from django.utils.html import format_html
+        from django.utils.safestring import mark_safe
+        from urllib.parse import quote
+
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+
+        if not obj or not obj.pk:
+            return 'Guarda la reserva primero y aparecerá acá.'
+
+        url = url_ficha_reserva(obj.pk)
+        nombre = ((obj.cliente.nombre if obj.cliente else '') or '').split(' ')[0]
+
+        tiene_masaje = obj.reservaservicios.filter(
+            servicio__tipo_servicio='masaje').exists()
+
+        # Mensaje de apertura, listo para pegar. El anterior DESCRIBÍA un
+        # documento ("ahí está el link de su ficha y encontrará los detalles");
+        # éste le da un trabajo: guárdalo, lo vas a necesitar al llegar.
+        saludo = f"Hola {nombre}, " if nombre else "Hola, "
+        mensaje = (
+            f"{saludo}acá está tu Pase para Aremko 🔑\n\n"
+            f"{url}\n\n"
+            "Adentro está el QR que muestras al llegar, las claves de wifi, "
+            "cómo llegar y la comanda para pedir desde tu tina.\n\n"
+            "Guárdalo, lo vas a necesitar."
+        )
+
+        pasos = [
+            ('Mándale el Pase',
+             'Dile que <b>adentro está el QR para ingresar</b>. Ese es el motivo '
+             'por el que va a abrir la pantalla.'),
+            ('Claves de wifi',
+             'Pídele que abra <b>Tips</b> y las revise. Espera a que te diga que '
+             'las vio.'),
+            ('Cómo llegar',
+             'Muéstrale el botón del mapa. Ahorra la llamada de "no encuentro la '
+             'entrada".'),
+            ('Comanda digital',
+             '<b>Acá está la venta:</b> puede pedir desde la tina sin caminar '
+             'hasta la cafetería.'),
+        ]
+        if tiene_masaje:
+            pasos.append((
+                'Ficha de masaje del acompañante',
+                'Que <b>comparta el link con quien lo acompaña</b> para llenarla '
+                'antes de venir. Llega lista, y es el momento natural para '
+                'preguntar si el acompañante también quiere masaje.'))
+
+        filas = ''.join(
+            '<li style="margin-bottom:7px"><b>{}</b><br>'
+            '<span style="color:#555">{}</span></li>'.format(t, d)
+            for t, d in pasos)
+
+        tel = ''.join(ch for ch in (
+            (obj.cliente.telefono if obj.cliente else '') or '') if ch.isdigit())
+        boton_wa = ''
+        if tel:
+            boton_wa = (
+                '<a class="button" target="_blank" style="margin-left:6px" href="{}">'
+                '💬 Abrir WhatsApp con el mensaje listo</a>'.format(
+                    f"https://wa.me/{tel}?text={quote(mensaje)}"))
+
+        return mark_safe(
+            '<div style="max-width:640px">'
+            '<div style="margin-bottom:10px">'
+            '<textarea readonly onclick="this.select();" rows="7" '
+            'style="width:100%;font-size:12px;padding:8px;border-radius:6px;'
+            'border:1px solid #ccc">{msg}</textarea>'
+            '<div style="margin-top:6px">'
+            '<button type="button" class="button" '
+            "onclick=\"var t=this.closest('div').previousElementSibling;t.select();"
+            "if(navigator.clipboard)navigator.clipboard.writeText(t.value);"
+            "this.textContent='✓ Copiado';return false;\">📋 Copiar mensaje</button>"
+            '{wa}</div></div>'
+            '<div style="background:#F5EFE3;border-left:4px solid #BC5630;'
+            'border-radius:8px;padding:12px 14px">'
+            '<div style="font-weight:600;margin-bottom:8px">Recórrelo con el cliente, '
+            'en este orden:</div>'
+            '<ol style="margin:0;padding-left:20px;font-size:13px">{filas}</ol>'
+            '<div style="margin-top:9px;font-size:12px;color:#777">'
+            'Cada paso termina cuando el cliente dice "sí, lo veo". '
+            'No es un instructivo: es usarlo con él al lado.</div>'
+            '</div></div>'.format(msg=mensaje, wa=boton_wa, filas=filas)
+        )
+    pase_guion_display.short_description = 'El Pase + guion para el cliente'
 
     def agregar_comanda_button(self, obj):
         """Botón para agregar comanda — abre el mismo menú que usa el cliente."""

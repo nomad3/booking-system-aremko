@@ -285,3 +285,70 @@ class AgendaMuestraLlegadasTest(_Base):
         registrar_llegada(self.venta, via=VIA_QR)
         cuerpo = self.client.get(reverse('ventas:agenda_operativa')).content.decode()
         self.assertIn('Llegó', cuerpo)
+
+
+class GuionEnElAdminTest(_Base):
+    """El guion vive donde Deborah copia el link, y no en un manual.
+
+    Un sábado con seis llegadas, lo que no está delante de los ojos no pasa. Es
+    la misma lección que ya costó un bug esta semana: los guardias van en el
+    camino principal, no en una rama que a veces se ejecuta.
+    """
+
+    def _guion(self, venta=None):
+        from ventas.admin import VentaReservaAdmin
+        from django.contrib import admin as dj_admin
+        adm = VentaReservaAdmin(VentaReserva, dj_admin.site)
+        return adm.pase_guion_display(venta or self.venta)
+
+    def test_trae_el_link_del_Pase_listo_para_pegar(self):
+        html = self._guion()
+        self.assertIn('/ventas/reserva/', html)
+        self.assertIn('Copiar mensaje', html)
+
+    def test_el_mensaje_le_da_un_TRABAJO_no_describe_un_documento(self):
+        """El mensaje viejo decía 'ahí está el link de su ficha y encontrará los
+        detalles'. Nadie abre eso. El nuevo pide guardarlo y anuncia el QR."""
+        html = self._guion()
+        self.assertIn('QR', html)
+        self.assertIn('Guárdalo', html)
+        self.assertNotIn('encontrará los detalles', html)
+
+    def test_los_cuatro_pasos_estan_y_en_orden(self):
+        html = self._guion()
+        pasos = ['Mándale el Pase', 'Claves de wifi', 'Cómo llegar', 'Comanda digital']
+        posiciones = [html.find(p) for p in pasos]
+        self.assertNotIn(-1, posiciones, 'falta un paso del guion')
+        self.assertEqual(posiciones, sorted(posiciones), 'el guion quedó desordenado')
+
+    def test_el_paso_del_masaje_NO_aparece_si_no_hay_masaje(self):
+        """Un guion con pasos que no aplican se empieza a saltar entero."""
+        self.assertNotIn('acompañante', self._guion())
+
+    def test_el_paso_del_masaje_SI_aparece_cuando_hay_masaje(self):
+        masaje = Servicio.objects.create(
+            id=9431, nombre='Masaje de relajación', categoria=self.cat,
+            tipo_servicio='masaje', precio_base=Decimal('45000'), duracion=60,
+            activo=True, slots_disponibles={})
+        self.venta.reservaservicios.create(
+            servicio=masaje, fecha_agendamiento=timezone.localdate(),
+            hora_inicio='18:00', cantidad_personas=1)
+        html = self._guion()
+        self.assertIn('acompañante', html)
+        self.assertIn('antes de venir', html)
+
+    def test_una_reserva_sin_guardar_no_revienta(self):
+        self.assertIn('Guarda la reserva', self._guion(VentaReserva()))
+
+    def test_un_cliente_SIN_NOMBRE_no_produce_un_saludo_roto(self):
+        """Pasa de verdad: desde H-067 se guarda nombre vacío cuando el pushname
+        de WhatsApp es basura ("L@mirn@dri@@🥰"). El saludo no puede quedar
+        "Hola , " ni con el emoji adentro."""
+        anonimo = Cliente.objects.create(id=9441, nombre='', telefono='+56900000043')
+        venta = VentaReserva.objects.create(cliente=anonimo)
+        html = self._guion(venta)
+        self.assertIn('Hola, acá está tu Pase', html)
+
+    def test_arma_el_boton_de_WhatsApp_con_el_telefono_del_cliente(self):
+        html = self._guion()
+        self.assertIn('wa.me/56900000042', html)
