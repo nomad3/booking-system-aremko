@@ -2504,10 +2504,77 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
             'el texto dice que se agregó/cambió algo, pero ninguna herramienta tocó el carrito',
             modelo=modelo, tokens=tokens)
 
+    # H-096: si preguntó algo que El Pase ya responde, se le suma el link.
+    texto = sumar_pase_si_pregunta(texto, mensaje, phone)
+
     return {
         'escalar': False, 'motivo': '', 'texto': texto, 'modelo': modelo, 'error': '',
         'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2],
     }
+
+
+def sumar_pase_si_pregunta(texto, mensaje_cliente, phone):
+    """Agrega el link de El Pase cuando el cliente pregunta algo que vive ahí.
+
+    Es la parte del guion de Deborah que Luna SÍ puede sostener. Ella no aguanta
+    cinco turnos de "ábrelo… ¿lo ves?" (H-085, H-090), pero cuando el cliente
+    pregunta por su cuenta, responder con El Pase logra lo mismo: abre la
+    pantalla. Y de a una cosa, que es la regla de la casa (H-088).
+
+    Va en CÓDIGO y no en el prompt por lo de siempre: una regla más entre veinte
+    se cumple a veces. Además tapa un hueco real — Luna **no tiene** los datos de
+    wifi, así que hoy no puede responder esa pregunta de ninguna forma.
+
+    Es aditivo y no reescribe nada del modelo: en el peor caso sobra un link.
+    """
+    from . import pase as pase_mod
+
+    try:
+        tema = pase_mod.tema_del_pase(mensaje_cliente)
+        if not tema:
+            return texto
+
+        venta = _reserva_vigente_del_cliente(phone)
+        if venta is None:
+            return texto   # sin reserva no hay Pase que mandar
+
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+        agregado = pase_mod.respuesta_del_pase(tema, url_ficha_reserva(venta.id))
+        if not agregado or agregado in texto:
+            return texto
+
+        logger.info('[Agente WA] H-096: pregunta de %s → se suma El Pase (reserva %s)',
+                    tema, venta.id)
+        return f'{texto}\n\n{agregado}'
+    except Exception:  # noqa: BLE001 — sumar un link jamás puede tumbar la respuesta
+        logger.exception('[Agente WA] H-096: no se pudo sumar El Pase')
+        return texto
+
+
+def _reserva_vigente_del_cliente(phone):
+    """La reserva vigente del cliente, o None.
+
+    Solo reservas de hoy en adelante: el Pase de una visita del mes pasado no le
+    sirve a nadie y confundiría más de lo que ayuda. Reusa el mismo buscador de
+    cliente que el resto del agente — el teléfono de WhatsApp llega en formatos
+    distintos y esa normalización ya está resuelta (ver H-067 / PhoneService).
+    """
+    from django.utils import timezone
+
+    from ventas.models import VentaReserva
+    from ventas.services.cliente_service import ClienteService
+
+    if not (phone or '').strip():
+        return None
+    cliente, _ = ClienteService.buscar_cliente_por_telefono(phone)
+    if not cliente:
+        return None
+    return (VentaReserva.objects
+            .filter(cliente=cliente,
+                    reservaservicios__fecha_agendamiento__gte=timezone.localdate())
+            .exclude(estado_reserva='cancelado')
+            .order_by('id')
+            .last())
 
 
 def generar_sugerencia(phone, *, forzar=False):

@@ -6,7 +6,10 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from datetime import datetime
+import logging
 from ..models import VentaReserva, ConfiguracionResumen
+
+logger = logging.getLogger(__name__)
 
 
 def staff_required(view_func):
@@ -253,5 +256,20 @@ def _generar_texto_resumen(reserva, config):
     # NOTA: Link de Mercado Pago removido por solicitud del usuario (28-dic-2025)
     # lineas.append("")
     # lineas.append(f"{config.texto_link_pago} {config.link_pago_mercadopago}")
+
+    # El Pase, al final y en CÓDIGO (H-096). Va acá y no en el prompt de Luna
+    # porque este texto lo consumen los dos caminos: Luna al crear la reserva, y
+    # el botón "📋 Resumen" que usa Deborah. Un solo lugar, y ningún cliente se
+    # queda sin él porque el modelo se olvidó de mencionarlo.
+    try:
+        from whatsapp_agent.pase import bloque_resumen
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+        bloque = bloque_resumen(url_ficha_reserva(reserva.id), tiene_masaje=tiene_masajes)
+        if bloque:
+            lineas.append("")
+            lineas.append("")
+            lineas.append(bloque)
+    except Exception:  # noqa: BLE001 — el resumen NO puede caerse por esto
+        logger.exception('[resumen] no se pudo agregar El Pase (reserva %s)', reserva.id)
 
     return '\n'.join(lineas)

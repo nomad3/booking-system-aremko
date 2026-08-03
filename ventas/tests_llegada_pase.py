@@ -352,3 +352,45 @@ class GuionEnElAdminTest(_Base):
     def test_arma_el_boton_de_WhatsApp_con_el_telefono_del_cliente(self):
         html = self._guion()
         self.assertIn('wa.me/56900000042', html)
+
+
+class ElPaseEntraEnElResumenTest(_Base):
+    """El texto que Luna manda al crear la reserva — y el mismo que genera el
+    botón "📋 Resumen" de Deborah.
+
+    Va en CÓDIGO y no en el prompt de Luna a propósito: los dos caminos comen del
+    mismo generador, así que ningún cliente se queda sin El Pase porque el modelo
+    se olvidó de mencionarlo (H-088: una regla más entre veinte se cumple a veces).
+    """
+
+    def _resumen(self):
+        from ventas.models import ConfiguracionResumen
+        from ventas.views.resumen_reserva_view import _generar_texto_resumen
+        return _generar_texto_resumen(self.venta, ConfiguracionResumen.get_solo())
+
+    def test_el_resumen_trae_El_Pase(self):
+        texto = self._resumen()
+        self.assertIn('Tu Pase para Aremko', texto)
+        self.assertIn('/ventas/reserva/', texto)
+
+    def test_trae_las_cuatro_cosas_que_Deborah_recorre_a_mano(self):
+        texto = self._resumen()
+        for esperado in ('QR', 'wifi', 'Cómo llegar', 'comanda'):
+            self.assertIn(esperado, texto, esperado)
+
+    def test_la_ficha_de_masaje_aparece_SOLO_con_masaje(self):
+        self.assertNotIn('acompañante', self._resumen())
+        masaje = Servicio.objects.create(
+            id=9451, nombre='Masaje descontracturante', categoria=self.cat,
+            tipo_servicio='masaje', precio_base=Decimal('45000'), duracion=60,
+            activo=True, slots_disponibles={})
+        self.venta.reservaservicios.create(
+            servicio=masaje, fecha_agendamiento=timezone.localdate(),
+            hora_inicio='18:00', cantidad_personas=1)
+        self.assertIn('acompañante', self._resumen())
+
+    def test_El_Pase_va_al_FINAL_para_que_quede_a_mano(self):
+        # En WhatsApp se lee el principio y el final. El Pase es lo que el
+        # cliente tiene que guardar, así que cierra el mensaje.
+        texto = self._resumen()
+        self.assertGreater(texto.index('Tu Pase para Aremko'), len(texto) * 0.5)
