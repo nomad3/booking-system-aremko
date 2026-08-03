@@ -307,3 +307,93 @@ class UnaSolaConsultaTest(_Base):
         self.assertGreaterEqual(codigo.count('comandas_para_cocina(hoy)'), 2)
         # El filtro que dejaba comandas invisibles no puede volver.
         self.assertNotIn('creada_por_cliente=True', codigo)
+
+
+class CerrarComandasAntiguasTest(_Base):
+    """Las 83 comandas abiertas de otros días (Jorge, 2026-08-03).
+
+    El contador del aviso las destapó. Son pedidos que nadie cerró y quedaron
+    abiertos para siempre; con 83 el aviso se vuelve ruido y deja de servir.
+
+    Lo que estos tests protegen es lo que NO se debe cerrar: si la visita es hoy
+    o futura, cocina todavía tiene que preparar ese pedido.
+    """
+
+    def setUp(self):
+        from ventas.management.commands.cerrar_comandas_antiguas import (
+            comandas_a_cerrar, fecha_de_referencia)
+        self.a_cerrar = comandas_a_cerrar
+        self.referencia = fecha_de_referencia
+
+    def _ids(self):
+        return {c.id for c, _ in self.a_cerrar(_hoy())}
+
+    def test_cierra_la_de_una_visita_que_ya_paso(self):
+        venta = self._reserva(fechas_servicio=(_hoy() - timedelta(days=5),))
+        c = self._comanda(venta, objetivo=None)
+        self.assertIn(c.id, self._ids())
+
+    def test_NO_cierra_la_de_una_visita_de_HOY(self):
+        venta = self._reserva(fechas_servicio=(_hoy(),))
+        c = self._comanda(venta)
+        self.assertNotIn(c.id, self._ids())
+
+    def test_NO_cierra_la_de_una_visita_FUTURA(self):
+        """La razón de ser del filtro: cocina todavía la tiene que preparar."""
+        venta = self._reserva(fechas_servicio=(_hoy() + timedelta(days=6),))
+        c = self._comanda(venta)
+        self.assertNotIn(c.id, self._ids())
+
+    def test_una_estadia_que_TERMINA_hoy_no_se_cierra(self):
+        """Llegó hace tres días y se va hoy: sigue adentro, puede pedir."""
+        venta = self._reserva(fechas_servicio=(
+            _hoy() - timedelta(days=3), _hoy() - timedelta(days=2), _hoy()))
+        c = self._comanda(venta)
+        self.assertNotIn(c.id, self._ids())
+
+    def test_sin_servicios_manda_la_fecha_objetivo(self):
+        venta = self._reserva(fechas_servicio=())
+        vieja = self._comanda(venta, objetivo=_en(_hoy() - timedelta(days=2)))
+        futura = self._comanda(venta, objetivo=_en(_hoy() + timedelta(days=2)))
+        ids = self._ids()
+        self.assertIn(vieja.id, ids)
+        self.assertNotIn(futura.id, ids)
+
+    def test_sin_servicios_ni_objetivo_manda_cuando_se_pidio(self):
+        venta = self._reserva(fechas_servicio=())
+        c = self._comanda(venta, objetivo=None,
+                          solicitada=_en(_hoy() - timedelta(days=4)))
+        self.assertIn(c.id, self._ids())
+
+    def test_las_ya_entregadas_o_canceladas_ni_se_miran(self):
+        venta = self._reserva(fechas_servicio=(_hoy() - timedelta(days=5),))
+        for estado in ('entregada', 'cancelada', 'borrador'):
+            c = self._comanda(venta, estado=estado)
+            self.assertNotIn(c.id, self._ids(), estado)
+
+    def test_la_referencia_es_el_ULTIMO_servicio_no_el_primero(self):
+        venta = self._reserva(fechas_servicio=(
+            _hoy() - timedelta(days=4), _hoy() + timedelta(days=1)))
+        c = self._comanda(venta)
+        # Llegó hace 4 días pero se va mañana → la visita NO terminó.
+        self.assertEqual(self.referencia(c), _hoy() + timedelta(days=1))
+        self.assertNotIn(c.id, self._ids())
+
+    def test_el_listado_de_productos_suma_unidades_y_trae_el_stock(self):
+        """Lo que Jorge pidió para revisar el inventario antes de cerrar nada."""
+        from ventas.management.commands.cerrar_comandas_antiguas import (
+            productos_involucrados)
+        ayer = _hoy() - timedelta(days=3)
+        venta = self._reserva(fechas_servicio=(ayer,))
+        c1 = self._comanda(venta)                        # 1 unidad
+        DetalleComanda.objects.create(comanda=c1, producto=self.producto,
+                                      cantidad=4, precio_unitario=3000)
+        self._comanda(venta)                             # 1 unidad más, otra comanda
+
+        filas = productos_involucrados(self.a_cerrar(_hoy()))
+        self.assertEqual(len(filas), 1)
+        nombre, unidades, comandas, stock = filas[0]
+        self.assertEqual(nombre, 'Facilitar copas de vino')
+        self.assertEqual(unidades, 6)      # 1 + 4 + 1
+        self.assertEqual(comandas, 2)      # cuenta comandas, no líneas
+        self.assertEqual(stock, 99)        # el stock de hoy, para comparar
