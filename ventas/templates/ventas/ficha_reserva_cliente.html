@@ -23,6 +23,21 @@
       --pag-bg:#E2EAD6; --pag-fg:#436327;
       --can-bg:#F2DAD7; --can-fg:#9A3B2E;
     }
+    /* Código de ingreso — la puerta de entrada visual a El Pase */
+    .pase-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+      padding:16px;margin-top:12px;text-align:center}
+    .pase-qr .qr-tt{font-weight:600;font-size:15px}
+    .pase-qr .qr-sub{color:var(--muted);font-size:13px;margin-top:6px}
+    /* 220px y no menos: el token firmado es largo, así que el QR sale denso
+       (41 módulos por lado). A 180px cada módulo medía 4px — el mínimo para
+       leer de pantalla a cámara, y cualquier reflejo lo arruina. A 220px cada
+       módulo pasa de 5px y se escanea sin pelear. */
+    .pase-qr .qr-svg{margin:10px auto 2px;width:220px;max-width:72vw}
+    .pase-qr .qr-svg svg{width:100%;height:auto;display:block}
+    .pase-bien{border-color:var(--pag-fg)}
+    .pase-bien .qr-tt{color:var(--pag-fg);font-size:17px}
+    .btn-pedir{display:block;margin-top:12px;padding:14px;border-radius:12px;
+      background:var(--brand);color:#fff;text-decoration:none;font-weight:600}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--ink);
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
@@ -121,6 +136,35 @@
 
         {% if error_aprobar %}
           <div class="com-lock" style="border-color:var(--can-fg);color:var(--can-fg);margin-top:12px">{{ error_aprobar }}</div>
+        {% endif %}
+
+        {% comment %}
+        El QR va ARRIBA de todo y no al final, a propósito. Su trabajo no es
+        controlar el ingreso —recepción siempre puede buscar por nombre en la
+        agenda— sino ser el motivo por el cual el huésped abre esta pantalla.
+        Deborah dice "acá está su pase, con el QR para entrar", el cliente
+        abre, ve el código… y ve todo lo demás. Esa conversación es la que
+        enseña a usar El Pase y de paso vende.
+
+        Cuando ya llegó, el QR cumplió: desaparece y su lugar lo toma el
+        atajo a la comanda, que es lo que sirve estando adentro.
+        {% endcomment %}
+        {% if not es_cotizacion %}
+          {% if llego %}
+            <div class="pase-qr pase-bien">
+              <div class="qr-tt">🌿 Bienvenido</div>
+              <div class="qr-sub">Llegada registrada a las {{ hora_llegada }}</div>
+              {% if not comanda_bloqueada %}
+                <a class="btn-pedir" href="{{ comanda_url }}">🔔 Pedir a mi tina o cabaña</a>
+              {% endif %}
+            </div>
+          {% elif qr_svg %}
+            <div class="pase-qr">
+              <div class="qr-tt">Tu código de ingreso</div>
+              <div class="qr-svg">{{ qr_svg|safe }}</div>
+              <div class="qr-sub">Muéstralo en recepción al llegar</div>
+            </div>
+          {% endif %}
         {% endif %}
 
         <details open>

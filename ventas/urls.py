@@ -50,6 +50,7 @@ urlpatterns = [
     path('masaje/ficha-terapeuta/<int:ficha_id>/', ficha_masajista_view.ficha_masajista, name='ficha_masajista'),
     path('agenda-operativa/api/comandas-pendientes/', agenda_operativa_view.comandas_pendientes_api, name='comandas_pendientes_api'),
     path('agenda-operativa/api/comanda-cambiar-estado/', agenda_operativa_view.comanda_cambiar_estado_api, name='comanda_cambiar_estado_api'),
+    path('agenda-operativa/api/marcar-llegada/', agenda_operativa_view.marcar_llegada_api, name='marcar_llegada_api'),
     path('agenda-operativa/api/producto-marcar-entregado/', agenda_operativa_view.producto_marcar_entregado_api, name='producto_marcar_entregado_api'),
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed
@@ -173,6 +174,9 @@ urlpatterns = [
     # Ficha de Reserva del cliente (Reserva-cliente-digital) — token firmado, solo lectura
     path('reserva/<str:token>/', ficha_reserva_view.ficha_reserva_cliente, name='ficha_reserva_cliente'),
     path('reserva/<str:token>/comanda/', ficha_reserva_view.ficha_comanda, name='ficha_reserva_comanda'),
+    # Lo que abre el QR de El Pase: recepción registra la llegada; el cliente
+    # que escanea su propia pantalla cae en su Pase (misma URL, ver la vista).
+    path('reserva/<str:token>/llegada/', ficha_reserva_view.ficha_llegada, name='ficha_llegada'),
     path('reserva/<str:token>/pagar/', ficha_reserva_view.ficha_reserva_pagar, name='ficha_reserva_pagar'),
     path('reserva/<str:token>/bebida/', ficha_reserva_view.ficha_personalizar_bebida, name='ficha_personalizar_bebida'),
 

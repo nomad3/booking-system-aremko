@@ -64,3 +64,7 @@ markdown>=3.6  # Markdown → HTML render para BlogPost.body_md
 
 # Reporting (operational reports as .docx attachments)
 python-docx>=1.1.0  # Reportes operativos en Word (follow-ups, etc)
+
+# QR de El Pase (llegada del huésped) — puro Python, sin dependencias, emite SVG
+# inline: no genera archivos, no pasa por Cloudinary y se ve sin pedir nada más.
+segno>=1.6.1

@@ -1,0 +1,114 @@
+{% comment %}
+Lo que ve RECEPCIÓN en el celular al escanear el QR de El Pase.
+
+Pensada para leerse de una mirada, con el cliente parado al frente: quién es,
+qué contratÓ, a qué hora, y cuánto debe. El saldo va grande y en rojo porque
+ése es el segundo en que se cobra — si hay que buscarlo, no se cobra.
+
+Nada de menús ni navegación: es una pantalla de un solo vistazo con dos salidas
+(abrir la reserva para cobrar, o ver El Pase del cliente).
+{% endcomment %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Llegada · {{ cliente.nombre|default:"Reserva" }} · Aremko</title>
+<style>
+  :root{
+    --bg:#F5EFE3; --card:#FFFDF8; --ink:#2E2A24; --hint:#8A8175;
+    --line:#EADFCD; --brand:#BC5630; --ok:#2E7D32; --debe:#C62828;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       padding:14px;font-size:17px;line-height:1.45}
+  .wrap{max-width:520px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:16px;margin-bottom:12px}
+  .hero{text-align:center;padding:20px 16px}
+  .hero .tick{font-size:44px;line-height:1}
+  .hero h1{margin:8px 0 2px;font-size:22px}
+  .hero .sub{color:var(--hint);font-size:14px}
+  .nombre{font-size:26px;font-weight:700;margin:2px 0 0}
+  .fila{display:flex;justify-content:space-between;gap:12px;
+        padding:9px 0;border-bottom:1px solid var(--line)}
+  .fila:last-child{border-bottom:none}
+  .fila .cuando{color:var(--hint);font-size:14px}
+  .saldo{text-align:center;padding:18px}
+  .saldo .monto{font-size:34px;font-weight:700}
+  .saldo.debe .monto{color:var(--debe)}
+  .saldo.pagado .monto{color:var(--ok)}
+  .saldo .rot{color:var(--hint);font-size:14px;text-transform:uppercase;
+              letter-spacing:.08em}
+  .alerta{background:#FFF8E1;border-left:4px solid #FFA000;border-radius:10px;
+          padding:12px 14px;margin-bottom:12px;font-size:15px}
+  .btn{display:block;text-align:center;padding:15px;border-radius:12px;
+       text-decoration:none;font-weight:600;margin-bottom:10px}
+  .btn-p{background:var(--brand);color:#fff}
+  .btn-s{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+  .pie{text-align:center;color:var(--hint);font-size:12px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card hero">
+    {% if recien %}
+      <div class="tick">✅</div>
+      <h1>Llegada registrada</h1>
+      <div class="sub">{{ hora_llegada }}</div>
+    {% else %}
+      <div class="tick">🔁</div>
+      <h1>Ya estaba registrado</h1>
+      {# Escanear dos veces no es un error: pasa y punto. Se informa sin alarmar. #}
+      <div class="sub">Llegó a las {{ hora_llegada }}</div>
+    {% endif %}
+    <p class="nombre">{{ cliente.nombre|default:"—" }}</p>
+    <div class="sub">Reserva {{ venta.id }}</div>
+  </div>
+
+  <div class="card saldo {% if saldo > 0 %}debe{% else %}pagado{% endif %}">
+    {% if saldo > 0 %}
+      <div class="rot">Saldo por cobrar</div>
+      <div class="monto">${{ saldo_str }}</div>
+      <div class="sub">de ${{ total_str }} total</div>
+    {% else %}
+      <div class="rot">Pagada</div>
+      <div class="monto">$0</div>
+      <div class="sub">No hay nada que cobrar</div>
+    {% endif %}
+  </div>
+
+  {% if fichas_pendientes %}
+  <div class="alerta">
+    ⚠️ <strong>Ficha de bienestar sin completar</strong><br>
+    {% for p in fichas_pendientes %}{{ p.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+    Pídesela ahora, antes del masaje.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="rot" style="color:var(--hint);font-size:13px;text-transform:uppercase;
+                            letter-spacing:.08em;margin-bottom:6px">Contrató</div>
+    {% for l in lineas %}
+      <div class="fila">
+        <span>{{ l.nombre }}</span>
+        <span class="cuando">{% if l.hora %}{{ l.hora }}{% endif %}</span>
+      </div>
+    {% empty %}
+      <div class="fila"><span class="cuando">Sin servicios cargados.</span></div>
+    {% endfor %}
+  </div>
+
+  {% if saldo > 0 %}
+    <a class="btn btn-p" href="{{ url_admin }}">Abrir la reserva y cobrar</a>
+  {% else %}
+    <a class="btn btn-s" href="{{ url_admin }}">Abrir la reserva</a>
+  {% endif %}
+  <a class="btn btn-s" href="{{ url_pase }}">Ver El Pase del cliente</a>
+
+  <p class="pie">Aremko Spa · Puerto Varas</p>
+</div>
+</body>
+</html>

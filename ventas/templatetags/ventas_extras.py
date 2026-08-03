@@ -403,3 +403,17 @@ def dias_cerrados_js(slots_disponibles):
         if not (slots_disponibles.get(nombre) or [])
     ]
     return ','.join(cerrados)
+
+
+@register.filter
+def hora_llegada(llegadas, reserva_id):
+    """'15:04' si esa reserva ya registró llegada, '' si no.
+
+    Existe porque las plantillas de Django no saben buscar en un diccionario con
+    una clave variable, y la agenda arma sus tarjetas en cinco lugares distintos:
+    meter el dato en cada uno sería garantizar que alguno quede sin él.
+    """
+    try:
+        return (llegadas or {}).get(int(reserva_id)) or ''
+    except (TypeError, ValueError):
+        return ''

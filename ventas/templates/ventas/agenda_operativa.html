@@ -1,6 +1,7 @@
 {% extends "admin/base_site.html" %}
 {% load static %}
 {% load humanize %}
+{% load ventas_extras %}
 
 {% block title %}Agenda Operativa del Día{% endblock %}
 
@@ -1196,6 +1197,28 @@
                             <span>👤</span>
                             <span><strong>{{ item.cliente }}</strong></span>
                         </div>
+                        {% comment %}
+                        Llegada. El QR de El Pase la marca solo, pero acá está
+                        el mismo botón para cuando el cliente llega sin celular,
+                        sin batería o sin haber abierto nunca El Pase — que es
+                        como se ha trabajado siempre y tiene que seguir andando.
+                        {% endcomment %}
+                        <div class="detalle-item" id="llegada-{{ item.reserva_id }}">
+                            {% with hora=llegadas|hora_llegada:item.reserva_id %}
+                                {% if hora %}
+                                    <span>✅</span>
+                                    <span style="color:#2E7D32;font-weight:600">Llegó {{ hora }}</span>
+                                {% else %}
+                                    <span>🚪</span>
+                                    <button onclick="marcarLlegada({{ item.reserva_id }})"
+                                            style="background:#00796b;color:#fff;border:none;
+                                                   border-radius:6px;padding:4px 10px;cursor:pointer;
+                                                   font-size:13px">
+                                        Marcar llegada
+                                    </button>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
                         <div class="detalle-item">
                             <span>📋</span>
                             <a href="/admin/ventas/ventareserva/{{ item.reserva_id }}/change/"
@@ -1424,6 +1447,30 @@ function probarSonidoComanda() {
     desbloquearAudio();
     playNotificationSound();
     marcarComandasPendientes(1);  // muestra también cómo se ve el parpadeo
+}
+
+// === Marcar llegada a mano (sin QR) =======================================
+// El camino de siempre: el cliente dice su nombre, se ubica en la agenda y se
+// marca acá. Existe para que el QR nunca sea la única puerta.
+function marcarLlegada(reservaId) {
+    const celda = document.getElementById('llegada-' + reservaId);
+    fetch('/ventas/agenda-operativa/api/marcar-llegada/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({reserva_id: reservaId})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) { alert(data.error || 'No se pudo marcar la llegada'); return; }
+        if (celda) {
+            celda.innerHTML = '<span>✅</span>' +
+                '<span style="color:#2E7D32;font-weight:600">Llegó ' + data.hora + '</span>';
+        }
+    })
+    .catch(function(e) {
+        console.error('Error marcando llegada:', e);
+        alert('No se pudo marcar la llegada. Revisa la conexión.');
+    });
 }
 
 // === Parpadeo del título de la pestaña ====================================

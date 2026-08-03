@@ -53,6 +53,42 @@ def url_ficha_reserva(venta_id):
     return f"{base}{reverse('ventas:ficha_reserva_cliente', kwargs={'token': token_para_reserva(venta_id)})}"
 
 
+def url_llegada(token):
+    """Lo que lleva codificado el QR de El Pase.
+
+    Va la URL COMPLETA (con dominio) porque la cámara del celular la abre en
+    frío, sin ninguna página de origen de la cual heredar el host.
+    """
+    from django.urls import reverse
+    from django.conf import settings
+    base = getattr(settings, 'COMANDA_PUBLIC_BASE_URL', 'https://www.aremko.cl')
+    return f"{base}{reverse('ventas:ficha_llegada', kwargs={'token': token})}"
+
+
+def qr_svg(datos, escala=4):
+    """QR como SVG en línea, listo para incrustar en el HTML.
+
+    SVG y no imagen: no genera archivos, no pasa por Cloudinary, se ve nítido en
+    cualquier pantalla y no agrega una petición más a una página que el cliente
+    abre con datos móviles en el estacionamiento.
+
+    Devuelve '' si algo falla — un QR ausente afea El Pase; una excepción lo
+    deja en blanco, y El Pase tiene que abrir SIEMPRE.
+    """
+    try:
+        import io
+        import segno
+        buf = io.BytesIO()   # segno escribe BYTES, no texto
+        segno.make(datos, error='m').save(
+            buf, kind='svg', scale=escala, border=2,
+            dark='#3A2E1F', light=None,   # transparente: hereda el fondo crema
+            svgclass=None, lineclass=None, xmldecl=False, svgns=True)
+        return buf.getvalue().decode('utf-8')
+    except Exception:  # noqa: BLE001
+        logger.exception('[pase] no se pudo generar el QR')
+        return ''
+
+
 def _url_masaje_ficha(token_formulario):
     """URL pública completa de la ficha de bienestar de UN participante de masaje
     (mismo patrón que url_ficha_reserva; la vista 'masaje_ficha' ya existe —
@@ -224,12 +260,25 @@ def ficha_reserva_cliente(request, token):
     except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
         bebida_personalizable = False
 
+    # QR de llegada + reordenamiento del Pase según el momento del huésped.
+    # Antes de llegar manda "cómo llego y cuánto debo"; una vez adentro manda
+    # "wifi y pedir algo". Que la pantalla cambie sola tras el escaneo es
+    # además lo que le demuestra al cliente que el QR sirvió para algo.
+    from ..llegadas import hora_local, ya_llego
+    llego_en = ya_llego(venta.id)
+    context_qr = {
+        'llego': bool(llego_en),
+        'hora_llegada': hora_local(llego_en),
+        'qr_svg': '' if llego_en else qr_svg(url_llegada(token)),
+    }
+
     context = {
         'venta': venta,
         'numero': venta.id,
         'cliente': venta.cliente,
         'estado_label': estado_label,
         'estado_cls': estado_cls,
+        **context_qr,
         'experiencia_nombre': _experiencia_nombre(tipos_venta),
         'lineas': _lineas_servicios(venta),
         'total_str': _clp(venta.total),
@@ -257,6 +306,62 @@ def ficha_reserva_cliente(request, token):
         'bebida_guardado': request.GET.get('bebida'),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
+
+
+def ficha_llegada(request, token):
+    """Lo que abre el QR de El Pase al escanearlo.
+
+    MISMA URL para los dos que pueden escanear, y eso es a propósito:
+
+    · **Recepción** (sesión de personal iniciada en el celular) → registra la
+      llegada y ve en pantalla lo único que necesita en ese segundo: nombre,
+      qué contrató, a qué hora, y cuánto debe. Ahí es cuando se cobra.
+    · **El propio cliente**, que apunta la cámara a su pantalla por curiosidad
+      → cae en su Pase de siempre. No registra nada ni ve datos internos.
+
+    Un solo link evita el error clásico de tener dos y que en el mesón se use
+    el equivocado. Y el celular de recepción NO necesita ninguna app: la cámara
+    abre el navegador, que ya tiene la sesión.
+    """
+    from django.urls import reverse
+
+    from ..llegadas import VIA_QR, hora_local, registrar_llegada, ya_llego
+
+    venta = _venta_desde_token(token)
+    usuario = getattr(request, 'user', None)
+
+    if not (getattr(usuario, 'is_authenticated', False) and usuario.is_staff):
+        # No es personal: que vea su Pase y siga su vida.
+        return redirect('ventas:ficha_reserva_cliente', token=token)
+
+    cuando, recien = registrar_llegada(venta, usuario=usuario, via=VIA_QR)
+    if cuando is None:
+        cuando = ya_llego(venta.id)   # el registro falló; se muestra igual
+
+    tipos_venta = list(
+        venta.reservaservicios.select_related('servicio')
+        .values_list('servicio__tipo_servicio', flat=True))
+    try:
+        participantes = _participantes_masaje_ficha(venta, tipos_venta)
+    except Exception:  # noqa: BLE001
+        logger.exception('[llegada] participantes de masaje (reserva %s)', venta.id)
+        participantes = []
+
+    saldo = int(venta.saldo_pendiente or 0)
+    return render(request, 'ventas/llegada_recepcion.html', {
+        'venta': venta,
+        'cliente': venta.cliente,
+        'lineas': [l for l in _lineas_servicios(venta) if not l['es_descuento']],
+        'saldo': saldo,
+        'saldo_str': _clp(saldo),
+        'total_str': _clp(venta.total),
+        'recien': recien,
+        'hora_llegada': hora_local(cuando),
+        # Lo que hay que resolver EN EL MESÓN, no después.
+        'fichas_pendientes': [p for p in participantes if not p['completada']],
+        'url_admin': f'/admin/ventas/ventareserva/{venta.id}/change/',
+        'url_pase': reverse('ventas:ficha_reserva_cliente', kwargs={'token': token}),
+    })
 
 
 def ficha_reserva_pagar(request, token):

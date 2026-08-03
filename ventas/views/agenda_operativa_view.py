@@ -83,6 +83,28 @@ def comandas_para_cocina(hoy):
     )
 
 
+def _ids_de_reserva(agenda_ordenada):
+    """Todas las reservas que aparecen hoy en la agenda, sin repetir."""
+    ids = set()
+    for bloque in agenda_ordenada or []:
+        for item in (bloque.get('items') or []):
+            rid = item.get('reserva_id')
+            if rid:
+                ids.add(rid)
+    return ids
+
+
+def _llegadas_de_la_agenda(agenda_ordenada):
+    """{reserva_id: '15:04'} para pintar quién ya está adentro.
+
+    Una sola consulta para toda la pantalla, y el formato de hora resuelto acá:
+    la plantilla solo imprime lo que recibe.
+    """
+    from ..llegadas import hora_local, llegadas_de
+    return {rid: hora_local(cuando)
+            for rid, cuando in llegadas_de(_ids_de_reserva(agenda_ordenada)).items()}
+
+
 def comandas_fuera_de_hoy(hoy):
     """Pendientes que NO entran hoy (quedan para otro día).
 
@@ -918,6 +940,7 @@ def agenda_operativa(request):
         'filtro_vista': filtro_vista,
         'comandas_pendientes': comandas_data,
         'comandas_otro_dia': comandas_fuera_de_hoy(hoy),
+        'llegadas': _llegadas_de_la_agenda(agenda_ordenada),
         'checkouts': checkouts,
         'checkout_por_cobrar': checkout_por_cobrar,
         'checkout_deudores': checkout_deudores,
@@ -971,6 +994,42 @@ def comandas_pendientes_api(request):
         })
 
     return JsonResponse({'success': True, 'comandas': data})
+
+
+# ---------------------------------------------------------------------------
+# AJAX: marcar llegada a mano (el plan B del QR)
+# ---------------------------------------------------------------------------
+
+@staff_required
+@require_http_methods(["POST"])
+def marcar_llegada_api(request):
+    """Marca la llegada desde la agenda, sin QR de por medio.
+
+    Este camino NO es un respaldo de segunda: es como se ha trabajado siempre
+    —llega alguien, dice su nombre, se busca en la agenda del día— y tiene que
+    seguir funcionando igual de bien. Sin celular, sin batería, sin señal o con
+    un cliente que nunca abrió El Pase, recepción marca acá y sigue.
+
+    Body JSON: { reserva_id: int }
+    """
+    from ..llegadas import VIA_MANUAL, hora_local, registrar_llegada
+
+    try:
+        data = json.loads(request.body)
+        venta = VentaReserva.objects.select_related('cliente').get(
+            id=data.get('reserva_id'))
+    except (ValueError, TypeError, VentaReserva.DoesNotExist):
+        return JsonResponse({'success': False, 'error': 'Reserva no encontrada'},
+                            status=404)
+
+    cuando, recien = registrar_llegada(venta, usuario=request.user, via=VIA_MANUAL)
+    if cuando is None:
+        return JsonResponse({'success': False, 'error': 'No se pudo registrar'},
+                            status=500)
+    # `recien=False` (ya estaba marcada) NO es un error: la respuesta es exitosa
+    # igual, con la hora real de llegada.
+    return JsonResponse({'success': True, 'recien': recien,
+                         'hora': hora_local(cuando)})
 
 
 # ---------------------------------------------------------------------------
