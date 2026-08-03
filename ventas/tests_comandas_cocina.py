@@ -397,3 +397,80 @@ class CerrarComandasAntiguasTest(_Base):
         self.assertEqual(unidades, 6)      # 1 + 4 + 1
         self.assertEqual(comandas, 2)      # cuenta comandas, no líneas
         self.assertEqual(stock, 99)        # el stock de hoy, para comparar
+
+
+class QueSePreparaEnCocinaTest(TestCase):
+    """Qué entra a una comanda auto-creada y qué no.
+
+    Se destapó al cerrar las 83 viejas (Jorge, 2026-08-03): entre los pedidos
+    había **316 "Gift Cards"**, un "Producto temporal para pago giftcard" y
+    líneas de "Descuento -1000". Nada de eso se prepara. Ensuciaba la agenda
+    —pedidos que nadie debe atender— y el inventario, porque al cerrarlas se
+    descontaba stock de algo que no existe físicamente.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from .models import CategoriaProducto
+        cls.cat_normal = CategoriaProducto.objects.create(id=9351, nombre='Comestibles')
+        cls.cat_gift = CategoriaProducto.objects.create(id=9352, nombre='Gift Cards')
+        cls.cat_sueldos = CategoriaProducto.objects.create(id=9353, nombre='Sueldos')
+
+    def _producto(self, pk, nombre, categoria=None, precio=3000):
+        return Producto.objects.create(
+            id=pk, nombre=nombre, precio_base=Decimal(precio),
+            cantidad_disponible=10, categoria=categoria)
+
+    def _entra(self, producto):
+        from ventas.admin import _se_prepara_en_cocina
+        return _se_prepara_en_cocina(producto)
+
+    def test_una_tabla_de_quesos_SI_entra(self):
+        self.assertTrue(self._entra(
+            self._producto(9361, 'Tabla Mixta de Quesos y Jamones', self.cat_normal)))
+
+    def test_las_giftcards_NO_entran(self):
+        """316 unidades aparecieron en las comandas viejas."""
+        self.assertFalse(self._entra(
+            self._producto(9362, 'Gift Card $50.000', self.cat_gift)))
+
+    def test_el_producto_tecnico_del_pago_NO_entra(self):
+        """Puede vivir en cualquier categoría: se delata por el nombre."""
+        self.assertFalse(self._entra(
+            self._producto(9363, 'Producto temporal para pago giftcard', self.cat_normal)))
+
+    def test_los_descuentos_NO_entran(self):
+        for pk, nombre in ((9364, 'Descuento -1000'), (9365, 'DTO especial'),
+                           (9366, '-500 ajuste')):
+            self.assertFalse(self._entra(self._producto(pk, nombre, self.cat_normal)), nombre)
+
+    def test_un_precio_negativo_NO_entra_aunque_el_nombre_sea_inocente(self):
+        self.assertFalse(self._entra(
+            self._producto(9367, 'Ajuste comercial', self.cat_normal, precio=-1000)))
+
+    def test_las_categorias_contables_NO_entran(self):
+        self.assertFalse(self._entra(
+            self._producto(9368, 'Sueldo mensual', self.cat_sueldos)))
+
+    def test_sin_producto_o_sin_nombre_no_revienta(self):
+        self.assertFalse(self._entra(None))
+        self.assertFalse(self._entra(self._producto(9369, '', self.cat_normal)))
+
+    def test_un_producto_sin_categoria_SI_entra(self):
+        """Permisivo a propósito: hay productos vendibles sin categoría, y
+        dejarlos fuera los volvería invisibles para cocina."""
+        self.assertTrue(self._entra(self._producto(9370, 'Jugo natural de melón')))
+
+    def test_el_cron_diario_LO_LLAMA(self):
+        """Sin esto, el cierre automático existe pero nunca corre — y las
+        comandas se vuelven a acumular en silencio, que es de donde venimos."""
+        import io
+        import os
+        from django.conf import settings
+        ruta = os.path.join(settings.BASE_DIR, 'ventas', 'management', 'commands',
+                            'send_communication_triggers.py')
+        fuente = io.open(ruta, encoding='utf-8').read()
+        self.assertIn("call_command('cerrar_comandas_antiguas'", fuente)
+        self.assertIn('_run_cierre_comandas_antiguas', fuente)
+        # Y que esté en la lista que se ejecuta, no solo definido.
+        self.assertIn('self._run_cierre_comandas_antiguas)', fuente)

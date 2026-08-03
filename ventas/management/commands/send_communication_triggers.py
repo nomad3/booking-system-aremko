@@ -174,6 +174,25 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Error en entregas de inventario: {str(e)}"))
 
+    def _run_cierre_comandas_antiguas(self):
+        """Cierra las comandas que quedaron abiertas de visitas ya pasadas.
+
+        Sin esto se acumulan: el 2026-08-03 había 83 abiertas, 60 de ellas del
+        mes anterior, y con ese número el aviso de la agenda se vuelve ruido de
+        fondo y deja de servir para lo que se creó.
+
+        Con 3 días de margen —el mismo del checkout rezagado—, para que el
+        equipo alcance a cerrarlas a mano si corresponde antes de que el cron
+        las dé por entregadas.
+        """
+        from django.core.management import call_command
+        self.stdout.write("🧾 Cerrando comandas de visitas ya pasadas...")
+        try:
+            call_command('cerrar_comandas_antiguas', aplicar=True, dias=3)
+            self.stdout.write(self.style.SUCCESS("✅ Comandas antiguas cerradas"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"❌ Error cerrando comandas antiguas: {str(e)}"))
+
     def _run_seguimientos_masaje(self):
         """Envía los seguimientos de bienestar de masaje vencidos (si están activados)."""
         from django.core.management import call_command
@@ -195,6 +214,10 @@ class Command(BaseCommand):
             ("🔄 Reactivación", self._run_reactivation_campaigns),
             ("👑 VIP", self._run_vip_newsletters),
             ("📦 Entregas inventario (comandas vencidas)", self._run_inventory_deliveries),
+            # Va DESPUÉS de las entregas: el paso anterior descuenta el stock de
+            # las vencidas, así que cuando llega este el inventario ya está al
+            # día y cerrar no mueve nada.
+            ("🧾 Cierre de comandas antiguas", self._run_cierre_comandas_antiguas),
             ("🧖 Seguimientos de masaje", self._run_seguimientos_masaje),
         ]
         

@@ -443,6 +443,48 @@ from django.utils.html import format_html as _format_html_masaje
 MASAJE_BASE_URL = "https://www.aremko.cl"
 
 
+def _se_prepara_en_cocina(producto):
+    """¿Este "producto" es algo que alguien tiene que preparar y entregar?
+
+    Se destapó cerrando las 83 comandas viejas (Jorge, 2026-08-03): entre los
+    pedidos había **316 "Gift Cards"**, un "Producto temporal para pago
+    giftcard" y líneas de "Descuento -1000". Nada de eso se prepara en cocina.
+    Ensuciaba dos cosas a la vez: la agenda —pedidos que nadie debe atender— y
+    el inventario, porque al cerrarlas se descontaba stock de algo que no existe
+    físicamente.
+
+    Se reutiliza `CATEGORIAS_PRODUCTO_INTERNAS` (la misma lista de H-088 que ya
+    filtra el catálogo de la bandeja) en vez de escribir otra: dos listas de lo
+    mismo se desincronizan siempre, y la primera vez que pase nadie se va a dar
+    cuenta.
+    """
+    from ventas.views.luna_api_views import CATEGORIAS_PRODUCTO_INTERNAS
+
+    if producto is None:
+        return False
+
+    categoria = getattr(getattr(producto, 'categoria', None), 'nombre', '') or ''
+    if categoria.strip() in CATEGORIAS_PRODUCTO_INTERNAS:
+        return False
+
+    # La categoría no siempre alcanza: "Producto temporal para pago giftcard"
+    # puede vivir en cualquier parte, y los descuentos a veces solo se delatan
+    # por el nombre o por venir en negativo.
+    nombre = str(producto.nombre or '').strip().lower()
+    if not nombre:
+        return False
+    if any(t in nombre for t in ('descuento', 'dto', 'giftcard', 'gift card')):
+        return False
+    if nombre.startswith('-'):
+        return False
+    try:
+        if float(producto.precio_base or 0) < 0:
+            return False
+    except (TypeError, ValueError):
+        pass
+    return True
+
+
 def _masaje_link_copiable(url, etiqueta="Copiar link"):
     """Widget de admin: campo de solo-lectura con la URL + botón que la copia al
     portapapeles (para que Deborah la pegue en WhatsApp en vez de abrirla)."""
@@ -677,17 +719,12 @@ class VentaReservaAdmin(admin.ModelAdmin):
             .values_list('producto_id', flat=True)
         )
         faltantes = []
-        for rp in venta.reservaproductos.select_related('producto'):
+        for rp in venta.reservaproductos.select_related('producto', 'producto__categoria'):
             p = rp.producto
             if not p or rp.producto_id in cubiertos:
                 continue
-            nombre = str(p.nombre or '').strip().lower()
-            es_descuento = (
-                'descuento' in nombre or 'dto' in nombre
-                or nombre.startswith('-') or float(p.precio_base or 0) < 0
-            )
-            if es_descuento:
-                continue  # los descuentos no se preparan en cocina
+            if not _se_prepara_en_cocina(p):
+                continue
             faltantes.append(rp)
         if not faltantes:
             logger.info(
