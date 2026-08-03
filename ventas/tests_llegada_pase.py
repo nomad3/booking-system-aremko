@@ -446,3 +446,37 @@ class LlegadaMueveElCheckinTest(_Base):
 
     def test_marcar_checkin_es_seguro_con_basura(self):
         self.assertFalse(marcar_checkin(None))
+
+
+class ManualDeRecepcionTest(_Base):
+    """El manual del ciclo completo, para el equipo (Jorge, 2026-08-03)."""
+
+    def test_abre_para_el_personal(self):
+        self._staff()
+        r = self.client.get(reverse('ventas:manual_recepcion'))
+        self.assertEqual(r.status_code, 200)
+
+    def test_NO_es_publico(self):
+        r = self.client.get(reverse('ventas:manual_recepcion'))
+        self.assertIn(r.status_code, (302, 403))
+
+    def test_cubre_el_ciclo_completo_de_punta_a_punta(self):
+        self._staff()
+        cuerpo = self.client.get(reverse('ventas:manual_recepcion')).content.decode()
+        for hito in ('Llega la consulta', 'Se confirma el pago', 'Le mandas El Pase',
+                     'Llega a Aremko', 'Durante la estadía', 'Se va'):
+            self.assertIn(hito, cuerpo, hito)
+
+    def test_incluye_el_plan_B_del_QR(self):
+        """Lo que más se va a necesitar en el peor momento."""
+        self._staff()
+        cuerpo = self.client.get(reverse('ventas:manual_recepcion')).content.decode()
+        self.assertIn('Marcar llegada', cuerpo)
+        self.assertIn('sin batería', cuerpo)
+
+    def test_se_llega_desde_la_agenda(self):
+        """En un cajón no se lee: tiene que estar a un clic de donde se trabaja."""
+        self._staff()
+        agenda = self.client.get(reverse('ventas:agenda_operativa')).content.decode()
+        self.assertIn(reverse('ventas:manual_recepcion'), agenda)
+        self.assertIn('📖 Manual', agenda)

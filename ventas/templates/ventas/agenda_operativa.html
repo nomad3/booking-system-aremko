@@ -901,6 +901,12 @@
                     onclick="probarSonidoComanda()" title="Suena igual que cuando entra una comanda">
                 🔊 Probar sonido
             </button>
+            {# El manual vive a un clic de donde se trabaja: en un cajón no se lee. #}
+            <a href="{% url 'ventas:manual_recepcion' %}" target="_blank"
+               class="btn-actualizar" style="background:#5D4037;"
+               title="El ciclo completo, de la reserva a la llegada">
+                📖 Manual
+            </a>
             {% if not debug_mode %}
             <a href="?filtro={{ filtro_vista }}&debug=true" class="btn-actualizar" style="background: #9C27B0;">
                 🐛 Modo Debug

@@ -1,0 +1,273 @@
+{% comment %}
+Manual de recepción — el ciclo completo, de la consulta a la llegada.
+
+Pedido por Jorge (2026-08-03) para Deborah. Vive DENTRO del sistema y no como
+documento suelto por una razón práctica: acá se actualiza cuando cambia el
+flujo, y un manual que envejece es peor que no tener manual — enseña a hacer
+algo que ya no existe y nadie se entera.
+
+Pensado para leerse en el celular parada en el mesón: pasos numerados, lo que
+hay que apretar en negrita, y los "si falla" al lado del paso que falla, no en
+un anexo al final.
+{% endcomment %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Manual de recepción · Aremko</title>
+<style>
+  :root{
+    --bg:#F2E8D8; --surface:#FFFDF9; --ink:#2E2A24; --muted:#7C736A; --hint:#A99F90;
+    --line:#EADFCD; --line2:#DBCDB4; --brand:#BC5630; --ok:#436327; --ok-bg:#E2EAD6;
+    --warn-bg:#FFF8E1; --warn-fg:#8A5A12; --azul:#2C597F; --azul-bg:#DEE6EF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    padding:16px;font-size:16px}
+  .wrap{max-width:760px;margin:0 auto}
+  header{background:var(--surface);border:1px solid var(--line2);border-radius:18px;
+    padding:22px;margin-bottom:16px}
+  h1{margin:0 0 4px;font-size:24px;color:var(--brand)}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  .intro{background:var(--azul-bg);color:var(--azul);border-radius:12px;
+    padding:14px 16px;margin-top:16px;font-size:15px}
+
+  .paso{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px;margin-bottom:14px}
+  .paso.clave{border:2px solid var(--brand);box-shadow:0 4px 16px rgba(188,86,48,.10)}
+  .num{display:inline-flex;align-items:center;justify-content:center;
+    width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;
+    font-weight:700;font-size:15px;margin-right:10px;flex-shrink:0}
+  .paso h2{display:flex;align-items:center;margin:0 0 4px;font-size:19px}
+  .cuando{color:var(--hint);font-size:13px;margin:0 0 12px 40px;text-transform:uppercase;
+    letter-spacing:.05em}
+  .paso .cuerpo{margin-left:40px}
+  @media(max-width:520px){ .paso .cuerpo,.cuando{margin-left:0} }
+
+  .badge-clave{background:var(--brand);color:#fff;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;margin-left:auto;letter-spacing:.05em}
+  ol.pasos{margin:10px 0;padding-left:20px}
+  ol.pasos li{margin-bottom:7px}
+  .btn-ref{display:inline-block;background:var(--bg);border:1px solid var(--line2);
+    border-radius:6px;padding:1px 8px;font-size:14px;font-weight:600;white-space:nowrap}
+  .dice{background:var(--bg);border-left:3px solid var(--line2);border-radius:8px;
+    padding:12px 14px;margin:10px 0;font-style:italic;color:#544E45}
+  .ojo{background:var(--warn-bg);color:var(--warn-fg);border-radius:10px;
+    padding:12px 14px;margin-top:12px;font-size:14.5px}
+  .ojo b{display:block;margin-bottom:2px}
+  .bien{background:var(--ok-bg);color:var(--ok);border-radius:10px;
+    padding:12px 14px;margin-top:12px;font-size:14.5px}
+  a{color:var(--brand)}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14.5px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--hint);font-weight:600;font-size:12px;text-transform:uppercase;
+    letter-spacing:.05em}
+  .pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:4px;color:#fff;
+    white-space:nowrap}
+  .p-pen{background:#FF9800} .p-in{background:#2196F3} .p-out{background:#9E9E9E}
+  .foot{text-align:center;color:var(--hint);font-size:13px;margin:24px 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Manual de recepción</h1>
+    <p class="sub">De la consulta del cliente hasta que entra por la puerta</p>
+    <div class="intro">
+      Lo que más cambia el resultado no es ningún botón: es <strong>la conversación
+      del paso 3</strong>. Un cliente que abrió El Pase antes de llegar pregunta
+      menos, pide más y se va sabiendo usar todo. Uno que no lo abrió llega
+      preguntando dónde está el wifi.
+    </div>
+  </header>
+
+  <!-- 1 -->
+  <div class="paso">
+    <h2><span class="num">1</span> Llega la consulta</h2>
+    <p class="cuando">WhatsApp · Instagram · la web</p>
+    <div class="cuerpo">
+      <p>Luna responde sola las consultas de horarios, precios y disponibilidad, y
+      arma la cotización. Tú entras cuando el caso se sale de lo común o cuando
+      Luna escala.</p>
+      <p>La cotización le llega al cliente como una página con botón
+      <span class="btn-ref">Aprobar ✅</span>. Cuando la aprueba, se convierte en
+      reserva.</p>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="paso">
+    <h2><span class="num">2</span> Se confirma el pago</h2>
+    <p class="cuando">Transferencia o pago online</p>
+    <div class="cuerpo">
+      <p>El cliente puede pagar de dos formas, y en las dos el saldo se actualiza solo:</p>
+      <ol class="pasos">
+        <li><strong>Transferencia</strong> — los datos están en El Pase, en
+          <span class="btn-ref">Datos para transferir</span>, con botón para copiar
+          cada dato.</li>
+        <li><strong>Pago online</strong> — botón
+          <span class="btn-ref">💳 Pagar online</span>, hasta 12 cuotas.</li>
+      </ol>
+      <div class="ojo">
+        <b>Ojo</b>
+        Mientras la reserva esté <strong>pendiente de pago</strong>, el sistema
+        avisa al cliente que tiene 2 horas para completarla. No lo tomes como que
+        se anula sola siempre — si ves algo raro, revisa la reserva.
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 — EL PASO CLAVE -->
+  <div class="paso clave">
+    <h2><span class="num">3</span> Le mandas El Pase <span class="badge-clave">EL PASO CLAVE</span></h2>
+    <p class="cuando">Apenas paga — no después</p>
+    <div class="cuerpo">
+      <p>Este es el momento en que el cliente <strong>está mirando el teléfono y te
+      está poniendo atención</strong>. Una hora más tarde ya no abre nada.</p>
+
+      <p>En el admin, abre la reserva y busca el bloque
+      <span class="btn-ref">🔑 El Pase del cliente</span>. Ahí tienes el mensaje
+      listo con <span class="btn-ref">📋 Copiar mensaje</span> y
+      <span class="btn-ref">💬 Abrir WhatsApp con el mensaje listo</span>.</p>
+
+      <p><strong>Mándaselo y recórrelo con él</strong>, en este orden. Cada paso
+      termina cuando el cliente te dice “sí, lo veo”:</p>
+
+      <div class="dice">
+        <p style="margin:0 0 8px">— Te mandé tu Pase. <strong>Adentro está el QR
+        que muestras al llegar.</strong></p>
+        <p style="margin:0 0 8px">— Ábrelo y anda a <strong>Tips</strong>, ahí están
+        las claves de wifi de cada sector. Revísalas.</p>
+        <p style="margin:0 0 8px">— Más abajo hay un botón que te abre el mapa
+        para llegar.</p>
+        <p style="margin:0 0 8px">— Y tienes la <strong>comanda digital</strong>:
+        puedes pedir desde tu tina o cabaña sin caminar hasta la cafetería.</p>
+        <p style="margin:0"><em>(Si tiene masajes)</em> — Comparte con tu
+        acompañante <strong>la ficha de bienestar</strong> para que la complete
+        antes de venir.</p>
+      </div>
+
+      <div class="bien">
+        <b>Por qué el QR primero</b>
+        No sirve para controlar el ingreso: sirve para que abra la pantalla. Una
+        vez abierta, ve todo lo demás — y ahí es cuando aprende a usarlo.
+      </div>
+
+      <div class="ojo">
+        <b>Los dos pasos que venden</b>
+        La <strong>comanda</strong> es venta directa: pedir sin levantarse. Y la
+        <strong>ficha del acompañante</strong> abre solo la pregunta “¿y tu
+        acompañante también quiere masaje?”. Los otros dos no venden, pero son los
+        que enseñan a abrir El Pase — no los saltes.
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="paso">
+    <h2><span class="num">4</span> Llega a Aremko</h2>
+    <p class="cuando">En el mesón</p>
+    <div class="cuerpo">
+      <p>Le pides el Pase, escaneas el QR con el <strong>celular de recepción</strong>
+      y en la pantalla te aparece de una vez:</p>
+      <ol class="pasos">
+        <li>El nombre y la reserva</li>
+        <li><strong>El saldo, en grande</strong> — si debe, sale en rojo. Ese es el
+          momento de cobrar</li>
+        <li>Qué contrató y a qué hora</li>
+        <li>Aviso si falta alguna ficha de masaje por completar</li>
+      </ol>
+      <p>Con el escaneo quedan hechas <strong>dos cosas de una vez</strong>: se
+      registra la hora de llegada y la reserva pasa de
+      <span class="pill p-pen">Pendiente</span> a
+      <span class="pill p-in">Check-in</span>.</p>
+
+      <div class="ojo">
+        <b>Si el QR no funciona — nunca es un problema</b>
+        Sin celular, sin batería, sin señal, o si nunca abrió El Pase: sigues como
+        siempre. Buscas al cliente por su nombre en la Agenda Operativa y aprietas
+        <span class="btn-ref">Marcar llegada</span>. Hace exactamente lo mismo.
+      </div>
+
+      <div class="bien">
+        <b>Escanear dos veces no rompe nada</b>
+        Si el cliente muestra el QR de nuevo, te dice “ya estaba registrado” con la
+        hora real de llegada. No duplica ni cambia la hora.
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="paso">
+    <h2><span class="num">5</span> Durante la estadía</h2>
+    <p class="cuando">Agenda Operativa</p>
+    <div class="cuerpo">
+      <p>Cuando el cliente hace un pedido desde su tina, <strong>suena una alerta</strong>
+      en la Agenda Operativa y el pedido aparece en
+      <span class="btn-ref">🍽️ Comandas de Clientes</span>.</p>
+      <ul>
+        <li>El sonido se puede probar cuando quieras con
+          <span class="btn-ref">🔊 Probar sonido</span>, para calibrar el volumen del
+          equipo.</li>
+        <li>Si estás en otra pestaña, <strong>el nombre de la pestaña parpadea</strong>.</li>
+        <li>Marca el pedido como entregado cuando salga. Así no se acumulan.</li>
+      </ul>
+      <div class="ojo">
+        <b>Si no suena</b>
+        La primera vez que abres la agenda, el navegador no deja sonar hasta que
+        hagas un clic en la página. Aprieta <span class="btn-ref">🔊 Probar sonido</span>
+        una vez al empezar el turno y queda habilitado.
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="paso">
+    <h2><span class="num">6</span> Se va</h2>
+    <p class="cuando">Botón Checkout</p>
+    <div class="cuerpo">
+      <p>En la Agenda Operativa, el botón
+      <span class="btn-ref">🔑 Checkout</span> te muestra quiénes se van hoy y
+      <strong>cuánto debe cada uno</strong>, con enlace directo a la reserva para cobrar.</p>
+      <p>Arrastra también las salidas de los <strong>3 días anteriores que quedaron
+      debiendo</strong>, para que un cobro no se pierda si nadie lo notó ese día.</p>
+    </div>
+  </div>
+
+  <!-- Referencia -->
+  <div class="paso">
+    <h2><span class="num">?</span> Los estados, de un vistazo</h2>
+    <div class="cuerpo">
+      <table>
+        <tr><th>Estado</th><th>Qué significa</th></tr>
+        <tr>
+          <td><span class="pill p-pen">Pendiente</span></td>
+          <td>Todavía no llega</td>
+        </tr>
+        <tr>
+          <td><span class="pill p-in">Check-in</span></td>
+          <td>Está adentro. Puede pedir por la comanda</td>
+        </tr>
+        <tr>
+          <td><span class="pill p-out">Check-out</span></td>
+          <td>Ya se fue. La comanda queda cerrada</td>
+        </tr>
+      </table>
+      <div class="ojo" style="margin-top:16px">
+        <b>Una reserva puede estar pagada y aun así en Pendiente</b>
+        Son dos cosas distintas: <strong>pagada</strong> habla de la plata,
+        <strong>check-in</strong> de si la persona ya está adentro.
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">Aremko Spa · Puerto Varas<br>
+  Si algo de este manual no calza con lo que ves en pantalla, avísale a Jorge —
+  significa que el sistema cambió y el manual quedó atrás.</p>
+</div>
+</body>
+</html>

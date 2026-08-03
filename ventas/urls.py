@@ -46,6 +46,7 @@ urlpatterns = [
     path('inventario/ajustar/<int:producto_id>/', inventario_view.ajustar_inventario, name='ajustar_inventario'),
     # Agenda Operativa del Día
     path('agenda-operativa/', agenda_operativa_view.agenda_operativa, name='agenda_operativa'),
+    path('manual-recepcion/', agenda_operativa_view.manual_recepcion, name='manual_recepcion'),
     path('agenda-masajes/', agenda_masajes_view.agenda_masajes, name='agenda_masajes'),
     path('masaje/ficha-terapeuta/<int:ficha_id>/', ficha_masajista_view.ficha_masajista, name='ficha_masajista'),
     path('agenda-operativa/api/comandas-pendientes/', agenda_operativa_view.comandas_pendientes_api, name='comandas_pendientes_api'),

@@ -323,6 +323,17 @@ def staff_required(view_func):
     return login_required(decorated_view)
 
 @staff_required
+def manual_recepcion(request):
+    """El ciclo completo de una reserva, para el equipo de recepción.
+
+    Vive DENTRO del sistema y no como documento aparte por una razón práctica:
+    acá se actualiza cuando cambia el flujo. Un manual que envejece es peor que
+    no tener manual — enseña a hacer algo que ya no existe y nadie se entera.
+    """
+    return render(request, 'ventas/manual_recepcion.html')
+
+
+@staff_required
 def agenda_operativa(request):
     """
     Vista principal de la agenda operativa del día.
