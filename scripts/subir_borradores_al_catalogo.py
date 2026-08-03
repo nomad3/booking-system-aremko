@@ -41,6 +41,11 @@ import uuid
 BASE = "https://www.aremko.cl/marketing/api/catalogo/"
 RAIZ = pathlib.Path("/Volumes/JAguilera/AREMKO")
 SUBIBLES = {".jpg", ".jpeg", ".png", ".webp"}
+# Guarda de marca: al catálogo solo entra material real. Un nombre no prueba
+# nada, pero estos aparecen cuando el archivo salió de un generador, y es
+# preferible dejar fuera una foto real que colar una sintética.
+SUENA_A_GENERADA = ("generated", "midjourney", "dall", "chatgpt", "firefly",
+                    "stable-diffusion", "nano-banana", "ai_generated")
 LADO_MAYOR = 2400          # de sobra para una historia vertical
 LIMITE = 15 * 1024 * 1024  # el endpoint corta en 16; se deja margen
 
@@ -130,7 +135,7 @@ def main() -> int:
             reales.setdefault(p.name, p)
 
     en_nube = _ya_en_la_nube(clave)
-    pendientes, videos, sin_archivo = [], 0, 0
+    pendientes, videos, sin_archivo, generadas = [], 0, 0, []
     for c in catalogo:
         if c.get("estado") != op.estado:
             continue
@@ -144,6 +149,9 @@ def main() -> int:
         if c.get("tipo") == "video" or ruta.suffix.lower() in {".mp4", ".mov", ".m4v"}:
             videos += 1
             continue
+        if any(p in nombre.lower() for p in SUENA_A_GENERADA):
+            generadas.append(nombre)
+            continue
         # El nombre con el que va a quedar en la nube: si hay que convertirlo,
         # es el .jpg. Sin esto, volver a correr el script re-subiría todo.
         final = nombre if ruta.suffix.lower() in SUBIBLES else ruta.stem + ".jpg"
@@ -156,6 +164,10 @@ def main() -> int:
 
     print(f"{len(pendientes)} foto(s) para subir · {videos} video(s) que este catálogo no "
           f"acepta · {sin_archivo} del catálogo sin archivo en el disco")
+    if generadas:
+        print(f"  {len(generadas)} fuera por parecer generadas (al catálogo solo entra "
+              f"material real): {', '.join(generadas[:3])}"
+              + (" …" if len(generadas) > 3 else ""))
     if op.en_seco or not pendientes:
         return 0
 
@@ -183,7 +195,10 @@ def main() -> int:
                     "vapor": c.get("vapor") or "no",
                     "decoracion": c.get("decoracion") or "",
                     "personas": bool(c.get("personas")),
-                    "calidad": c.get("calidad") or "media",
+                    # El catálogo del disco tiene «baja» y el de la nube no la
+                    # acepta —solo alta o media—. Entra como media: llega en
+                    # «revisar» igual, así que el que decide si sirve la mira.
+                    "calidad": {"baja": "media"}.get(c.get("calidad"), c.get("calidad") or "media"),
                     "descripcion": (c.get("descripcion") or "")[:300],
                     "etiquetas": c.get("etiquetas") or [],
                     "apto_para": c.get("apto_para") or [],
