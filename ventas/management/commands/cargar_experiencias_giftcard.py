@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Carga las 4 EXPERIENCIAS INSIGNIA como GiftCardExperiencia (docs/
+"""Carga las EXPERIENCIAS INSIGNIA como GiftCardExperiencia (docs/
 PROPUESTA_GIFTCARDS_EXPERIENCIAS.md, decisiones de Jorge 2026-07-05):
 
 - Precio ÚNICO al valor de día de semana (dom-jue), válido CUALQUIER día — decisión
@@ -19,6 +19,29 @@ Uso:
 from django.core.management.base import BaseCommand
 
 INSIGNIAS = [
+    {
+        # Jorge, 2026-08-04: "quiero que agregues tina para dos en las giftcards,
+        # solo aparecen las 4 experiencias".
+        #
+        # OJO al leer esto en el futuro: en julio-2026 la decisión fue la
+        # contraria — "solo se regalan experiencias, no tinas sueltas" (ver el
+        # comentario más abajo). Jorge la revirtió a propósito, no es un olvido.
+        # El razonamiento es sano: a $60.000 es la puerta de entrada del que
+        # quiere regalar algo lindo sin gastar $210.000, y el que entra por la
+        # tina vuelve por el Ritual. Queda PRIMERA por precio (la lista va
+        # ascendente) y es la única sin masaje ni alojamiento.
+        'id_experiencia': 'tina_para_dos',
+        'categoria': 'packs',
+        'nombre': 'Tina para dos · junto al río',
+        'descripcion': 'Tina caliente privada para dos, con el río de fondo. Válida cualquier día.',
+        'descripcion_giftcard': (
+            'Dos horas de tina caliente privada junto al río Pescado, con el agua a '
+            'temperatura y el bosque alrededor. Sin apuro y sin nadie más. La forma más '
+            'simple de regalar Aremko. Válida cualquier día de la semana.'
+        ),
+        'monto_fijo': 60000,
+        'orden': 0,
+    },
     {
         'id_experiencia': 'pausa_junto_al_rio',
         'categoria': 'packs',
@@ -118,13 +141,19 @@ VELADAS = _build_veladas()
 
 # DECISIÓN RADICAL de Jorge (2026-07-05, reforzada al ver la página): "solo se
 # regalan experiencias, no tinas sueltas, no masajes sueltos" — y la GiftCard de
-# monto libre TAMPOCO va. Se desactiva TODO lo que no sea una de las 4 insignia.
+# monto libre TAMPOCO va. Se desactiva TODO lo que no sea una de las insignia.
+#
+# MATIZADA el 2026-08-04: entró "Tina para dos" como quinta insignia. Lo que
+# sigue vigente es el fondo de aquella decisión —no se regala un catálogo, se
+# regalan experiencias elegidas y con nombre—; lo que cambió es que la tina para
+# dos ES una experiencia con nombre propio, no un ítem suelto del catálogo. La
+# GiftCard de monto libre sigue fuera.
 # Reversible: activo=False, se reactivan en el admin.
-CATEGORIAS_QUE_SOBREVIVEN = set()  # nada sobrevive fuera de las 4 insignia
+CATEGORIAS_QUE_SOBREVIVEN = set()  # nada sobrevive fuera de las insignia
 
 
 class Command(BaseCommand):
-    help = "Carga las 4 experiencias insignia y desactiva todo lo demás (radical: solo se regalan experiencias)."
+    help = "Carga las experiencias insignia y desactiva todo lo demás (solo se regalan experiencias con nombre)."
 
     def add_arguments(self, parser):
         parser.add_argument('--aplicar', action='store_true',

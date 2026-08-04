@@ -68,7 +68,10 @@ def giftcard_menu(request):
     # Las 4 insignia en orden fijo de escalera (ascendente de precio). Se identifican
     # por id_experiencia (creadas por cargar_experiencias_giftcard). Jorge (2026-07-05):
     # la GiftCard de monto libre TAMPOCO va — solo las 4 experiencias, nada más.
-    IDS_INSIGNIA = ['pausa_junto_al_rio', 'noche_aguas_calientes', 'ritual_del_rio', 'refugio_aremko']
+    # El orden de esta lista ES el orden en pantalla, y va de menor a mayor precio:
+    # la tina ($60.000) abre como puerta de entrada y el Refugio ($290.000) cierra.
+    IDS_INSIGNIA = ['tina_para_dos', 'pausa_junto_al_rio', 'noche_aguas_calientes',
+                    'ritual_del_rio', 'refugio_aremko']
     por_id = {exp['id']: exp for exp in experiencias}
     experiencias_insignia = [por_id[i] for i in IDS_INSIGNIA if i in por_id]
 
