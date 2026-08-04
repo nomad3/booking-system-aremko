@@ -26,20 +26,29 @@ INSIGNIAS = [
         # OJO al leer esto en el futuro: en julio-2026 la decisión fue la
         # contraria — "solo se regalan experiencias, no tinas sueltas" (ver el
         # comentario más abajo). Jorge la revirtió a propósito, no es un olvido.
-        # El razonamiento es sano: a $60.000 es la puerta de entrada del que
+        # El razonamiento es sano: a $50.000 es la puerta de entrada del que
         # quiere regalar algo lindo sin gastar $210.000, y el que entra por la
         # tina vuelve por el Ritual. Queda PRIMERA por precio (la lista va
         # ascendente) y es la única sin masaje ni alojamiento.
+        #
+        # PRECIO PLANO, decisión de Jorge (2026-08-04): $50.000 para dos
+        # personas, **cualquier tina y cualquier día**. No sigue la tarifa del
+        # catálogo (una tina para dos ronda los $60.000) ni distingue
+        # hidromasaje: es a propósito más barata que comprarla suelta, porque el
+        # trabajo de esta GiftCard es que alguien regale Aremko por primera vez.
+        # Si mañana suben las tinas, este monto NO se mueve solo — hay que
+        # decidirlo acá.
         'id_experiencia': 'tina_para_dos',
         'categoria': 'packs',
         'nombre': 'Tina para dos · junto al río',
-        'descripcion': 'Tina caliente privada para dos, con el río de fondo. Válida cualquier día.',
+        'descripcion': 'Tina caliente privada para dos. Cualquier tina, cualquier día.',
         'descripcion_giftcard': (
-            'Dos horas de tina caliente privada junto al río Pescado, con el agua a '
-            'temperatura y el bosque alrededor. Sin apuro y sin nadie más. La forma más '
-            'simple de regalar Aremko. Válida cualquier día de la semana.'
+            'Una tina caliente privada para dos junto al río Pescado, con el agua a '
+            'temperatura y el bosque alrededor. Sin apuro y sin nadie más. Válida en '
+            'cualquiera de nuestras tinas y cualquier día de la semana — la forma más '
+            'simple de regalar Aremko.'
         ),
-        'monto_fijo': 60000,
+        'monto_fijo': 50000,
         'orden': 0,
     },
     {

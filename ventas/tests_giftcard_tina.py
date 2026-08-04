@@ -6,7 +6,7 @@ todo lo que no fuera una de las 4 insignia. Jorge la revirtió a propósito.
 
 El fondo de aquella decisión sigue en pie: no se regala un catálogo, se regalan
 experiencias elegidas y con nombre. Lo que cambió es que la tina para dos ES una
-experiencia con nombre propio, y a $60.000 es la puerta de entrada de quien
+experiencia con nombre propio, y a $50.000 es la puerta de entrada de quien
 quiere regalar algo lindo sin gastar $210.000.
 
 Ejecutar:
@@ -18,6 +18,7 @@ from ventas.management.commands.cargar_experiencias_giftcard import INSIGNIAS
 
 
 class TinaParaDosTest(TestCase):
+    """Precio PLANO: $50.000 para dos, cualquier tina y cualquier día."""
 
     def _tina(self):
         return next(d for d in INSIGNIAS if d['id_experiencia'] == 'tina_para_dos')
@@ -25,7 +26,7 @@ class TinaParaDosTest(TestCase):
     def test_la_tina_para_dos_existe_como_insignia(self):
         tina = self._tina()
         self.assertEqual(tina['nombre'], 'Tina para dos · junto al río')
-        self.assertEqual(tina['monto_fijo'], 60000)
+        self.assertEqual(tina['monto_fijo'], 50000)
 
     def test_aparece_en_la_vitrina(self):
         """Sin esto la experiencia existe en la base pero NO se ve: la vitrina
@@ -63,3 +64,23 @@ class TinaParaDosTest(TestCase):
     def test_todas_las_insignia_tienen_orden_unico(self):
         ordenes = [d['orden'] for d in INSIGNIAS]
         self.assertEqual(len(ordenes), len(set(ordenes)), 'hay órdenes repetidos')
+
+    def test_el_precio_es_PLANO_y_no_sigue_la_tarifa_del_catalogo(self):
+        """Decisión de Jorge (2026-08-04): $50.000 para dos, cualquier tina y
+        cualquier día — a propósito MÁS BARATA que comprarla suelta (una tina
+        para dos ronda los $60.000), porque el trabajo de esta GiftCard es que
+        alguien regale Aremko por primera vez.
+
+        Si mañana suben las tinas, este monto no se mueve solo: hay que
+        decidirlo. El test está para que el cambio sea deliberado.
+        """
+        self.assertEqual(self._tina()['monto_fijo'], 50000)
+
+    def test_la_descripcion_NO_ata_la_giftcard_a_una_tina_ni_a_un_dia(self):
+        """Si el texto nombrara una tina concreta o un día, recepción tendría que
+        pelear en el mesón con un cliente que leyó otra cosa."""
+        tina = self._tina()
+        texto = (tina['descripcion'] + ' ' + tina['descripcion_giftcard']).lower()
+        self.assertIn('cualquier', texto)
+        for atadura in ('hidromasaje', 'dom-jue', 'lunes a jueves', 'fin de semana'):
+            self.assertNotIn(atadura, texto, atadura)
