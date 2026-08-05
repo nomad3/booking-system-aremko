@@ -5137,6 +5137,28 @@ class EncuestaSatisfaccionAdmin(admin.ModelAdmin):
     marcar_followup_pendiente.short_description = '🔄 Reabrir follow-up (marcar pendiente)'
 
 
+def _delta_reviews(rating_delta, total_delta):
+    """"🔺 +0.10★ / +5" para la columna Δ de un snapshot de reseñas.
+
+    OJO — el número se formatea ANTES de entrar a `format_html`, y esto no es
+    estilo: `format_html` pasa cada argumento por `conditional_escape`, así que
+    llegan convertidos en `SafeString`. Un `{:+.2f}` sobre un texto revienta con
+    «Unknown format code 'f' for object of type 'SafeString'», y eso tiraba un
+    500 en /admin/ventas/reviewsnapshot/ (Jorge, 2026-08-05).
+
+    Estuvo latente desde el primer día: con UN solo snapshot `deltas()` devuelve
+    None y estas columnas mostraban "—", así que nunca se ejecutaba esta línea.
+    Reventó al registrar el segundo. Un camino que solo se recorre la segunda vez
+    es un camino que las pruebas del primer día no tocan.
+    """
+    from django.utils.html import format_html
+
+    rd = float(rating_delta or 0)
+    td = float(total_delta or 0)
+    flecha = '🔺' if rd > 0 else ('🔻' if rd < 0 else '→')
+    return format_html('{} {}★ / {}', flecha, '%+.2f' % rd, '%+.0f' % td)
+
+
 @admin.register(ReviewSnapshot)
 class ReviewSnapshotAdmin(admin.ModelAdmin):
     """Dashboard simple para registrar el snapshot semanal de Google + TripAdvisor.
@@ -5196,22 +5218,14 @@ class ReviewSnapshotAdmin(admin.ModelAdmin):
         d = obj.deltas()
         if not d or d['google_rating_delta'] is None:
             return '—'
-        from django.utils.html import format_html
-        rd = d['google_rating_delta']
-        td = d['google_total_delta'] or 0
-        arrow = '🔺' if rd > 0 else ('🔻' if rd < 0 else '→')
-        return format_html('{} {:+.2f}★ / {:+.0f}', arrow, rd, td)
+        return _delta_reviews(d['google_rating_delta'], d['google_total_delta'])
     google_delta_display.short_description = 'Δ Google'
 
     def tripadvisor_delta_display(self, obj):
         d = obj.deltas()
         if not d or d['tripadvisor_rating_delta'] is None:
             return '—'
-        from django.utils.html import format_html
-        rd = d['tripadvisor_rating_delta']
-        td = d['tripadvisor_total_delta'] or 0
-        arrow = '🔺' if rd > 0 else ('🔻' if rd < 0 else '→')
-        return format_html('{} {:+.2f}★ / {:+.0f}', arrow, rd, td)
+        return _delta_reviews(d['tripadvisor_rating_delta'], d['tripadvisor_total_delta'])
     tripadvisor_delta_display.short_description = 'Δ TripAdvisor'
 
     def google_link(self, obj):
