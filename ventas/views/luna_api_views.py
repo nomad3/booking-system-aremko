@@ -933,14 +933,27 @@ def crear_reserva(request):
                         continue  # un producto inexistente no debe tumbar la reserva
                     cant = int(prod_data.get('cantidad', 1) or 1)
                     # Línea de cocina (comanda) + línea de facturación (ReservaProducto sin fecha).
-                    DetalleComanda.objects.create(
-                        comanda=comanda, producto=producto, cantidad=cant,
-                        precio_unitario=producto.precio_base)
+                    # El descuento SÍ se factura pero NO se prepara: sin este gate,
+                    # agregar un descuento desde el cajón le manda a cocina un
+                    # pedido de "Descuento -1000" (H-097 acababa de sacar 316 de
+                    # esos de las comandas viejas). Mismo criterio, mismo helper.
+                    from ventas.admin import _se_prepara_en_cocina
+                    if _se_prepara_en_cocina(producto):
+                        DetalleComanda.objects.create(
+                            comanda=comanda, producto=producto, cantidad=cant,
+                            precio_unitario=producto.precio_base)
                     ReservaProducto.objects.create(
                         venta_reserva=venta_reserva, producto=producto, cantidad=cant,
                         precio_unitario_venta=producto.precio_base)  # fecha_entrega = NULL
                     # precio_base es Decimal y total_estimado es Decimal: NO mezclar con float.
                     total_estimado += producto.precio_base * cant
+
+                # Si TODO lo agregado era descuento, la comanda quedó sin líneas:
+                # se borra en vez de mandarle a cocina un pedido vacío.
+                if not comanda.detalles.exists():
+                    logger.info('[Luna API] comanda %s sin líneas de cocina '
+                                '(solo descuentos) → se elimina', comanda.id)
+                    comanda.delete()
 
             # 4. Aplicar descuentos. Fuente ÚNICA: PackDescuentoService.descuento_para_servicios,
             # que arma el carrito como espera el motor (masajes divididos por persona). Antes este
@@ -1615,6 +1628,24 @@ CATEGORIAS_PRODUCTO_INTERNAS = [
     'Impuestos', 'Lavanderia', 'Combustible - Reparto', 'Gift Cards',
 ]
 
+# Los descuentos SÍ se pueden agregar al carrito desde el cajón, aunque su
+# categoría esté arriba (Jorge, 2026-08-05: "tengo que agregar un descuento al
+# carrito y no puedo"). Son la única excepción, y por dos motivos a la vez:
+#
+#   · su categoría está en la lista de internas, y
+#   · su `precio_base` es NEGATIVO, así que tampoco pasa el filtro `> 1`
+#     — ese filtro existe para sacar cortesías en $0 y centinelas en $1, y se
+#     llevaba los descuentos por delante sin que nadie lo hubiera decidido.
+#
+# La excepción va acotada a ESTAS categorías. Abrir el filtro entero devolvería
+# al picker las cortesías y los insumos.
+#
+# ⚠️ NO confundir con `_se_prepara_en_cocina()` de admin.py, que EXCLUYE los
+# descuentos de las comandas automáticas (H-097). Son dos filtros con propósitos
+# opuestos: uno decide qué se puede VENDER, el otro qué se PREPARA. Unificarlos
+# devolvería los descuentos a la cocina.
+CATEGORIAS_DESCUENTO = ['Descuento', 'Descuento_Servicio']
+
 
 @api_view(['GET'])
 @authentication_classes([LunaAPIKeyAuthentication])
@@ -1647,19 +1678,34 @@ def catalogo_agregables(request):
                 precio_base__gt=1,
             ).order_by('nombre')
         ]
-        productos = [
-            {
+        def _fila(p):
+            return {
                 'producto_id': p.id,
                 'nombre': p.nombre,
                 'precio': int(p.precio_base),
                 'categoria': p.categoria.nombre if p.categoria else '',
             }
+
+        vendibles = [
+            _fila(p)
             for p in Producto.objects.select_related('categoria')
             .filter(precio_base__gt=1)
             .exclude(categoria__nombre__in=CATEGORIAS_PRODUCTO_INTERNAS)
             .order_by('categoria__nombre', 'nombre')
         ]
-        return Response({'success': True, 'ambientaciones': ambientaciones, 'productos': productos})
+        # Los descuentos van al FINAL y no ordenados alfabéticamente entre la
+        # comida: "Descuento" caería justo después de "Comestibles", y nadie
+        # debería toparse con un descuento mientras busca una tabla de quesos.
+        # De mayor a menor monto (más negativo primero) para que la denominación
+        # grande quede arriba, que es la que se usa para montos altos.
+        descuentos = [
+            _fila(p)
+            for p in Producto.objects.select_related('categoria')
+            .filter(categoria__nombre__in=CATEGORIAS_DESCUENTO, precio_base__lt=0)
+            .order_by('precio_base', 'nombre')
+        ]
+        return Response({'success': True, 'ambientaciones': ambientaciones,
+                         'productos': vendibles + descuentos})
     except Exception as e:
         logger.error(f'[Luna API] Error en catalogo_agregables: {str(e)}', exc_info=True)
         return Response({'success': False, 'error': 'internal_error',
