@@ -1562,6 +1562,9 @@ class CompraAdmin(admin.ModelAdmin):
 
 @admin.register(GiftCard)
 class GiftCardAdmin(admin.ModelAdmin):
+    """GiftCards. Incluye «Ajustar saldo», reservada al dueño (ver más abajo)."""
+
+    actions = ['ajustar_saldo']
     list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
     search_fields = ('codigo', 'cliente_comprador__nombre', 'cliente_destinatario__nombre')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
@@ -1569,6 +1572,97 @@ class GiftCardAdmin(admin.ModelAdmin):
     autocomplete_fields = ['cliente_comprador', 'cliente_destinatario', 'venta_reserva']  # FIX: Agregar venta_reserva para evitar N+1
     change_list_template = 'admin/ventas/giftcard/change_list.html'
     list_select_related = ('cliente_comprador', 'cliente_destinatario', 'venta_reserva')  # Optimizar list view
+
+    # ------------------------------------------------------------------
+    # Ajustar saldo — SOLO EL DUEÑO
+    # ------------------------------------------------------------------
+    # Jorge (2026-08-04): "solo yo como usuario pueda hacerlo, nadie más".
+    #
+    # El candado es `is_superuser` y no un nombre de usuario escrito a mano:
+    # hardcodear "jorge" se rompe el día que cambie de cuenta, y peor, se rompe
+    # en silencio. Superusuario es el concepto que Django ya tiene para esto.
+    #
+    # Va en DOS capas a propósito:
+    #   1. `get_actions` esconde la acción del desplegable.
+    #   2. La acción misma vuelve a preguntar antes de tocar nada.
+    # Esconder no es bloquear: el desplegable se puede falsificar con un POST
+    # armado a mano. La que protege de verdad es la segunda.
+    #
+    # `monto_disponible` sigue en readonly_fields: este es el ÚNICO camino para
+    # moverlo, y deja rastro. Un campo editable a mano no dejaría ninguno.
+    def get_actions(self, request):
+        acciones = super().get_actions(request)
+        if not request.user.is_superuser:
+            acciones.pop('ajustar_saldo', None)
+        return acciones
+
+    @admin.action(description='💳 Ajustar saldo (solo el dueño)')
+    def ajustar_saldo(self, request, queryset):
+        from django.contrib.admin.models import CHANGE, LogEntry
+        from django.contrib.contenttypes.models import ContentType
+        from django.shortcuts import render as _render
+
+        # Capa 2: el guardia real. No confía en que la acción haya estado oculta.
+        if not request.user.is_superuser:
+            self.message_user(
+                request, 'Solo el dueño puede ajustar el saldo de una GiftCard.',
+                level=messages.ERROR)
+            return None
+
+        if 'aplicar' in request.POST:
+            try:
+                nuevo = int(str(request.POST.get('nuevo_monto', '')).replace('.', '').strip())
+            except (TypeError, ValueError):
+                nuevo = -1
+            motivo = (request.POST.get('motivo') or '').strip()
+
+            if nuevo < 0:
+                self.message_user(request, 'El monto no es válido.', level=messages.ERROR)
+                return None
+            if not motivo:
+                self.message_user(request, 'El motivo es obligatorio: es lo único que '
+                                           'explica el ajuste dentro de seis meses.',
+                                  level=messages.ERROR)
+                return None
+
+            ct = ContentType.objects.get_for_model(GiftCard)
+            for gc in queryset:
+                antes_disp, antes_ini = gc.monto_disponible, gc.monto_inicial
+                # Si NUNCA se usó, es una reemisión y el inicial también cambia.
+                # Si ya se usó en parte, es una recarga: el inicial es el registro
+                # histórico de por cuánto se emitió y no se toca.
+                sin_usar = antes_disp == antes_ini
+                gc.monto_disponible = nuevo
+                if sin_usar:
+                    gc.monto_inicial = nuevo
+                if nuevo > 0 and gc.estado == 'cobrado':
+                    gc.estado = 'por_cobrar'   # tenía saldo 0 y ahora tiene
+                gc.save()
+
+                detalle = (f'Saldo ajustado de ${antes_disp:,.0f} a ${nuevo:,.0f}'
+                           f'{" (reemisión: también el monto inicial)" if sin_usar else " (recarga)"}. '
+                           f'Motivo: {motivo}').replace(',', '.')
+                LogEntry.objects.log_action(
+                    user_id=request.user.pk, content_type_id=ct.pk,
+                    object_id=gc.pk, object_repr=str(gc),
+                    action_flag=CHANGE, change_message=detalle)
+                logger.warning('[giftcard] %s ajustó %s: %s',
+                               request.user.username, gc.codigo, detalle)
+
+            self.message_user(
+                request,
+                f'{queryset.count()} GiftCard(s) ajustada(s) a ${nuevo:,.0f}. '
+                'Queda registrado en el Historial de cada una.'.replace(',', '.'),
+                level=messages.SUCCESS)
+            return None
+
+        # Primera pasada: mostrar el formulario.
+        return _render(request, 'admin/ventas/giftcard/ajustar_saldo.html', {
+            'giftcards': queryset,
+            'titulo': 'Ajustar saldo de GiftCard',
+            'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+            'opts': self.model._meta,
+        })
 
     def get_queryset(self, request):
         """Optimizar queries con select_related para evitar N+1 queries"""

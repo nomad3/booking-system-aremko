@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+Formulario del ajuste de saldo. Muestra el ANTES de cada tarjeta antes de pedir
+el monto nuevo: el error que se quiere evitar es teclear sobre una tarjeta que
+no era, y la única forma de evitarlo es que el código y el saldo actual estén a
+la vista en el momento de escribir.
+{% endcomment %}
+{% block content %}
+<div style="max-width:640px">
+  <h1>💳 Ajustar saldo de GiftCard</h1>
+
+  <div style="background:#FFF8E1;border-left:4px solid #FFA000;border-radius:8px;
+              padding:12px 14px;margin:16px 0;color:#795548">
+    Esto cambia <strong>el dinero que la tarjeta puede gastar</strong>. Queda
+    registrado con tu nombre en el Historial de cada GiftCard.
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+    <tr style="text-align:left;color:#666;font-size:12px;text-transform:uppercase">
+      <th style="padding:8px 6px">Código</th>
+      <th style="padding:8px 6px">Saldo actual</th>
+      <th style="padding:8px 6px">Emitida por</th>
+      <th style="padding:8px 6px">Vence</th>
+    </tr>
+    {% for gc in giftcards %}
+    <tr style="border-top:1px solid #ddd">
+      <td style="padding:8px 6px"><code>{{ gc.codigo }}</code></td>
+      <td style="padding:8px 6px"><strong>${{ gc.monto_disponible|floatformat:0 }}</strong></td>
+      <td style="padding:8px 6px">${{ gc.monto_inicial|floatformat:0 }}</td>
+      <td style="padding:8px 6px">{{ gc.fecha_vencimiento }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for gc in giftcards %}
+      <input type="hidden" name="{{ action_checkbox_name }}" value="{{ gc.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="ajustar_saldo">
+
+    <p>
+      <label for="nuevo_monto"><strong>Nuevo saldo (en pesos)</strong></label><br>
+      <input type="number" id="nuevo_monto" name="nuevo_monto" min="0" step="1000"
+             required autofocus style="font-size:18px;padding:8px;width:220px">
+    </p>
+
+    <p>
+      <label for="motivo"><strong>Motivo</strong> — obligatorio</label><br>
+      <span style="color:#777;font-size:13px">
+        Dentro de seis meses esto es lo único que va a explicar el ajuste.
+        Ej: “Regalo de cortesía a proveedor”, “Corrección: se emitió por el monto equivocado”.
+      </span><br>
+      <input type="text" id="motivo" name="motivo" required maxlength="200"
+             style="padding:8px;width:100%;max-width:560px">
+    </p>
+
+    <p style="margin-top:24px">
+      <input type="submit" name="aplicar" value="Ajustar el saldo" class="default"
+             style="padding:10px 20px">
+      <a href="../" style="margin-left:12px">Cancelar</a>
+    </p>
+  </form>
+</div>
+{% endblock %}
