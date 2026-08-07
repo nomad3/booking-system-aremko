@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-07-20_
+_Última revisión: 2026-08-06_
 
 ## Web y marketing
 
@@ -58,6 +58,28 @@ _Última revisión: 2026-07-20_
     los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
     + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
     1-a-1 boleta↔pago. F3: notas de crédito + cuadratura mensual.
+
+22. **P-22 · Jornada de orden contable: plan de cuentas + registro mensual de
+    ingresos y gastos** — Pedido de Jorge 2026-08-06 tras el diagnóstico de correos.
+    **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
+    de pago y de servicios enterrados) y no existe un registro consolidado de gastos
+    ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número
+    de "cuánto gastó Aremko este mes" ni "de dónde entró la plata".
+    **Alcance de la jornada (bloque de trabajo dedicado, no incremental):**
+    (a) definir un **plan de cuentas** simple para Aremko — categorías de ingreso por
+    canal (Flow, Mercado Pago, transferencias, giftcards) y de gasto (infraestructura
+    web, publicidad, remuneraciones, impuestos, insumos, servicios básicos, seguros);
+    (b) decidir **dónde vive el registro** (extender `costos_web`, app nueva, o
+    planilla) y cómo se alimenta desde el correo — ver el diseño de `EventoCosto`
+    conversado el 2026-08-06;
+    (c) **cerrar los circuitos de plata** ya mapeados: MP recauda → barre a Scotiabank
+    → de Scotiabank salen sueldos, SII y contador (Patricio Rubio → Previred);
+    (d) **cuadratura mensual** de ingresos vs. lo que registra el sistema de reservas.
+    **Insumo ya listo:** el mapa de las 4 casillas y sus remitentes de cobro está en la
+    memoria `reference_correos_jorge_mapa`, y desde el 2026-08-06 hay filtros que
+    reenvían lo relevante de `ecolonco1`, `aremkospa` y `abonosaremko` a `ecolonco`.
+    **Punto ciego conocido:** Scotiabank no avisa por correo los abonos entrantes
+    (Banco de Chile y MP sí) → pedir a la ejecutiva que active esos avisos.
 
 ## Infraestructura y Luna
 

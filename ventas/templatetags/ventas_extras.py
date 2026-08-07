@@ -352,6 +352,29 @@ def cuadrada(image_field, size=600):
     return url.replace('/upload/', f'/upload/{transf}/', 1)
 
 
+# NO transformar videos con Cloudinary. Medido el 2026-08-06 sobre
+# IMG_4138_web_soihdc.mp4 (el video de fondo de las landings):
+#
+#     original (1080p, ffmpeg)   2.783 KB
+#     q_auto                     3.396 KB   (+22%)
+#     w_960                      6.010 KB  (+116%)
+#     w_1280                     8.312 KB  (+199%)
+#
+# Incluso ACHICARLO lo deja al doble: el encoder por defecto de Cloudinary es mucho
+# menos agresivo que el pipeline de ffmpeg (skill comprimir-video). Para bajar el
+# peso de un video hay que reencodearlo con ffmpeg y subir el archivo nuevo, no
+# pedirle una transformación a Cloudinary.
+#
+# La solución que sí funcionó: reencodear a 720p con ffmpeg y subir el archivo como
+# asset nuevo (`IMG_4138_fondo720_uisqp9`, 808 KB, 406x720). Eso es lo que sirven
+# hoy las seis landings — 1,96 MB menos por visita entre video y póster.
+#
+# En imágenes `f_auto,q_auto` sí ayuda, pero solo cuando el original está mal: un
+# PNG de foto bajó de 616 KB a 30 KB, y un JPG pesado de 274 a 187. Un JPG que ya
+# estaba liviano (64 KB) subió a 74. Antes de agregar una transformación "por si
+# ayuda", medir con curl: puede empeorar.
+
+
 @register.filter
 def optimizada(image_field, width=900):
     """URL de una imagen de Cloudinary OPTIMIZADA para entrega web, SIN recortar.
