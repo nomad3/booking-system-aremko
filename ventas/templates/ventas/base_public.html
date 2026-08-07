@@ -855,18 +855,20 @@
         // reactiva el modal global, agregar listener al boton id="legacyCompleteCheckoutBtn".
     </script>
 
-    {# ── Videos que se cargan al llegar a la seccion ─────────────────────────
-       Un <video autoplay> descarga el archivo completo apenas carga la pagina,
-       aunque el visitante nunca baje hasta el: `autoplay` anula el
-       `preload="metadata"`. Los videos de fondo viven en secciones profundas,
-       asi que la mayoria de las visitas pagaba el peso sin ver nada.
+    {% comment %}
+      ── Videos que se cargan al llegar a la seccion ──────────────────────────
+      Un <video autoplay> descarga el archivo completo apenas carga la pagina,
+      aunque el visitante nunca baje hasta el: `autoplay` anula el
+      `preload="metadata"`. Los videos de fondo viven en secciones profundas,
+      asi que la mayoria de las visitas pagaba el peso sin ver nada.
 
-       Para diferirlo, en la plantilla se escribe `data-src` en vez de `src`:
-           <video autoplay muted loop playsinline poster="...">
-             <source data-src="...mp4" type="video/mp4">
-           </video>
-       El poster se muestra igual desde el principio, asi que visualmente no
-       cambia nada. Los <source src="..."> normales siguen cargando como antes.  #}
+      Para diferirlo, en la plantilla se escribe `data-src` en vez de `src`:
+          <video autoplay muted loop playsinline poster="...">
+            <source data-src="...mp4" type="video/mp4">
+          </video>
+      El poster se muestra igual desde el principio, asi que visualmente no
+      cambia nada. Los <source src="..."> normales siguen cargando como antes.
+    {% endcomment %}
     <script>
     (function () {
         var MARGEN = 300;   // px antes de entrar en pantalla: llega reproduciendo

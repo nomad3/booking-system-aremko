@@ -177,9 +177,11 @@
         <div class="paso-t">1 · <b>Elige una:</b> ¿qué celebran?</div>
         <div class="opts">
           {% for oc in ocasiones %}
-          {# El titulo va en <span> a proposito: `.opt.foto > *` sube al z-index 2
-             solo a los hijos ELEMENTO, y el velo oscuro (::after) esta en z-index 1.
-             Como texto suelto, el titulo quedaba pintado DEBAJO del velo — invisible. #}
+          {% comment %}
+            El titulo va en <span> a proposito: `.opt.foto > *` sube al z-index 2
+            solo a los hijos ELEMENTO, y el velo oscuro (::after) esta en z-index 1.
+            Como texto suelto, el titulo quedaba pintado DEBAJO del velo — invisible.
+          {% endcomment %}
           <button type="button" class="opt foto{% if forloop.first %} sel{% endif %}" id="{{ oc.css_id }}" data-oc="{{ oc.clave }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"><i class="tic" aria-hidden="true">✓</i><span>{{ oc.titulo }}</span><small>{{ oc.sub }}</small></button>
           {% endfor %}
         </div>
