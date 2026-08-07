@@ -94,10 +94,14 @@ URL_POR_MODO = {
 
 # Botones del selector de ocasión. El id CSS importa: la foto de fondo de cada
 # botón se define por #id en el template.
+#
+# El subtítulo dice CUÁNTAS PERSONAS a propósito: es lo primero que la gente
+# necesita saber para elegir, y sin ese dato las tres opciones se parecen. El
+# título carga la ocasión, el subtítulo el tamaño del grupo.
 OCASION_BOTONES = {
-    'cumpleanos': {'css_id': 'optCum', 'titulo': 'Cumpleaños', 'sub': 'Con o sin torta · de a dos'},
-    'grupo': {'css_id': 'optGrupo', 'titulo': 'En grupo', 'sub': 'Cumpleaños de 3 a 6'},
-    'despedida': {'css_id': 'optDespedida', 'titulo': 'Despedida', 'sub': 'De soltera/o · en grupo'},
+    'cumpleanos': {'css_id': 'optCum', 'titulo': 'Cumpleaños de a dos', 'sub': 'Con o sin torta · 2 personas'},
+    'grupo': {'css_id': 'optGrupo', 'titulo': 'Cumpleaños en grupo', 'sub': 'De 3 a 6 personas'},
+    'despedida': {'css_id': 'optDespedida', 'titulo': 'Despedida de soltera/o', 'sub': 'En grupo · 4 a 6 personas'},
 }
 
 # Ocasiones que solo existen si hay tinas grupales publicadas.

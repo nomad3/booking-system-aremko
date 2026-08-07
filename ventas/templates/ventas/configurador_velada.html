@@ -75,6 +75,15 @@
     .opt.foto::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(30,18,16,.05), rgba(30,18,16,.72)); z-index:1;}
     .opt.foto > *{position:relative; z-index:2;}
     .opt.foto small{color:#f0e2df;}
+    /* La elegida se destaca y las otras se apagan: sobre una foto, un borde solo
+       no alcanza para que se lea como "esta es la que elegí". */
+    .opt.foto:not(.sel)::after{background:linear-gradient(180deg, rgba(30,18,16,.34), rgba(30,18,16,.86));}
+    .opt.foto:not(.sel){filter:saturate(.7);}
+    .opt.foto.sel::after{background:linear-gradient(180deg, rgba(30,18,16,0), rgba(30,18,16,.66));}
+    .opt.foto .tic{position:absolute; top:9px; right:9px; z-index:3; width:25px; height:25px;
+      border-radius:50%; background:var(--rosa); color:#fff; font-size:14px; font-style:normal;
+      font-weight:700; line-height:1; display:none; align-items:center; justify-content:center;}
+    .opt.foto.sel .tic{display:flex;}
     /* Las tres ocasiones de celebración comparten foto (la romántica ya no tiene
        selector: es su propia landing). */
     #optCum::before, #optGrupo::before, #optDespedida::before{background-image:url('https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto,w_500/v1/servicios/cumplea%C3%B1osdamasaremko2_kroa3j');}
@@ -165,10 +174,13 @@
 
         {# La romántica no dibuja este paso: tiene una sola ocasión (un paso menos). #}
         {% if ocasiones %}
-        <div class="paso-t">1 · <b>Elige</b> tu ocasión</div>
+        <div class="paso-t">1 · <b>Elige una:</b> ¿qué celebran?</div>
         <div class="opts">
           {% for oc in ocasiones %}
-          <button type="button" class="opt foto{% if forloop.first %} sel{% endif %}" id="{{ oc.css_id }}" data-oc="{{ oc.clave }}">{{ oc.titulo }}<small>{{ oc.sub }}</small></button>
+          {# El titulo va en <span> a proposito: `.opt.foto > *` sube al z-index 2
+             solo a los hijos ELEMENTO, y el velo oscuro (::after) esta en z-index 1.
+             Como texto suelto, el titulo quedaba pintado DEBAJO del velo — invisible. #}
+          <button type="button" class="opt foto{% if forloop.first %} sel{% endif %}" id="{{ oc.css_id }}" data-oc="{{ oc.clave }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"><i class="tic" aria-hidden="true">✓</i><span>{{ oc.titulo }}</span><small>{{ oc.sub }}</small></button>
           {% endfor %}
         </div>
         {% endif %}
@@ -259,6 +271,9 @@
         var on = b.getAttribute(attr) === val;
         b.classList.toggle('sel', on);
         b.classList.toggle('azulsel', on && attr==='data-color' && val==='azul');
+        // Sin esto el aria-pressed inicial se queda pegado y un lector de
+        // pantalla anuncia como elegida una opcion que ya no lo esta.
+        if (b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
     }
     function precioBase(){
