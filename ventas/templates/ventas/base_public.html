@@ -854,6 +854,75 @@
         // checkout.html con switch para Flow/Transferencia. Si en el futuro se
         // reactiva el modal global, agregar listener al boton id="legacyCompleteCheckoutBtn".
     </script>
+
+    {# ── Videos que se cargan al llegar a la seccion ─────────────────────────
+       Un <video autoplay> descarga el archivo completo apenas carga la pagina,
+       aunque el visitante nunca baje hasta el: `autoplay` anula el
+       `preload="metadata"`. Los videos de fondo viven en secciones profundas,
+       asi que la mayoria de las visitas pagaba el peso sin ver nada.
+
+       Para diferirlo, en la plantilla se escribe `data-src` en vez de `src`:
+           <video autoplay muted loop playsinline poster="...">
+             <source data-src="...mp4" type="video/mp4">
+           </video>
+       El poster se muestra igual desde el principio, asi que visualmente no
+       cambia nada. Los <source src="..."> normales siguen cargando como antes.  #}
+    <script>
+    (function () {
+        var MARGEN = 300;   // px antes de entrar en pantalla: llega reproduciendo
+        var pendientes = function () { return document.querySelectorAll('video source[data-src]'); };
+        if (!pendientes().length) return;
+
+        function cargar(video) {
+            if (!video) return;
+            var fuentes = video.querySelectorAll('source[data-src]');
+            for (var i = 0; i < fuentes.length; i++) {
+                fuentes[i].src = fuentes[i].getAttribute('data-src');
+                fuentes[i].removeAttribute('data-src');
+            }
+            video.load();
+            // Cambiar la fuente en caliente no siempre vuelve a disparar el
+            // autoplay, asi que lo pedimos explicito. Si el navegador lo niega
+            // (politica de reproduccion), queda el poster y no rompe nada.
+            var p = video.play();
+            if (p && p['catch']) { p['catch'](function () {}); }
+        }
+
+        function aLaVista(el) {
+            var r = el.getBoundingClientRect();
+            var alto = window.innerHeight || document.documentElement.clientHeight;
+            return r.bottom > -MARGEN && r.top < alto + MARGEN;
+        }
+
+        // Se usa scroll + getBoundingClientRect en vez de IntersectionObserver a
+        // proposito: el observer depende del compositor y hay entornos donde no
+        // entrega callbacks nunca. Si eso pasara, el video no cargaria jamas y la
+        // seccion quedaria con el poster congelado — una falla muda. Esto es mas
+        // simple, funciona en todos lados y se puede probar.
+        var pedido = false;
+        function revisar() {
+            pedido = false;
+            var lista = pendientes();
+            for (var i = 0; i < lista.length; i++) {
+                if (aLaVista(lista[i].parentElement)) cargar(lista[i].parentElement);
+            }
+            if (!pendientes().length) {
+                window.removeEventListener('scroll', agendar);
+                window.removeEventListener('resize', agendar);
+            }
+        }
+        function agendar() {
+            if (pedido) return;
+            pedido = true;
+            window.requestAnimationFrame ? requestAnimationFrame(revisar) : setTimeout(revisar, 100);
+        }
+
+        window.addEventListener('scroll', agendar, { passive: true });
+        window.addEventListener('resize', agendar, { passive: true });
+        revisar();   // por si algun video ya esta a la vista al cargar la pagina
+    })();
+    </script>
+
     {# Page specific script goes here, outside the main script tag #}
     {% block extra_script %}{% endblock %}
 </body>
