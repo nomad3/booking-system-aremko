@@ -530,3 +530,37 @@ class FlujoCajaTest(TestCase):
     def test_solo_superusuario(self):
         self.assertEqual(self.client.get(
             reverse('finanzas:flujo_caja')).status_code, 302)
+
+
+class CartolaScotiabankMensualTest(TestCase):
+    """La segunda variante real del portal: estado de cuenta mensual —
+    6 columnas, orden ASCENDENTE, Saldo Anterior/Actual en la cabecera."""
+
+    FILAS = [
+        ['Nombre Empresa', 'AREMKO HOTEL SPA', '', '', '', ''],
+        ['Numero Cuenta', 973080644.0, '', '', '', ''],
+        ['Fecha Desde', '01-07-2026', '', '', '', ''],
+        ['Fecha Hasta', '31-07-2026', '', '', '', ''],
+        ['Saldo Anterior', 882699.0, '', '', '', ''],
+        ['Saldo Actual', 490434.0, '', '', '', ''],
+        ['Fecha', 'Descripción', 'Numero Documento', 'Cargo', 'Abono', 'Saldo Diario'],
+        ['01-07-2026', 'COMISION MANTENCION PLAN', 0.0, -40823.0, '', 841876.0],
+        ['03-07-2026', 'TEF 18883207-5 PAULA ANDREA IB', 0.0, '', 155000.0, 996876.0],
+        ['31-07-2026', 'REDCOMPRA COVEPA SPA', 0.0, -506442.0, '', 490434.0],
+    ]
+
+    def test_variante_mensual_cuadra_y_ancla_el_cierre(self):
+        from finanzas.services import parsear_filas_scotiabank
+        r = parsear_filas_scotiabank([list(f) for f in self.FILAS])
+        self.assertTrue(r['cuadra'])
+        self.assertEqual(r['cadena_rota'], 0)
+        # NO se invierte (ya viene cronológico) y el inicio sale de la cabecera.
+        self.assertEqual(r['filas'][0]['fecha'], '2026-07-01')
+        self.assertEqual(r['saldo_inicial'], 882699)
+        self.assertEqual(r['saldo_final_calculado'], 490434)
+        # Mes cerrado (Fecha Hasta = 31-07) → ancla el cierre aunque no haya
+        # filas de agosto.
+        self.assertEqual(r['cierres_mes'], {'2026-07': 490434})
+        self.assertEqual(r['cuenta_numero'], '973080644')
+        # El abono de una clienta cuenta como ingreso (transferencia recibida).
+        self.assertEqual(r['filas'][1]['categoria'], 'transferencias_recibidas')

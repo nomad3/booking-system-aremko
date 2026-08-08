@@ -457,8 +457,17 @@ def clasificar_fila_scotiabank(descripcion, cargo, abono):
 
 
 def parsear_filas_scotiabank(filas_crudas):
-    """Núcleo puro: recibe las filas de la hoja 'Data' como listas y devuelve
-    el mismo shape que la cartola BancoEstado. Testeable sin xlrd."""
+    """Núcleo puro: recibe las filas de la hoja como listas y devuelve el
+    mismo shape que la cartola BancoEstado. Testeable sin xlrd.
+
+    Soporta las DOS variantes reales del portal (verificadas 2026-08-08):
+    - Movimientos de la línea (typeDesc, 7 columnas, DESCENDENTE, meta
+      'Saldo Disponible' / 'Número Línea')
+    - Estado de cuenta mensual (6 columnas, ASCENDENTE, meta 'Saldo
+      Anterior' / 'Saldo Actual' / 'Numero Cuenta')
+    Las columnas se mapean POR NOMBRE del encabezado y el orden se detecta
+    comparando la primera y la última fecha.
+    """
     from datetime import datetime
 
     meta, encabezado_en = {}, None
@@ -473,6 +482,17 @@ def parsear_filas_scotiabank(filas_crudas):
         raise ValueError('No encuentro el encabezado de movimientos — '
                          '¿es el export de Scotiabank?')
 
+    encabezado = [str(c or '').lower() for c in filas_crudas[encabezado_en]]
+
+    def _col(pedazo):
+        for j, h in enumerate(encabezado):
+            if pedazo in h:
+                return j
+        raise ValueError(f'No encuentro la columna «{pedazo}» en el export.')
+
+    c_desc, c_cargo = _col('descripci'), _col('cargo')
+    c_abono, c_saldo = _col('abono'), _col('saldo')
+
     movimientos = []
     for fila in filas_crudas[encabezado_en + 1:]:
         crudo_fecha = str(fila[0] or '').strip()
@@ -482,18 +502,24 @@ def parsear_filas_scotiabank(filas_crudas):
             fecha = datetime.strptime(crudo_fecha, '%d-%m-%Y').date()
         except ValueError:
             continue
-        desc = str(fila[1] or '').strip()
-        cargo = abs(_monto_celda(fila[4]))
-        abono = _monto_celda(fila[5])
-        saldo = _monto_celda(fila[6])
+        desc = str(fila[c_desc] or '').strip()
+        cargo = abs(_monto_celda(fila[c_cargo]))
+        abono = _monto_celda(fila[c_abono])
+        saldo = _monto_celda(fila[c_saldo])
         if cargo == 0 and abono == 0:
             continue
         movimientos.append((fecha, desc, cargo, abono, saldo))
 
-    # El archivo viene de lo más nuevo a lo más viejo → invertir para encadenar.
-    movimientos.reverse()
+    # Orden: la variante typeDesc viene de lo más nuevo a lo más viejo; el
+    # estado de cuenta mensual ya viene cronológico. Se detecta por fechas.
+    if len(movimientos) > 1 and movimientos[0][0] > movimientos[-1][0]:
+        movimientos.reverse()
 
-    filas, cadena_rota, saldo_prev = [], 0, None
+    # Ancla del inicio si la trae la cabecera (estado de cuenta mensual).
+    saldo_anterior = _monto_celda(meta.get('Saldo Anterior'))
+
+    filas, cadena_rota = [], 0
+    saldo_prev = saldo_anterior if saldo_anterior else None
     for fecha, desc, cargo, abono, saldo in movimientos:
         if saldo_prev is not None and saldo_prev + abono - cargo != saldo:
             cadena_rota += 1
@@ -510,7 +536,8 @@ def parsear_filas_scotiabank(filas_crudas):
     if not filas:
         raise ValueError('El export no trae movimientos.')
 
-    saldo_inicial = filas[0]['saldo'] - filas[0]['abono'] + filas[0]['cargo']
+    saldo_inicial = (saldo_anterior or
+                     filas[0]['saldo'] - filas[0]['abono'] + filas[0]['cargo'])
     saldo_final = filas[-1]['saldo']
 
     cierres = {}
@@ -518,18 +545,36 @@ def parsear_filas_scotiabank(filas_crudas):
         mes_fila = f['fecha'][:7]
         if any(g['fecha'][:7] > mes_fila for g in filas[i + 1:]):
             cierres[mes_fila] = f['saldo']
+    # El estado de cuenta MENSUAL cerrado (Fecha Hasta = último día del mes)
+    # también ancla el cierre de ese mes, aunque no haya filas del siguiente.
+    hasta = str(meta.get('Fecha Hasta') or '').strip()
+    if hasta:
+        try:
+            from datetime import datetime as _dt
+            from datetime import timedelta as _td
+            f_hasta = _dt.strptime(hasta, '%d-%m-%Y').date()
+            if (f_hasta + _td(days=1)).month != f_hasta.month:
+                cierres.setdefault(f'{f_hasta.year}-{f_hasta.month:02d}',
+                                   saldo_final)
+        except ValueError:
+            pass
 
-    disponible = _monto_celda(meta.get('Saldo Disponible'))
+    # Saldo final declarado por la cabecera, según la variante.
+    declarado = (_monto_celda(meta.get('Saldo Disponible')) or
+                 _monto_celda(meta.get('Saldo Actual')))
+    n_cuenta = meta.get('Número Línea') or meta.get('Numero Cuenta') or ''
+    if isinstance(n_cuenta, float) and n_cuenta.is_integer():
+        n_cuenta = int(n_cuenta)
     return {
-        'cuenta_numero': str(meta.get('Número Línea') or ''),
+        'cuenta_numero': str(n_cuenta),
         'fecha_inicio': filas[0]['fecha'], 'fecha_final': filas[-1]['fecha'],
-        'saldo_inicial': saldo_inicial, 'saldo_final_resumen': disponible or saldo_final,
+        'saldo_inicial': saldo_inicial, 'saldo_final_resumen': declarado or saldo_final,
         'saldo_final_calculado': saldo_final,
         'total_cargos': sum(f['cargo'] for f in filas),
         'total_abonos': sum(f['abono'] for f in filas),
         'cadena_rota': cadena_rota,
         'cuadra': (cadena_rota == 0 and
-                   (not disponible or disponible == saldo_final)),
+                   (not declarado or declarado == saldo_final)),
         'cierres_mes': cierres,
         'filas': filas,
     }
