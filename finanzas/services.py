@@ -169,3 +169,60 @@ def registrar_transferencia_mp(datos, fecha, referencia):
             fuente='correo', referencia=referencia,
             descripcion=f'Transferencia MP a {benef}'[:255])
         return 'creado', 1
+
+
+# ── F4 paso 2: comisiones que MP descuenta por cada cobro ────────────────────
+
+def _comision_cobro_mp(pago):
+    """Comisión total que paga Aremko (collector) en un pago, en CLP enteros.
+
+    `fee_details` viene por pago en /v1/payments/search; las transferencias
+    simples suelen traer 0 y los cobros con tarjeta/link el % de MP.
+    """
+    total = 0.0
+    for f in (pago.get('fee_details') or []):
+        if (f.get('fee_payer') or 'collector') == 'collector':
+            total += float(f.get('amount') or 0)
+    return int(round(total))
+
+
+def registrar_comisiones_mp(cobros_api):
+    """Registra la comisión de cada cobro MP como gasto «comisiones» (fuente api).
+
+    Sin esto el saldo MP calculado queda inflado: los cobros entran BRUTOS al
+    registro comercial, pero a la cuenta le llega el neto. Idempotente por
+    referencia mp:fee:<payment_id>; respeta el corte de julio. Nunca lanza.
+    """
+    from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
+
+    try:
+        cuenta = CuentaFinanciera.objects.get(clave='mercado_pago')
+        cat = CategoriaFinanciera.objects.get(clave='comisiones')
+    except (CuentaFinanciera.DoesNotExist, CategoriaFinanciera.DoesNotExist):
+        logger.warning('finanzas sin sembrar: comisiones MP no registradas')
+        return 0
+
+    creados = 0
+    for p in cobros_api:
+        try:
+            pid = str(p.get('id') or '')
+            monto = _comision_cobro_mp(p)
+            if not pid or monto <= 0:
+                continue
+            f = parse_datetime(p.get('date_approved') or p.get('date_created') or '')
+            if not f or f.date() < COBERTURA_GASTOS_DESDE:
+                continue
+            ref = f'mp:fee:{pid}'
+            if MovimientoFinanciero.objects.filter(referencia=ref).exists():
+                continue
+            MovimientoFinanciero.objects.create(
+                fecha=f.date(), cuenta=cuenta, clase='gasto', sentido='sale',
+                monto=monto, categoria=cat, fuente='api', referencia=ref,
+                descripcion=f"Comisión MP del cobro {pid} ({p.get('description') or 'sin glosa'})"[:255])
+            creados += 1
+        except Exception:
+            logger.exception('comisión MP %s no registrada', p.get('id'))
+
+    if creados:
+        logger.info('finanzas: %s comisiones MP registradas', creados)
+    return creados

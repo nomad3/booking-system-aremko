@@ -159,6 +159,14 @@ def traer_pagos_mp(dias=14):
         except Exception:
             logger.exception('compras MP → finanzas fallaron (la conciliacion sigue)')
 
+    # Tercer consumidor (P-22 F4): la comisión que MP descuenta de cada cobro,
+    # como gasto — sin esto el saldo MP calculado queda inflado por el bruto.
+    try:
+        from finanzas.services import registrar_comisiones_mp
+        registrar_comisiones_mp(resultados)
+    except Exception:
+        logger.exception('comisiones MP → finanzas fallaron (la conciliacion sigue)')
+
     vistos = set(MovimientoMP.objects.filter(
         mp_payment_id__in=[str(p.get('id')) for p in resultados]
     ).values_list('mp_payment_id', flat=True))

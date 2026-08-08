@@ -18,7 +18,7 @@ from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 
 from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
 from .services import (parsear_transferencia_mp, registrar_compras_mp,
-                       registrar_transferencia_mp)
+                       registrar_comisiones_mp, registrar_transferencia_mp)
 
 
 class SiembraTest(TestCase):
@@ -170,6 +170,38 @@ class ComprasMPTest(TestCase):
         self.assertEqual(registrar_compras_mp([dict(
             id=1, transaction_amount=1000, payment_type_id='account_money',
             date_approved='2026-08-05T10:00:00.000-04:00')]), 0)
+
+
+class ComisionesMPTest(TestCase):
+    """F4 paso 2: la comisión que MP descuenta de cada cobro, como gasto."""
+
+    def test_registra_con_corte_e_idempotencia(self):
+        call_command('sembrar_finanzas')
+        cobros = [
+            # Cobro con comisión del lado de Aremko → gasto comisiones.
+            dict(id=901, date_approved='2026-08-06T12:00:00.000-04:00',
+                 description='Reserva Ana',
+                 fee_details=[{'type': 'mercadopago_fee', 'amount': 1990.0,
+                               'fee_payer': 'collector'}]),
+            # Comisión que paga el CLIENTE → no es gasto de Aremko.
+            dict(id=902, date_approved='2026-08-06T12:00:00.000-04:00',
+                 fee_details=[{'amount': 500.0, 'fee_payer': 'payer'}]),
+            # Transferencia simple sin comisión → nada.
+            dict(id=903, date_approved='2026-08-06T12:00:00.000-04:00',
+                 fee_details=[]),
+            # Antes del corte de julio → fuera.
+            dict(id=904, date_approved='2026-06-06T12:00:00.000-04:00',
+                 fee_details=[{'amount': 1000.0, 'fee_payer': 'collector'}]),
+        ]
+        self.assertEqual(registrar_comisiones_mp(cobros), 1)
+        m = MovimientoFinanciero.objects.get(referencia='mp:fee:901')
+        self.assertEqual((m.clase, m.cuenta.clave, m.categoria.clave, int(m.monto)),
+                         ('gasto', 'mercado_pago', 'comisiones', 1990))
+        self.assertIn('Reserva Ana', m.descripcion)
+        # Segunda corrida: no duplica.
+        self.assertEqual(registrar_comisiones_mp(cobros), 0)
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            referencia__startswith='mp:fee:').count(), 1)
 
 
 # Estructura real del correo «Tu transferencia fue enviada» (2026-08-08),
