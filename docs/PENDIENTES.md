@@ -81,6 +81,19 @@ _Última revisión: 2026-08-06_
     **Punto ciego conocido:** Scotiabank no avisa por correo los abonos entrantes
     (Banco de Chile y MP sí) → pedir a la ejecutiva que active esos avisos.
 
+23. **P-23 · Preguntarle a Deborah qué significa su "ignorar" en el Conciliador** —
+    En julio 2026, de $21,5M que Mercado Pago recibió, **$16.376.500 (140 movimientos,
+    76%) terminaron en `ignorado` y solo $1.272.000 en `aplicado`**. Se investigó el
+    2026-08-08 pensando que era ruido de la herramienta: se encontró y arregló un bug
+    real (el fetch traía también las compras que Aremko hace por MP), pero eran solo
+    **19 movimientos de 401, menos del 5%**. La hipótesis del ruido NO explica el 76%.
+    **Es una pregunta de operación, no de código:** *"cuando marcas ignorar, ¿estás
+    diciendo que ese pago ya lo registraste a mano, o que no sabes qué hacer con él?"*
+    Si es lo primero, el Conciliador no está ahorrando trabajo y hay que decidir si
+    vale la pena mantenerlo; si es lo segundo, hay pagos de clientes sin aplicar y la
+    cola es peor de lo que se ve. **Bloquea saber si P-22 tiene que ocuparse también
+    de los ingresos o solo de los egresos.** Detalle en `[[project_aremko_conciliacion_pagos]]`.
+
 ## Infraestructura y Luna
 
 11. **P-11 · Logging de errores 500 en Render** — Agregar handler para el logger
