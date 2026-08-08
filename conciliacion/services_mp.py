@@ -63,16 +63,56 @@ def nombre_en_glosa(nombre_cliente, glosa):
     return any(t in glosa_norm for t in tokens)
 
 
+def id_cuenta_mp(token):
+    """Id de usuario de la cuenta dueña del token (Aremko).
+
+    Hace falta para distinguir lo que Aremko COBRA de lo que Aremko PAGA:
+    `/v1/payments/search` devuelve las dos cosas y no acepta filtrarlo por
+    parametro, asi que la separacion se hace comparando `collector_id`.
+
+    Se consulta a la API en vez de guardarlo en settings a proposito: una
+    constante mal copiada dejaria el filtro descartando TODO en silencio.
+    """
+    r = requests.get(
+        'https://api.mercadopago.com/users/me',
+        headers={'Authorization': f'Bearer {token}'},
+        timeout=30,
+    )
+    r.raise_for_status()
+    mi_id = r.json().get('id')
+    if not mi_id:
+        raise RuntimeError('Mercado Pago no devolvio el id de la cuenta en /users/me')
+    return str(mi_id)
+
+
+def es_cobro_nuestro(pago, mi_id):
+    """True si en este pago Aremko es quien COBRA (no quien paga).
+
+    Sin este filtro entran a la cola de Deborah las compras que Aremko hace por
+    Mercado Pago (Mercado Libre, retail), que no tienen reserva a la cual
+    aplicarse. Detectado 2026-08-08: eran ~40% de la cola.
+    """
+    cobrador = pago.get('collector_id')
+    if cobrador is None:
+        cobrador = (pago.get('collector') or {}).get('id')
+    return cobrador is not None and str(cobrador) == str(mi_id)
+
+
 def traer_pagos_mp(dias=14):
     """Consulta /v1/payments/search (approved) y guarda los nuevos MovimientoMP.
 
-    Idempotente: los mp_payment_id ya vistos se saltan. Devuelve (nuevos, total_api).
+    Solo guarda los pagos donde Aremko es el COBRADOR. Idempotente: los
+    mp_payment_id ya vistos se saltan. Devuelve (nuevos, total_api).
     """
     from .models import MovimientoMP
 
     token = getattr(settings, 'MERCADOPAGO_ACCESS_TOKEN', None)
     if not token:
         raise RuntimeError('MERCADOPAGO_ACCESS_TOKEN no configurado')
+
+    # Si esto falla se corta aca a proposito. Seguir sin el id significaria
+    # volver a mezclar compras con cobros, que es el bug que esto arregla.
+    mi_id = id_cuenta_mp(token)
 
     desde = timezone.now() - timedelta(days=dias)
     resultados, offset = [], 0
@@ -98,6 +138,18 @@ def traer_pagos_mp(dias=14):
         offset += len(page)
         if not page or offset >= total_api or offset >= 500:
             break
+
+    # OJO: `resultados` se reduce aca, pero el segundo valor que devuelve esta
+    # funcion es el total que trajo la API — no el filtrado. Si se cambia, el
+    # boton del admin pasa a mentir sobre cuanto reviso.
+    total_traidos = len(resultados)
+    resultados = [p for p in resultados if es_cobro_nuestro(p, mi_id)]
+    descartados = total_traidos - len(resultados)
+    if descartados:
+        logger.info(
+            'MP: descartados %s pagos donde Aremko no es el cobrador (de %s)',
+            descartados, total_traidos,
+        )
 
     vistos = set(MovimientoMP.objects.filter(
         mp_payment_id__in=[str(p.get('id')) for p in resultados]
@@ -133,7 +185,7 @@ def traer_pagos_mp(dias=14):
         mov.save()
         nuevos.append(mov)
 
-    return nuevos, len(resultados)
+    return nuevos, total_traidos
 
 
 def matchear_movimiento(mov):
