@@ -37,7 +37,8 @@
   <h1>Finanzas</h1>
   <p class="sub">Ingresos leídos del sistema de reservas · gastos y traspasos del registro propio ·
      <a href="/admin/finanzas/movimientofinanciero/">movimientos</a> ·
-     <a href="/admin/finanzas/saldomensual/">saldos</a></p>
+     <a href="/admin/finanzas/saldomensual/">saldos</a> ·
+     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola BancoEstado</a></p>
 
   {% if not hay_gastos %}
   <div class="aviso">Todavía no hay gastos cargados. Correr en la Shell:

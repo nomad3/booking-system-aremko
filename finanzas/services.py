@@ -226,3 +226,211 @@ def registrar_comisiones_mp(cobros_api):
     if creados:
         logger.info('finanzas: %s comisiones MP registradas', creados)
     return creados
+
+
+# ── F4 paso 3: cartola BancoEstado (export XLSX del portal) ──────────────────
+# Formato real verificado 2026-08-08 (Excel_Cartola_Historica_Chequera_
+# Electronica.xlsx): hoja "Resumen" con rótulos en col A y valores en col E;
+# hoja "Movimientos" con encabezado Fecha DD/MM (sin año — el año sale del
+# rango del Resumen) | ... | Descripción | Cheques / Cargos | Depósitos /
+# Abonos | Saldo (encadenado fila a fila). Montos mezclados: enteros crudos
+# y strings '$1.234.567'.
+
+CATEGORIAS_CARTOLA = {
+    # clave → (nombre, clase). Se crean al confirmar si no existen (sin Shell).
+    'liquidacion_flow': ('Liquidación Flow', 'ingreso'),
+    'liquidacion_sumup': ('Liquidación SumUp', 'ingreso'),
+    'transferencias_recibidas': ('Transferencias recibidas', 'ingreso'),
+}
+
+
+def _monto_celda(v):
+    if v is None:
+        return 0
+    if isinstance(v, (int, float)):
+        return int(round(v))
+    s = str(v).replace('$', '').replace('.', '').replace(' ', '').strip()
+    return int(s) if s.lstrip('-').isdigit() else 0
+
+
+def clasificar_fila_cartola(descripcion, cargo, abono):
+    """(clase, sentido, categoria_clave) para una fila de la cartola."""
+    d = (descripcion or '').upper()
+    if abono > 0:
+        if 'SUMUP' in d:
+            return 'ingreso', 'entra', 'liquidacion_sumup'
+        if 'FLOW' in d:
+            return 'ingreso', 'entra', 'liquidacion_flow'
+        return 'ingreso', 'entra', 'transferencias_recibidas'
+    return 'gasto', 'sale', 'por_clasificar'
+
+
+def parsear_cartola_bancoestado(archivo):
+    """Lee el XLSX del portal y devuelve dict con resumen, filas y chequeos.
+
+    No escribe nada. Cada fila queda con su referencia idempotente
+    be:<hash(fecha|descripcion|cargo|abono|saldo)> — el saldo encadenado hace
+    única incluso a la segunda transferencia idéntica del mismo día.
+    """
+    import warnings
+    from datetime import datetime
+
+    import openpyxl
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        wb = openpyxl.load_workbook(archivo, data_only=True, read_only=True)
+
+    if 'Resumen' not in wb.sheetnames or 'Movimientos' not in wb.sheetnames:
+        raise ValueError('El archivo no tiene las hojas Resumen y Movimientos '
+                         'del export de BancoEstado.')
+
+    # ── Resumen: rótulo en col A, valor en la primera celda no vacía después ──
+    resumen = {}
+    for fila in wb['Resumen'].iter_rows(values_only=True):
+        rotulo = str(fila[0] or '').strip()
+        if not rotulo:
+            continue
+        valor = next((c for c in fila[1:] if c is not None), None)
+        resumen[rotulo] = valor
+
+    def _fecha_resumen(rotulo):
+        crudo = str(resumen.get(rotulo) or '').strip()
+        return datetime.strptime(crudo, '%d/%m/%Y').date()
+
+    try:
+        f_inicio = _fecha_resumen('Fecha Inicio')
+        f_final = _fecha_resumen('Fecha Final')
+    except ValueError:
+        raise ValueError('El Resumen no trae Fecha Inicio/Fecha Final — '
+                         '¿es el export correcto?')
+    saldo_inicial = _monto_celda(resumen.get('Saldo Inicial'))
+    saldo_final_resumen = _monto_celda(resumen.get('Saldo Final'))
+
+    # ── Movimientos ──────────────────────────────────────────────────────────
+    ws = wb['Movimientos']
+    filas_crudas = list(ws.iter_rows(values_only=True))
+    if not filas_crudas:
+        raise ValueError('La hoja Movimientos viene vacía.')
+    encabezado = [str(c or '') for c in filas_crudas[0]]
+
+    def _col(nombre):
+        for i, h in enumerate(encabezado):
+            if nombre.lower() in h.lower():
+                return i
+        raise ValueError(f'No encuentro la columna «{nombre}» en Movimientos.')
+
+    c_fecha, c_desc = _col('Fecha'), _col('Descripción')
+    c_cargo, c_abono, c_saldo = _col('Cargos'), _col('Abonos'), _col('Saldo')
+
+    filas, saldo_prev, cadena_rota = [], saldo_inicial, 0
+    anio, mes_prev = f_inicio.year, f_inicio.month
+    for cruda in filas_crudas[1:]:
+        crudo_fecha = cruda[c_fecha]
+        if crudo_fecha is None:
+            continue
+        if hasattr(crudo_fecha, 'year'):          # celda ya viene como fecha
+            fecha = crudo_fecha.date() if hasattr(crudo_fecha, 'date') else crudo_fecha
+        else:
+            try:
+                dia, mes = (int(x) for x in str(crudo_fecha).strip().split('/')[:2])
+            except ValueError:
+                continue
+            if mes < mes_prev:                    # cruce de año (dic → ene)
+                anio += 1
+            mes_prev = mes
+            fecha = date(anio, mes, dia)
+
+        desc = str(cruda[c_desc] or '').strip()
+        cargo, abono = _monto_celda(cruda[c_cargo]), _monto_celda(cruda[c_abono])
+        saldo = _monto_celda(cruda[c_saldo])
+        if cargo == 0 and abono == 0:
+            continue
+        if saldo_prev + abono - cargo != saldo:
+            cadena_rota += 1
+        saldo_prev = saldo
+
+        clase, sentido, cat = clasificar_fila_cartola(desc, cargo, abono)
+        huella = f'{fecha.isoformat()}|{desc}|{cargo}|{abono}|{saldo}'
+        filas.append({
+            'fecha': fecha.isoformat(), 'descripcion': desc,
+            'cargo': cargo, 'abono': abono, 'saldo': saldo,
+            'clase': clase, 'sentido': sentido, 'categoria': cat,
+            'referencia': 'be:' + hashlib.sha1(huella.encode()).hexdigest()[:24],
+        })
+
+    # ── Cierres de mes cubiertos por el archivo ──────────────────────────────
+    # El saldo de la última fila de un mes ES el cierre de ese mes, siempre que
+    # el archivo siga en el mes siguiente (si no, el mes quedó a medias).
+    cierres = {}
+    for i, f in enumerate(filas):
+        mes_fila = f['fecha'][:7]
+        hay_despues = any(g['fecha'][:7] > mes_fila for g in filas[i + 1:])
+        if hay_despues:
+            cierres[mes_fila] = f['saldo']
+
+    return {
+        'cuenta_numero': str(resumen.get('N° Cuenta') or ''),
+        'fecha_inicio': f_inicio.isoformat(), 'fecha_final': f_final.isoformat(),
+        'saldo_inicial': saldo_inicial, 'saldo_final_resumen': saldo_final_resumen,
+        'saldo_final_calculado': saldo_prev,
+        'total_cargos': sum(f['cargo'] for f in filas),
+        'total_abonos': sum(f['abono'] for f in filas),
+        'cadena_rota': cadena_rota,
+        'cuadra': (cadena_rota == 0 and saldo_prev == saldo_final_resumen),
+        'cierres_mes': cierres,
+        'filas': filas,
+    }
+
+
+def registrar_filas_cartola(filas, cierres_mes=None):
+    """Escribe las filas confirmadas de la cartola (fuente=captura) + cierres.
+
+    Idempotente por referencia; respeta el corte de julio; guardia anti-solape
+    con la carga histórica (hist: misma cuenta+fecha+monto). Devuelve
+    (creados, saltados).
+    """
+    from django.db import transaction
+
+    from .models import (CategoriaFinanciera, CuentaFinanciera,
+                         MovimientoFinanciero, SaldoMensual)
+
+    cuenta = CuentaFinanciera.objects.get(clave='bancoestado')
+    cats = {c.clave: c for c in CategoriaFinanciera.objects.all()}
+    for clave, (nombre, clase) in CATEGORIAS_CARTOLA.items():
+        if clave not in cats:
+            cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
+                clave=clave, defaults={'nombre': nombre, 'clase': clase})
+
+    creados = saltados = 0
+    with transaction.atomic():
+        for f in filas:
+            fecha = date.fromisoformat(f['fecha'])
+            monto = f['abono'] or f['cargo']
+            if fecha < COBERTURA_GASTOS_DESDE or monto <= 0:
+                saltados += 1
+                continue
+            if MovimientoFinanciero.objects.filter(referencia=f['referencia']).exists():
+                saltados += 1
+                continue
+            if MovimientoFinanciero.objects.filter(
+                    referencia__startswith='hist:', cuenta=cuenta,
+                    fecha=fecha, monto=monto).exists():
+                saltados += 1
+                continue
+            MovimientoFinanciero.objects.create(
+                fecha=fecha, cuenta=cuenta, clase=f['clase'],
+                sentido=f['sentido'], monto=monto,
+                categoria=cats.get(f['categoria']),
+                fuente='captura', referencia=f['referencia'],
+                descripcion=f"Cartola BE: {f['descripcion']}"[:255])
+            creados += 1
+
+        for mes_iso, saldo in (cierres_mes or {}).items():
+            anio, mes = (int(x) for x in mes_iso.split('-'))
+            SaldoMensual.objects.update_or_create(
+                cuenta=cuenta, periodo=date(anio, mes, 1),
+                defaults={'saldo_cierre': saldo, 'fuente': 'cartola',
+                          'notas': 'Cierre derivado del export de cartola'})
+
+    return creados, saltados

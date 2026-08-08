@@ -16,9 +16,11 @@ from django.utils import timezone
 
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 
-from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
-from .services import (parsear_transferencia_mp, registrar_compras_mp,
-                       registrar_comisiones_mp, registrar_transferencia_mp)
+from .models import (CategoriaFinanciera, CuentaFinanciera,
+                     MovimientoFinanciero, SaldoMensual)
+from .services import (parsear_cartola_bancoestado, parsear_transferencia_mp,
+                       registrar_compras_mp, registrar_comisiones_mp,
+                       registrar_transferencia_mp)
 
 
 class SiembraTest(TestCase):
@@ -296,3 +298,99 @@ class VerificacionMPTest(TestCase):
         self.assertNotContains(r, '$111.222')
         # Sin pagos en Django, la diferencia de la ventana es todo el lado MP.
         self.assertContains(r, '+$1.333.332')
+
+
+def _xlsx_cartola():
+    """Un export de BancoEstado en memoria con la estructura real: Resumen con
+    rótulos en col A y valores en col E; Movimientos con fechas DD/MM (sin
+    año), cargos como enteros crudos y abonos/saldos como strings '$1.234'.
+    Incluye dos transferencias GEMELAS el mismo día (el saldo encadenado las
+    distingue) y el cruce julio→agosto (cierre de julio derivable)."""
+    import io
+
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    res = wb.active
+    res.title = 'Resumen'
+    for i, (k, v) in enumerate([
+            ('Fecha Inicio', '14/07/2026'), ('Fecha Final', '04/08/2026'),
+            ('Saldo Inicial', '$100.000'), ('Saldo Final', '$100.000'),
+            ('N° Cuenta', '82370351925')], 1):
+        res.cell(row=i, column=1, value=k)
+        res.cell(row=i, column=5, value=v)
+    mov = wb.create_sheet('Movimientos')
+    mov.append(['Fecha', 'Sucursal', 'N° Cuenta', 'Alias', 'N° Cartola',
+                'N° Operación', 'Descripción', 'Cheques / Cargos',
+                'Depósitos / Abonos', 'Saldo'])
+    mov.append(['15/07', 'STGO', '82370351925', 'CHEQ', 9, '0001077',
+                'TEF DE SUMUP CHILE PAYMENTS S A', 0, '$50.000', '$150.000'])
+    mov.append(['20/07', 'STGO', '82370351925', 'CHEQ', 9, '7023294',
+                'TEF A PEREZ SOTO MARIA', 30000, '$0', '$120.000'])
+    mov.append(['20/07', 'STGO', '82370351925', 'CHEQ', 9, '7023295',
+                'TEF A PEREZ SOTO MARIA', 30000, '$0', '$90.000'])
+    mov.append(['02/08', 'STGO', '82370351925', 'CHEQ', 9, '0001077',
+                'TEF DE FLOW S A', 0, '$10.000', '$100.000'])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+class CartolaBancoEstadoTest(TestCase):
+    """F4 paso 3: parser del export XLSX y página de carga con confirmación."""
+
+    def test_parser_cuadra_clasifica_y_deriva_cierre_julio(self):
+        r = parsear_cartola_bancoestado(_xlsx_cartola())
+        self.assertTrue(r['cuadra'])
+        self.assertEqual(len(r['filas']), 4)
+        self.assertEqual(r['cierres_mes'], {'2026-07': 90000})
+        # El año se asigna bien cruzando julio→agosto.
+        self.assertEqual(r['filas'][-1]['fecha'], '2026-08-02')
+        # Las gemelas (mismo día, mismo monto) tienen referencias distintas.
+        refs = [f['referencia'] for f in r['filas']]
+        self.assertEqual(len(refs), len(set(refs)))
+        # Clasificación por descripción.
+        self.assertEqual(r['filas'][0]['categoria'], 'liquidacion_sumup')
+        self.assertEqual(r['filas'][1]['categoria'], 'por_clasificar')
+        self.assertEqual(r['filas'][3]['categoria'], 'liquidacion_flow')
+
+    def test_pagina_propone_confirma_y_no_duplica(self):
+        call_command('sembrar_finanzas')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        url = reverse('finanzas:cargar_cartola')
+
+        self.assertContains(self.client.get(url), 'Subir el export')
+
+        # Propuesta: nada se escribe todavía.
+        r = self.client.post(url, {'archivo': _xlsx_cartola()})
+        self.assertContains(r, 'Confirmar y escribir 4')
+        self.assertEqual(MovimientoFinanciero.objects.count(), 0)
+
+        # Confirmar: se escriben los 4 + el cierre de julio.
+        r2 = self.client.post(url, {'confirmar': '1',
+                                    'payload': r.context['payload']})
+        self.assertContains(r2, 'movimientos nuevos escritos')
+        en_be = MovimientoFinanciero.objects.filter(cuenta__clave='bancoestado')
+        self.assertEqual(en_be.count(), 4)
+        self.assertEqual(en_be.filter(clase='ingreso').count(), 2)
+        self.assertEqual(en_be.filter(fuente='captura').count(), 4)
+        cierre = SaldoMensual.objects.get(cuenta__clave='bancoestado',
+                                          periodo=date(2026, 7, 1))
+        self.assertEqual((int(cierre.saldo_cierre), cierre.fuente),
+                         (90000, 'cartola'))
+        # Las categorías de ingreso se crearon solas.
+        self.assertTrue(CategoriaFinanciera.objects.filter(
+            clave='liquidacion_sumup', clase='ingreso').exists())
+
+        # Re-subir el mismo archivo: todo «ya está», nada que confirmar.
+        r3 = self.client.post(url, {'archivo': _xlsx_cartola()})
+        self.assertContains(r3, 'Nada nuevo que escribir')
+        # Y re-confirmar el payload viejo tampoco duplica.
+        self.client.post(url, {'confirmar': '1', 'payload': r.context['payload']})
+        self.assertEqual(en_be.count(), 4)
+
+    def test_solo_superusuario(self):
+        self.assertEqual(self.client.get(
+            reverse('finanzas:cargar_cartola')).status_code, 302)

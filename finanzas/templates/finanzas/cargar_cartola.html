@@ -1,0 +1,112 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cargar cartola · Finanzas Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1050px; margin:0 auto;}
+  h1{font-size:24px; margin:0 0 4px;}
+  h2{font-size:17px; margin:28px 0 8px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 16px;}
+  .aviso{background:#f5eeda; border:1px solid #e3d5ac; border-radius:10px;
+         padding:10px 14px; font-size:13.5px; margin:14px 0; color:#5c4d1f;}
+  .ok{background:#e8f2ea; border-color:#c4dccb; color:var(--verde);}
+  .mal{background:#f7e8e8; border-color:#e0bcbc; color:var(--rojo);}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px; background:#fff;}
+  table{border-collapse:collapse; width:100%; min-width:760px; font-size:13.5px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:6px 10px; border-bottom:1px solid var(--linea); text-align:right; white-space:nowrap;}
+  th:first-child,td:first-child,td.izq,th.izq{text-align:left;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:12px;
+           text-transform:uppercase; letter-spacing:.04em;}
+  tr:last-child td{border-bottom:none;}
+  .entra{color:var(--verde);}
+  .sale{color:var(--rojo);}
+  .ya{color:var(--suave); font-style:italic;}
+  .boton{display:inline-block; background:var(--acento); color:#fff; border:none;
+         border-radius:10px; padding:11px 22px; font-size:15px; font-weight:600; cursor:pointer;}
+  .boton.sec{background:#fff; color:var(--acento); border:1px solid var(--acento);}
+  input[type=file]{font-size:14px;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Cargar cartola BancoEstado</h1>
+  <p class="sub">Chequera Electrónica · sube el export XLSX del portal (Cartola Histórica) ·
+     <a href="{% url 'finanzas:tablero' %}">volver al tablero</a></p>
+
+  {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
+
+  {% if resultado %}
+  <div class="aviso ok">✓ Listo: <b>{{ resultado.creados }}</b> movimientos nuevos escritos
+    (fuente captura) · {{ resultado.saltados }} saltados (ya estaban, histórico o fuera de cobertura).
+    {% for m, s in resultado.cierres %}<br>Cierre {{ m }} guardado: <b>{{ s }}</b>.{% endfor %}
+  </div>
+  <p><a class="boton sec" href="{% url 'finanzas:tablero' %}">Ver el tablero</a>
+     <a class="boton sec" href="/admin/finanzas/movimientofinanciero/?fuente__exact=captura">Ver los movimientos</a></p>
+
+  {% elif datos %}
+  {% if datos.cuadra %}
+  <div class="aviso ok">✓ El archivo cuadra: saldo inicial {{ saldo_inicial_fmt }}
+    + abonos {{ abonos_fmt }} − cargos {{ cargos_fmt }} = {{ saldo_final_fmt }},
+    y la cadena de saldos no tiene saltos.</div>
+  {% else %}
+  <div class="aviso mal">⚠️ El archivo NO cuadra ({{ datos.cadena_rota }} filas rompen la cadena
+    de saldos). Puede faltar una página del export — revisar antes de confirmar.</div>
+  {% endif %}
+
+  <p class="sub">Período {{ datos.fecha_inicio }} → {{ datos.fecha_final }} ·
+     {{ datos.filas|length }} movimientos: <b>{{ n_nuevas }} nuevos</b> · {{ n_ya }} ya registrados.
+     {% for m, s in cierres_fmt %} Cierre {{ m }} que se guardará: <b>{{ s }}</b>.{% endfor %}</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Fecha</th><th class="izq">Descripción</th><th class="izq">Clasificación</th>
+               <th>Monto</th><th>Saldo</th><th class="izq">Estado</th></tr></thead>
+    <tbody>
+      {% for f in datos.filas %}
+      <tr{% if f.ya %} class="ya"{% endif %}>
+        <td>{{ f.fecha }}</td>
+        <td class="izq">{{ f.descripcion }}</td>
+        <td class="izq">{{ f.clase }} · {{ f.categoria }}</td>
+        <td class="{{ f.sentido }}">{% if f.sentido == 'entra' %}+{% else %}−{% endif %}{{ f.monto_fmt }}</td>
+        <td>{{ f.saldo_fmt }}</td>
+        <td class="izq">{% if f.ya %}ya está{% else %}nuevo{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if payload %}
+  <form method="post" style="margin-top:18px;">{% csrf_token %}
+    <input type="hidden" name="payload" value="{{ payload }}">
+    <button class="boton" type="submit" name="confirmar" value="1">
+      Confirmar y escribir {{ n_nuevas }} movimientos</button>
+    <a class="boton sec" href="{% url 'finanzas:cargar_cartola' %}">Cancelar</a>
+  </form>
+  <p class="sub">Nada se escribió todavía — solo al confirmar. Los «ya está» no se duplican.</p>
+  {% else %}
+  <div class="aviso">Nada nuevo que escribir: todos los movimientos del archivo ya están registrados.</div>
+  {% endif %}
+
+  {% else %}
+  <h2>Subir el export</h2>
+  <p class="sub">En el portal BancoEstado Empresas: movimientos de la Chequera →
+     Exportar → Excel. El archivo se llama <code>Excel_Cartola_Historica_…xlsx</code>.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <p><input type="file" name="archivo" accept=".xlsx" required></p>
+    <button class="boton" type="submit">Revisar el archivo</button>
+  </form>
+  <p class="sub">Primero verás la propuesta con los chequeos (cadena de saldos, totales,
+     qué es nuevo). Nada se escribe sin tu confirmación.</p>
+  {% endif %}
+</div>
+</body>
+</html>

@@ -200,3 +200,75 @@ def tablero(request):
         'verif_cuadra': verif_dif == 0,
         'mp_al_dia': mp_al_dia,
     })
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def cargar_cartola(request):
+    """Carga del export XLSX de la cartola BancoEstado (P-22 F4 paso 3).
+
+    Flujo en dos golpes, nada se escribe sin confirmar: (1) subir archivo →
+    propuesta con chequeos (cadena de saldos, totales) y qué es nuevo;
+    (2) botón Confirmar → se escriben los nuevos (fuente=captura) y los
+    cierres de mes que el archivo cubre. El payload viaja firmado.
+    """
+    from django.core import signing
+
+    from .services import parsear_cartola_bancoestado, registrar_filas_cartola
+
+    ctx = {}
+
+    if request.method == 'POST' and request.POST.get('confirmar'):
+        try:
+            payload = signing.loads(request.POST.get('payload', ''), max_age=3600)
+        except signing.BadSignature:
+            ctx['error'] = ('La propuesta expiró o viene alterada — '
+                            'sube el archivo de nuevo.')
+        else:
+            creados, saltados = registrar_filas_cartola(
+                payload['filas'], payload.get('cierres_mes'))
+            ctx['resultado'] = {
+                'creados': creados, 'saltados': saltados,
+                'cierres': [(m, _clp(s)) for m, s
+                            in sorted((payload.get('cierres_mes') or {}).items())],
+            }
+
+    elif request.method == 'POST' and request.FILES.get('archivo'):
+        try:
+            datos = parsear_cartola_bancoestado(request.FILES['archivo'])
+        except ValueError as e:
+            ctx['error'] = str(e)
+        except Exception:
+            ctx['error'] = ('No pude leer el archivo — ¿es el XLSX exportado '
+                            'del portal BancoEstado (Cartola Histórica)?')
+        else:
+            refs = [f['referencia'] for f in datos['filas']]
+            ya = set(MovimientoFinanciero.objects.filter(
+                referencia__in=refs).values_list('referencia', flat=True))
+            for f in datos['filas']:
+                f['ya'] = f['referencia'] in ya
+                f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
+                f['saldo_fmt'] = _clp(f['saldo'])
+            nuevas = [f for f in datos['filas'] if not f['ya']]
+            # Solo cierres que falten o difieran de lo ya guardado — así
+            # re-subir el mismo archivo termina en "nada nuevo", no en un
+            # botón de confirmar vacío.
+            cierres_pend = {}
+            for mes_iso, saldo in datos['cierres_mes'].items():
+                anio, mes = (int(x) for x in mes_iso.split('-'))
+                if not SaldoMensual.objects.filter(
+                        cuenta__clave='bancoestado', periodo=date(anio, mes, 1),
+                        saldo_cierre=saldo).exists():
+                    cierres_pend[mes_iso] = saldo
+            ctx['datos'] = datos
+            ctx['n_nuevas'] = len(nuevas)
+            ctx['n_ya'] = len(datos['filas']) - len(nuevas)
+            ctx['saldo_inicial_fmt'] = _clp(datos['saldo_inicial'])
+            ctx['saldo_final_fmt'] = _clp(datos['saldo_final_resumen'])
+            ctx['abonos_fmt'] = _clp(datos['total_abonos'])
+            ctx['cargos_fmt'] = _clp(datos['total_cargos'])
+            ctx['cierres_fmt'] = [(m, _clp(s)) for m, s in sorted(cierres_pend.items())]
+            if nuevas or cierres_pend:
+                ctx['payload'] = signing.dumps(
+                    {'filas': nuevas, 'cierres_mes': cierres_pend})
+
+    return render(request, 'finanzas/cargar_cartola.html', ctx)
