@@ -82,10 +82,22 @@ _Última revisión: 2026-08-06_
     registrar_compras_mp` (por clasificar, fuente api, ref `mp:<id>`, corte
     julio, cuenta según payment_type: account_money→MP, credit_card→Visa),
     enganchado dentro de `traer_pagos_mp` (un fetch, dos consumidores);
-    (C) comando cronable `python manage.py traer_pagos_mp --dias 3` — falta que
-    Jorge cree el Cron Job horario en Render (patrón aremko-reminders `0 * * * *`).
-    Siguen: F3 ingesta de correos, F4 cierre mensual por saldos (capturas →
-    bandeja de revisión) y reporte de diferencias en el briefing de Luna Interna.
+    (C) Cron Job «revisar pagos» CREADO y verificado en Render 2026-08-08
+    (horario, `0 * * * *`; primera corrida OK: «MP: 17 pagos revisados»).
+    **F3 CONSTRUIDA 2026-08-08:** comando `ingerir_correos_finanzas` (IMAP
+    solo-lectura a ecolonco, modo lectura default, idempotente por Message-ID)
+    parsea los correos MP «Tu transferencia fue enviada» → remuneraciones /
+    insumos / traspaso MP→Scotiabank con dos piernas; guardia anti-solape con
+    la carga histórica (hist:mp misma fecha+monto). Paraguas cronable
+    `auditoria_horaria` = traer_pagos_mp + ingerir_correos (pasos aislados).
+    Pendiente de Jorge: App Password de Gmail → env `GMAIL_FINANZAS_APP_PASSWORD`
+    en el cron + cambiar el Command del cron a `python manage.py auditoria_horaria`.
+    **Datos de Jorge 2026-08-08:** SumUp deposita en la Chequera Electrónica
+    BancoEstado (cuenta renombrada en sembrar); el portal BancoEstado SÍ tiene
+    botón Exportar → F4 va por CSV/XLS subido, no OCR ni PDF con clave; la
+    débito ••••5702 sigue sin dueño confirmado.
+    Siguen: F4 cierre mensual por saldos (página de carga del export + capturas
+    de saldo) y reporte de diferencias en el briefing de Luna Interna.
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número

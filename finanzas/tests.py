@@ -17,7 +17,8 @@ from django.utils import timezone
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 
 from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
-from .services import registrar_compras_mp
+from .services import (parsear_transferencia_mp, registrar_compras_mp,
+                       registrar_transferencia_mp)
 
 
 class SiembraTest(TestCase):
@@ -169,6 +170,70 @@ class ComprasMPTest(TestCase):
         self.assertEqual(registrar_compras_mp([dict(
             id=1, transaction_amount=1000, payment_type_id='account_money',
             date_approved='2026-08-05T10:00:00.000-04:00')]), 0)
+
+
+# Estructura real del correo «Tu transferencia fue enviada» (2026-08-08),
+# anonimizada: mismos rótulos, mismo anidado de tags alrededor del monto.
+HTML_TRANSFERENCIA = (
+    '<html><body><span>Ya enviamos tu transferencia de '
+    '<span style="white-space: nowrap;">$ {monto}</span></span>'
+    '<h1> Nombre y apellido: <strong>{nombre}</strong><p></p> '
+    'Entidad: <strong>Banco Estado</strong><p></p> '
+    'N&uacute;mero de cuenta: <strong>12345678</strong></h1></body></html>'
+)
+
+
+class CorreosMPTest(TestCase):
+    """F3: transferencias salientes de MP desde el correo."""
+
+    def _html(self, monto='250.000', nombre='Maria Prueba'):
+        return HTML_TRANSFERENCIA.format(monto=monto, nombre=nombre)
+
+    def test_parser_extrae_los_tres_campos(self):
+        d = parsear_transferencia_mp(self._html())
+        self.assertEqual(d, {'monto': 250000, 'beneficiario': 'Maria Prueba',
+                             'entidad': 'Banco Estado'})
+        # Correo que no calza → None, no un registro inventado.
+        self.assertIsNone(parsear_transferencia_mp('<html>Recibiste un pago</html>'))
+
+    def test_registro_clasifica_e_idempotente(self):
+        call_command('sembrar_finanzas')
+        f = date(2026, 8, 7)
+
+        d = parsear_transferencia_mp(self._html())
+        self.assertEqual(registrar_transferencia_mp(d, f, 'correo:mp:t1'), ('creado', 1))
+        m = MovimientoFinanciero.objects.get(referencia='correo:mp:t1')
+        self.assertEqual((m.clase, m.fuente, m.cuenta.clave, m.categoria.clave),
+                         ('gasto', 'correo', 'mercado_pago', 'remuneraciones'))
+        # Mismo correo de nuevo → no duplica.
+        self.assertEqual(registrar_transferencia_mp(d, f, 'correo:mp:t1'), ('ya_existe', 0))
+
+        # Insumos Sur → insumos.
+        d2 = parsear_transferencia_mp(self._html(monto='89.990', nombre='Insumos Sur'))
+        registrar_transferencia_mp(d2, f, 'correo:mp:t2')
+        self.assertEqual(MovimientoFinanciero.objects.get(
+            referencia='correo:mp:t2').categoria.clave, 'insumos')
+
+        # Barrido a cuenta propia → traspaso con dos piernas enlazadas.
+        d3 = parsear_transferencia_mp(self._html(monto='1.500.000',
+                                                 nombre='Aremko Spa Scotiabank'))
+        self.assertEqual(registrar_transferencia_mp(d3, f, 'correo:mp:t3'), ('creado', 2))
+        sale = MovimientoFinanciero.objects.get(referencia='correo:mp:t3:sale')
+        self.assertEqual(sale.clase, 'traspaso')
+        self.assertEqual(sale.traspaso_par.cuenta.clave, 'scotiabank')
+        self.assertEqual(sale.traspaso_par.traspaso_par_id, sale.id)
+
+    def test_no_duplica_lo_que_cargo_el_historico(self):
+        call_command('sembrar_finanzas')
+        f = date(2026, 8, 2)
+        MovimientoFinanciero.objects.create(
+            fecha=f, cuenta=CuentaFinanciera.objects.get(clave='mercado_pago'),
+            clase='gasto', sentido='sale', monto=40000,
+            categoria=CategoriaFinanciera.objects.get(clave='remuneraciones'),
+            fuente='correo', referencia='hist:mp:77')
+        d = parsear_transferencia_mp(self._html(monto='40.000', nombre='Javiera Perez'))
+        self.assertEqual(registrar_transferencia_mp(d, f, 'correo:mp:t9'),
+                         ('en_historico', 0))
 
 
 class VerificacionMPTest(TestCase):

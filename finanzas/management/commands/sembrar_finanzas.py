@@ -13,9 +13,10 @@ CUENTAS = [
     ('mercado_pago', 'Mercado Pago', 'pasarela',
      'Recauda ventas web y links de pago; paga trabajadores; barre saldo a Scotiabank. '
      'Verificable por API.'),
-    ('bancoestado', 'BancoEstado Cuenta Pro', 'banco',
+    ('bancoestado', 'BancoEstado Chequera Electrónica', 'banco',
      'Recibe las liquidaciones de Flow y SumUp (netas de comisión). También paga. '
-     'Cartola por correo y en línea.'),
+     'Cartola por correo y en línea, con botón Exportar (confirmado 2026-08-08). '
+     'SumUp declara depositar acá (dato de Jorge 2026-08-08).'),
     ('scotiabank', 'Scotiabank', 'banco',
      'Recibe barridos de MP y transferencias de clientes antiguos (SIN aviso por correo: '
      'los abonos entrantes solo se ven en cartola). Paga sueldos, SII y contador.'),
