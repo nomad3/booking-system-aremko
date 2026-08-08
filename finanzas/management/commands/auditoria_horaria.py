@@ -38,7 +38,21 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f'ingerir_correos_finanzas falló: {e}'))
             fallos.append('ingerir_correos_finanzas')
 
-        if len(fallos) == 2:
+        import os
+        if os.environ.get('SUMUP_API_KEY'):
+            try:
+                from finanzas.services import traer_comisiones_sumup
+                creados, total = traer_comisiones_sumup(dias=7)
+                self.stdout.write(f'SumUp: {total} payouts revisados · '
+                                  f'{creados} comisiones nuevas')
+            except Exception as e:
+                logger.exception('auditoria_horaria: comisiones SumUp fallaron')
+                self.stderr.write(self.style.ERROR(f'SumUp falló: {e}'))
+                fallos.append('sumup')
+        else:
+            self.stdout.write('SUMUP_API_KEY no configurada — SumUp saltado.')
+
+        if len(fallos) >= 3:
             raise CommandError(f'Todos los pasos fallaron: {fallos}')
         if fallos:
             self.stdout.write(self.style.WARNING(

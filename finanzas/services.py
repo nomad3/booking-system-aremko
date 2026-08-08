@@ -633,3 +633,90 @@ def estado_fila_cartola(cuenta_clave, fila):
             return 'en_historico'
 
     return 'nuevo'
+
+
+# ── F5: comisiones de SumUp por la API ───────────────────────────────────────
+# Estructura real verificada 2026-08-08 (sonda): /v0.1/me/financials/payouts
+# devuelve un item POR TRANSACCIÓN liquidada: {"amount": neto, "fee": comisión,
+# "date": "AAAA-MM-DD", "id": único, "type": "PAYOUT", "status": "SUCCESSFUL"}.
+# El neto ya entra a BancoEstado vía cartola (ingreso liquidacion_sumup), así
+# que acá solo se registra la COMISIÓN — en la cuenta puente "SumUp (en
+# tránsito)", que no está en el flujo de caja (no mueve saldos) pero sí suma
+# al gasto del mes en el tablero. Mismo patrón que las comisiones MP.
+
+
+def registrar_payouts_sumup(items):
+    """Núcleo puro-DB: convierte items de payouts en gastos de comisión.
+
+    Idempotente por referencia sumup:fee:<id>; corte julio; solo PAYOUT
+    SUCCESSFUL con fee > 0. Devuelve (creados, saltados).
+    """
+    from .models import (CategoriaFinanciera, CuentaFinanciera,
+                         MovimientoFinanciero)
+
+    try:
+        cuenta = CuentaFinanciera.objects.get(clave='sumup_transito')
+        cat = CategoriaFinanciera.objects.get(clave='comisiones')
+    except (CuentaFinanciera.DoesNotExist, CategoriaFinanciera.DoesNotExist):
+        logger.warning('finanzas sin sembrar (sumup_transito): comisiones '
+                       'SumUp no registradas')
+        return 0, 0
+
+    creados = saltados = 0
+    for p in items:
+        try:
+            if (p.get('type') != 'PAYOUT'
+                    or p.get('status') != 'SUCCESSFUL'):
+                saltados += 1
+                continue
+            fee = int(round(float(p.get('fee') or 0)))
+            pid = p.get('id')
+            fecha = date.fromisoformat(str(p.get('date') or ''))
+            if not pid or fee <= 0 or fecha < COBERTURA_GASTOS_DESDE:
+                saltados += 1
+                continue
+            ref = f'sumup:fee:{pid}'
+            if MovimientoFinanciero.objects.filter(referencia=ref).exists():
+                saltados += 1
+                continue
+            MovimientoFinanciero.objects.create(
+                fecha=fecha, cuenta=cuenta, clase='gasto', sentido='sale',
+                monto=fee, categoria=cat, fuente='api', referencia=ref,
+                descripcion=(f"Comisión SumUp venta {p.get('transaction_code') or pid} "
+                             f"(neto ${int(float(p.get('amount') or 0)):,})"
+                             .replace(',', '.'))[:255])
+            creados += 1
+        except Exception:
+            logger.exception('payout SumUp %s no registrado', p.get('id'))
+    return creados, saltados
+
+
+def traer_comisiones_sumup(dias=7):
+    """Capa fina: consulta payouts a la API de SumUp y registra comisiones.
+
+    Devuelve (creados, total_api). Lanza RuntimeError si no hay clave —
+    el que llama decide si eso es un salto limpio o un error.
+    """
+    import os
+
+    import requests
+
+    clave = os.environ.get('SUMUP_API_KEY')
+    if not clave:
+        raise RuntimeError('SUMUP_API_KEY no configurada')
+
+    from datetime import timedelta
+    desde = (date.today() - timedelta(days=dias)).isoformat()
+    r = requests.get(
+        'https://api.sumup.com/v0.1/me/financials/payouts',
+        headers={'Authorization': f'Bearer {clave}'},
+        params={'start_date': desde, 'end_date': date.today().isoformat()},
+        timeout=30,
+    )
+    r.raise_for_status()
+    datos = r.json()
+    items = datos if isinstance(datos, list) else (datos.get('items') or [])
+    creados, _ = registrar_payouts_sumup(items)
+    if creados:
+        logger.info('finanzas: %s comisiones SumUp registradas', creados)
+    return creados, len(items)

@@ -27,6 +27,10 @@ CUENTAS = [
      'Siete rechazos entre jun y ago 2026 — punto único de falla.'),
     ('mach', 'Mach y otros medios', 'billetera',
      'Pagos sueltos (ej. Movistar pagado vía Mach).'),
+    ('sumup_transito', 'SumUp (en tránsito)', 'pasarela',
+     'Cuenta puente: las comisiones SumUp (API) viven acá — suman al gasto '
+     'del mes pero NO tocan el flujo de caja (el neto ya llega a BancoEstado '
+     'por cartola). Saldo pendiente visible en el panel SumUp.'),
 ]
 
 CATEGORIAS = [

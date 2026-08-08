@@ -564,3 +564,35 @@ class CartolaScotiabankMensualTest(TestCase):
         self.assertEqual(r['cuenta_numero'], '973080644')
         # El abono de una clienta cuenta como ingreso (transferencia recibida).
         self.assertEqual(r['filas'][1]['categoria'], 'transferencias_recibidas')
+
+
+class ComisionesSumUpTest(TestCase):
+    """F5: la comisión de cada payout SumUp como gasto en la cuenta puente."""
+
+    def test_registra_solo_payouts_exitosos_con_fee(self):
+        from finanzas.services import registrar_payouts_sumup
+        call_command('sembrar_finanzas')
+        items = [
+            # Payout real con comisión (estructura de la sonda 2026-08-08).
+            {'id': 111, 'type': 'PAYOUT', 'status': 'SUCCESSFUL', 'fee': 1998.0,
+             'amount': 58002.0, 'date': '2026-07-27', 'transaction_code': 'TAAA1'},
+            # Sin comisión → nada.
+            {'id': 222, 'type': 'PAYOUT', 'status': 'SUCCESSFUL', 'fee': 0,
+             'amount': 10000.0, 'date': '2026-08-01'},
+            # No es payout → fuera.
+            {'id': 333, 'type': 'CHARGE_BACK', 'status': 'SUCCESSFUL',
+             'fee': 500.0, 'date': '2026-08-01'},
+            # Antes del corte de julio → fuera.
+            {'id': 444, 'type': 'PAYOUT', 'status': 'SUCCESSFUL', 'fee': 900.0,
+             'amount': 5000.0, 'date': '2026-06-15'},
+        ]
+        self.assertEqual(registrar_payouts_sumup(items), (1, 3))
+        m = MovimientoFinanciero.objects.get(referencia='sumup:fee:111')
+        self.assertEqual(
+            (m.cuenta.clave, m.categoria.clave, int(m.monto), str(m.fecha)),
+            ('sumup_transito', 'comisiones', 1998, '2026-07-27'))
+        # La cuenta puente NO participa del flujo de caja.
+        from finanzas.views import CUENTAS_FLUJO
+        self.assertNotIn('sumup_transito', CUENTAS_FLUJO)
+        # Idempotente.
+        self.assertEqual(registrar_payouts_sumup(items), (0, 4))
