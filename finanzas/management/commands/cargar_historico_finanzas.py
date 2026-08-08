@@ -37,6 +37,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--aplicar', action='store_true',
                             help='Escribe. Sin esto, solo informa.')
+        # Decisión de Jorge 2026-08-08: partir de JULIO, el primer mes completo
+        # y que se recuerda. Los datos de mayo/junio quedan en _datos_historicos
+        # por si algún día se quiere mirar atrás, pero no se cargan: reclasificar
+        # gastos que nadie recuerda es adivinar, no ordenar.
+        parser.add_argument('--desde', default='2026-07-01',
+                            help='No cargar movimientos anteriores a esta fecha (AAAA-MM-DD).')
 
     def handle(self, *args, **opts):
         from finanzas.models import (CategoriaFinanciera, CuentaFinanciera,
@@ -98,6 +104,14 @@ class Command(BaseCommand):
             planes.append((f'hist:infra:{i}', dict(
                 fecha=_fecha(f), cuenta=cuentas[cta], clase='gasto', sentido='sale',
                 monto=monto, categoria=cats[cat], descripcion=desc, fuente='correo')))
+
+        # ── Corte por fecha (default: julio 2026, primer mes completo) ──────
+        desde = _fecha(opts['desde'])
+        antes = len(planes)
+        planes = [(r, kw) for r, kw in planes if kw['fecha'] >= desde]
+        if antes != len(planes):
+            self.stdout.write(f'Corte --desde {desde}: {antes - len(planes)} '
+                              f'movimientos anteriores quedaron fuera.')
 
         # ── Resumen previo ──────────────────────────────────────────────────
         existentes = set(MovimientoFinanciero.objects.filter(

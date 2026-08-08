@@ -36,7 +36,12 @@ class CargaHistoricaTest(TestCase):
 
         call_command('cargar_historico_finanzas', '--aplicar')
         total = MovimientoFinanciero.objects.count()
-        self.assertGreater(total, 150)
+        self.assertGreater(total, 100)
+
+        # Decisión 2026-08-08: se parte de julio, el primer mes completo y que
+        # se recuerda. Nada anterior debe entrar con el default.
+        self.assertEqual(
+            MovimientoFinanciero.objects.filter(fecha__lt=date(2026, 7, 1)).count(), 0)
 
         # Idempotencia: segunda corrida no duplica.
         call_command('cargar_historico_finanzas', '--aplicar')
