@@ -26,7 +26,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.utils import timezone
 
-MOTIVO = 'No es un cobro: en Mercado Pago Aremko figura como pagador'
+from conciliacion.models import MOTIVO_NO_ES_COBRO as MOTIVO
 
 
 class Command(BaseCommand):

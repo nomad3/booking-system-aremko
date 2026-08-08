@@ -3,7 +3,7 @@
 
 Sin fixtures de ventas: la app es aislada y el tablero funciona con Pago vacío.
 """
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -12,6 +12,9 @@ from django.core.management import call_command
 from django.db.models import Sum
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+
+from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 
 from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
 
@@ -108,3 +111,33 @@ class TableroTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Resumen mensual')
         self.assertContains(r, 'Los traspasos cuadran')
+
+
+class VerificacionMPTest(TestCase):
+    """La sección sistema-vs-API del tablero (P-22 F2-A)."""
+
+    def test_lado_mp_cuenta_lo_correcto(self):
+        # La tabla agrega POR DÍA: cada caso va en su propio día para poder
+        # afirmar su monto, y el ajeno comparte día con v1 — si se colara,
+        # el día de v1 mostraría la suma y no $987.654.
+        ahora = timezone.now()
+        # Cobro normal → cuenta.
+        MovimientoMP.objects.create(mp_payment_id='v1', fecha=ahora, monto=987654)
+        # Ignorado POR DEBORAH (irrelevante para su tarea, pero plata que entró) → cuenta.
+        MovimientoMP.objects.create(mp_payment_id='v2', monto=345678,
+                                    fecha=ahora - timedelta(days=1),
+                                    estado='ignorado')
+        # Ajeno confirmado por la API (Aremko pagador) → NO cuenta.
+        MovimientoMP.objects.create(mp_payment_id='v3', fecha=ahora, monto=111222,
+                                    estado='ignorado',
+                                    sugerencia_motivo=MOTIVO_NO_ES_COBRO)
+
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:tablero'))
+        self.assertContains(r, 'Verificación Mercado Pago')
+        self.assertContains(r, '$987.654')
+        self.assertContains(r, '$345.678')
+        self.assertNotContains(r, '$111.222')
+        # Sin pagos en Django, la diferencia de la ventana es todo el lado MP.
+        self.assertContains(r, '+$1.333.332')

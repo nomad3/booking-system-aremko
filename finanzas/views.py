@@ -10,12 +10,14 @@ Honestidad del tablero: los meses sin gastos cargados muestran "—" y no un
 resultado. Un resultado calculado solo con ingresos sería una mentira cómoda.
 """
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.decorators import user_passes_test
-from django.db.models import Count, Sum
+from django.db.models import Count, Max, Sum
+from django.db.models.functions import TruncDate
 from django.shortcuts import render
 
+from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 from ventas.models import Pago
 
 from .models import MovimientoFinanciero, SaldoMensual
@@ -38,6 +40,9 @@ CANAL_POR_METODO = {
 # NO son ingreso nuevo: el canje de giftcard es un pasivo que se libera (la
 # plata entró cuando se compró la giftcard) y el descuento es un pseudo-pago.
 METODOS_EXCLUIDOS = ('giftcard', 'descuento')
+# Métodos que en Django significan "cobrado por Mercado Pago" — el lado sistema
+# de la verificación contra la API.
+METODOS_MP = ('mercadopago', 'mercadopagoaremko', 'mercadopago_link')
 
 
 def _clp(n):
@@ -111,6 +116,42 @@ def tablero(request):
     saldos = list(SaldoMensual.objects.filter(periodo__gte=desde)
                   .select_related('cuenta').order_by('periodo', 'cuenta__nombre'))
 
+    # ── Verificación Mercado Pago: sistema vs API, día a día (P-22 F2) ───────
+    # El corazón de la auditoría: lo que Django registró como cobrado por MP
+    # contra lo que la API de MP dice que entró. Se excluyen solo los ajenos
+    # (Aremko pagador); lo que Deborah ignoró para SU tarea igual es plata que
+    # entró y acá cuenta. El desfase de un día (MP aprueba de noche, se registra
+    # a la mañana) es normal — la señal real es el TOTAL de la ventana.
+    corte_mp = hoy - timedelta(days=13)
+    por_dia = defaultdict(dict)
+    for r in (Pago.objects.filter(metodo_pago__in=METODOS_MP,
+                                  fecha_pago__date__gte=corte_mp)
+              .annotate(d=TruncDate('fecha_pago')).values('d')
+              .annotate(t=Sum('monto'), n=Count('id'))):
+        por_dia[r['d']].update(sis=int(r['t'] or 0), sis_n=r['n'])
+    for r in (MovimientoMP.objects.filter(fecha__date__gte=corte_mp)
+              .exclude(sugerencia_motivo=MOTIVO_NO_ES_COBRO)
+              .annotate(d=TruncDate('fecha')).values('d')
+              .annotate(t=Sum('monto'), n=Count('id'))):
+        por_dia[r['d']].update(mp=int(r['t'] or 0), mp_n=r['n'])
+
+    verif_mp, v_sis, v_mp = [], 0, 0
+    for d in sorted(por_dia):
+        v = por_dia[d]
+        sis, mp_t = v.get('sis', 0), v.get('mp', 0)
+        dif = mp_t - sis
+        v_sis += sis
+        v_mp += mp_t
+        verif_mp.append({
+            'dia': d,
+            'sistema': _clp(sis) if sis else '—', 'sistema_n': v.get('sis_n', 0),
+            'mp': _clp(mp_t) if mp_t else '—', 'mp_n': v.get('mp_n', 0),
+            'dif': (f'+{_clp(dif)}' if dif > 0 else f'−{_clp(-dif)}') if dif else '',
+            'dif_alerta': dif != 0,
+        })
+    verif_dif = v_mp - v_sis
+    mp_al_dia = MovimientoMP.objects.aggregate(m=Max('fecha'))['m']
+
     # ── Armar filas para el template (formateo acá; el template es tonto) ────
     resumen = []
     for m in meses:
@@ -143,4 +184,11 @@ def tablero(request):
         'traspasos_cuadran': traspasos_cuadran,
         'tras_totales': {k: _clp(v) for k, v in tras_totales.items()},
         'hay_gastos': bool(categorias),
+        'verif_mp': verif_mp,
+        'verif_sis': _clp(v_sis),
+        'verif_mp_total': _clp(v_mp),
+        'verif_dif': ((f'+{_clp(verif_dif)}' if verif_dif > 0 else f'−{_clp(-verif_dif)}')
+                      if verif_dif else '$0'),
+        'verif_cuadra': verif_dif == 0,
+        'mp_al_dia': mp_al_dia,
     })

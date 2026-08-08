@@ -10,6 +10,12 @@ AUDITADO de cada pago conciliado que se aplicó, con su clave de idempotencia.
 
 from django.db import models
 
+# Motivo con que `limpiar_movimientos_ajenos` marca los pagos donde Aremko es el
+# PAGADOR (compras), no el cobrador. Finanzas lo usa para excluir esos movimientos
+# del lado MP al verificar ingresos: todo lo demás — incluso lo que Deborah ignoró
+# para SU tarea — es plata que entró y debe contar.
+MOTIVO_NO_ES_COBRO = 'No es un cobro: en Mercado Pago Aremko figura como pagador'
+
 
 class ReconciliacionLog(models.Model):
     """Una fila por cada pago conciliado que AgentProvision aplicó a una reserva.

@@ -76,6 +76,43 @@
   </table></div>
   <p class="sub">* El canje de giftcard no suma como ingreso nuevo: esa plata entró cuando se compró la giftcard.</p>
 
+  <h2>Verificación Mercado Pago · últimos 14 días</h2>
+  <p class="sub">Lo que el sistema registró como cobrado por MP contra lo que la API de Mercado Pago
+     dice que entró (sin las compras donde Aremko es el pagador).
+     {% if mp_al_dia %}Datos MP hasta el {{ mp_al_dia|date:"d-m-Y H:i" }}.{% endif %}</p>
+  {% if verif_mp %}
+  {% if verif_cuadra %}
+  <div class="aviso ok">✓ Cuadra: en la ventana, el sistema y Mercado Pago dicen lo mismo.</div>
+  {% else %}
+  <div class="aviso">Diferencia de la ventana: <b>{{ verif_dif }}</b>
+    (MP {{ verif_mp_total }} vs sistema {{ verif_sis }}).
+    Una diferencia un día que se compensa al siguiente es solo desfase de registro;
+    una que persiste en el total es plata que entró sin registrarse
+    (o registrada como MP sin serlo) — revisar en la
+    <a href="/admin/conciliacion/movimientomp/">conciliación</a>.</div>
+  {% endif %}
+  <div class="scroll"><table>
+    <thead><tr><th>Día</th><th>Sistema (Django)</th><th>N</th>
+               <th>Mercado Pago (API)</th><th>N</th><th>Diferencia</th></tr></thead>
+    <tbody>
+      {% for f in verif_mp %}
+      <tr><td>{{ f.dia|date:"D d-m" }}</td>
+          <td>{{ f.sistema }}</td><td>{{ f.sistema_n|default:'' }}</td>
+          <td>{{ f.mp }}</td><td>{{ f.mp_n|default:'' }}</td>
+          <td{% if f.dif_alerta %} class="neg"{% endif %}>{{ f.dif }}</td></tr>
+      {% endfor %}
+      <tr class="tot"><td>Total ventana</td><td>{{ verif_sis }}</td><td></td>
+          <td>{{ verif_mp_total }}</td><td></td>
+          <td{% if not verif_cuadra %} class="neg"{% endif %}>{{ verif_dif }}</td></tr>
+    </tbody>
+  </table></div>
+  <p class="sub">El lado MP se mantiene fresco con el botón «Traer pagos de MP» de la conciliación
+     — y quedará automático con el cron (F2-C).</p>
+  {% else %}
+  <p class="sub">Sin datos en la ventana: ni pagos MP en el sistema ni movimientos traídos de la API
+     en los últimos 14 días.</p>
+  {% endif %}
+
   <h2>Ingresos por canal</h2>
   <div class="scroll"><table>
     <thead><tr><th>Canal</th>{% for m in meses %}<th>{{ m|date:"Y-m" }}</th>{% endfor %}</tr></thead>
