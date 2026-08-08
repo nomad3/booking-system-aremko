@@ -53,7 +53,11 @@ class Command(BaseCommand):
         desde = timezone.now() - timedelta(days=dias)
 
         # Mismo recorrido que el fetch: se pagina hasta agotar o hasta 500.
-        cobros, offset, total = set(), 0, 0
+        # Se guardan los DOS conjuntos por separado. Marcar por ausencia seria
+        # un error: un pago puede faltar en la respuesta por paginacion o porque
+        # la API busca por date_created y la base guarda date_approved. Solo se
+        # toca lo que la API confirma que NO es un cobro nuestro.
+        cobros, ajenos_confirmados, offset, total = set(), set(), 0, 0
         while True:
             r = requests.get(
                 'https://api.mercadopago.com/v1/payments/search',
@@ -73,8 +77,7 @@ class Command(BaseCommand):
             page = data.get('results', [])
             for p in page:
                 total += 1
-                if es_cobro_nuestro(p, mi_id):
-                    cobros.add(str(p.get('id')))
+                (cobros if es_cobro_nuestro(p, mi_id) else ajenos_confirmados).add(str(p.get('id')))
             offset += len(page)
             if not page or offset >= data.get('paging', {}).get('total', 0) or offset >= 500:
                 break
@@ -85,12 +88,26 @@ class Command(BaseCommand):
             self.stderr.write('La API no devolvio pagos. No se toca nada.')
             return
 
-        en_rango = MovimientoMP.objects.filter(fecha__gte=desde)
-        ajenos = [m for m in en_rango if m.mp_payment_id not in cobros]
+        en_rango = list(MovimientoMP.objects.filter(fecha__gte=desde))
+        ajenos = [m for m in en_rango if m.mp_payment_id in ajenos_confirmados]
+        sin_verificar = [m for m in en_rango
+                         if m.mp_payment_id not in cobros
+                         and m.mp_payment_id not in ajenos_confirmados]
 
-        self.stdout.write(f'API: {total} pagos en la ventana, {len(cobros)} son cobros de Aremko')
-        self.stdout.write(f'Base: {en_rango.count()} movimientos en el mismo rango')
+        self.stdout.write(f'API: {total} pagos en la ventana — '
+                          f'{len(cobros)} cobros de Aremko, {len(ajenos_confirmados)} compras')
+        self.stdout.write(f'Base: {len(en_rango)} movimientos en el mismo rango')
         self.stdout.write(f'A sacar de la cola: {len(ajenos)}\n')
+
+        if sin_verificar:
+            self.stdout.write(self.style.WARNING(
+                f'{len(sin_verificar)} movimientos NO aparecieron en la respuesta de la API. '
+                'No se tocan: faltar en la respuesta no prueba que sean ajenos.'))
+            for m in sorted(sin_verificar, key=lambda x: x.fecha, reverse=True)[:10]:
+                self.stdout.write(
+                    f'  {str(m.fecha)[:10]}  {int(m.monto):>9,}'.replace(',', '.')
+                    + f'  {m.estado:<10} {(m.glosa or "(sin glosa)")[:46]}')
+            self.stdout.write('')
 
         if not ajenos:
             self.stdout.write('Nada que limpiar.')
