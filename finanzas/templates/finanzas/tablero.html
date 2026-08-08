@@ -1,0 +1,121 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Finanzas · Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1180px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  h2{font-size:17px; margin:34px 0 8px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 18px;}
+  .aviso{background:#f5eeda; border:1px solid #e3d5ac; border-radius:10px;
+         padding:10px 14px; font-size:13.5px; margin:14px 0; color:#5c4d1f;}
+  .ok{background:#e8f2ea; border-color:#c4dccb; color:var(--verde);}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px; background:#fff;}
+  table{border-collapse:collapse; width:100%; min-width:900px; font-size:13.5px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:7px 10px; border-bottom:1px solid var(--linea); text-align:right; white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:#fff;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:12px;
+           text-transform:uppercase; letter-spacing:.04em;}
+  tr:last-child td{border-bottom:none;}
+  .neg{color:var(--rojo); font-weight:600;}
+  .actual{color:var(--suave); font-style:italic;}
+  .tot td{font-weight:700; border-top:2px solid var(--linea); background:#fcfbf8;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Finanzas</h1>
+  <p class="sub">Ingresos leídos del sistema de reservas · gastos y traspasos del registro propio ·
+     <a href="/admin/finanzas/movimientofinanciero/">movimientos</a> ·
+     <a href="/admin/finanzas/saldomensual/">saldos</a></p>
+
+  {% if not hay_gastos %}
+  <div class="aviso">Todavía no hay gastos cargados. Correr en la Shell:
+    <code>python manage.py sembrar_finanzas</code> y luego
+    <code>python manage.py cargar_historico_finanzas</code>.</div>
+  {% else %}
+  <div class="aviso">Cobertura de gastos: <b>junio–agosto 2026, parcial</b> (reconstruidos del correo;
+    los egresos de Mercado Pago de junio parten el día 9; varios de Scotiabank tienen solo el mes).
+    Los meses sin gastos muestran «—» y no un resultado: un resultado solo con ingresos sería mentira.</div>
+  {% endif %}
+
+  {% if traspasos_cuadran %}
+  <div class="aviso ok">✓ Los traspasos cuadran: todo lo que salió de una cuenta entró en otra.</div>
+  {% else %}
+  <div class="aviso">⚠️ Los traspasos NO cuadran (entra {{ tras_totales.entra }} vs sale {{ tras_totales.sale }}).
+    Hay un traspaso registrado por un solo lado — revisar en movimientos.</div>
+  {% endif %}
+
+  <h2>Resumen mensual</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Resultado</th>
+               <th>Traspasos</th><th>Canje GiftCard*</th></tr></thead>
+    <tbody>
+      {% for f in resumen %}
+      <tr{% if f.es_actual %} class="actual"{% endif %}>
+        <td>{{ f.mes|date:"Y-m" }}{% if f.es_actual %} (en curso){% endif %}</td>
+        <td>{{ f.ingresos }}</td>
+        <td>{{ f.gastos }}</td>
+        <td{% if f.resultado_neg %} class="neg"{% endif %}>{{ f.resultado }}</td>
+        <td>{{ f.traspasos }}</td>
+        <td>{{ f.canje_gc }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="sub">* El canje de giftcard no suma como ingreso nuevo: esa plata entró cuando se compró la giftcard.</p>
+
+  <h2>Ingresos por canal</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Canal</th>{% for m in meses %}<th>{{ m|date:"Y-m" }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for fila in tabla_ingresos %}
+      <tr><td>{{ fila.canal }}</td>{% for c in fila.celdas %}<td>{{ c }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if hay_gastos %}
+  <h2>Gastos por categoría</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Categoría</th>{% for m in meses %}<th>{{ m|date:"Y-m" }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for fila in tabla_gastos %}
+      <tr><td>{{ fila.categoria }}</td>{% for c in fila.celdas %}<td>{{ c }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="sub">«Por clasificar» es trabajo de la jornada P-22: se reclasifica en el
+     <a href="/admin/finanzas/movimientofinanciero/?clase__exact=gasto">admin de movimientos</a>.</p>
+  {% endif %}
+
+  <h2>Saldos de cierre</h2>
+  {% if saldos %}
+  <div class="scroll"><table>
+    <thead><tr><th>Mes</th><th>Cuenta</th><th>Saldo</th><th>Fuente</th><th>Notas</th></tr></thead>
+    <tbody>
+      {% for s in saldos %}
+      <tr><td>{{ s.periodo|date:"Y-m" }}</td><td>{{ s.cuenta.nombre }}</td>
+          <td>${{ s.saldo_cierre|floatformat:0 }}</td><td>{{ s.get_fuente_display }}</td><td>{{ s.notas }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p class="sub">Sin saldos cargados aún. A fin de mes: una captura del saldo de cada cuenta
+     → <a href="/admin/finanzas/saldomensual/add/">cargarlo acá</a>. Con eso la fórmula
+     <em>saldo anterior + entradas − salidas</em> se vuelve verificable por cuenta — el control
+     que atrapa lo que ningún correo avisa.</p>
+  {% endif %}
+</div>
+</body>
+</html>

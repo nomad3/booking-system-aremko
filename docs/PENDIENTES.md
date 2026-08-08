@@ -61,6 +61,21 @@ _Última revisión: 2026-08-06_
 
 22. **P-22 · Jornada de orden contable: plan de cuentas + registro mensual de
     ingresos y gastos** — Pedido de Jorge 2026-08-06 tras el diagnóstico de correos.
+    **F1 CONSTRUIDA 2026-08-08:** app `finanzas/` (solo superusuario, aislada
+    drift-safe): cuentas financieras (6: MP, BancoEstado Cuenta Pro, Scotiabank,
+    efectivo, Visa ••••2936, Mach), plan de cuentas mínimo (13 categorías),
+    `MovimientoFinanciero` (gasto/traspaso con jerarquía de fuentes api>correo>
+    captura>manual e idempotencia por referencia), `SaldoMensual` (ancla del
+    cierre: saldo anterior + entradas − salidas), tablero en `/finanzas/tablero/`
+    (ingresos leídos DIRECTO de `Pago` — sin duplicar, sin cron; canje giftcard
+    excluido del ingreso; meses sin gastos muestran «—», no un resultado
+    mentiroso), botón admin "Registrar traspaso" que crea las 2 piernas, y carga
+    histórica jun–ago 2026 (211 movs: $32,1M de gastos + 24 traspasos MP→Scotia
+    que cuadran en $19,23M por lado). Comandos: `sembrar_finanzas` +
+    `cargar_historico_finanzas [--aplicar]`. **Mapa de dinero cerrado 2026-08-08:**
+    Flow Y SumUp liquidan a BancoEstado (visto en cartola en línea); BCh no es
+    cuenta de Aremko. Siguen: F2 cron MP entra/sale + reporte diario, F3 ingesta
+    de correos, F4 cierre mensual por saldos (capturas → bandeja de revisión).
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número

@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="max-width:560px;">
+  <p>Un traspaso mueve plata <b>entre cuentas propias</b>: no es ingreso ni gasto.
+     Este formulario crea las <b>dos líneas</b> de una vez (sale de una cuenta,
+     entra a la otra) para que el control de suma cero siempre cuadre.</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" value="Registrar traspaso" class="default">
+    <a href="{% url 'admin:finanzas_movimientofinanciero_changelist' %}" class="button cancel-link">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

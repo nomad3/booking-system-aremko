@@ -193,6 +193,9 @@ urlpatterns = [
     # Verificación pública de boletas electrónicas (P-16, requisito declaración SII)
     path('boletas/', include('facturacion.urls', namespace='facturacion')),
 
+    # Tablero financiero del dueño (P-22 F1, solo superusuario)
+    path('finanzas/', include('finanzas.urls', namespace='finanzas')),
+
     # Cola de publicaciones de la semana para aremko-cli (asistente community manager)
     path('marketing/', include('marketing_briefs.urls', namespace='marketing_briefs')),
     # Catálogo de Clips (H-070, M17): ingesta + CRUD por API para aremko-cli.
