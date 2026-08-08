@@ -143,13 +143,21 @@ def traer_pagos_mp(dias=14):
     # funcion es el total que trajo la API — no el filtrado. Si se cambia, el
     # boton del admin pasa a mentir sobre cuanto reviso.
     total_traidos = len(resultados)
+    compras = [p for p in resultados if not es_cobro_nuestro(p, mi_id)]
     resultados = [p for p in resultados if es_cobro_nuestro(p, mi_id)]
-    descartados = total_traidos - len(resultados)
-    if descartados:
+    if compras:
         logger.info(
             'MP: descartados %s pagos donde Aremko no es el cobrador (de %s)',
-            descartados, total_traidos,
+            len(compras), total_traidos,
         )
+        # Un fetch, dos consumidores (P-22 F2-B): lo que para la cola de
+        # Deborah es ruido (Aremko pagador) para finanzas es exactamente el
+        # gasto pagado via MP. Best-effort: un fallo alla no rompe esto.
+        try:
+            from finanzas.services import registrar_compras_mp
+            registrar_compras_mp(compras)
+        except Exception:
+            logger.exception('compras MP → finanzas fallaron (la conciliacion sigue)')
 
     vistos = set(MovimientoMP.objects.filter(
         mp_payment_id__in=[str(p.get('id')) for p in resultados]

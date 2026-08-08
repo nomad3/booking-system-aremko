@@ -96,6 +96,11 @@ def tablero(request):
         m = date(f['fecha__year'], f['fecha__month'], 1)
         gastos[m][f['categoria__nombre'] or 'Sin categoría'] += int(f['t'] or 0)
 
+    # Congelar AQUÍ qué meses tienen gastos de verdad: cualquier acceso posterior
+    # a gastos[m] (la ordenación de abajo, las tablas) crea la llave en el
+    # defaultdict y "todos los meses tendrían gastos $0" (visto en prod 2026-08-08).
+    meses_con_gastos = set(gastos)
+
     categorias = sorted({c for por_cat in gastos.values() for c in por_cat},
                         key=lambda c: -sum(gastos[m].get(c, 0) for m in meses))
 
@@ -156,15 +161,18 @@ def tablero(request):
     resumen = []
     for m in meses:
         ing = sum(ingresos[m].values())
-        gas = sum(gastos[m].values())
-        con_gastos = m in gastos
+        con_gastos = m in meses_con_gastos
+        gas = sum(gastos[m].values()) if con_gastos else 0
         resumen.append({
             'mes': m, 'es_actual': (m.year, m.month) == (hoy.year, hoy.month),
             'ingresos': _clp(ing) if ing else '—',
             'gastos': _clp(gas) if con_gastos else '—',
             'canje_gc': _clp(canje_gc[m]) if canje_gc[m] else '',
             'traspasos': _clp(traspasos[m]['sale']) if traspasos[m]['n'] else '',
-            'resultado': _clp(ing - gas) if (ing and con_gastos) else '—',
+            # `con_gastos` es el único guard honesto: los ingresos salen de Pago
+            # (fuente siempre completa), así que ing=0 es un cero real — con
+            # gastos cargados el resultado se muestra aunque sea todo pérdida.
+            'resultado': _clp(ing - gas) if con_gastos else '—',
             'resultado_neg': con_gastos and (ing - gas) < 0,
         })
 

@@ -17,6 +17,7 @@ from django.utils import timezone
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 
 from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
+from .services import registrar_compras_mp
 
 
 class SiembraTest(TestCase):
@@ -111,6 +112,63 @@ class TableroTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Resumen mensual')
         self.assertContains(r, 'Los traspasos cuadran')
+
+        # Regresión (visto en prod 2026-08-08): un mes SIN gastos cargados
+        # muestra «—» y no "$0 + resultado" — la trampa era que sum(gastos[m])
+        # sobre un defaultdict creaba la llave antes del chequeo `m in gastos`.
+        por_mes = {f['mes']: f for f in r.context['resumen']}
+        junio = date(2026, 6, 1)
+        self.assertIn(junio, por_mes)
+        self.assertEqual(por_mes[junio]['gastos'], '—')
+        self.assertEqual(por_mes[junio]['resultado'], '—')
+        # Julio sí tiene gastos cargados → números de verdad.
+        julio = date(2026, 7, 1)
+        self.assertNotEqual(por_mes[julio]['gastos'], '—')
+        self.assertNotEqual(por_mes[julio]['resultado'], '—')
+
+
+class ComprasMPTest(TestCase):
+    """Compras vía MP (Aremko pagador) → gasto automático (P-22 F2-B)."""
+
+    def test_registra_con_cuenta_corte_e_idempotencia(self):
+        call_command('sembrar_finanzas')
+        pagos = [
+            # Con saldo MP → cuenta mercado_pago.
+            dict(id=111, transaction_amount=25990, payment_type_id='account_money',
+                 date_approved='2026-08-05T10:00:00.000-04:00',
+                 description='Mercado Libre - cable HDMI'),
+            # Con la Visa a través de MP → el gasto es de la Visa.
+            dict(id=222, transaction_amount=49990, payment_type_id='credit_card',
+                 date_approved='2026-07-15T09:00:00.000-04:00',
+                 description='Retail'),
+            # Antes del corte de julio → fuera.
+            dict(id=333, transaction_amount=10000, payment_type_id='account_money',
+                 date_approved='2026-06-20T09:00:00.000-04:00'),
+            # Monto cero y sin fecha → fuera, sin explotar.
+            dict(id=444, transaction_amount=0,
+                 date_approved='2026-08-05T10:00:00.000-04:00'),
+            dict(id=555, transaction_amount=5000, payment_type_id='account_money'),
+        ]
+        self.assertEqual(registrar_compras_mp(pagos), 2)
+
+        m1 = MovimientoFinanciero.objects.get(referencia='mp:111')
+        self.assertEqual((m1.cuenta.clave, m1.clase, m1.sentido, m1.fuente),
+                         ('mercado_pago', 'gasto', 'sale', 'api'))
+        self.assertEqual(m1.categoria.clave, 'por_clasificar')
+        self.assertEqual(m1.fecha, date(2026, 8, 5))
+        self.assertIn('Mercado Libre', m1.descripcion)
+
+        m2 = MovimientoFinanciero.objects.get(referencia='mp:222')
+        self.assertEqual(m2.cuenta.clave, 'visa_2936')
+
+        # Segunda corrida: nada nuevo.
+        self.assertEqual(registrar_compras_mp(pagos), 0)
+        self.assertEqual(MovimientoFinanciero.objects.count(), 2)
+
+    def test_sin_sembrar_no_explota(self):
+        self.assertEqual(registrar_compras_mp([dict(
+            id=1, transaction_amount=1000, payment_type_id='account_money',
+            date_approved='2026-08-05T10:00:00.000-04:00')]), 0)
 
 
 class VerificacionMPTest(TestCase):

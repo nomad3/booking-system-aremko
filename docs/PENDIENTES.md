@@ -70,12 +70,22 @@ _Última revisión: 2026-08-06_
     (ingresos leídos DIRECTO de `Pago` — sin duplicar, sin cron; canje giftcard
     excluido del ingreso; meses sin gastos muestran «—», no un resultado
     mentiroso), botón admin "Registrar traspaso" que crea las 2 piernas, y carga
-    histórica jun–ago 2026 (211 movs: $32,1M de gastos + 24 traspasos MP→Scotia
-    que cuadran en $19,23M por lado). Comandos: `sembrar_finanzas` +
-    `cargar_historico_finanzas [--aplicar]`. **Mapa de dinero cerrado 2026-08-08:**
-    Flow Y SumUp liquidan a BancoEstado (visto en cartola en línea); BCh no es
-    cuenta de Aremko. Siguen: F2 cron MP entra/sale + reporte diario, F3 ingesta
-    de correos, F4 cierre mensual por saldos (capturas → bandeja de revisión).
+    histórica jun–ago 2026 (211 movs; corte julio decidido 2026-08-08: quedan
+    124 desde el 1-jul). Comandos: `sembrar_finanzas` +
+    `cargar_historico_finanzas [--aplicar] [--desde]`. **Mapa de dinero cerrado
+    2026-08-08:** Flow Y SumUp liquidan a BancoEstado (visto en cartola en
+    línea); BCh no es cuenta de Aremko.
+    **F2 CONSTRUIDA 2026-08-08:** (A) sección «Verificación Mercado Pago» en el
+    tablero — por día, 14 días, Pago vs MovimientoMP excluyendo solo ajenos por
+    `MOTIVO_NO_ES_COBRO` (lo ignorado por Deborah SÍ cuenta: es plata que entró);
+    (B) compras vía MP (Aremko pagador) → gasto automático `finanzas.services.
+    registrar_compras_mp` (por clasificar, fuente api, ref `mp:<id>`, corte
+    julio, cuenta según payment_type: account_money→MP, credit_card→Visa),
+    enganchado dentro de `traer_pagos_mp` (un fetch, dos consumidores);
+    (C) comando cronable `python manage.py traer_pagos_mp --dias 3` — falta que
+    Jorge cree el Cron Job horario en Render (patrón aremko-reminders `0 * * * *`).
+    Siguen: F3 ingesta de correos, F4 cierre mensual por saldos (capturas →
+    bandeja de revisión) y reporte de diferencias en el briefing de Luna Interna.
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número
