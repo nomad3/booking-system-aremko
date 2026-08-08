@@ -383,19 +383,20 @@ def parsear_cartola_bancoestado(archivo):
     }
 
 
-def registrar_filas_cartola(filas, cierres_mes=None):
-    """Escribe las filas confirmadas de la cartola (fuente=captura) + cierres.
+def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado'):
+    """Escribe las filas confirmadas de una cartola (fuente=captura) + cierres.
 
-    Idempotente por referencia; respeta el corte de julio; guardia anti-solape
-    con la carga histórica (hist: misma cuenta+fecha+monto). Devuelve
-    (creados, saltados).
+    Idempotente por referencia; respeta el corte de julio; y re-verifica el
+    estado de cada fila (defensa doble contra dobles conteos: histórico
+    mes-nivel de Scotiabank, barridos ya registrados como traspaso).
+    Devuelve (creados, saltados).
     """
     from django.db import transaction
 
     from .models import (CategoriaFinanciera, CuentaFinanciera,
                          MovimientoFinanciero, SaldoMensual)
 
-    cuenta = CuentaFinanciera.objects.get(clave='bancoestado')
+    cuenta = CuentaFinanciera.objects.get(clave=cuenta_clave)
     cats = {c.clave: c for c in CategoriaFinanciera.objects.all()}
     for clave, (nombre, clase) in CATEGORIAS_CARTOLA.items():
         if clave not in cats:
@@ -407,15 +408,8 @@ def registrar_filas_cartola(filas, cierres_mes=None):
         for f in filas:
             fecha = date.fromisoformat(f['fecha'])
             monto = f['abono'] or f['cargo']
-            if fecha < COBERTURA_GASTOS_DESDE or monto <= 0:
-                saltados += 1
-                continue
-            if MovimientoFinanciero.objects.filter(referencia=f['referencia']).exists():
-                saltados += 1
-                continue
-            if MovimientoFinanciero.objects.filter(
-                    referencia__startswith='hist:', cuenta=cuenta,
-                    fecha=fecha, monto=monto).exists():
+            if (fecha < COBERTURA_GASTOS_DESDE or monto <= 0
+                    or estado_fila_cartola(cuenta_clave, f) != 'nuevo'):
                 saltados += 1
                 continue
             MovimientoFinanciero.objects.create(
@@ -423,7 +417,7 @@ def registrar_filas_cartola(filas, cierres_mes=None):
                 sentido=f['sentido'], monto=monto,
                 categoria=cats.get(f['categoria']),
                 fuente='captura', referencia=f['referencia'],
-                descripcion=f"Cartola BE: {f['descripcion']}"[:255])
+                descripcion=f"Cartola {cuenta_clave}: {f['descripcion']}"[:255])
             creados += 1
 
         for mes_iso, saldo in (cierres_mes or {}).items():
@@ -434,3 +428,163 @@ def registrar_filas_cartola(filas, cierres_mes=None):
                           'notas': 'Cierre derivado del export de cartola'})
 
     return creados, saltados
+
+
+# ── F4 paso 3b: cartola Scotiabank (export .xls del portal) ──────────────────
+# Formato real verificado 2026-08-08 (typeDesc.xls): hoja única 'Data' con
+# metadatos rótulo/valor arriba (Saldo Disponible, Fecha Desde/Hasta) y luego
+# encabezado Fecha DD-MM-AAAA | Descripción | Sucursal | N° Doc. | Cargos
+# (NEGATIVOS) | Abonos | Saldo — en orden DESCENDENTE (lo más nuevo primero).
+
+RUT_AREMKO_SIN_DV = '76485192'
+
+
+def clasificar_fila_scotiabank(descripcion, cargo, abono):
+    """(clase, sentido, categoria_clave, propio) para una fila Scotiabank."""
+    d = (descripcion or '').upper()
+    propio = RUT_AREMKO_SIN_DV in d or 'AREMKO' in d
+    if abono > 0:
+        # Abono propio = barrido desde otra cuenta de Aremko (traspaso, no
+        # ingreso). El match contra el traspaso ya registrado se hace aparte.
+        if propio:
+            return 'traspaso', 'entra', '', True
+        return 'ingreso', 'entra', 'transferencias_recibidas', False
+    if 'SEGURO' in d:
+        return 'gasto', 'sale', 'seguros', False
+    if 'COMISION' in d or d.startswith('IVA'):
+        return 'gasto', 'sale', 'comisiones', False
+    return 'gasto', 'sale', 'por_clasificar', False
+
+
+def parsear_filas_scotiabank(filas_crudas):
+    """Núcleo puro: recibe las filas de la hoja 'Data' como listas y devuelve
+    el mismo shape que la cartola BancoEstado. Testeable sin xlrd."""
+    from datetime import datetime
+
+    meta, encabezado_en = {}, None
+    for i, fila in enumerate(filas_crudas):
+        primera = str(fila[0] or '').strip()
+        if primera == 'Fecha' and any('Descripci' in str(c or '') for c in fila):
+            encabezado_en = i
+            break
+        if primera and len(fila) > 1 and fila[1] not in ('', None):
+            meta[primera] = fila[1]
+    if encabezado_en is None:
+        raise ValueError('No encuentro el encabezado de movimientos — '
+                         '¿es el export de Scotiabank?')
+
+    movimientos = []
+    for fila in filas_crudas[encabezado_en + 1:]:
+        crudo_fecha = str(fila[0] or '').strip()
+        if not crudo_fecha:
+            continue
+        try:
+            fecha = datetime.strptime(crudo_fecha, '%d-%m-%Y').date()
+        except ValueError:
+            continue
+        desc = str(fila[1] or '').strip()
+        cargo = abs(_monto_celda(fila[4]))
+        abono = _monto_celda(fila[5])
+        saldo = _monto_celda(fila[6])
+        if cargo == 0 and abono == 0:
+            continue
+        movimientos.append((fecha, desc, cargo, abono, saldo))
+
+    # El archivo viene de lo más nuevo a lo más viejo → invertir para encadenar.
+    movimientos.reverse()
+
+    filas, cadena_rota, saldo_prev = [], 0, None
+    for fecha, desc, cargo, abono, saldo in movimientos:
+        if saldo_prev is not None and saldo_prev + abono - cargo != saldo:
+            cadena_rota += 1
+        saldo_prev = saldo
+        clase, sentido, cat, propio = clasificar_fila_scotiabank(desc, cargo, abono)
+        huella = f'{fecha.isoformat()}|{desc}|{cargo}|{abono}|{saldo}'
+        filas.append({
+            'fecha': fecha.isoformat(), 'descripcion': desc,
+            'cargo': cargo, 'abono': abono, 'saldo': saldo,
+            'clase': clase, 'sentido': sentido, 'categoria': cat,
+            'propio': propio,
+            'referencia': 'sc:' + hashlib.sha1(huella.encode()).hexdigest()[:24],
+        })
+    if not filas:
+        raise ValueError('El export no trae movimientos.')
+
+    saldo_inicial = filas[0]['saldo'] - filas[0]['abono'] + filas[0]['cargo']
+    saldo_final = filas[-1]['saldo']
+
+    cierres = {}
+    for i, f in enumerate(filas):
+        mes_fila = f['fecha'][:7]
+        if any(g['fecha'][:7] > mes_fila for g in filas[i + 1:]):
+            cierres[mes_fila] = f['saldo']
+
+    disponible = _monto_celda(meta.get('Saldo Disponible'))
+    return {
+        'cuenta_numero': str(meta.get('Número Línea') or ''),
+        'fecha_inicio': filas[0]['fecha'], 'fecha_final': filas[-1]['fecha'],
+        'saldo_inicial': saldo_inicial, 'saldo_final_resumen': disponible or saldo_final,
+        'saldo_final_calculado': saldo_final,
+        'total_cargos': sum(f['cargo'] for f in filas),
+        'total_abonos': sum(f['abono'] for f in filas),
+        'cadena_rota': cadena_rota,
+        'cuadra': (cadena_rota == 0 and
+                   (not disponible or disponible == saldo_final)),
+        'cierres_mes': cierres,
+        'filas': filas,
+    }
+
+
+def parsear_cartola_scotiabank(archivo):
+    """Capa fina: lee el .xls con xlrd y delega en el núcleo puro."""
+    import xlrd
+
+    wb = xlrd.open_workbook(file_contents=archivo.read())
+    hoja = wb.sheet_by_index(0)
+    crudas = [[hoja.cell_value(i, j) for j in range(hoja.ncols)]
+              for i in range(hoja.nrows)]
+    return parsear_filas_scotiabank(crudas)
+
+
+def estado_fila_cartola(cuenta_clave, fila):
+    """'nuevo' | 'ya_existe' | 'en_historico' | 'revisar' para una fila.
+
+    La usan la vista previa (mostrar) Y el registro (defensa doble):
+    - referencia ya escrita → ya_existe
+    - Scotiabank, gasto: el histórico de julio era mes-nivel con fecha
+      estimada → cualquier hist: del MISMO MES con el mismo monto lo cubre
+      (conservador: mejor saltar que contar dos veces).
+    - BancoEstado: hist: exacto por fecha+monto.
+    - Traspaso propio (barrido que llega): si ya existe la pierna 'entra'
+      con el mismo monto a ±2 días → ya_existe; si no → 'revisar' (no se
+      crea una pierna suelta que rompería la suma cero).
+    """
+    from .models import MovimientoFinanciero
+
+    fecha = date.fromisoformat(fila['fecha'])
+    monto = fila['abono'] or fila['cargo']
+
+    if MovimientoFinanciero.objects.filter(referencia=fila['referencia']).exists():
+        return 'ya_existe'
+
+    if fila.get('propio') and fila['clase'] == 'traspaso':
+        from datetime import timedelta
+        hay_par = MovimientoFinanciero.objects.filter(
+            clase='traspaso', sentido='entra', cuenta__clave=cuenta_clave,
+            monto=monto, fecha__range=(fecha - timedelta(days=2),
+                                       fecha + timedelta(days=2))).exists()
+        return 'ya_existe' if hay_par else 'revisar'
+
+    if cuenta_clave == 'scotiabank' and fila['clase'] == 'gasto':
+        if MovimientoFinanciero.objects.filter(
+                referencia__startswith='hist:', cuenta__clave=cuenta_clave,
+                monto=monto, fecha__year=fecha.year,
+                fecha__month=fecha.month).exists():
+            return 'en_historico'
+    else:
+        if MovimientoFinanciero.objects.filter(
+                referencia__startswith='hist:', cuenta__clave=cuenta_clave,
+                fecha=fecha, monto=monto).exists():
+            return 'en_historico'
+
+    return 'nuevo'

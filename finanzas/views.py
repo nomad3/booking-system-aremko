@@ -202,18 +202,25 @@ def tablero(request):
     })
 
 
+NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
+                         'scotiabank': 'Scotiabank'}
+
+
 @user_passes_test(lambda u: u.is_superuser)
 def cargar_cartola(request):
-    """Carga del export XLSX de la cartola BancoEstado (P-22 F4 paso 3).
+    """Carga de cartolas bancarias (P-22 F4 paso 3): BancoEstado (.xlsx) y
+    Scotiabank (.xls) — el banco se detecta por los bytes del archivo.
 
     Flujo en dos golpes, nada se escribe sin confirmar: (1) subir archivo →
-    propuesta con chequeos (cadena de saldos, totales) y qué es nuevo;
-    (2) botón Confirmar → se escriben los nuevos (fuente=captura) y los
-    cierres de mes que el archivo cubre. El payload viaja firmado.
+    propuesta con chequeos (cadena de saldos, totales) y el estado de cada
+    fila (nuevo / ya está / en histórico / revisar); (2) botón Confirmar →
+    se escriben los nuevos (fuente=captura) y los cierres de mes que el
+    archivo cubre. El payload viaja firmado.
     """
     from django.core import signing
 
-    from .services import parsear_cartola_bancoestado, registrar_filas_cartola
+    from .services import (estado_fila_cartola, parsear_cartola_bancoestado,
+                           parsear_cartola_scotiabank, registrar_filas_cartola)
 
     ctx = {}
 
@@ -224,31 +231,44 @@ def cargar_cartola(request):
             ctx['error'] = ('La propuesta expiró o viene alterada — '
                             'sube el archivo de nuevo.')
         else:
+            cuenta_clave = payload.get('cuenta', 'bancoestado')
             creados, saltados = registrar_filas_cartola(
-                payload['filas'], payload.get('cierres_mes'))
+                payload['filas'], payload.get('cierres_mes'),
+                cuenta_clave=cuenta_clave)
             ctx['resultado'] = {
                 'creados': creados, 'saltados': saltados,
+                'cuenta': NOMBRE_CUENTA_CARTOLA.get(cuenta_clave, cuenta_clave),
                 'cierres': [(m, _clp(s)) for m, s
                             in sorted((payload.get('cierres_mes') or {}).items())],
             }
 
     elif request.method == 'POST' and request.FILES.get('archivo'):
+        archivo = request.FILES['archivo']
+        magia = archivo.read(4)
+        archivo.seek(0)
         try:
-            datos = parsear_cartola_bancoestado(request.FILES['archivo'])
+            if magia.startswith(b'PK'):            # zip → xlsx BancoEstado
+                cuenta_clave = 'bancoestado'
+                datos = parsear_cartola_bancoestado(archivo)
+            elif magia.startswith(b'\xd0\xcf'):    # OLE2 → xls Scotiabank
+                cuenta_clave = 'scotiabank'
+                datos = parsear_cartola_scotiabank(archivo)
+            else:
+                raise ValueError('No reconozco el archivo: se esperan el .xlsx '
+                                 'de BancoEstado o el .xls de Scotiabank.')
         except ValueError as e:
             ctx['error'] = str(e)
         except Exception:
-            ctx['error'] = ('No pude leer el archivo — ¿es el XLSX exportado '
-                            'del portal BancoEstado (Cartola Histórica)?')
+            ctx['error'] = ('No pude leer el archivo — ¿es el export del '
+                            'portal del banco?')
         else:
-            refs = [f['referencia'] for f in datos['filas']]
-            ya = set(MovimientoFinanciero.objects.filter(
-                referencia__in=refs).values_list('referencia', flat=True))
             for f in datos['filas']:
-                f['ya'] = f['referencia'] in ya
+                f['estado'] = estado_fila_cartola(cuenta_clave, f)
+                if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
+                    f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
                 f['saldo_fmt'] = _clp(f['saldo'])
-            nuevas = [f for f in datos['filas'] if not f['ya']]
+            nuevas = [f for f in datos['filas'] if f['estado'] == 'nuevo']
             # Solo cierres que falten o difieran de lo ya guardado — así
             # re-subir el mismo archivo termina en "nada nuevo", no en un
             # botón de confirmar vacío.
@@ -256,12 +276,14 @@ def cargar_cartola(request):
             for mes_iso, saldo in datos['cierres_mes'].items():
                 anio, mes = (int(x) for x in mes_iso.split('-'))
                 if not SaldoMensual.objects.filter(
-                        cuenta__clave='bancoestado', periodo=date(anio, mes, 1),
+                        cuenta__clave=cuenta_clave, periodo=date(anio, mes, 1),
                         saldo_cierre=saldo).exists():
                     cierres_pend[mes_iso] = saldo
             ctx['datos'] = datos
+            ctx['cuenta_nombre'] = NOMBRE_CUENTA_CARTOLA[cuenta_clave]
             ctx['n_nuevas'] = len(nuevas)
             ctx['n_ya'] = len(datos['filas']) - len(nuevas)
+            ctx['n_revisar'] = sum(1 for f in datos['filas'] if f['estado'] == 'revisar')
             ctx['saldo_inicial_fmt'] = _clp(datos['saldo_inicial'])
             ctx['saldo_final_fmt'] = _clp(datos['saldo_final_resumen'])
             ctx['abonos_fmt'] = _clp(datos['total_abonos'])
@@ -269,6 +291,7 @@ def cargar_cartola(request):
             ctx['cierres_fmt'] = [(m, _clp(s)) for m, s in sorted(cierres_pend.items())]
             if nuevas or cierres_pend:
                 ctx['payload'] = signing.dumps(
-                    {'filas': nuevas, 'cierres_mes': cierres_pend})
+                    {'cuenta': cuenta_clave, 'filas': nuevas,
+                     'cierres_mes': cierres_pend})
 
     return render(request, 'finanzas/cargar_cartola.html', ctx)

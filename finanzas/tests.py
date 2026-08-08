@@ -394,3 +394,81 @@ class CartolaBancoEstadoTest(TestCase):
     def test_solo_superusuario(self):
         self.assertEqual(self.client.get(
             reverse('finanzas:cargar_cartola')).status_code, 302)
+
+
+class CartolaScotiabankTest(TestCase):
+    """F4 paso 3b: núcleo puro del parser Scotiabank + estados anti-doble-conteo."""
+
+    # Estructura real de typeDesc.xls: metadatos rótulo/valor, encabezado, y
+    # filas DESCENDENTES con cargos NEGATIVOS. Cruza julio→agosto.
+    FILAS = [
+        ['Nombre Empresa', 'AREMKO HOTEL SPA', '', '', '', '', ''],
+        ['Saldo Disponible', 700000.0, '', '', '', '', ''],
+        ['Fecha', 'Descripción', 'Sucursal', 'N° Doc.', 'Cargos', 'Abonos', 'Saldo'],
+        ['02-08-2026', 'PAC SEGUROS GENERALES  51927', 'PM', 1.0, -100000.0, '', 700000.0],
+        ['02-08-2026', 'REDCOMPRA COVEPA SPA', 'PM', 2.0, -50000.0, '', 800000.0],
+        ['20-07-2026', 'TEF 76485192-7 AREMKO HOTEL SP', 'NM', 3.0, '', 500000.0, 850000.0],
+        ['20-07-2026', 'TEF 12343982-1 Nancy Mansilla', 'PM', 4.0, -150000.0, '', 350000.0],
+    ]
+
+    def _parsear(self):
+        from finanzas.services import parsear_filas_scotiabank
+        return parsear_filas_scotiabank([list(f) for f in self.FILAS])
+
+    def test_nucleo_invierte_encadena_y_clasifica(self):
+        r = self._parsear()
+        self.assertTrue(r['cuadra'])
+        self.assertEqual(r['cadena_rota'], 0)
+        # Invertido: la más vieja primero; saldo inicial derivado de ella.
+        self.assertEqual(r['filas'][0]['fecha'], '2026-07-20')
+        self.assertEqual(r['saldo_inicial'], 500000)   # 350.000 + 150.000
+        self.assertEqual(r['saldo_final_calculado'], 700000)
+        # Cierre de julio derivado (el archivo sigue en agosto).
+        self.assertEqual(r['cierres_mes'], {'2026-07': 850000})
+        # Clasificación: barrido propio → traspaso; TEF persona → gasto;
+        # PAC SEGUROS → seguros; REDCOMPRA → por clasificar.
+        por_desc = {f['descripcion']: f for f in r['filas']}
+        self.assertEqual(por_desc['TEF 76485192-7 AREMKO HOTEL SP']['clase'], 'traspaso')
+        self.assertTrue(por_desc['TEF 76485192-7 AREMKO HOTEL SP']['propio'])
+        self.assertEqual(por_desc['TEF 12343982-1 Nancy Mansilla']['categoria'],
+                         'por_clasificar')
+        self.assertEqual(por_desc['PAC SEGUROS GENERALES  51927']['categoria'], 'seguros')
+
+    def test_estados_evitan_dobles_conteos(self):
+        from finanzas.services import estado_fila_cartola, registrar_filas_cartola
+        call_command('sembrar_finanzas')
+        r = self._parsear()
+        por_desc = {f['descripcion']: f for f in r['filas']}
+
+        # Barrido propio SIN traspaso registrado → revisar (no se crea suelto).
+        barrido = por_desc['TEF 76485192-7 AREMKO HOTEL SP']
+        self.assertEqual(estado_fila_cartola('scotiabank', barrido), 'revisar')
+
+        # Con el traspaso registrado (fecha ±2 días) → ya_existe.
+        mp = CuentaFinanciera.objects.get(clave='mercado_pago')
+        sc = CuentaFinanciera.objects.get(clave='scotiabank')
+        sale = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 19), cuenta=mp, clase='traspaso', sentido='sale',
+            monto=500000, fuente='correo', referencia='t:s')
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 19), cuenta=sc, clase='traspaso', sentido='entra',
+            monto=500000, fuente='correo', referencia='t:e', traspaso_par=sale)
+        self.assertEqual(estado_fila_cartola('scotiabank', barrido), 'ya_existe')
+
+        # Gasto que el histórico mes-nivel ya cubre (mismo MES + monto) → en_historico.
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 1), cuenta=sc, clase='gasto', sentido='sale',
+            monto=150000, fecha_estimada=True, fuente='correo',
+            categoria=CategoriaFinanciera.objects.get(clave='por_clasificar'),
+            referencia='hist:scotia:99')
+        nancy = por_desc['TEF 12343982-1 Nancy Mansilla']
+        self.assertEqual(estado_fila_cartola('scotiabank', nancy), 'en_historico')
+
+        # El registro respeta los estados: solo entran los 2 gastos de agosto.
+        creados, saltados = registrar_filas_cartola(
+            r['filas'], r['cierres_mes'], cuenta_clave='scotiabank')
+        self.assertEqual((creados, saltados), (2, 2))
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            fuente='captura', cuenta=sc).count(), 2)
+        self.assertEqual(int(SaldoMensual.objects.get(
+            cuenta=sc, periodo=date(2026, 7, 1)).saldo_cierre), 850000)

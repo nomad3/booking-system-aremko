@@ -39,15 +39,17 @@
 </head>
 <body>
 <div class="caja">
-  <h1>Cargar cartola BancoEstado</h1>
-  <p class="sub">Chequera Electrónica · sube el export XLSX del portal (Cartola Histórica) ·
+  <h1>Cargar cartola bancaria</h1>
+  <p class="sub">Acepta el .xlsx de BancoEstado (Cartola Histórica) y el .xls de Scotiabank —
+     el banco se detecta solo ·
      <a href="{% url 'finanzas:tablero' %}">volver al tablero</a></p>
 
   {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
 
   {% if resultado %}
-  <div class="aviso ok">✓ Listo: <b>{{ resultado.creados }}</b> movimientos nuevos escritos
-    (fuente captura) · {{ resultado.saltados }} saltados (ya estaban, histórico o fuera de cobertura).
+  <div class="aviso ok">✓ Listo ({{ resultado.cuenta }}):
+    <b>{{ resultado.creados }}</b> movimientos nuevos escritos (fuente captura) ·
+    {{ resultado.saltados }} saltados (ya estaban, histórico o fuera de cobertura).
     {% for m, s in resultado.cierres %}<br>Cierre {{ m }} guardado: <b>{{ s }}</b>.{% endfor %}
   </div>
   <p><a class="boton sec" href="{% url 'finanzas:tablero' %}">Ver el tablero</a>
@@ -63,22 +65,27 @@
     de saldos). Puede faltar una página del export — revisar antes de confirmar.</div>
   {% endif %}
 
-  <p class="sub">Período {{ datos.fecha_inicio }} → {{ datos.fecha_final }} ·
-     {{ datos.filas|length }} movimientos: <b>{{ n_nuevas }} nuevos</b> · {{ n_ya }} ya registrados.
+  <p class="sub"><b>{{ cuenta_nombre }}</b> · período {{ datos.fecha_inicio }} → {{ datos.fecha_final }} ·
+     {{ datos.filas|length }} movimientos: <b>{{ n_nuevas }} nuevos</b> · {{ n_ya }} que no se escriben.
      {% for m, s in cierres_fmt %} Cierre {{ m }} que se guardará: <b>{{ s }}</b>.{% endfor %}</p>
+  {% if n_revisar %}
+  <div class="aviso">⚠️ {{ n_revisar }} abonos desde cuentas propias no calzan con ningún traspaso
+    registrado (±2 días, mismo monto) — se saltan para no romper la suma cero. Si son barridos
+    reales que faltan, se registran con el botón «Registrar traspaso» del admin.</div>
+  {% endif %}
 
   <div class="scroll"><table>
     <thead><tr><th>Fecha</th><th class="izq">Descripción</th><th class="izq">Clasificación</th>
                <th>Monto</th><th>Saldo</th><th class="izq">Estado</th></tr></thead>
     <tbody>
       {% for f in datos.filas %}
-      <tr{% if f.ya %} class="ya"{% endif %}>
+      <tr{% if f.estado != 'nuevo' %} class="ya"{% endif %}>
         <td>{{ f.fecha }}</td>
         <td class="izq">{{ f.descripcion }}</td>
-        <td class="izq">{{ f.clase }} · {{ f.categoria }}</td>
+        <td class="izq">{{ f.clase }}{% if f.categoria %} · {{ f.categoria }}{% endif %}</td>
         <td class="{{ f.sentido }}">{% if f.sentido == 'entra' %}+{% else %}−{% endif %}{{ f.monto_fmt }}</td>
         <td>{{ f.saldo_fmt }}</td>
-        <td class="izq">{% if f.ya %}ya está{% else %}nuevo{% endif %}</td>
+        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'en_historico' %}en histórico{% elif f.estado == 'revisar' %}revisar a mano{% else %}fuera de cobertura{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -98,10 +105,11 @@
 
   {% else %}
   <h2>Subir el export</h2>
-  <p class="sub">En el portal BancoEstado Empresas: movimientos de la Chequera →
-     Exportar → Excel. El archivo se llama <code>Excel_Cartola_Historica_…xlsx</code>.</p>
+  <p class="sub">BancoEstado Empresas: movimientos de la Chequera → Exportar → Excel
+     (<code>Excel_Cartola_Historica_…xlsx</code>). Scotiabank: movimientos de la línea →
+     exportar Excel (<code>typeDesc.xls</code>). El banco se detecta solo.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    <p><input type="file" name="archivo" accept=".xlsx" required></p>
+    <p><input type="file" name="archivo" accept=".xlsx,.xls" required></p>
     <button class="boton" type="submit">Revisar el archivo</button>
   </form>
   <p class="sub">Primero verás la propuesta con los chequeos (cadena de saldos, totales,
