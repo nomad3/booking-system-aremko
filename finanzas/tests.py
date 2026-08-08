@@ -3,7 +3,7 @@
 
 Sin fixtures de ventas: la app es aislada y el tablero funciona con Pago vacío.
 """
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -472,3 +472,61 @@ class CartolaScotiabankTest(TestCase):
             fuente='captura', cuenta=sc).count(), 2)
         self.assertEqual(int(SaldoMensual.objects.get(
             cuenta=sc, periodo=date(2026, 7, 1)).saldo_cierre), 850000)
+
+
+class FlujoCajaTest(TestCase):
+    """F4 paso 4: saldo = ancla de julio + movimientos, día a día."""
+
+    def test_ancla_mas_movimientos_da_el_saldo(self):
+        call_command('sembrar_finanzas')
+        be = CuentaFinanciera.objects.get(clave='bancoestado')
+        sc = CuentaFinanciera.objects.get(clave='scotiabank')
+        SaldoMensual.objects.create(cuenta=be, periodo=date(2026, 7, 1),
+                                    saldo_cierre=1000000, fuente='cartola')
+        SaldoMensual.objects.create(cuenta=sc, periodo=date(2026, 7, 1),
+                                    saldo_cierre=500000, fuente='cartola')
+        oi = CategoriaFinanciera.objects.get(clave='otros_ingresos')
+        pc = CategoriaFinanciera.objects.get(clave='por_clasificar')
+        M = MovimientoFinanciero
+        M.objects.create(fecha=date(2026, 8, 2), cuenta=be, clase='ingreso',
+                         sentido='entra', monto=100000, categoria=oi,
+                         fuente='captura', referencia='fc:1')
+        M.objects.create(fecha=date(2026, 8, 3), cuenta=sc, clase='gasto',
+                         sentido='sale', monto=50000, categoria=pc,
+                         fuente='captura', referencia='fc:2')
+        # Traspaso BE → Scotia: mueve saldos, pero NO es entrada ni salida.
+        M.objects.create(fecha=date(2026, 8, 4), cuenta=be, clase='traspaso',
+                         sentido='sale', monto=200000, fuente='manual',
+                         referencia='fc:3')
+        M.objects.create(fecha=date(2026, 8, 4), cuenta=sc, clase='traspaso',
+                         sentido='entra', monto=200000, fuente='manual',
+                         referencia='fc:4')
+        # Cobro MP por API (cuenta sin ancla: cuenta como entrada del día,
+        # pero su saldo muestra «—»).
+        MovimientoMP.objects.create(
+            mp_payment_id='fc1', monto=30000,
+            fecha=timezone.make_aware(datetime(2026, 8, 5, 12, 0)))
+
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:flujo_caja'))
+        self.assertEqual(r.status_code, 200)
+
+        # La primera fila es HOY (orden descendente pedido por Jorge).
+        hoy_fila = r.context['filas'][0]
+        self.assertEqual(hoy_fila['dia'], date.today())
+        # Orden de cuentas: MP, BancoEstado, Scotiabank, Efectivo.
+        self.assertEqual(hoy_fila['saldos'],
+                         ['—', '$900.000', '$650.000', '—'])
+        self.assertEqual(hoy_fila['total'], '$1.550.000')
+
+        por_dia = {f['dia']: f for f in r.context['filas']}
+        self.assertEqual(por_dia[date(2026, 8, 2)]['entradas'], '$100.000')
+        self.assertEqual(por_dia[date(2026, 8, 4)]['entradas'], '')
+        self.assertEqual(por_dia[date(2026, 8, 4)]['salidas'], '')
+        self.assertEqual(por_dia[date(2026, 8, 5)]['entradas'], '$30.000')
+        self.assertIn('Mercado Pago', ' '.join(r.context['sin_ancla']))
+
+    def test_solo_superusuario(self):
+        self.assertEqual(self.client.get(
+            reverse('finanzas:flujo_caja')).status_code, 302)

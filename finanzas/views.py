@@ -295,3 +295,113 @@ def cargar_cartola(request):
                      'cierres_mes': cierres_pend})
 
     return render(request, 'finanzas/cargar_cartola.html', ctx)
+
+
+# Orden fijo de las cuentas de caja en el flujo. La Visa queda FUERA a
+# propósito: es crédito (deuda), no caja — sus gastos igual están en el
+# tablero, y el pago de la tarjeta aparecerá como cargo en la cuenta que
+# la pague.
+CUENTAS_FLUJO = ('mercado_pago', 'bancoestado', 'scotiabank', 'efectivo')
+INICIO_FLUJO = date(2026, 8, 1)   # decisión de Jorge 2026-08-08
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def flujo_caja(request):
+    """El flujo de la caja real (P-22 F4 paso 4): día a día desde hoy hacia
+    el 1 de agosto — entradas, salidas y saldo por cuenta y total.
+
+    saldo(cuenta, día) = ancla (cierre julio en SaldoMensual) + acumulado de
+    movimientos. Entradas de MP vienen de la API (MovimientoMP sin ajenos);
+    entradas de efectivo, de los Pago en efectivo; el resto vive en
+    MovimientoFinanciero. Cuentas sin ancla muestran «—» y quedan fuera del
+    total — el número que se muestra es verificable o no se muestra.
+    """
+    from .models import CuentaFinanciera
+
+    hoy = date.today()
+    cuentas = {c.clave: c for c in
+               CuentaFinanciera.objects.filter(clave__in=CUENTAS_FLUJO)}
+
+    anclas = {s.cuenta.clave: int(s.saldo_cierre)
+              for s in SaldoMensual.objects.filter(
+                  periodo=date(2026, 7, 1), cuenta__clave__in=CUENTAS_FLUJO)}
+
+    # ── Netos por día y cuenta ───────────────────────────────────────────────
+    netos = defaultdict(lambda: defaultdict(int))
+    entradas_dia = defaultdict(int)   # sin traspasos: plata nueva de verdad
+    salidas_dia = defaultdict(int)
+    for r in (MovimientoFinanciero.objects
+              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=CUENTAS_FLUJO)
+              .values('fecha', 'cuenta__clave', 'sentido', 'clase')
+              .annotate(t=Sum('monto'))):
+        monto = int(r['t'] or 0)
+        signo = 1 if r['sentido'] == 'entra' else -1
+        netos[r['fecha']][r['cuenta__clave']] += signo * monto
+        if r['clase'] != 'traspaso':
+            if r['sentido'] == 'entra':
+                entradas_dia[r['fecha']] += monto
+            else:
+                salidas_dia[r['fecha']] += monto
+
+    # Cobros de MP: la API es la fuente (no están en MovimientoFinanciero).
+    for r in (MovimientoMP.objects.filter(fecha__date__gte=INICIO_FLUJO)
+              .exclude(sugerencia_motivo=MOTIVO_NO_ES_COBRO)
+              .annotate(d=TruncDate('fecha')).values('d')
+              .annotate(t=Sum('monto'))):
+        monto = int(r['t'] or 0)
+        netos[r['d']]['mercado_pago'] += monto
+        entradas_dia[r['d']] += monto
+
+    # Efectivo que entra: los Pago en efectivo del sistema.
+    for r in (Pago.objects.filter(metodo_pago='efectivo',
+                                  fecha_pago__date__gte=INICIO_FLUJO)
+              .annotate(d=TruncDate('fecha_pago')).values('d')
+              .annotate(t=Sum('monto'))):
+        monto = int(r['t'] or 0)
+        netos[r['d']]['efectivo'] += monto
+        entradas_dia[r['d']] += monto
+
+    # ── Acumular del 1-ago a hoy, y presentar de hoy hacia atrás ────────────
+    saldos = {c: anclas.get(c) for c in CUENTAS_FLUJO}
+    filas = []
+    d = INICIO_FLUJO
+    while d <= hoy:
+        for c in CUENTAS_FLUJO:
+            if saldos[c] is not None:
+                saldos[c] += netos[d][c]
+        con_ancla = [saldos[c] for c in CUENTAS_FLUJO if saldos[c] is not None]
+        filas.append({
+            'dia': d,
+            'entradas': _clp(entradas_dia[d]) if entradas_dia[d] else '',
+            'salidas': _clp(salidas_dia[d]) if salidas_dia[d] else '',
+            'saldos': [(_clp(saldos[c]) if saldos[c] is not None else '—')
+                       for c in CUENTAS_FLUJO],
+            'total': _clp(sum(con_ancla)) if con_ancla else '—',
+        })
+        d += timedelta(days=1)
+    filas.reverse()
+
+    # ── Frescura por cuenta: hasta cuándo llega cada fuente ─────────────────
+    frescura = []
+    mp_max = MovimientoMP.objects.aggregate(m=Max('fecha'))['m']
+    frescura.append(('Mercado Pago', 'API cada hora · datos al '
+                     + (mp_max.strftime('%d-%m %H:%M') if mp_max else 'sin datos')))
+    for clave, nombre in (('bancoestado', 'BancoEstado'), ('scotiabank', 'Scotiabank')):
+        ult = (MovimientoFinanciero.objects
+               .filter(cuenta__clave=clave, fuente='captura')
+               .aggregate(m=Max('fecha'))['m'])
+        frescura.append((nombre, ('cartola hasta el ' + ult.strftime('%d-%m'))
+                         if ult else 'sin cartola cargada'))
+    frescura.append(('Efectivo', 'pagos en efectivo del sistema, en vivo'))
+
+    sin_ancla = [cuentas[c].nombre for c in CUENTAS_FLUJO
+                 if c not in anclas and c in cuentas]
+
+    return render(request, 'finanzas/flujo_caja.html', {
+        'filas': filas,
+        'nombres_cuentas': [cuentas[c].nombre if c in cuentas else c
+                            for c in CUENTAS_FLUJO],
+        'frescura': frescura,
+        'sin_ancla': sin_ancla,
+        'inicio': INICIO_FLUJO,
+    })

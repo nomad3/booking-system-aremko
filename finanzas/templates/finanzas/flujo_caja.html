@@ -1,0 +1,77 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Flujo de Caja · Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1180px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 14px;}
+  .aviso{background:#f5eeda; border:1px solid #e3d5ac; border-radius:10px;
+         padding:10px 14px; font-size:13.5px; margin:14px 0; color:#5c4d1f;}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 18px;}
+  .chip{background:#fff; border:1px solid var(--linea); border-radius:99px;
+        padding:4px 12px; font-size:12.5px; color:var(--suave);}
+  .chip b{color:var(--tinta); font-weight:600;}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px; background:#fff;}
+  table{border-collapse:collapse; width:100%; min-width:940px; font-size:13.5px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:7px 10px; border-bottom:1px solid var(--linea); text-align:right; white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:#fff;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:12px;
+           text-transform:uppercase; letter-spacing:.04em;}
+  tr:first-child td{font-weight:700; background:#fcfbf8;}
+  tr:last-child td{border-bottom:none;}
+  .entra{color:var(--verde);}
+  .sale{color:var(--rojo);}
+  .total{font-weight:700;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Flujo de Caja</h1>
+  <p class="sub">Día a día desde hoy hacia el {{ inicio|date:"d-m-Y" }} · saldo = ancla del cierre
+     de julio + movimientos registrados · <a href="{% url 'finanzas:tablero' %}">tablero</a> ·
+     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola</a></p>
+
+  <div class="chips">
+    {% for nombre, detalle in frescura %}<span class="chip"><b>{{ nombre }}</b> · {{ detalle }}</span>{% endfor %}
+  </div>
+
+  {% if sin_ancla %}
+  <div class="aviso">⚠️ Sin ancla de julio: <b>{% for n in sin_ancla %}{{ n }}{% if not forloop.last %}, {% endif %}{% endfor %}</b>
+    — sus saldos muestran «—» y el TOTAL no las incluye todavía. Se cargan en
+    <a href="/admin/finanzas/saldomensual/add/">saldos</a> (período 2026-07-01).</div>
+  {% endif %}
+
+  <div class="scroll"><table>
+    <thead><tr><th>Día</th><th>Entradas</th><th>Salidas</th>
+      {% for n in nombres_cuentas %}<th>{{ n }}</th>{% endfor %}
+      <th>TOTAL CAJA</th></tr></thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.dia|date:"D d-m" }}</td>
+        <td class="entra">{{ f.entradas }}</td>
+        <td class="sale">{{ f.salidas }}</td>
+        {% for s in f.saldos %}<td>{{ s }}</td>{% endfor %}
+        <td class="total">{{ f.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="sub">Entradas/Salidas del día no incluyen traspasos entre cuentas propias (esa plata no es
+     nueva ni se fue — solo cambió de bolsillo; sí mueve los saldos por cuenta). Los saldos de
+     BancoEstado y Scotiabank quedan «congelados» después de la última cartola cargada — el chip
+     de arriba dice hasta cuándo llega cada fuente.</p>
+</div>
+</body>
+</html>

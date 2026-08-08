@@ -96,8 +96,19 @@ _Última revisión: 2026-08-06_
     BancoEstado (cuenta renombrada en sembrar); el portal BancoEstado SÍ tiene
     botón Exportar → F4 va por CSV/XLS subido, no OCR ni PDF con clave; la
     débito ••••5702 sigue sin dueño confirmado.
-    Siguen: F4 cierre mensual por saldos (página de carga del export + capturas
-    de saldo) y reporte de diferencias en el briefing de Luna Interna.
+    **F4 CONSTRUIDA 2026-08-08 (pasos 2-4):** comisiones MP automáticas por
+    cobro (fee_details → gasto 'comisiones', ref mp:fee:<id>; backfill corrido:
+    141 por $508.999 desde julio); página /finanzas/cargar-cartola/ que acepta
+    el XLSX de BancoEstado Y el .xls de Scotiabank (detección por bytes, cadena
+    de saldos verificada, estados nuevo/ya está/en histórico/revisar contra
+    dobles conteos, cierres de mes derivados) — cargadas ambas cartolas reales
+    (36 + 44 movimientos; anclas julio: BE $15.865.429, Scotia $490.434);
+    vista /finanzas/flujo-caja/ día a día desde el 1-ago (hoy hacia atrás):
+    entradas/salidas sin traspasos + saldo por cuenta (ancla + acumulado) +
+    total, con frescura declarada por fuente y cuentas sin ancla en «—».
+    Pendiente: anclas de MP (saldo hoy → derivar 31-jul) y efectivo (estimación
+    de Jorge); cartola Scotiabank 1-16 julio (hueco REDCOMPRA); reporte de
+    diferencias en el briefing de Luna Interna.
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número
