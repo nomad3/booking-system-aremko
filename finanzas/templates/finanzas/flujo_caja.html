@@ -27,12 +27,24 @@
   th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:#fff;}
   thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:12px;
            text-transform:uppercase; letter-spacing:.04em;}
-  tr:first-child td{font-weight:700; background:#fcfbf8;}
-  tr:last-child td{border-bottom:none;}
+  tr.dia:first-child td{font-weight:700; background:#fcfbf8;}
   .entra{color:var(--verde);}
   .sale{color:var(--rojo);}
   .total{font-weight:700;}
   a{color:var(--acento);}
+  tr.dia{cursor:pointer;}
+  tr.dia:hover td{background:#faf7ef;}
+  .tic-dia{display:inline-block; width:1em; color:var(--suave); transition:transform .15s;}
+  tr.dia.abierto .tic-dia{transform:rotate(90deg);}
+  .n-movs{color:var(--suave); font-size:11.5px; margin-left:4px;}
+  tr.detalle{display:none;}
+  tr.detalle.abierto{display:table-row;}
+  tr.detalle > td{background:#fbfaf6; padding:4px 10px 10px; white-space:normal;}
+  .mini{width:100%; min-width:0; font-size:12.5px;}
+  .mini td{border-bottom:1px dashed var(--linea); padding:4px 8px;}
+  .mini tr:last-child td{border-bottom:none;}
+  .mini .m-desc{text-align:left; max-width:420px; white-space:normal;}
+  .mini .m-cta{text-align:left; color:var(--suave);}
 </style>
 </head>
 <body>
@@ -58,17 +70,31 @@
       <th>TOTAL CAJA</th></tr></thead>
     <tbody>
       {% for f in filas %}
-      <tr>
-        <td>{{ f.dia|date:"D d-m" }}</td>
+      <tr class="dia" onclick="const d=this.nextElementSibling; d.classList.toggle('abierto'); this.classList.toggle('abierto');">
+        <td><span class="tic-dia">▸</span>{{ f.dia|date:"D d-m" }}{% if f.n_movs %}<span class="n-movs">({{ f.n_movs }})</span>{% endif %}</td>
         <td class="entra">{{ f.entradas }}</td>
         <td class="sale">{{ f.salidas }}</td>
         {% for s in f.saldos %}<td>{{ s }}</td>{% endfor %}
         <td class="total">{{ f.total }}</td>
       </tr>
+      <tr class="detalle"><td colspan="8">
+        {% if f.movs %}
+        <table class="mini">
+          {% for m in f.movs %}
+          <tr>
+            <td class="m-desc">{{ m.desc }}</td>
+            <td class="m-cta">{{ m.cuenta }}{% if m.extra %} · {{ m.extra }}{% endif %}</td>
+            <td class="{{ m.sentido }}">{% if m.sentido == 'entra' %}+{% else %}−{% endif %}{{ m.monto_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}<span class="sub">Sin movimientos registrados este día.</span>{% endif %}
+      </td></tr>
       {% endfor %}
     </tbody>
   </table></div>
-  <p class="sub">Entradas/Salidas del día no incluyen traspasos entre cuentas propias (esa plata no es
+  <p class="sub">Pulsa cualquier día para ver todos sus movimientos, uno por uno.
+     Entradas/Salidas del día no incluyen traspasos entre cuentas propias (esa plata no es
      nueva ni se fue — solo cambió de bolsillo; sí mueve los saldos por cuenta). Los saldos de
      BancoEstado y Scotiabank quedan «congelados» después de la última cartola cargada — el chip
      de arriba dice hasta cuándo llega cada fuente.</p>

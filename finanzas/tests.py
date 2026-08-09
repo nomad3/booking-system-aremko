@@ -527,6 +527,17 @@ class FlujoCajaTest(TestCase):
         self.assertEqual(por_dia[date(2026, 8, 5)]['entradas'], '$30.000')
         self.assertIn('Mercado Pago', ' '.join(r.context['sin_ancla']))
 
+        # Detalle por día: cada fila trae sus movimientos uno a uno.
+        self.assertEqual(por_dia[date(2026, 8, 2)]['n_movs'], 1)
+        self.assertEqual(por_dia[date(2026, 8, 2)]['movs'][0]['sentido'], 'entra')
+        # El día del traspaso muestra sus dos piernas.
+        self.assertEqual(por_dia[date(2026, 8, 4)]['n_movs'], 2)
+        self.assertEqual(por_dia[date(2026, 8, 4)]['movs'][0]['extra'], 'traspaso')
+        # El cobro MP aparece con su glosa/etiqueta y cuenta.
+        mp_mov = por_dia[date(2026, 8, 5)]['movs'][0]
+        self.assertIn('Cobro MP', mp_mov['desc'])
+        self.assertEqual(mp_mov['cuenta'], 'Mercado Pago')
+
     def test_solo_superusuario(self):
         self.assertEqual(self.client.get(
             reverse('finanzas:flujo_caja')).status_code, 302)

@@ -361,6 +361,36 @@ def flujo_caja(request):
         netos[r['d']]['efectivo'] += monto
         entradas_dia[r['d']] += monto
 
+    # ── Detalle por día: TODOS los movimientos, para expandir cada fila ─────
+    from django.utils import timezone as _tz
+    detalles = defaultdict(list)
+    for m in (MovimientoFinanciero.objects
+              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=CUENTAS_FLUJO)
+              .select_related('cuenta', 'categoria').order_by('id')):
+        detalles[m.fecha].append({
+            'desc': m.descripcion or (m.categoria.nombre if m.categoria else ''),
+            'cuenta': m.cuenta.nombre,
+            'extra': 'traspaso' if m.clase == 'traspaso'
+                     else (m.categoria.nombre if m.categoria else ''),
+            'monto_fmt': _clp(m.monto), 'sentido': m.sentido,
+        })
+    for mv in (MovimientoMP.objects.filter(fecha__date__gte=INICIO_FLUJO)
+               .exclude(sugerencia_motivo=MOTIVO_NO_ES_COBRO).order_by('fecha')):
+        detalles[_tz.localtime(mv.fecha).date()].append({
+            'desc': mv.glosa or f'Cobro MP {mv.mp_payment_id}',
+            'cuenta': 'Mercado Pago', 'extra': 'cobro API',
+            'monto_fmt': _clp(mv.monto), 'sentido': 'entra',
+        })
+    for p in (Pago.objects.filter(metodo_pago='efectivo',
+                                  fecha_pago__date__gte=INICIO_FLUJO)
+              .order_by('fecha_pago')):
+        detalles[_tz.localtime(p.fecha_pago).date()].append({
+            'desc': (f'Pago en efectivo (reserva #{p.venta_reserva_id})'
+                     if p.venta_reserva_id else 'Pago en efectivo'),
+            'cuenta': 'Efectivo', 'extra': 'sistema',
+            'monto_fmt': _clp(p.monto), 'sentido': 'entra',
+        })
+
     # ── Acumular del 1-ago a hoy, y presentar de hoy hacia atrás ────────────
     saldos = {c: anclas.get(c) for c in CUENTAS_FLUJO}
     filas = []
@@ -370,6 +400,7 @@ def flujo_caja(request):
             if saldos[c] is not None:
                 saldos[c] += netos[d][c]
         con_ancla = [saldos[c] for c in CUENTAS_FLUJO if saldos[c] is not None]
+        movs = sorted(detalles[d], key=lambda x: 0 if x['sentido'] == 'entra' else 1)
         filas.append({
             'dia': d,
             'entradas': _clp(entradas_dia[d]) if entradas_dia[d] else '',
@@ -377,6 +408,7 @@ def flujo_caja(request):
             'saldos': [(_clp(saldos[c]) if saldos[c] is not None else '—')
                        for c in CUENTAS_FLUJO],
             'total': _clp(sum(con_ancla)) if con_ancla else '—',
+            'movs': movs, 'n_movs': len(movs),
         })
         d += timedelta(days=1)
     filas.reverse()
