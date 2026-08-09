@@ -41,6 +41,12 @@ class ArtesaniaPieza(models.Model):
     venta_reserva = models.ForeignKey(
         'ventas.VentaReserva', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='artesanias_vendidas')
+    # La LÍNEA exacta de la reserva que representa esta venta. Si esa línea
+    # se elimina (o se borra la reserva), la señal pre_delete devuelve la
+    # pieza a disponible AUTOMÁTICAMENTE — nadie tiene que acordarse de nada.
+    venta_linea = models.OneToOneField(
+        'ventas.ReservaProducto', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='artesania_pieza')
     venta_monto = models.DecimalField(max_digits=10, decimal_places=0,
                                       null=True, blank=True)
     venta_fecha = models.DateField(null=True, blank=True)

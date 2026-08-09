@@ -44,13 +44,14 @@ def vender_pieza(codigo, reserva_id, monto=None, usuario=None):
         # fecha_entrega HOY a propósito: la artesanía se entrega en mano al
         # venderla — así no aparece como "pendiente de entrega" en las agendas
         # de checkout (que persiguen productos con deuda de entrega).
-        ReservaProducto.objects.create(
+        linea = ReservaProducto.objects.create(
             venta_reserva=reserva,
             producto=producto_generico(),
             cantidad=1,
             precio_unitario_venta=monto_final,
             fecha_entrega=date.today(),
         )
+        pieza.venta_linea = linea
         pieza.estado = 'vendida'
         pieza.venta_reserva = reserva
         pieza.venta_monto = monto_final

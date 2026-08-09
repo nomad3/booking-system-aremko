@@ -149,3 +149,47 @@ class CatalogoVistaTest(TestCase):
         self.client.post(reverse('artesanias:catalogo'), {
             'accion': 'alta', 'codigo': '1061', 'nombre': 'Otra', 'precio': '1000'})
         self.assertEqual(ArtesaniaPieza.objects.filter(codigo='1061').count(), 1)
+
+
+class DeshacerVentaTest(TestCase):
+    """Al eliminar la línea (o la reserva), la pieza vuelve sola a disponible."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _sin_senales_reserva()
+
+    @classmethod
+    def tearDownClass(cls):
+        _con_senales_reserva()
+        super().tearDownClass()
+
+    def test_borrar_la_linea_devuelve_la_pieza(self):
+        ArtesaniaPieza.objects.create(codigo='45', nombre='Tabla', precio=20000)
+        reserva = _reserva_minima()
+        pieza, r = vender_pieza('45', reserva.id)
+        linea = r.reservaproductos.get()
+        self.assertEqual(pieza.venta_linea_id, linea.id)
+
+        linea.delete()
+
+        pieza.refresh_from_db()
+        self.assertEqual(pieza.estado, 'disponible')
+        self.assertIsNone(pieza.venta_reserva)
+        self.assertIsNone(pieza.venta_monto)
+        self.assertIsNone(pieza.venta_linea)
+        self.assertIn('deshecha', pieza.notas)
+        # Y el total de la reserva volvió a cero (señal post_delete de ventas).
+        r.refresh_from_db()
+        self.assertEqual(int(r.total), 0)
+        # Se puede volver a vender.
+        vender_pieza('45', reserva.id)
+
+    def test_borrar_la_reserva_entera_tambien_devuelve(self):
+        ArtesaniaPieza.objects.create(codigo='58', nombre='Telar', precio=8000)
+        reserva = _reserva_minima()
+        pieza, _ = vender_pieza('58', reserva.id)
+        reserva.delete()
+        pieza.refresh_from_db()
+        self.assertEqual(pieza.estado, 'disponible')
+        self.assertIsNone(pieza.venta_linea)
