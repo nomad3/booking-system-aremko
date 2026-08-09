@@ -31,6 +31,9 @@
   .entra{color:var(--verde);}
   .sale{color:var(--rojo);}
   .total{font-weight:700;}
+  .subtotal{font-weight:600;}
+  th.puente,td.puente{background:#faf7ef;}
+  thead th.puente{background:#efe9dc;}
   a{color:var(--acento);}
   tr.dia{cursor:pointer;}
   tr.dia:hover td{background:#faf7ef;}
@@ -66,8 +69,9 @@
 
   <div class="scroll"><table>
     <thead><tr><th>Día</th><th>Entradas</th><th>Salidas</th>
-      {% for n in nombres_cuentas %}<th>{{ n }}</th>{% endfor %}
-      <th>TOTAL CAJA</th></tr></thead>
+      {% for c in nombres_cuentas %}<th title="{{ c.largo }}"{% if c.es_puente %} class="puente"{% endif %}>{{ c.nombre }}</th>{% endfor %}
+      <th>Caja Aremko</th>{% if hay_puente %}<th class="puente">En cuentas puente</th>{% endif %}
+      <th>TOTAL DISPONIBLE</th></tr></thead>
     <tbody>
       {% for f in filas %}
       <tr class="dia" onclick="const d=this.nextElementSibling; d.classList.toggle('abierto'); this.classList.toggle('abierto');">
@@ -75,9 +79,11 @@
         <td class="entra">{{ f.entradas }}</td>
         <td class="sale">{{ f.salidas }}</td>
         {% for s in f.saldos %}<td>{{ s }}</td>{% endfor %}
+        <td class="subtotal">{{ f.total_caja }}</td>
+        {% if hay_puente %}<td class="subtotal puente">{{ f.total_puente }}</td>{% endif %}
         <td class="total">{{ f.total }}</td>
       </tr>
-      <tr class="detalle"><td colspan="8">
+      <tr class="detalle"><td colspan="{{ n_columnas }}">
         {% if f.movs %}
         <table class="mini">
           {% for m in f.movs %}
@@ -95,9 +101,14 @@
   </table></div>
   <p class="sub">Pulsa cualquier día para ver todos sus movimientos, uno por uno.
      Entradas/Salidas del día no incluyen traspasos entre cuentas propias (esa plata no es
-     nueva ni se fue — solo cambió de bolsillo; sí mueve los saldos por cuenta). Los saldos de
-     BancoEstado y Scotiabank quedan «congelados» después de la última cartola cargada — el chip
-     de arriba dice hasta cuándo llega cada fuente.</p>
+     nueva ni se fue — solo cambió de bolsillo; sí mueve los saldos por cuenta).<br>
+     <b>Caja Aremko</b> son las cuatro cuentas del negocio. <b>Cuentas puente</b> son la CuentaRUT
+     de Jorge y la Scotiabank de Alda: personales, pero con plata de Aremko adentro esperando
+     pagar cuentas — por eso están acá. Cuando se traspasa plata desde el negocio a una de ellas,
+     Caja Aremko baja pero el <b>TOTAL DISPONIBLE no se mueve</b>: la plata sigue existiendo.
+     Recién baja cuando se gasta de verdad.<br>
+     Los saldos de las cuentas bancarias quedan «congelados» después de la última cartola cargada
+     — el chip de arriba dice hasta cuándo llega cada fuente.</p>
 </div>
 </body>
 </html>

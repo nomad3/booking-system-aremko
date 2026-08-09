@@ -73,7 +73,9 @@
   <h2>Propuesta — {{ cuenta_nombre }}</h2>
   <div class="aviso">Se van a escribir <b>{{ n_nuevas }}</b> movimientos
     ({{ total_cargos }} en cargos); {{ n_otras }} quedan fuera (ya estaban, son
-    abonos personales o son anteriores a julio 2026).</div>
+    anteriores a julio 2026 o son abonos desde Aremko sin retiro que calce).
+    Los abonos que no vienen de Aremko se registran como <b>abono personal</b>:
+    no son ingreso del negocio, pero sí mueven el saldo de la cuenta.</div>
 
   <div class="scroll"><table>
     <thead><tr><th class="izq">Fecha</th><th class="izq">Glosa</th>
@@ -84,8 +86,8 @@
         <td class="izq">{{ f.fecha }}</td>
         <td class="izq">{{ f.descripcion }}</td>
         <td{% if f.es_abono %} class="abono"{% endif %}>{{ f.monto_fmt }}</td>
-        <td class="izq">{% if f.clase == 'traspaso' %}traspaso desde Aremko{% elif f.clase == 'personal' %}—{% else %}{{ f.categoria }}{% endif %}</td>
-        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'personal' %}personal (no se registra){% elif f.estado == 'revisar' %}revisar: sin retiro que calce{% else %}fuera de cobertura{% endif %}</td>
+        <td class="izq">{% if f.clase == 'traspaso' %}traspaso desde Aremko{% elif f.clase == 'personal' %}abono personal{% else %}{{ f.categoria }}{% endif %}</td>
+        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'revisar' %}revisar: sin retiro que calce{% else %}fuera de cobertura{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

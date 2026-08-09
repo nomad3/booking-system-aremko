@@ -626,6 +626,12 @@ CATEGORIAS_ALDA = {
     # cosa. Queda por clasificar y VISIBLE, no adivinado.
     'vale_vista_alda': ('Vale vista emitido (asignar destino)', 'gasto',
                         'otros'),
+    # Los abonos que NO vienen de Aremko (AFP, IPS, línea de crédito, plata
+    # de ella o de él) sí están en el saldo del banco: se registran para que
+    # el saldo de la cuenta puente cuadre con la app. No tocan el resultado
+    # del negocio — los ingresos del tablero salen de las reservas.
+    'abonos_personales': ('Abonos personales (no son de Aremko)', 'ingreso',
+                          'ingresos'),
 }
 
 
@@ -917,11 +923,20 @@ def registrar_filas_puente(filas, cuenta_clave, cierres_mes=None):
         for f in filas:
             fecha = date.fromisoformat(f['fecha'])
             monto = f['abono'] or f['cargo']
-            if (f.get('clase') == 'personal' or monto <= 0
-                    or fecha < COBERTURA_GASTOS_DESDE
+            if (monto <= 0 or fecha < COBERTURA_GASTOS_DESDE
                     or MovimientoFinanciero.objects.filter(
                         referencia=f['referencia']).exists()):
                 saltados += 1
+                continue
+
+            if f.get('clase') == 'personal':
+                MovimientoFinanciero.objects.create(
+                    fecha=fecha, cuenta=cuenta, clase='ingreso',
+                    sentido='entra', monto=monto,
+                    categoria=_categoria('abonos_personales'),
+                    fuente='captura', referencia=f['referencia'],
+                    descripcion=f"Cartola {etiqueta}: {f['descripcion']}"[:255])
+                creados += 1
                 continue
 
             if f.get('propio') and f['clase'] == 'traspaso':

@@ -523,9 +523,12 @@ class FlujoCajaTest(TestCase):
         # La primera fila es HOY (orden descendente pedido por Jorge).
         hoy_fila = r.context['filas'][0]
         self.assertEqual(hoy_fila['dia'], date.today())
-        # Orden de cuentas: MP, BancoEstado, Scotiabank, Efectivo.
+        # Orden: MP, BancoEstado, Scotiabank, Efectivo + las dos puente
+        # (sin ancla todavía → «—» y fuera de los totales).
         self.assertEqual(hoy_fila['saldos'],
-                         ['—', '$900.000', '$650.000', '—'])
+                         ['—', '$900.000', '$650.000', '—', '—', '—'])
+        self.assertEqual(hoy_fila['total_caja'], '$1.550.000')
+        self.assertEqual(hoy_fila['total_puente'], '—')
         self.assertEqual(hoy_fila['total'], '$1.550.000')
 
         por_dia = {f['dia']: f for f in r.context['filas']}
@@ -545,6 +548,57 @@ class FlujoCajaTest(TestCase):
         mp_mov = por_dia[date(2026, 8, 5)]['movs'][0]
         self.assertIn('Cobro MP', mp_mov['desc'])
         self.assertEqual(mp_mov['cuenta'], 'Mercado Pago')
+
+    def test_traspaso_a_cuenta_puente_no_hace_desaparecer_la_plata(self):
+        """El caso que pilló Jorge (2026-08-09): sacar plata del negocio a la
+        CuentaRUT baja Caja Aremko pero NO el total disponible — la plata
+        sigue existiendo, solo cambió de bolsillo."""
+        call_command('sembrar_finanzas')
+        sc = CuentaFinanciera.objects.get(clave='scotiabank')
+        rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        SaldoMensual.objects.create(cuenta=sc, periodo=date(2026, 7, 1),
+                                    saldo_cierre=3000000, fuente='cartola')
+        SaldoMensual.objects.create(cuenta=rut, periodo=date(2026, 7, 1),
+                                    saldo_cierre=344977, fuente='cartola')
+        M = MovimientoFinanciero
+        sale = M.objects.create(fecha=date(2026, 8, 2), cuenta=sc,
+                                clase='traspaso', sentido='sale',
+                                monto=1000000, fuente='manual',
+                                referencia='fp:1')
+        M.objects.create(fecha=date(2026, 8, 2), cuenta=rut, clase='traspaso',
+                         sentido='entra', monto=1000000, fuente='manual',
+                         referencia='fp:2', traspaso_par=sale)
+
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:flujo_caja'))
+        hoy_fila = r.context['filas'][0]
+        self.assertEqual(hoy_fila['total_caja'], '$2.000.000')
+        self.assertEqual(hoy_fila['total_puente'], '$1.344.977')
+        self.assertEqual(hoy_fila['total'], '$3.344.977')
+        # Y el día del traspaso no muestra salida: no se gastó nada.
+        por_dia = {f['dia']: f for f in r.context['filas']}
+        self.assertEqual(por_dia[date(2026, 8, 2)]['salidas'], '')
+
+    def test_gasto_desde_la_cuenta_puente_si_baja_el_total(self):
+        """Contrapartida: cuando esa plata se gasta de verdad, el total baja."""
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        SaldoMensual.objects.create(cuenta=rut, periodo=date(2026, 7, 1),
+                                    saldo_cierre=344977, fuente='cartola')
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 3), cuenta=rut, clase='gasto', sentido='sale',
+            monto=119443, fuente='captura', referencia='fp:3',
+            categoria=CategoriaFinanciera.objects.get(clave='infraestructura'))
+
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:flujo_caja'))
+        hoy_fila = r.context['filas'][0]
+        self.assertEqual(hoy_fila['total_puente'], '$225.534')
+        por_dia = {f['dia']: f for f in r.context['filas']}
+        self.assertEqual(por_dia[date(2026, 8, 3)]['salidas'], '$119.443')
 
     def test_solo_superusuario(self):
         self.assertEqual(self.client.get(
@@ -979,8 +1033,15 @@ class CartolaAldaTest(TestCase):
 
         creados, saltados, convertidos = registrar_filas_alda(
             datos['filas'], datos['cierres_mes'])
-        # 3 cargos de julio creados; junio y el abono personal saltan.
-        self.assertEqual((creados, convertidos, saltados), (3, 1, 2))
+        # 3 cargos de julio + el abono personal (que también mueve su saldo);
+        # solo junio queda fuera por cobertura.
+        self.assertEqual((creados, convertidos, saltados), (4, 1, 1))
+        # El abono que no viene de Aremko entra como ingreso personal: hace
+        # que el saldo de la cuenta puente cuadre con el banco, sin tocar el
+        # resultado del negocio.
+        personal = MovimientoFinanciero.objects.get(monto=400000)
+        self.assertEqual(personal.clase, 'ingreso')
+        self.assertEqual(personal.categoria.clave, 'abonos_personales')
 
         retiro.refresh_from_db()
         self.assertEqual(retiro.clase, 'traspaso')
@@ -1021,7 +1082,7 @@ class CartolaAldaTest(TestCase):
                                                             BSA_ALDA)})
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Scotiabank Alda (personal)')
-        self.assertContains(r, 'personal (no se registra)')
+        self.assertContains(r, 'abono personal')
         self.assertContains(r, 'fuera de cobertura')     # la fila de junio
 
         # Un BSA de otra cuenta se rechaza con mensaje claro.
@@ -1088,16 +1149,16 @@ class MovimientosPegadosTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'CuentaRUT Jorge')
         self.assertContains(r, 'publicidad')
-        # El abono de AFP no se registra y el de junio queda fuera.
-        self.assertContains(r, 'personal (no se registra)')
+        # El abono de AFP entra como personal; el de junio queda fuera.
+        self.assertContains(r, 'abono personal')
         self.assertContains(r, 'fuera de cobertura')
         # Sin retiro que calce, el abono de Aremko pide revisión.
         self.assertContains(r, 'sin retiro que calce')
         payload = r.context['payload']
-        self.assertEqual(r.context['n_nuevas'], 4)   # 4 cargos de julio
+        self.assertEqual(r.context['n_nuevas'], 5)   # 4 cargos + abono AFP
 
         r2 = self.client.post(url, {'payload': payload, 'confirmar': '1'})
-        self.assertEqual(r2.context['resultado']['creados'], 4)
+        self.assertEqual(r2.context['resultado']['creados'], 5)
         google = MovimientoFinanciero.objects.get(monto=180000)
         self.assertEqual(google.cuenta.clave, 'cuentarut_jorge')
         self.assertEqual(google.categoria.grupo, 'marketing')
@@ -1108,7 +1169,7 @@ class MovimientosPegadosTest(TestCase):
                                     'texto': self.PEGADO})
         self.assertEqual(r3.context['n_nuevas'], 0)
         self.assertEqual(MovimientoFinanciero.objects.filter(
-            cuenta__clave='cuentarut_jorge').count(), 4)
+            cuenta__clave='cuentarut_jorge').count(), 5)
 
     def test_retiro_a_jorge_se_convierte_en_traspaso(self):
         from .services import registrar_filas_puente, preparar_filas_manual

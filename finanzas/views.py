@@ -486,9 +486,6 @@ def cargar_cartola(request):
         else:
             for f in datos['filas']:
                 f['estado'] = estado_fila_cartola(cuenta_clave, f)
-                if f.get('clase') == 'personal':
-                    # Abonos personales de Alda: plata de ella, no se registra.
-                    f['estado'] = 'personal'
                 if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
                     f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
@@ -572,8 +569,6 @@ def cargar_movimientos(request):
                                                    cuenta_clave)
             for f in filas:
                 f['estado'] = estado_fila_cartola(cuenta_clave, f)
-                if f['clase'] == 'personal':
-                    f['estado'] = 'personal'
                 if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
                     f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
@@ -598,6 +593,12 @@ def cargar_movimientos(request):
 # tablero, y el pago de la tarjeta aparecerá como cargo en la cuenta que
 # la pague.
 CUENTAS_FLUJO = ('mercado_pago', 'bancoestado', 'scotiabank', 'efectivo')
+# Cuentas puente: personales, pero con plata de Aremko adentro esperando
+# pagar cuentas. Van EN el flujo (si no, un traspaso Scotiabank→CuentaRUT
+# hacía desaparecer la plata del total sin ninguna fila que lo explicara —
+# lo pilló Jorge el 2026-08-09) pero suman a su propio subtotal.
+CUENTAS_PUENTE_FLUJO = ('cuentarut_jorge', 'scotiabank_alda')
+TODAS_FLUJO = CUENTAS_FLUJO + CUENTAS_PUENTE_FLUJO
 INICIO_FLUJO = date(2026, 8, 1)   # decisión de Jorge 2026-08-08
 
 
@@ -616,18 +617,21 @@ def flujo_caja(request):
 
     hoy = date.today()
     cuentas = {c.clave: c for c in
-               CuentaFinanciera.objects.filter(clave__in=CUENTAS_FLUJO)}
+               CuentaFinanciera.objects.filter(clave__in=TODAS_FLUJO)}
+    presentes = [c for c in TODAS_FLUJO if c in cuentas]
+    caja_aremko = [c for c in CUENTAS_FLUJO if c in cuentas]
+    puente = [c for c in CUENTAS_PUENTE_FLUJO if c in cuentas]
 
     anclas = {s.cuenta.clave: int(s.saldo_cierre)
               for s in SaldoMensual.objects.filter(
-                  periodo=date(2026, 7, 1), cuenta__clave__in=CUENTAS_FLUJO)}
+                  periodo=date(2026, 7, 1), cuenta__clave__in=TODAS_FLUJO)}
 
     # ── Netos por día y cuenta ───────────────────────────────────────────────
     netos = defaultdict(lambda: defaultdict(int))
     entradas_dia = defaultdict(int)   # sin traspasos: plata nueva de verdad
     salidas_dia = defaultdict(int)
     for r in (MovimientoFinanciero.objects
-              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=CUENTAS_FLUJO)
+              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=TODAS_FLUJO)
               .values('fecha', 'cuenta__clave', 'sentido', 'clase')
               .annotate(t=Sum('monto'))):
         monto = int(r['t'] or 0)
@@ -661,7 +665,7 @@ def flujo_caja(request):
     from django.utils import timezone as _tz
     detalles = defaultdict(list)
     for m in (MovimientoFinanciero.objects
-              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=CUENTAS_FLUJO)
+              .filter(fecha__gte=INICIO_FLUJO, cuenta__clave__in=TODAS_FLUJO)
               .select_related('cuenta', 'categoria').order_by('id')):
         detalles[m.fecha].append({
             'desc': m.descripcion or (m.categoria.nombre if m.categoria else ''),
@@ -688,22 +692,31 @@ def flujo_caja(request):
         })
 
     # ── Acumular del 1-ago a hoy, y presentar de hoy hacia atrás ────────────
-    saldos = {c: anclas.get(c) for c in CUENTAS_FLUJO}
+    saldos = {c: anclas.get(c) for c in presentes}
     filas = []
     d = INICIO_FLUJO
     while d <= hoy:
-        for c in CUENTAS_FLUJO:
+        for c in presentes:
             if saldos[c] is not None:
                 saldos[c] += netos[d][c]
-        con_ancla = [saldos[c] for c in CUENTAS_FLUJO if saldos[c] is not None]
+
+        def _suma(claves):
+            vivos = [saldos[c] for c in claves if saldos[c] is not None]
+            return sum(vivos) if vivos else None
+
+        t_caja, t_puente = _suma(caja_aremko), _suma(puente)
+        t_total = None if t_caja is None and t_puente is None else \
+            (t_caja or 0) + (t_puente or 0)
         movs = sorted(detalles[d], key=lambda x: 0 if x['sentido'] == 'entra' else 1)
         filas.append({
             'dia': d,
             'entradas': _clp(entradas_dia[d]) if entradas_dia[d] else '',
             'salidas': _clp(salidas_dia[d]) if salidas_dia[d] else '',
             'saldos': [(_clp(saldos[c]) if saldos[c] is not None else '—')
-                       for c in CUENTAS_FLUJO],
-            'total': _clp(sum(con_ancla)) if con_ancla else '—',
+                       for c in presentes],
+            'total_caja': _clp(t_caja) if t_caja is not None else '—',
+            'total_puente': _clp(t_puente) if t_puente is not None else '—',
+            'total': _clp(t_total) if t_total is not None else '—',
             'movs': movs, 'n_movs': len(movs),
         })
         d += timedelta(days=1)
@@ -714,22 +727,31 @@ def flujo_caja(request):
     mp_max = MovimientoMP.objects.aggregate(m=Max('fecha'))['m']
     frescura.append(('Mercado Pago', 'API cada hora · datos al '
                      + (mp_max.strftime('%d-%m %H:%M') if mp_max else 'sin datos')))
-    for clave, nombre in (('bancoestado', 'BancoEstado'), ('scotiabank', 'Scotiabank')):
+    for clave, nombre in (('bancoestado', 'BancoEstado'),
+                          ('scotiabank', 'Scotiabank'),
+                          ('scotiabank_alda', 'Scotia Alda'),
+                          ('cuentarut_jorge', 'CuentaRUT Jorge')):
+        if clave not in cuentas:
+            continue
         ult = (MovimientoFinanciero.objects
                .filter(cuenta__clave=clave, fuente='captura')
                .aggregate(m=Max('fecha'))['m'])
-        frescura.append((nombre, ('cartola hasta el ' + ult.strftime('%d-%m'))
+        frescura.append((NOMBRE_CORTO_CUENTA.get(clave, nombre),
+                         ('cartola hasta el ' + ult.strftime('%d-%m'))
                          if ult else 'sin cartola cargada'))
     frescura.append(('Efectivo', 'pagos en efectivo del sistema, en vivo'))
 
-    sin_ancla = [cuentas[c].nombre for c in CUENTAS_FLUJO
-                 if c not in anclas and c in cuentas]
+    sin_ancla = [cuentas[c].nombre for c in presentes if c not in anclas]
 
     return render(request, 'finanzas/flujo_caja.html', {
         'filas': filas,
-        'nombres_cuentas': [cuentas[c].nombre if c in cuentas else c
-                            for c in CUENTAS_FLUJO],
+        'nombres_cuentas': [
+            {'nombre': NOMBRE_CORTO_CUENTA.get(c, cuentas[c].nombre),
+             'largo': cuentas[c].nombre, 'es_puente': c in CUENTAS_PUENTE_FLUJO}
+            for c in presentes],
+        'hay_puente': bool(puente),
         'frescura': frescura,
         'sin_ancla': sin_ancla,
         'inicio': INICIO_FLUJO,
+        'n_columnas': len(presentes) + 6,
     })
