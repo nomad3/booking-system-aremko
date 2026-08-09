@@ -9,7 +9,10 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('ventas', '0132_servicehistory_campaignemailtemplate_clientepremio_and_more'),
+        # OJO drift AR-033/034: la 0132 existe solo LOCAL (no está en git ni en
+        # prod). Se ancla a la última migración REAL de ventas en el repo —
+        # mismo patrón que conciliacion/0001 (anclada a 0126 por igual motivo).
+        ('ventas', '0131_masajeslandingconfig_video_recorrido'),
     ]
 
     operations = [
