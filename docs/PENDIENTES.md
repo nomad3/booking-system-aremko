@@ -123,6 +123,17 @@ _Última revisión: 2026-08-06_
     cartola agosto fresca); cartolas se suben a diario (decisión de Jorge:
     revisión diaria manual); combustibles y comercios REDCOMPRA ambiguos se
     asignan a mano; reporte de diferencias en el briefing de Luna Interna.
+    **ACCESO ALDA CONSTRUIDO 2026-08-09:** grupo Django «Finanzas colaborador»
+    — las 3 vistas (tablero/flujo/cartola) aceptan superusuario O grupo; en
+    Movimientos el grupo ve todo y solo edita la categoría (triaje); crear/
+    borrar/traspasos siguen solo-dueño; enlaces en cabecera admin para el
+    grupo. Alta: `python manage.py configurar_acceso_alda` (usa el usuario
+    EXISTENTE de Alda, contraseña intacta; `--usuario X` si hay ambigüedad).
+    **F7 SIGUIENTE SESIÓN — cuenta puente Scotiabank Alda:** parser BSA.dat
+    (`;`, DDMMYYYY, coma decimal), cuenta fuera del flujo, conversión
+    Aremko→Alda a traspaso SOLO con calce en su cartola, cargos default
+    personal, vale vista \$558.318→impuestos, pedir estado de la TARJETA
+    (65% del gasto) y reenvío de correos de atoloza1970 a ecolonco.
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número
