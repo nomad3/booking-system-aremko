@@ -61,7 +61,7 @@
 
   <div class="chips">
     <span class="chip"><b>{{ resumen.n_vivas }}</b> piezas en inventario</span>
-    <span class="chip">valor vivo <b>${{ resumen.valor_vivo }}</b></span>
+    <span class="chip">valor vivo <b>{{ resumen.valor_vivo }}</b></span>
     <span class="chip"><b>{{ resumen.n_vendidas }}</b> vendidas históricas</span>
   </div>
 
@@ -100,7 +100,7 @@
       {% else %}<div class="foto">🪵</div>{% endif %}
       <span class="cod">{{ p.codigo }}</span>
       <h3>{{ p.nombre }}</h3>
-      <div class="precio">${{ p.precio|floatformat:0 }}</div>
+      <div class="precio">{{ p.precio_fmt }}</div>
       <span class="estado {{ p.estado }}">{{ p.get_estado_display }}{% if p.venta_reserva_id %} · reserva #{{ p.venta_reserva_id }}{% endif %}</span>
       {% if p.viva %}
       <form class="venderform" method="post"
@@ -109,7 +109,7 @@
         <input type="hidden" name="accion" value="vender">
         <input type="hidden" name="codigo" value="{{ p.codigo }}">
         <input type="text" name="reserva_id" placeholder="N° reserva" required>
-        <input type="text" name="monto" placeholder="${{ p.precio|floatformat:0 }}" title="Solo si el precio final es distinto al de lista">
+        <input type="text" name="monto" placeholder="{{ p.precio_fmt }}" title="Solo si el precio final es distinto al de lista">
         <button class="boton" type="submit">Vender</button>
       </form>
       {% endif %}

@@ -68,9 +68,10 @@ def catalogo(request):
     piezas = sorted(piezas, key=_orden_natural)
 
     vivas = ArtesaniaPieza.objects.filter(estado__in=ArtesaniaPieza.VIVOS)
+    valor_vivo = int(vivas.aggregate(t=Sum('precio'))['t'] or 0)
     resumen = {
         'n_vivas': vivas.count(),
-        'valor_vivo': int(vivas.aggregate(t=Sum('precio'))['t'] or 0),
+        'valor_vivo': f'${valor_vivo:,}'.replace(',', '.'),
         'n_vendidas': ArtesaniaPieza.objects.filter(estado='vendida').count(),
     }
 

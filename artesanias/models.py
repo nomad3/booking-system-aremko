@@ -62,6 +62,10 @@ class ArtesaniaPieza(models.Model):
     def viva(self):
         return self.estado in self.VIVOS
 
+    @property
+    def precio_fmt(self):
+        return f'${int(self.precio):,}'.replace(',', '.')
+
     @staticmethod
     def siguiente_codigo():
         """El próximo código numérico libre (el papel quedó en 1060)."""
