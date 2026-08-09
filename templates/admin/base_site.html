@@ -177,26 +177,9 @@
 </h1>
 {% endblock %}
 
-{% block nav-global %}
-{% if user.is_staff %}
-<div style="padding:6px 0 2px; font-size:14px; font-weight:600;">
-    {% if user.is_superuser or user|puede_finanzas %}
-    <a href="{% url 'finanzas:tablero' %}" style="color:#A0522D; margin-right:14px;">
-        <i class="fas fa-chart-line me-1"></i>Tablero financiero</a>
-    <a href="{% url 'finanzas:flujo_caja' %}" style="color:#A0522D; margin-right:14px;">
-        <i class="fas fa-water me-1"></i>Flujo de caja</a>
-    <a href="{% url 'finanzas:gastos_mes' %}" style="color:#A0522D; margin-right:14px;">
-        <i class="fas fa-table-cells me-1"></i>Gastos del mes</a>
-    <a href="{% url 'finanzas:gastos_ano' %}" style="color:#A0522D; margin-right:14px;">
-        <i class="fas fa-calendar-days me-1"></i>Gastos del año</a>
-    <a href="{% url 'finanzas:cargar_cartola' %}" style="color:#A0522D; margin-right:14px;">
-        <i class="fas fa-file-upload me-1"></i>Cargar cartola</a>
-    {% endif %}
-    <a href="{% url 'artesanias:catalogo' %}" style="color:#A0522D;">
-        <i class="fas fa-store me-1"></i>Artesanías</a>
-</div>
-{% endif %}
-{% endblock %}
+{# Los accesos a reportes viven en la tarjeta REPO del panel de control
+   (pedido de Jorge 2026-08-09) — la cabecera queda limpia. #}
+{% block nav-global %}{% endblock %}
 
 {% block footer %}
     {{ block.super }}
