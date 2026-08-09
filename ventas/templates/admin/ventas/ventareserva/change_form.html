@@ -1,6 +1,14 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 
+{% block object-tools-items %}
+    {% if original %}
+    <li><a href="{% url 'artesanias:catalogo' %}?reserva={{ original.pk }}"
+           style="background:#8a6d3b;">🪵 Vender artesanía</a></li>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}
+
 {% block extrastyle %}
     {{ block.super }}
     <style>

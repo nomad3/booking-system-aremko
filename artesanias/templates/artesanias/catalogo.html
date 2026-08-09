@@ -59,6 +59,12 @@
 
   {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
 
+  {% if reserva_prefill %}
+  <div class="msg success">Vendiendo a la <b>reserva #{{ reserva_prefill }}</b> — el número ya está
+    puesto en todas las piezas: solo elige y pulsa Vender.
+    <a href="/admin/ventas/ventareserva/{{ reserva_prefill }}/change/">← volver a la reserva</a></div>
+  {% endif %}
+
   <div class="chips">
     <span class="chip"><b>{{ resumen.n_vivas }}</b> piezas en inventario</span>
     <span class="chip">valor vivo <b>{{ resumen.valor_vivo }}</b></span>
@@ -108,7 +114,7 @@
         {% csrf_token %}
         <input type="hidden" name="accion" value="vender">
         <input type="hidden" name="codigo" value="{{ p.codigo }}">
-        <input type="text" name="reserva_id" placeholder="N° reserva" required>
+        <input type="text" name="reserva_id" value="{{ reserva_prefill }}" placeholder="N° reserva" required>
         <input type="text" name="monto" placeholder="{{ p.precio_fmt }}" title="Solo si el precio final es distinto al de lista">
         <button class="boton" type="submit">Vender</button>
       </form>

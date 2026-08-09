@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q, Sum
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from .models import ArtesaniaPieza
 from .services import ErrorVenta, vender_pieza
@@ -32,6 +33,8 @@ def catalogo(request):
                 f'✓ {pieza.codigo} · {pieza.nombre} vendida en '
                 f'${int(pieza.venta_monto):,} a la reserva #{reserva.id} '
                 f'(total reserva: ${int(reserva.total):,})'.replace(',', '.'))
+            # Mantener la reserva prellenada: es común venderle varias piezas.
+            return redirect(f"{reverse('artesanias:catalogo')}?reserva={reserva.id}")
         except ErrorVenta as e:
             messages.error(request, str(e))
         return redirect('artesanias:catalogo')
@@ -75,7 +78,10 @@ def catalogo(request):
         'n_vendidas': ArtesaniaPieza.objects.filter(estado='vendida').count(),
     }
 
+    reserva_prefill = (request.GET.get('reserva') or '').strip()
+
     return render(request, 'artesanias/catalogo.html', {
+        'reserva_prefill': reserva_prefill if reserva_prefill.isdigit() else '',
         'piezas': piezas,
         'filtro': filtro,
         'q': q,
