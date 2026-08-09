@@ -821,9 +821,12 @@ class ReportesGastosTest(TestCase):
         r = self.client.get(reverse('finanzas:gastos_mes'),
                             {'ano': 2026, 'mes': 8})
         self.assertEqual(r.status_code, 200)
-        # Columnas: solo cuentas con gastos del mes, la mayor primero.
-        self.assertEqual(r.context['cuentas'],
+        # Columnas: solo cuentas con gastos del mes, la mayor primero, con
+        # nombre corto para que la tabla quepa en pantalla.
+        self.assertEqual([c['largo'] for c in r.context['cuentas']],
                          [self.be.nombre, self.mp.nombre])
+        self.assertEqual(r.context['cuentas'][0]['corto'],
+                         'BancoEstado Chequera')
         # Grupo con una sola categoría → se muestra la fila del grupo
         # (mismo criterio del tablero).
         self.assertContains(r, 'Energía eléctrica')
@@ -846,7 +849,9 @@ class ReportesGastosTest(TestCase):
         r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
         self.assertEqual(r.status_code, 200)
         # 2026 parte en julio (corte de datos).
-        self.assertEqual(r.context['columnas'][0]['nombre'], 'Julio')
+        # Encabezado abreviado (cabe en pantalla), nombre completo en el title.
+        self.assertEqual(r.context['columnas'][0]['nombre'], 'Jul')
+        self.assertEqual(r.context['columnas'][0]['largo'], 'Julio')
         self.assertEqual(len(r.context['columnas']), 6)   # jul..dic
         self.assertContains(r, '$333.000')   # fila luz: 111 + 222
         self.assertContains(r, '$388.000')   # total general del anio

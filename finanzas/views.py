@@ -264,6 +264,21 @@ def tablero(request):
 
 MESES_ES = ('', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre')
+MESES_ABREV = ('', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+               'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic')
+# Nombres cortos para los encabezados de los reportes: con el nombre completo
+# las columnas se estiran y la tabla no cabe en pantalla (Jorge 2026-08-09).
+NOMBRE_CORTO_CUENTA = {
+    'mercado_pago': 'Mercado Pago',
+    'bancoestado': 'BancoEstado Chequera',
+    'scotiabank': 'Scotiabank',
+    'efectivo': 'Efectivo',
+    'visa_2936': 'Visa ••••2936',
+    'mach': 'Mach',
+    'sumup_transito': 'SumUp tránsito',
+    'scotiabank_alda': 'Scotia Alda',
+    'cuentarut_jorge': 'CuentaRUT Jorge',
+}
 # Los gastos parten en julio 2026 (corte decidido 2026-08-08): antes de eso
 # no hay datos y las columnas vacías solo estorbarían.
 INICIO_GASTOS = date(2026, 7, 1)
@@ -327,25 +342,30 @@ def gastos_mes(request):
 
     datos = defaultdict(lambda: defaultdict(int))
     tot_cuenta = defaultdict(int)
+    nombres = {}
     for f in (MovimientoFinanciero.objects
               .filter(clase='gasto', fecha__year=ano, fecha__month=mes)
-              .values('categoria__grupo', 'categoria__nombre', 'cuenta__nombre')
+              .values('categoria__grupo', 'categoria__nombre',
+                      'cuenta__clave', 'cuenta__nombre')
               .annotate(t=Sum('monto'))):
         clave = (f['categoria__grupo'] or 'otros',
                  f['categoria__nombre'] or 'Sin categoría')
         monto = int(f['t'] or 0)
-        datos[clave][f['cuenta__nombre']] += monto
-        tot_cuenta[f['cuenta__nombre']] += monto
+        cta = f['cuenta__clave']
+        nombres[cta] = f['cuenta__nombre']
+        datos[clave][cta] += monto
+        tot_cuenta[cta] += monto
 
     # Solo las cuentas que generaron gastos este mes; la que más gasta primero.
-    cuentas = sorted(tot_cuenta, key=lambda c: -tot_cuenta[c])
-    filas, tot_columnas, tot_general = _tabla_matriz(datos, cuentas)
+    claves = sorted(tot_cuenta, key=lambda c: -tot_cuenta[c])
+    filas, tot_columnas, tot_general = _tabla_matriz(datos, claves)
 
     return render(request, 'finanzas/gastos_mes.html', {
         'ano': ano, 'mes': mes, 'nombre_mes': MESES_ES[mes],
         'anos': list(range(INICIO_GASTOS.year, hoy.year + 1)),
         'meses_sel': [(i, MESES_ES[i]) for i in range(1, 13)],
-        'cuentas': cuentas,
+        'cuentas': [{'corto': NOMBRE_CORTO_CUENTA.get(c, nombres[c]),
+                     'largo': nombres[c]} for c in claves],
         'filas': filas,
         'tot_columnas': tot_columnas,
         'tot_general': tot_general,
@@ -375,7 +395,8 @@ def gastos_ano(request):
     return render(request, 'finanzas/gastos_ano.html', {
         'ano': ano,
         'anos': list(range(INICIO_GASTOS.year, hoy.year + 1)),
-        'columnas': [{'num': m, 'nombre': MESES_ES[m],
+        'columnas': [{'num': m, 'nombre': MESES_ABREV[m],
+                      'largo': MESES_ES[m],
                       'es_actual': (ano, m) == (hoy.year, hoy.month)}
                      for m in meses_nums],
         'filas': filas,
