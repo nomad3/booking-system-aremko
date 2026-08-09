@@ -1,0 +1,123 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cargar movimientos · Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1000px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  h2{font-size:17px; margin:28px 0 8px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 18px;}
+  .aviso{border-radius:10px; padding:10px 14px; font-size:13.5px; margin:14px 0;
+         background:#f5eeda; border:1px solid #e3d5ac; color:#5c4d1f;}
+  .aviso.ok{background:#e8f2ea; border-color:#c4dccb; color:var(--verde);}
+  .aviso.mal{background:#f7e8e8; border-color:#e0bcbc; color:var(--rojo);}
+  textarea{width:100%; min-height:190px; padding:12px; border:1px solid var(--linea);
+           border-radius:10px; font:13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;}
+  select{padding:9px 10px; border:1px solid var(--linea); border-radius:10px;
+         font-size:14px; background:#fff; margin-bottom:10px;}
+  .boton{background:var(--acento); color:#fff; border:none; border-radius:10px;
+         padding:10px 18px; font-size:14.5px; font-weight:600; cursor:pointer;}
+  .boton.sec{background:#fff; color:var(--acento); border:1px solid var(--acento);
+             text-decoration:none; display:inline-block;}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px; background:#fff;}
+  table{border-collapse:collapse; width:100%; min-width:700px; font-size:13.5px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:6px 10px; border-bottom:1px solid var(--linea); text-align:right; white-space:nowrap;}
+  th.izq,td.izq{text-align:left;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:12px;
+           text-transform:uppercase; letter-spacing:.04em;}
+  tr.ya td{color:var(--suave); background:#fbfaf7;}
+  td.abono{color:var(--verde); font-weight:600;}
+  code{background:#f4f1ea; padding:1px 5px; border-radius:4px; font-size:12.5px;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Cargar movimientos pegados</h1>
+  <p class="sub">Para las cuentas personales que no tienen export del banco ·
+     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola (archivo)</a> ·
+     <a href="{% url 'finanzas:tablero' %}">volver al tablero</a></p>
+
+  {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
+
+  {% if resultado %}
+  <div class="aviso ok">✓ Listo ({{ resultado.cuenta }}):
+    <b>{{ resultado.creados }}</b> movimientos escritos ·
+    {{ resultado.saltados }} saltados (ya estaban o fuera de cobertura).
+    {% if resultado.convertidos %}<br><b>{{ resultado.convertidos }}</b> retiros
+    desde Aremko convertidos en traspaso (calzaron con lo ya registrado).{% endif %}
+  </div>
+  <p><a class="boton sec" href="{% url 'finanzas:gastos_mes' %}">Ver gastos del mes</a>
+     <a class="boton sec" href="/admin/finanzas/movimientofinanciero/?fuente__exact=captura">Ver los movimientos</a></p>
+  {% endif %}
+
+  {% if errores %}
+  <div class="aviso mal">No entendí {{ errores|length }} línea{{ errores|length|pluralize:"s" }} —
+    esas NO se van a cargar. Corrígelas y vuelve a pegar:
+    <ul>{% for n, cruda, por_que in errores %}
+      <li>Línea {{ n }}: {{ por_que }} — <code>{{ cruda }}</code></li>
+    {% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if filas %}
+  <h2>Propuesta — {{ cuenta_nombre }}</h2>
+  <div class="aviso">Se van a escribir <b>{{ n_nuevas }}</b> movimientos
+    ({{ total_cargos }} en cargos); {{ n_otras }} quedan fuera (ya estaban, son
+    abonos personales o son anteriores a julio 2026).</div>
+
+  <div class="scroll"><table>
+    <thead><tr><th class="izq">Fecha</th><th class="izq">Glosa</th>
+               <th>Monto</th><th class="izq">Va a</th><th class="izq">Estado</th></tr></thead>
+    <tbody>
+      {% for f in filas %}
+      <tr{% if f.estado != 'nuevo' %} class="ya"{% endif %}>
+        <td class="izq">{{ f.fecha }}</td>
+        <td class="izq">{{ f.descripcion }}</td>
+        <td{% if f.es_abono %} class="abono"{% endif %}>{{ f.monto_fmt }}</td>
+        <td class="izq">{% if f.clase == 'traspaso' %}traspaso desde Aremko{% elif f.clase == 'personal' %}—{% else %}{{ f.categoria }}{% endif %}</td>
+        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'personal' %}personal (no se registra){% elif f.estado == 'revisar' %}revisar: sin retiro que calce{% else %}fuera de cobertura{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if payload %}
+  <form method="post" style="margin-top:16px;">{% csrf_token %}
+    <input type="hidden" name="payload" value="{{ payload }}">
+    <button class="boton" name="confirmar" value="1" type="submit">
+      Confirmar y escribir {{ n_nuevas }} movimientos</button>
+  </form>
+  {% else %}
+  <div class="aviso">Nada nuevo que escribir.</div>
+  {% endif %}
+  {% endif %}
+
+  <h2>{% if filas %}Pegar otro bloque{% else %}Pegar los movimientos{% endif %}</h2>
+  <p class="sub">Una línea por movimiento: <code>fecha ; glosa ; monto</code>.
+     El monto va <b>tal como se ve en la app</b>: con signo menos si es cargo,
+     sin signo si entró plata. Fecha DD-MM-AAAA.<br>
+     Ejemplo: <code>14-07-2026 ; Pago Google Ads Google ; -180.000</code></p>
+  <form method="post">{% csrf_token %}
+    <p><select name="cuenta">
+      {% for c in cuentas %}
+      <option value="{{ c.clave }}" {% if c.clave == cuenta_sel %}selected{% endif %}>{{ c.nombre }}</option>
+      {% endfor %}
+    </select></p>
+    <p><textarea name="texto" placeholder="14-07-2026 ; Pago Google Ads Google ; -180.000">{{ texto }}</textarea></p>
+    <button class="boton" type="submit">Revisar</button>
+  </form>
+  <p class="sub">Primero verás la propuesta con lo que se va a escribir.
+     Nada se guarda sin tu confirmación, y repegar el mismo bloque no duplica.</p>
+</div>
+</body>
+</html>

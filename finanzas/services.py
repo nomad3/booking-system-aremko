@@ -755,16 +755,135 @@ def parsear_cartola_alda(archivo):
     }
 
 
-def registrar_filas_alda(filas, cierres_mes=None):
-    """Escribe la cartola de Alda (F7). Devuelve (creados, saltados,
-    convertidos).
+# ── F7b: CuentaRUT de Jorge — sin export, se cargan movimientos pegados ──────
+# El portal Personas de BancoEstado no da el mismo .xlsx que Empresas, así que
+# la cuenta se alimenta pegando los movimientos tal como se leen en la app
+# (negativo = cargo, positivo = abono).
 
-    - Cargos → gastos en su cuenta, clasificados (default personal).
-    - Abonos desde Aremko → buscan el RETIRO ya registrado (gasto grupo
-      personales_alda, mismo monto, ±2 días) y lo CONVIERTEN en traspaso
-      con la pierna entra en su cuenta: la plata deja de contarse dos
-      veces y el gasto real pasa a ser lo que ella paga.
-    - Abonos personales de ella ('personal') no se tocan.
+def clasificar_fila_cuentarut(descripcion, cargo, abono):
+    """(clase, sentido, categoria_clave, propio) para la CuentaRUT de Jorge.
+
+    Es una cuenta MIXTA: paga publicidad e infraestructura de Aremko y a la
+    vez el presupuesto de Martín y gastos personales. Lo que no calza con una
+    regla clara queda POR CLASIFICAR (grupo otros) — ni se infla el gasto de
+    la empresa ni se esconde como personal.
+    """
+    d = (descripcion or '').upper()
+    if abono > 0:
+        if RUT_AREMKO_SIN_DV in d or 'AREMKO' in d:
+            return 'traspaso', 'entra', '', True
+        return 'personal', 'entra', '', False
+    if 'GOOGLE ADS' in d or 'META PLATFORMS' in d or 'FACEBK' in d:
+        return 'gasto', 'sale', 'publicidad', False
+    if any(p in d for p in ('TWILIO', 'SENDGRID', 'DATAFORSEO', 'ECERT',
+                            'OPENAI', 'ANTHROPIC', 'RENDER', 'CLOUDINARY',
+                            'OPENROUTER', 'VERCEL')):
+        return 'gasto', 'sale', 'infraestructura', False
+    if 'COMISION' in d:
+        return 'gasto', 'sale', 'comisiones', False
+    if 'MARTIN AGUILERA' in d:
+        return 'gasto', 'sale', 'personales_martin', False
+    if 'JORGE ANTONIO AGUILERA' in d or 'JORGE AGUILERA' in d:
+        return 'gasto', 'sale', 'personales_jorge', False
+    return 'gasto', 'sale', 'por_clasificar', False
+
+
+# cuenta → (función de clasificación, grupo del retiro que se convierte)
+CUENTAS_PUENTE = {
+    'scotiabank_alda': (clasificar_fila_alda, 'personales_alda'),
+    'cuentarut_jorge': (clasificar_fila_cuentarut, 'personales_jorge'),
+}
+
+
+def _monto_pegado(texto):
+    """'-$22.687' → -22687 · '200.000' → 200000 · '' → None si no es número."""
+    t = str(texto or '').strip().replace('$', '').replace(' ', '')
+    t = t.replace('.', '').replace(',', '')
+    if not t or t in ('-', '+'):
+        return None
+    try:
+        return int(t)
+    except ValueError:
+        return None
+
+
+def parsear_pegado(texto):
+    """Movimientos pegados → (filas_crudas, errores).
+
+    Una línea por movimiento: `fecha ; descripción ; monto`, separadas por
+    `;` o tabulador. Fecha DD-MM-AAAA, DD/MM/AAAA o AAAA-MM-DD. Monto tal
+    como se ve en la app: NEGATIVO es cargo, positivo es abono.
+    Las líneas que no se entienden se DEVUELVEN como error con su número —
+    saltarlas en silencio sería perder plata sin avisar.
+    """
+    from datetime import datetime
+
+    filas, errores = [], []
+    for n, linea in enumerate(texto.splitlines(), start=1):
+        cruda = linea.strip()
+        if not cruda or cruda.startswith('#'):
+            continue
+        partes = [p.strip() for p in
+                  (cruda.split('\t') if '\t' in cruda else cruda.split(';'))]
+        if len(partes) < 3:
+            errores.append((n, cruda, 'faltan campos (fecha ; glosa ; monto)'))
+            continue
+        fecha = None
+        for formato in ('%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d'):
+            try:
+                fecha = datetime.strptime(partes[0], formato).date()
+                break
+            except ValueError:
+                continue
+        if fecha is None:
+            errores.append((n, cruda, f'no entiendo la fecha «{partes[0]}»'))
+            continue
+        monto = _monto_pegado(partes[2])
+        if monto is None or monto == 0:
+            errores.append((n, cruda, f'no entiendo el monto «{partes[2]}»'))
+            continue
+        filas.append({'fecha': fecha, 'descripcion': partes[1],
+                      'cargo': -monto if monto < 0 else 0,
+                      'abono': monto if monto > 0 else 0})
+    return filas, errores
+
+
+def preparar_filas_manual(texto, cuenta_clave):
+    """Pegado → filas con clase/categoría/referencia, listas para la vista."""
+    clasificar, _ = CUENTAS_PUENTE.get(cuenta_clave,
+                                       (clasificar_fila_cuentarut, ''))
+    crudas, errores = parsear_pegado(texto)
+    vistas, filas = {}, []
+    for f in crudas:
+        clase, sentido, cat, propio = clasificar(f['descripcion'],
+                                                 f['cargo'], f['abono'])
+        # Dos movimientos idénticos el mismo día son posibles: el contador de
+        # repetición los hace distintos sin romper la idempotencia al repegar.
+        base = f"{f['fecha'].isoformat()}|{f['descripcion']}|{f['cargo']}|{f['abono']}"
+        vistas[base] = vistas.get(base, 0) + 1
+        huella = f'{base}|{vistas[base]}'
+        filas.append({
+            'fecha': f['fecha'].isoformat(), 'descripcion': f['descripcion'],
+            'cargo': f['cargo'], 'abono': f['abono'], 'saldo': 0,
+            'clase': clase, 'sentido': sentido, 'categoria': cat,
+            'propio': propio,
+            'referencia': f'man:{cuenta_clave}:' +
+                          hashlib.sha1(huella.encode()).hexdigest()[:20],
+        })
+    return filas, errores
+
+
+def registrar_filas_puente(filas, cuenta_clave, cierres_mes=None):
+    """Escribe filas de una cuenta puente (Alda o CuentaRUT).
+
+    Devuelve (creados, saltados, convertidos).
+
+    - Cargos → gastos en esa cuenta, ya clasificados.
+    - Abonos desde Aremko → buscan el RETIRO ya registrado (gasto del grupo
+      familia de esa persona, mismo monto, ±2 días) y lo CONVIERTEN en
+      traspaso con la pierna entra en la cuenta puente: la plata deja de
+      contarse dos veces y el gasto real pasa a ser lo que ahí se paga.
+    - Abonos propios de la persona ('personal') no se tocan.
     """
     from datetime import timedelta
 
@@ -772,13 +891,26 @@ def registrar_filas_alda(filas, cierres_mes=None):
 
     from .models import (CategoriaFinanciera, CuentaFinanciera,
                          MovimientoFinanciero, SaldoMensual)
+    from .reglas import PLAN_CUENTAS
 
-    cuenta = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+    cuenta = CuentaFinanciera.objects.get(clave=cuenta_clave)
+    _, grupo_retiro = CUENTAS_PUENTE[cuenta_clave]
+    etiqueta = cuenta_clave.replace('_', ' ')
+
+    definiciones = dict(PLAN_CUENTAS)
+    definiciones.update(CATEGORIAS_ALDA)
     cats = {}
-    for clave, (nombre, clase, grupo) in CATEGORIAS_ALDA.items():
-        cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
-            clave=clave,
-            defaults={'nombre': nombre, 'clase': clase, 'grupo': grupo})
+
+    def _categoria(clave):
+        if not clave:
+            return None
+        if clave not in cats:
+            nombre, clase, grupo = definiciones.get(
+                clave, (clave.replace('_', ' ').title(), 'gasto', 'otros'))
+            cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
+                clave=clave,
+                defaults={'nombre': nombre, 'clase': clase, 'grupo': grupo})
+        return cats[clave]
 
     creados = saltados = convertidos = 0
     with transaction.atomic():
@@ -795,7 +927,7 @@ def registrar_filas_alda(filas, cierres_mes=None):
             if f.get('propio') and f['clase'] == 'traspaso':
                 candidatos = list(MovimientoFinanciero.objects.filter(
                     clase='gasto', sentido='sale', monto=monto,
-                    categoria__grupo='personales_alda',
+                    categoria__grupo=grupo_retiro,
                     fecha__range=(fecha - timedelta(days=2),
                                   fecha + timedelta(days=2)))
                     .exclude(cuenta=cuenta))
@@ -808,7 +940,7 @@ def registrar_filas_alda(filas, cierres_mes=None):
                     fecha=fecha, cuenta=cuenta, clase='traspaso',
                     sentido='entra', monto=monto, fuente='captura',
                     referencia=f['referencia'], traspaso_par=retiro,
-                    descripcion=f"Cartola alda: {f['descripcion']}"[:255])
+                    descripcion=f"Cartola {etiqueta}: {f['descripcion']}"[:255])
                 retiro.clase = 'traspaso'
                 retiro.categoria = None
                 retiro.traspaso_par = entra
@@ -819,9 +951,9 @@ def registrar_filas_alda(filas, cierres_mes=None):
 
             MovimientoFinanciero.objects.create(
                 fecha=fecha, cuenta=cuenta, clase='gasto', sentido='sale',
-                monto=monto, categoria=cats.get(f['categoria']),
+                monto=monto, categoria=_categoria(f['categoria']),
                 fuente='captura', referencia=f['referencia'],
-                descripcion=f"Cartola alda: {f['descripcion']}"[:255])
+                descripcion=f"Cartola {etiqueta}: {f['descripcion']}"[:255])
             creados += 1
 
         for mes_iso, saldo in (cierres_mes or {}).items():
@@ -829,9 +961,14 @@ def registrar_filas_alda(filas, cierres_mes=None):
             SaldoMensual.objects.update_or_create(
                 cuenta=cuenta, periodo=date(anio, mes, 1),
                 defaults={'saldo_cierre': saldo, 'fuente': 'cartola',
-                          'notas': 'Cierre derivado del BSA.dat'})
+                          'notas': 'Cierre derivado de la cartola'})
 
     return creados, saltados, convertidos
+
+
+def registrar_filas_alda(filas, cierres_mes=None):
+    """Compatibilidad: la cartola de Alda por el camino genérico."""
+    return registrar_filas_puente(filas, 'scotiabank_alda', cierres_mes)
 
 
 def estado_fila_cartola(cuenta_clave, fila):
@@ -863,13 +1000,14 @@ def estado_fila_cartola(cuenta_clave, fila):
                                        fecha + timedelta(days=2))).exists()
         if hay_par:
             return 'ya_existe'
-        if cuenta_clave == 'scotiabank_alda':
-            # F7: si existe el retiro Aremko→Alda (gasto personales_alda,
-            # mismo monto, ±2 días), la fila se puede CONVERTIR en traspaso
-            # al confirmar → cuenta como nueva. Sin calce → revisar.
+        if cuenta_clave in CUENTAS_PUENTE:
+            # F7: si existe el retiro Aremko→persona (gasto de su grupo
+            # familia, mismo monto, ±2 días), la fila se puede CONVERTIR en
+            # traspaso al confirmar → cuenta como nueva. Sin calce → revisar.
+            _, grupo_retiro = CUENTAS_PUENTE[cuenta_clave]
             hay_retiro = MovimientoFinanciero.objects.filter(
                 clase='gasto', sentido='sale', monto=monto,
-                categoria__grupo='personales_alda',
+                categoria__grupo=grupo_retiro,
                 fecha__range=(fecha - timedelta(days=2),
                               fecha + timedelta(days=2))).exists()
             return 'nuevo' if hay_retiro else 'revisar'

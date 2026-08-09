@@ -20,7 +20,8 @@ from django.shortcuts import render
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 from ventas.models import Pago
 
-from .models import CategoriaFinanciera, MovimientoFinanciero, SaldoMensual
+from .models import (CategoriaFinanciera, CuentaFinanciera,
+                     MovimientoFinanciero, SaldoMensual)
 from .reglas import GRUPO_DEVOLUCIONES, GRUPOS_FAMILIA
 
 # De los ~22 métodos de pago históricos a los canales reales. Los que no están
@@ -385,7 +386,8 @@ def gastos_ano(request):
 
 NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
                          'scotiabank': 'Scotiabank',
-                         'scotiabank_alda': 'Scotiabank Alda (personal)'}
+                         'scotiabank_alda': 'Scotiabank Alda (personal)',
+                         'cuentarut_jorge': 'CuentaRUT Jorge (personal)'}
 
 
 @user_passes_test(puede_ver_finanzas)
@@ -497,6 +499,77 @@ def cargar_cartola(request):
                      'cierres_mes': cierres_pend})
 
     return render(request, 'finanzas/cargar_cartola.html', ctx)
+
+
+@user_passes_test(puede_ver_finanzas)
+def cargar_movimientos(request):
+    """Carga por PEGADO para cuentas sin export (P-22 F7b).
+
+    La CuentaRUT de Jorge (portal Personas) no da el .xlsx que sí da la
+    Chequera, así que sus movimientos se pegan tal como se leen en la app:
+    una línea por movimiento, `fecha ; glosa ; monto` con el monto NEGATIVO
+    cuando es cargo. Mismo flujo de dos golpes de las cartolas: propuesta
+    con estados y confirmación; nada se escribe antes.
+    """
+    from django.core import signing
+
+    from .services import (CUENTAS_PUENTE, estado_fila_cartola,
+                           preparar_filas_manual, registrar_filas_puente)
+
+    cuentas = list(CuentaFinanciera.objects.filter(
+        clave__in=CUENTAS_PUENTE).order_by('nombre'))
+    ctx = {'cuentas': cuentas,
+           'cuenta_sel': request.POST.get('cuenta') or 'cuentarut_jorge',
+           'texto': request.POST.get('texto', '')}
+
+    if request.method == 'POST' and request.POST.get('confirmar'):
+        try:
+            payload = signing.loads(request.POST.get('payload', ''), max_age=3600)
+        except signing.BadSignature:
+            ctx['error'] = ('La propuesta expiró o viene alterada — '
+                            'pega los movimientos de nuevo.')
+        else:
+            cuenta_clave = payload['cuenta']
+            creados, saltados, convertidos = registrar_filas_puente(
+                payload['filas'], cuenta_clave)
+            ctx['resultado'] = {
+                'creados': creados, 'saltados': saltados,
+                'convertidos': convertidos,
+                'cuenta': NOMBRE_CUENTA_CARTOLA.get(cuenta_clave, cuenta_clave),
+            }
+            ctx['texto'] = ''
+
+    elif request.method == 'POST' and request.POST.get('texto', '').strip():
+        cuenta_clave = ctx['cuenta_sel']
+        if cuenta_clave not in CUENTAS_PUENTE:
+            ctx['error'] = 'Esa cuenta no acepta carga por pegado.'
+        elif not CuentaFinanciera.objects.filter(clave=cuenta_clave).exists():
+            ctx['error'] = ('La cuenta todavía no existe: correr '
+                            '«python manage.py sembrar_finanzas» en la Shell.')
+        else:
+            filas, errores = preparar_filas_manual(request.POST['texto'],
+                                                   cuenta_clave)
+            for f in filas:
+                f['estado'] = estado_fila_cartola(cuenta_clave, f)
+                if f['clase'] == 'personal':
+                    f['estado'] = 'personal'
+                if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
+                    f['estado'] = 'fuera_cobertura'
+                f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
+                f['es_abono'] = bool(f['abono'])
+            nuevas = [f for f in filas if f['estado'] == 'nuevo']
+            ctx['filas'] = filas
+            ctx['errores'] = errores
+            ctx['cuenta_nombre'] = NOMBRE_CUENTA_CARTOLA.get(cuenta_clave,
+                                                             cuenta_clave)
+            ctx['n_nuevas'] = len(nuevas)
+            ctx['n_otras'] = len(filas) - len(nuevas)
+            ctx['total_cargos'] = _clp(sum(f['cargo'] for f in nuevas))
+            if nuevas:
+                ctx['payload'] = signing.dumps({'cuenta': cuenta_clave,
+                                                'filas': nuevas})
+
+    return render(request, 'finanzas/cargar_movimientos.html', ctx)
 
 
 # Orden fijo de las cuentas de caja en el flujo. La Visa queda FUERA a

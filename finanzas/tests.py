@@ -1024,3 +1024,110 @@ class CartolaAldaTest(TestCase):
         r2 = self.client.post(reverse('finanzas:cargar_cartola'),
                               {'archivo': SimpleUploadedFile('BSA.dat', otro)})
         self.assertContains(r2, '11-22222-33')
+
+
+class MovimientosPegadosTest(TestCase):
+    """F7b: la CuentaRUT de Jorge se carga pegando lo que muestra la app."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('jefe', password='x')
+        self.client.login(username='jefe', password='x')
+
+    PEGADO = """
+14-07-2026 ; Pago Google Ads Google ; -180.000
+14-07-2026 ; Tef De Aremko Hotel Spa ; 200.000
+06-07-2026 ; Pago Fs Dataforseo ; -56.560
+06-07-2026 ; Comision Transaccion Internacional ; -1.075
+06-07-2026 ; Tef A Martin Aguilera Toloza 777021 ; -20.000
+18-07-2026 ; Abono Convenio Afp Plan Vital ; 162.154
+20-06-2026 ; Pago viejo antes del corte ; -9.999
+"""
+
+    def test_parseo_y_clasificacion(self):
+        from .services import preparar_filas_manual
+        filas, errores = preparar_filas_manual(self.PEGADO, 'cuentarut_jorge')
+        self.assertEqual(errores, [])
+        self.assertEqual(len(filas), 7)
+        por_desc = {f['descripcion']: f for f in filas}
+        self.assertEqual(por_desc['Pago Google Ads Google']['categoria'],
+                         'publicidad')
+        self.assertEqual(por_desc['Pago Google Ads Google']['cargo'], 180000)
+        self.assertEqual(por_desc['Pago Fs Dataforseo']['categoria'],
+                         'infraestructura')
+        self.assertEqual(por_desc['Comision Transaccion Internacional']
+                         ['categoria'], 'comisiones')
+        self.assertEqual(por_desc['Tef A Martin Aguilera Toloza 777021']
+                         ['categoria'], 'personales_martin')
+        aremko = por_desc['Tef De Aremko Hotel Spa']
+        self.assertEqual((aremko['clase'], aremko['abono']), ('traspaso', 200000))
+        self.assertEqual(por_desc['Abono Convenio Afp Plan Vital']['clase'],
+                         'personal')
+
+    def test_lineas_malas_se_reportan(self):
+        from .services import preparar_filas_manual
+        filas, errores = preparar_filas_manual(
+            "14-07-2026 ; Buena ; -1.000\n"
+            "sin fecha ; Mala ; -2.000\n"
+            "15-07-2026 ; Sin monto ; abc\n"
+            "15-07-2026 solo dos campos\n", 'cuentarut_jorge')
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(len(errores), 3)
+        self.assertEqual([n for n, _, _ in errores], [2, 3, 4])
+
+    def test_carga_e2e_por_la_pagina_es_idempotente(self):
+        url = reverse('finanzas:cargar_movimientos')
+        r = self.client.post(url, {'cuenta': 'cuentarut_jorge',
+                                   'texto': self.PEGADO})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'CuentaRUT Jorge')
+        self.assertContains(r, 'publicidad')
+        # El abono de AFP no se registra y el de junio queda fuera.
+        self.assertContains(r, 'personal (no se registra)')
+        self.assertContains(r, 'fuera de cobertura')
+        # Sin retiro que calce, el abono de Aremko pide revisión.
+        self.assertContains(r, 'sin retiro que calce')
+        payload = r.context['payload']
+        self.assertEqual(r.context['n_nuevas'], 4)   # 4 cargos de julio
+
+        r2 = self.client.post(url, {'payload': payload, 'confirmar': '1'})
+        self.assertEqual(r2.context['resultado']['creados'], 4)
+        google = MovimientoFinanciero.objects.get(monto=180000)
+        self.assertEqual(google.cuenta.clave, 'cuentarut_jorge')
+        self.assertEqual(google.categoria.grupo, 'marketing')
+        self.assertEqual(google.fuente, 'captura')
+
+        # Re-pegar el mismo bloque: todo "ya está", nada se duplica.
+        r3 = self.client.post(url, {'cuenta': 'cuentarut_jorge',
+                                    'texto': self.PEGADO})
+        self.assertEqual(r3.context['n_nuevas'], 0)
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            cuenta__clave='cuentarut_jorge').count(), 4)
+
+    def test_retiro_a_jorge_se_convierte_en_traspaso(self):
+        from .services import registrar_filas_puente, preparar_filas_manual
+        cat = CategoriaFinanciera.objects.get(clave='personales_jorge')
+        retiro = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 14),
+            cuenta=CuentaFinanciera.objects.get(clave='mercado_pago'),
+            clase='gasto', sentido='sale', monto=200000, categoria=cat,
+            descripcion='Transferencia a Jorge', fuente='correo',
+            referencia='correo:mp:test-jorge')
+        filas, _ = preparar_filas_manual(
+            "14-07-2026 ; Tef De Aremko Hotel Spa ; 200.000",
+            'cuentarut_jorge')
+        creados, saltados, convertidos = registrar_filas_puente(
+            filas, 'cuentarut_jorge')
+        self.assertEqual((creados, convertidos), (0, 1))
+        retiro.refresh_from_db()
+        self.assertEqual(retiro.clase, 'traspaso')
+        self.assertEqual(retiro.traspaso_par.cuenta.clave, 'cuentarut_jorge')
+
+    def test_dos_movimientos_identicos_el_mismo_dia_entran_los_dos(self):
+        from .services import preparar_filas_manual
+        filas, _ = preparar_filas_manual(
+            "20-07-2026 ; Pago Farmacias Del Doc ; -3.090\n"
+            "20-07-2026 ; Pago Farmacias Del Doc ; -3.090\n",
+            'cuentarut_jorge')
+        self.assertEqual(len({f['referencia'] for f in filas}), 2)
