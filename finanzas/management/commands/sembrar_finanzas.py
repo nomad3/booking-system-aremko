@@ -31,6 +31,17 @@ CUENTAS = [
      'Cuenta puente: las comisiones SumUp (API) viven acá — suman al gasto '
      'del mes pero NO tocan el flujo de caja (el neto ya llega a BancoEstado '
      'por cartola). Saldo pendiente visible en el panel SumUp.'),
+    # F7 (2026-08-09): cuentas personales puente — mezclan gastos de la
+    # empresa con personales. FUERA del flujo de caja (no son caja de
+    # Aremko); sus gastos sí clasifican al plan de cuentas.
+    ('scotiabank_alda', 'Scotiabank Alda (personal)', 'banco',
+     'Cuenta corriente personal de Alda Toloza (99-00138-96). Recibe '
+     'retiros desde MP/BancoEstado (se convierten en traspaso al calzar '
+     'con su cartola BSA.dat) y paga tarjeta, seguros e impuestos de '
+     'Aremko (vale vista). Cartola: BSA.dat de Scotia Connect.'),
+    ('cuentarut_jorge', 'CuentaRUT Jorge (personal)', 'banco',
+     'CuentaRUT personal de Jorge. Canaliza el presupuesto de Martín '
+     '($300k/mes) y gastos mixtos. Formato de cartola pendiente de sondear.'),
 ]
 
 CATEGORIAS = [

@@ -874,3 +874,128 @@ class ReportesGastosTest(TestCase):
         self.assertContains(r, 'REPO')
         self.assertNotContains(r, 'Tablero financiero')
         self.assertContains(r, 'Artesan')
+
+
+BSA_ALDA = ("\r\n".join([
+    ";Cartola ",
+    ";Numero Cuenta : 99-00138-96",
+    ";Fecha Desde : 24/06/2026",
+    ";Fecha Hasta : 31/07/2026",
+    ";Ejecutivo : EJECUTIVA DE PRUEBA",
+    "Fecha;Descripcion;NroDoc.;Cargos;Abonos;Saldo",
+    "   28062026;CARGO SEG.Fraude              ;00000000;0000000005000,00;;+0000000061836,00",
+    "   02072026;TEF 76485192-7 AREMKO HOTEL SP;00000000;;0000001000000,00;+0000001061836,00",
+    "   02072026;820407_PAGO TARJ.CRED. POR SWE;00000000;0000001000000,00;;+0000000061836,00",
+    "   06072026;CARGO SEG.Fraude              ;00000000;0000000010618,00;;+0000000051218,00",
+    "   10072026;VALE VISTA PAGO SII           ;00000000;0000000020000,00;;+0000000031218,00",
+    "   13072026;TEF 11744727-8 ALDA ANGELICA T;00000000;;0000000400000,00;+0000000431218,00",
+]) + "\r\n").encode("latin-1")
+
+
+class CartolaAldaTest(TestCase):
+    """F7: la cuenta personal de Alda — BSA.dat de Scotia Connect."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+
+    def _retiro_aremko(self):
+        cat = CategoriaFinanciera.objects.create(
+            clave='retiros-alda-test', nombre='Retiros Alda', clase='gasto',
+            grupo='personales_alda')
+        return MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 2),
+            cuenta=CuentaFinanciera.objects.get(clave='mercado_pago'),
+            clase='gasto', sentido='sale', monto=1000000, categoria=cat,
+            descripcion='Transferencia a ALDA ANGELICA TOLOZA',
+            fuente='correo', referencia='correo:mp:test-retiro')
+
+    def test_parser_bsa(self):
+        import io
+
+        from .services import parsear_cartola_alda
+        datos = parsear_cartola_alda(io.BytesIO(BSA_ALDA))
+        self.assertEqual(datos['cuenta_numero'], '99-00138-96')
+        self.assertEqual(len(datos['filas']), 6)
+        self.assertTrue(datos['cuadra'])            # cadena de saldos sana
+        self.assertEqual(datos['cierres_mes']['2026-07'], 431218)
+        self.assertEqual(datos['cierres_mes']['2026-06'], 61836)
+
+        por_desc = {f['descripcion']: f for f in datos['filas']}
+        aremko = por_desc['TEF 76485192-7 AREMKO HOTEL SP']
+        self.assertEqual((aremko['clase'], aremko['propio']), ('traspaso', True))
+        self.assertEqual(aremko['abono'], 1000000)
+        self.assertEqual(
+            por_desc['TEF 11744727-8 ALDA ANGELICA T']['clase'], 'personal')
+        self.assertEqual(
+            por_desc['820407_PAGO TARJ.CRED. POR SWE']['categoria'],
+            'tarjeta_alda')
+        self.assertEqual(
+            por_desc['VALE VISTA PAGO SII']['categoria'], 'impuestos_alda')
+        self.assertEqual(
+            por_desc['VALE VISTA PAGO SII']['cargo'], 20000)
+
+    def test_registro_convierte_el_retiro_y_es_idempotente(self):
+        import io
+
+        from .services import (estado_fila_cartola, parsear_cartola_alda,
+                               registrar_filas_alda)
+        retiro = self._retiro_aremko()
+        datos = parsear_cartola_alda(io.BytesIO(BSA_ALDA))
+
+        # El abono desde Aremko se ofrece como NUEVO (hay retiro que calza).
+        aremko = next(f for f in datos['filas']
+                      if 'AREMKO' in f['descripcion'])
+        self.assertEqual(estado_fila_cartola('scotiabank_alda', aremko),
+                         'nuevo')
+
+        creados, saltados, convertidos = registrar_filas_alda(
+            datos['filas'], datos['cierres_mes'])
+        # 3 cargos de julio creados; junio y el abono personal saltan.
+        self.assertEqual((creados, convertidos, saltados), (3, 1, 2))
+
+        retiro.refresh_from_db()
+        self.assertEqual(retiro.clase, 'traspaso')
+        self.assertIsNone(retiro.categoria)
+        entra = retiro.traspaso_par
+        self.assertEqual(entra.cuenta.clave, 'scotiabank_alda')
+        self.assertEqual((entra.sentido, int(entra.monto)),
+                         ('entra', 1000000))
+        # La suma global de traspasos sigue en cero.
+        tras = (MovimientoFinanciero.objects.filter(clase='traspaso')
+                .values('sentido').annotate(t=Sum('monto')))
+        por_sentido = {r['sentido']: int(r['t']) for r in tras}
+        self.assertEqual(por_sentido.get('entra'), por_sentido.get('sale'))
+
+        # El vale vista quedó como gasto de la EMPRESA (grupo impuestos).
+        vale = MovimientoFinanciero.objects.get(monto=20000,
+                                                cuenta__clave='scotiabank_alda')
+        self.assertEqual(vale.categoria.grupo, 'impuestos')
+        # La tarjeta quedó personal.
+        tarjeta = MovimientoFinanciero.objects.get(
+            monto=1000000, cuenta__clave='scotiabank_alda', clase='gasto')
+        self.assertEqual(tarjeta.categoria.grupo, 'personales_alda')
+
+        # Re-registrar: nada nuevo, nada se convierte dos veces.
+        creados2, saltados2, convertidos2 = registrar_filas_alda(
+            datos['filas'], datos['cierres_mes'])
+        self.assertEqual((creados2, convertidos2), (0, 0))
+
+    def test_vista_detecta_bsa_y_marca_personales(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self._retiro_aremko()
+        User.objects.create_superuser('jefe', password='x')
+        self.client.login(username='jefe', password='x')
+
+        r = self.client.post(reverse('finanzas:cargar_cartola'),
+                             {'archivo': SimpleUploadedFile('BSA.dat',
+                                                            BSA_ALDA)})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Scotiabank Alda (personal)')
+        self.assertContains(r, 'personal (no se registra)')
+        self.assertContains(r, 'fuera de cobertura')     # la fila de junio
+
+        # Un BSA de otra cuenta se rechaza con mensaje claro.
+        otro = BSA_ALDA.replace(b'99-00138-96', b'11-22222-33')
+        r2 = self.client.post(reverse('finanzas:cargar_cartola'),
+                              {'archivo': SimpleUploadedFile('BSA.dat', otro)})
+        self.assertContains(r2, '11-22222-33')

@@ -599,6 +599,227 @@ def parsear_cartola_scotiabank(archivo):
     return parsear_filas_scotiabank(crudas)
 
 
+# ── F7: cuenta personal de Alda — cartola BSA.dat de Scotia Connect ──────────
+# Formato real verificado 2026-08-08 (archivo de Jorge): texto ASCII con ';',
+# cabecera de metadatos (';Numero Cuenta : 99-00138-96', ';Fecha Hasta :
+# DD/MM/AAAA'), encabezado 'Fecha;Descripcion;NroDoc.;Cargos;Abonos;Saldo' y
+# filas 'DDMMYYYY;desc;nrodoc;cargo;abono;saldo' con montos rellenos de ceros
+# y coma decimal ('0000001000000,00') y saldo con signo ('+0000001061836,00').
+
+CUENTA_ALDA_NUMERO = '99-00138'   # 99-00138-96, se compara por prefijo
+
+# clave → (nombre, clase, grupo). El default de un cargo es PERSONAL (decisión
+# F7): lo que sea de la empresa (p. ej. el vale vista de impuestos) se
+# reclasifica o cae por regla propia.
+CATEGORIAS_ALDA = {
+    'tarjeta_alda': ('Tarjeta de crédito (Alda)', 'gasto', 'personales_alda'),
+    'banco_alda': ('Comisiones y seguros banco (Alda)', 'gasto', 'personales_alda'),
+    'impuestos_alda': ('Impuestos pagados desde cta. Alda', 'gasto', 'impuestos'),
+    'personales_alda_pc': ('Personales Alda (por clasificar)', 'gasto', 'personales_alda'),
+}
+
+
+def clasificar_fila_alda(descripcion, cargo, abono):
+    """(clase, sentido, categoria_clave, propio) para una fila del BSA.dat.
+
+    - Abono desde Aremko → 'traspaso' (el retiro ya registrado se convierte).
+    - Abono de otra fuente → 'personal': plata de ella, no se registra.
+    - Cargo → gasto: tarjeta / banco / vale vista (impuestos, dato de Jorge
+      2026-08-08) / resto personal por clasificar.
+    """
+    d = (descripcion or '').upper()
+    if abono > 0:
+        if RUT_AREMKO_SIN_DV in d or 'AREMKO' in d:
+            return 'traspaso', 'entra', '', True
+        return 'personal', 'entra', '', False
+    if 'PAGO TARJ' in d:
+        return 'gasto', 'sale', 'tarjeta_alda', False
+    if 'VALE VISTA' in d:
+        return 'gasto', 'sale', 'impuestos_alda', False
+    if ('SEG' in d or 'DESGRAVAMEN' in d or 'COMISION' in d
+            or d.startswith('IVA')):
+        return 'gasto', 'sale', 'banco_alda', False
+    return 'gasto', 'sale', 'personales_alda_pc', False
+
+
+def _monto_bsa(texto):
+    """'+0000001061836,00' → 1061836 · '' → 0 (los decimales son siempre ,00)."""
+    t = str(texto or '').strip()
+    if not t:
+        return 0
+    signo = -1 if t.startswith('-') else 1
+    entero = t.lstrip('+-').split(',')[0].lstrip('0')
+    return signo * int(entero or 0)
+
+
+def parsear_cartola_alda(archivo):
+    """Parsea el BSA.dat al mismo shape de las otras cartolas."""
+    from datetime import datetime
+
+    crudo = archivo.read()
+    texto = crudo.decode('latin-1') if isinstance(crudo, bytes) else crudo
+
+    meta, movimientos = {}, []
+    for linea in texto.splitlines():
+        limpia = linea.strip()
+        if not limpia:
+            continue
+        if limpia.startswith(';'):
+            clave, _, valor = limpia[1:].partition(':')
+            if valor.strip():
+                meta[clave.strip()] = valor.strip()
+            continue
+        if limpia.startswith('Fecha;'):
+            continue
+        partes = linea.split(';')
+        if len(partes) < 6:
+            continue
+        try:
+            fecha = datetime.strptime(partes[0].strip(), '%d%m%Y').date()
+        except ValueError:
+            continue
+        desc = partes[1].strip()
+        cargo = abs(_monto_bsa(partes[3]))
+        abono = _monto_bsa(partes[4])
+        saldo = _monto_bsa(partes[5])
+        if cargo == 0 and abono == 0:
+            continue
+        movimientos.append((fecha, desc, cargo, abono, saldo))
+
+    if not movimientos:
+        raise ValueError('El BSA.dat no trae movimientos — '
+                         '¿es el export de Scotia Connect?')
+    if len(movimientos) > 1 and movimientos[0][0] > movimientos[-1][0]:
+        movimientos.reverse()
+
+    filas, cadena_rota = [], 0
+    saldo_prev = None
+    for fecha, desc, cargo, abono, saldo in movimientos:
+        if saldo_prev is not None and saldo_prev + abono - cargo != saldo:
+            cadena_rota += 1
+        saldo_prev = saldo
+        clase, sentido, cat, propio = clasificar_fila_alda(desc, cargo, abono)
+        huella = f'{fecha.isoformat()}|{desc}|{cargo}|{abono}|{saldo}'
+        filas.append({
+            'fecha': fecha.isoformat(), 'descripcion': desc,
+            'cargo': cargo, 'abono': abono, 'saldo': saldo,
+            'clase': clase, 'sentido': sentido, 'categoria': cat,
+            'propio': propio,
+            'referencia': 'alda:' + hashlib.sha1(huella.encode()).hexdigest()[:24],
+        })
+
+    saldo_inicial = filas[0]['saldo'] - filas[0]['abono'] + filas[0]['cargo']
+    saldo_final = filas[-1]['saldo']
+
+    cierres = {}
+    for i, f in enumerate(filas):
+        mes_fila = f['fecha'][:7]
+        if any(g['fecha'][:7] > mes_fila for g in filas[i + 1:]):
+            cierres[mes_fila] = f['saldo']
+    hasta = meta.get('Fecha Hasta', '')
+    if hasta:
+        try:
+            from datetime import timedelta as _td
+            f_hasta = datetime.strptime(hasta, '%d/%m/%Y').date()
+            if (f_hasta + _td(days=1)).month != f_hasta.month:
+                cierres.setdefault(f'{f_hasta.year}-{f_hasta.month:02d}',
+                                   saldo_final)
+        except ValueError:
+            pass
+
+    return {
+        'cuenta_numero': meta.get('Numero Cuenta', ''),
+        'fecha_inicio': filas[0]['fecha'], 'fecha_final': filas[-1]['fecha'],
+        'saldo_inicial': saldo_inicial, 'saldo_final_resumen': saldo_final,
+        'saldo_final_calculado': saldo_final,
+        'total_cargos': sum(f['cargo'] for f in filas),
+        'total_abonos': sum(f['abono'] for f in filas),
+        'cadena_rota': cadena_rota,
+        'cuadra': cadena_rota == 0,
+        'cierres_mes': cierres,
+        'filas': filas,
+    }
+
+
+def registrar_filas_alda(filas, cierres_mes=None):
+    """Escribe la cartola de Alda (F7). Devuelve (creados, saltados,
+    convertidos).
+
+    - Cargos → gastos en su cuenta, clasificados (default personal).
+    - Abonos desde Aremko → buscan el RETIRO ya registrado (gasto grupo
+      personales_alda, mismo monto, ±2 días) y lo CONVIERTEN en traspaso
+      con la pierna entra en su cuenta: la plata deja de contarse dos
+      veces y el gasto real pasa a ser lo que ella paga.
+    - Abonos personales de ella ('personal') no se tocan.
+    """
+    from datetime import timedelta
+
+    from django.db import transaction
+
+    from .models import (CategoriaFinanciera, CuentaFinanciera,
+                         MovimientoFinanciero, SaldoMensual)
+
+    cuenta = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+    cats = {}
+    for clave, (nombre, clase, grupo) in CATEGORIAS_ALDA.items():
+        cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
+            clave=clave,
+            defaults={'nombre': nombre, 'clase': clase, 'grupo': grupo})
+
+    creados = saltados = convertidos = 0
+    with transaction.atomic():
+        for f in filas:
+            fecha = date.fromisoformat(f['fecha'])
+            monto = f['abono'] or f['cargo']
+            if (f.get('clase') == 'personal' or monto <= 0
+                    or fecha < COBERTURA_GASTOS_DESDE
+                    or MovimientoFinanciero.objects.filter(
+                        referencia=f['referencia']).exists()):
+                saltados += 1
+                continue
+
+            if f.get('propio') and f['clase'] == 'traspaso':
+                candidatos = list(MovimientoFinanciero.objects.filter(
+                    clase='gasto', sentido='sale', monto=monto,
+                    categoria__grupo='personales_alda',
+                    fecha__range=(fecha - timedelta(days=2),
+                                  fecha + timedelta(days=2)))
+                    .exclude(cuenta=cuenta))
+                if not candidatos:
+                    saltados += 1
+                    continue
+                retiro = min(candidatos,
+                             key=lambda m: abs((m.fecha - fecha).days))
+                entra = MovimientoFinanciero.objects.create(
+                    fecha=fecha, cuenta=cuenta, clase='traspaso',
+                    sentido='entra', monto=monto, fuente='captura',
+                    referencia=f['referencia'], traspaso_par=retiro,
+                    descripcion=f"Cartola alda: {f['descripcion']}"[:255])
+                retiro.clase = 'traspaso'
+                retiro.categoria = None
+                retiro.traspaso_par = entra
+                retiro.save(update_fields=['clase', 'categoria',
+                                           'traspaso_par'])
+                convertidos += 1
+                continue
+
+            MovimientoFinanciero.objects.create(
+                fecha=fecha, cuenta=cuenta, clase='gasto', sentido='sale',
+                monto=monto, categoria=cats.get(f['categoria']),
+                fuente='captura', referencia=f['referencia'],
+                descripcion=f"Cartola alda: {f['descripcion']}"[:255])
+            creados += 1
+
+        for mes_iso, saldo in (cierres_mes or {}).items():
+            anio, mes = (int(x) for x in mes_iso.split('-'))
+            SaldoMensual.objects.update_or_create(
+                cuenta=cuenta, periodo=date(anio, mes, 1),
+                defaults={'saldo_cierre': saldo, 'fuente': 'cartola',
+                          'notas': 'Cierre derivado del BSA.dat'})
+
+    return creados, saltados, convertidos
+
+
 def estado_fila_cartola(cuenta_clave, fila):
     """'nuevo' | 'ya_existe' | 'en_historico' | 'revisar' para una fila.
 
@@ -626,7 +847,19 @@ def estado_fila_cartola(cuenta_clave, fila):
             clase='traspaso', sentido='entra', cuenta__clave=cuenta_clave,
             monto=monto, fecha__range=(fecha - timedelta(days=2),
                                        fecha + timedelta(days=2))).exists()
-        return 'ya_existe' if hay_par else 'revisar'
+        if hay_par:
+            return 'ya_existe'
+        if cuenta_clave == 'scotiabank_alda':
+            # F7: si existe el retiro Aremko→Alda (gasto personales_alda,
+            # mismo monto, ±2 días), la fila se puede CONVERTIR en traspaso
+            # al confirmar → cuenta como nueva. Sin calce → revisar.
+            hay_retiro = MovimientoFinanciero.objects.filter(
+                clase='gasto', sentido='sale', monto=monto,
+                categoria__grupo='personales_alda',
+                fecha__range=(fecha - timedelta(days=2),
+                              fecha + timedelta(days=2))).exists()
+            return 'nuevo' if hay_retiro else 'revisar'
+        return 'revisar'
 
     if cuenta_clave == 'scotiabank' and fila['clase'] == 'gasto':
         if MovimientoFinanciero.objects.filter(

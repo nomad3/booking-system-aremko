@@ -384,7 +384,8 @@ def gastos_ano(request):
 
 
 NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
-                         'scotiabank': 'Scotiabank'}
+                         'scotiabank': 'Scotiabank',
+                         'scotiabank_alda': 'Scotiabank Alda (personal)'}
 
 
 @user_passes_test(puede_ver_finanzas)
@@ -400,8 +401,10 @@ def cargar_cartola(request):
     """
     from django.core import signing
 
-    from .services import (estado_fila_cartola, parsear_cartola_bancoestado,
-                           parsear_cartola_scotiabank, registrar_filas_cartola)
+    from .services import (CUENTA_ALDA_NUMERO, estado_fila_cartola,
+                           parsear_cartola_alda, parsear_cartola_bancoestado,
+                           parsear_cartola_scotiabank, registrar_filas_alda,
+                           registrar_filas_cartola)
 
     ctx = {}
 
@@ -413,11 +416,17 @@ def cargar_cartola(request):
                             'sube el archivo de nuevo.')
         else:
             cuenta_clave = payload.get('cuenta', 'bancoestado')
-            creados, saltados = registrar_filas_cartola(
-                payload['filas'], payload.get('cierres_mes'),
-                cuenta_clave=cuenta_clave)
+            convertidos = 0
+            if cuenta_clave == 'scotiabank_alda':
+                creados, saltados, convertidos = registrar_filas_alda(
+                    payload['filas'], payload.get('cierres_mes'))
+            else:
+                creados, saltados = registrar_filas_cartola(
+                    payload['filas'], payload.get('cierres_mes'),
+                    cuenta_clave=cuenta_clave)
             ctx['resultado'] = {
                 'creados': creados, 'saltados': saltados,
+                'convertidos': convertidos,
                 'cuenta': NOMBRE_CUENTA_CARTOLA.get(cuenta_clave, cuenta_clave),
                 'cierres': [(m, _clp(s)) for m, s
                             in sorted((payload.get('cierres_mes') or {}).items())],
@@ -434,9 +443,18 @@ def cargar_cartola(request):
             elif magia.startswith(b'\xd0\xcf'):    # OLE2 → xls Scotiabank
                 cuenta_clave = 'scotiabank'
                 datos = parsear_cartola_scotiabank(archivo)
+            elif magia.startswith(b';'):           # texto ';' → BSA.dat Alda
+                datos = parsear_cartola_alda(archivo)
+                if CUENTA_ALDA_NUMERO not in datos['cuenta_numero']:
+                    raise ValueError(
+                        f"Este BSA.dat es de la cuenta {datos['cuenta_numero']}"
+                        ' — por ahora solo está mapeada la cuenta personal de '
+                        'Alda (99-00138-96).')
+                cuenta_clave = 'scotiabank_alda'
             else:
                 raise ValueError('No reconozco el archivo: se esperan el .xlsx '
-                                 'de BancoEstado o el .xls de Scotiabank.')
+                                 'de BancoEstado, el .xls de Scotiabank o el '
+                                 'BSA.dat de la cuenta de Alda.')
         except ValueError as e:
             ctx['error'] = str(e)
         except Exception:
@@ -445,6 +463,9 @@ def cargar_cartola(request):
         else:
             for f in datos['filas']:
                 f['estado'] = estado_fila_cartola(cuenta_clave, f)
+                if f.get('clase') == 'personal':
+                    # Abonos personales de Alda: plata de ella, no se registra.
+                    f['estado'] = 'personal'
                 if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
                     f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])

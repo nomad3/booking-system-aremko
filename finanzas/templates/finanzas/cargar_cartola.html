@@ -50,6 +50,9 @@
   <div class="aviso ok">✓ Listo ({{ resultado.cuenta }}):
     <b>{{ resultado.creados }}</b> movimientos nuevos escritos (fuente captura) ·
     {{ resultado.saltados }} saltados (ya estaban, histórico o fuera de cobertura).
+    {% if resultado.convertidos %}<br><b>{{ resultado.convertidos }}</b> retiros
+    Aremko→Alda convertidos en traspaso (calzaron con la cartola: dejan de
+    contarse como gasto y el gasto real pasa a ser lo que ella paga).{% endif %}
     {% for m, s in resultado.cierres %}<br>Cierre {{ m }} guardado: <b>{{ s }}</b>.{% endfor %}
   </div>
   <p><a class="boton sec" href="{% url 'finanzas:tablero' %}">Ver el tablero</a>
@@ -85,7 +88,7 @@
         <td class="izq">{{ f.clase }}{% if f.categoria %} · {{ f.categoria }}{% endif %}</td>
         <td class="{{ f.sentido }}">{% if f.sentido == 'entra' %}+{% else %}−{% endif %}{{ f.monto_fmt }}</td>
         <td>{{ f.saldo_fmt }}</td>
-        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'en_historico' %}en histórico{% elif f.estado == 'revisar' %}revisar a mano{% else %}fuera de cobertura{% endif %}</td>
+        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'en_historico' %}en histórico{% elif f.estado == 'revisar' %}revisar a mano{% elif f.estado == 'personal' %}personal (no se registra){% else %}fuera de cobertura{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
