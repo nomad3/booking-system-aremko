@@ -20,7 +20,8 @@ from django.shortcuts import render
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 from ventas.models import Pago
 
-from .models import MovimientoFinanciero, SaldoMensual
+from .models import CategoriaFinanciera, MovimientoFinanciero, SaldoMensual
+from .reglas import GRUPOS_FAMILIA
 
 # De los ~22 métodos de pago históricos a los canales reales. Los que no están
 # acá caen en "Otros" con su nombre crudo — mejor visible que escondido.
@@ -88,21 +89,28 @@ def tablero(request):
                      key=lambda c: -sum(ingresos[m].get(c, 0) for m in meses))
 
     # ── Gastos y traspasos, de esta app ──────────────────────────────────────
-    gastos = defaultdict(lambda: defaultdict(int))     # mes → categoría → monto
+    # mes → (grupo, categoría) → monto. Los grupos son el plan de cuentas de
+    # Jorge (2026-08-08); los grupos "personales_*" son retiros de la familia
+    # y se restan aparte para mostrar el resultado OPERACIONAL del negocio.
+    gastos = defaultdict(lambda: defaultdict(int))
+    familia_mes = defaultdict(int)
     filas_g = (MovimientoFinanciero.objects.filter(clase='gasto', fecha__gte=desde)
-               .values('fecha__year', 'fecha__month', 'categoria__nombre')
+               .values('fecha__year', 'fecha__month', 'categoria__nombre',
+                       'categoria__grupo')
                .annotate(t=Sum('monto')))
     for f in filas_g:
         m = date(f['fecha__year'], f['fecha__month'], 1)
-        gastos[m][f['categoria__nombre'] or 'Sin categoría'] += int(f['t'] or 0)
+        clave = (f['categoria__grupo'] or 'otros',
+                 f['categoria__nombre'] or 'Sin categoría')
+        monto = int(f['t'] or 0)
+        gastos[m][clave] += monto
+        if clave[0] in GRUPOS_FAMILIA:
+            familia_mes[m] += monto
 
     # Congelar AQUÍ qué meses tienen gastos de verdad: cualquier acceso posterior
-    # a gastos[m] (la ordenación de abajo, las tablas) crea la llave en el
-    # defaultdict y "todos los meses tendrían gastos $0" (visto en prod 2026-08-08).
+    # a gastos[m] crea la llave en el defaultdict y "todos los meses tendrían
+    # gastos $0" (visto en prod 2026-08-08). Igual con familia_mes: solo .get().
     meses_con_gastos = set(gastos)
-
-    categorias = sorted({c for por_cat in gastos.values() for c in por_cat},
-                        key=lambda c: -sum(gastos[m].get(c, 0) for m in meses))
 
     traspasos = defaultdict(lambda: {'entra': 0, 'sale': 0, 'n': 0})
     for f in (MovimientoFinanciero.objects.filter(clase='traspaso', fecha__gte=desde)
@@ -162,26 +170,49 @@ def tablero(request):
     for m in meses:
         ing = sum(ingresos[m].values())
         con_gastos = m in meses_con_gastos
-        gas = sum(gastos[m].values()) if con_gastos else 0
+        gas_total = sum((gastos.get(m) or {}).values()) if con_gastos else 0
+        fam = familia_mes.get(m, 0)
+        gas_negocio = gas_total - fam
         resumen.append({
             'mes': m, 'es_actual': (m.year, m.month) == (hoy.year, hoy.month),
             'ingresos': _clp(ing) if ing else '—',
-            'gastos': _clp(gas) if con_gastos else '—',
+            # "gastos" = los del NEGOCIO (sin retiros de la familia).
+            'gastos': _clp(gas_negocio) if con_gastos else '—',
+            'retiros': (_clp(fam) if fam else '') if con_gastos else '—',
             'canje_gc': _clp(canje_gc[m]) if canje_gc[m] else '',
             'traspasos': _clp(traspasos[m]['sale']) if traspasos[m]['n'] else '',
             # `con_gastos` es el único guard honesto: los ingresos salen de Pago
             # (fuente siempre completa), así que ing=0 es un cero real — con
             # gastos cargados el resultado se muestra aunque sea todo pérdida.
-            'resultado': _clp(ing - gas) if con_gastos else '—',
-            'resultado_neg': con_gastos and (ing - gas) < 0,
+            'resultado': _clp(ing - gas_negocio) if con_gastos else '—',
+            'resultado_neg': con_gastos and (ing - gas_negocio) < 0,
+            'resultado_final': _clp(ing - gas_total) if con_gastos else '—',
+            'final_neg': con_gastos and (ing - gas_total) < 0,
         })
 
     tabla_ingresos = [{'canal': c,
                        'celdas': [_clp(ingresos[m][c]) if ingresos[m].get(c) else ''
                                   for m in meses]} for c in canales]
-    tabla_gastos = [{'categoria': c,
-                     'celdas': [_clp(gastos[m][c]) if gastos[m].get(c) else ''
-                                for m in meses]} for c in categorias]
+    # Tabla agrupada: fila de subtotal por grupo (en el orden del plan de
+    # cuentas) y debajo sus categorías, solo si el grupo tiene más de una.
+    tabla_gastos = []
+    for g, g_nombre in CategoriaFinanciera.GRUPOS:
+        if g == 'ingresos':
+            continue
+        cats_g = sorted({c for m in meses_con_gastos
+                         for (gg, c) in (gastos.get(m) or {}) if gg == g})
+        if not cats_g:
+            continue
+        celdas_g = [sum((gastos.get(m) or {}).get((g, c), 0) for c in cats_g)
+                    for m in meses]
+        tabla_gastos.append({'es_grupo': True, 'nombre': g_nombre,
+                             'celdas': [_clp(v) if v else '' for v in celdas_g]})
+        if len(cats_g) > 1:
+            for c in cats_g:
+                celdas = [(gastos.get(m) or {}).get((g, c), 0) for m in meses]
+                tabla_gastos.append({'es_grupo': False, 'nombre': c,
+                                     'celdas': [_clp(v) if v else ''
+                                                for v in celdas]})
 
     return render(request, 'finanzas/tablero.html', {
         'meses': meses,
@@ -191,7 +222,7 @@ def tablero(request):
         'saldos': saldos,
         'traspasos_cuadran': traspasos_cuadran,
         'tras_totales': {k: _clp(v) for k, v in tras_totales.items()},
-        'hay_gastos': bool(categorias),
+        'hay_gastos': bool(meses_con_gastos),
         'verif_mp': verif_mp,
         'verif_sis': _clp(v_sis),
         'verif_mp_total': _clp(v_mp),

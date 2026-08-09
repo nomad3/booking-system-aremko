@@ -61,8 +61,9 @@
 
   <h2>Resumen mensual</h2>
   <div class="scroll"><table>
-    <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Resultado</th>
-               <th>Traspasos</th><th>Canje GiftCard*</th></tr></thead>
+    <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos del negocio</th>
+               <th>Resultado operacional</th><th>Retiros familia</th>
+               <th>Resultado final</th><th>Traspasos</th><th>Canje GC*</th></tr></thead>
     <tbody>
       {% for f in resumen %}
       <tr{% if f.es_actual %} class="actual"{% endif %}>
@@ -70,13 +71,17 @@
         <td>{{ f.ingresos }}</td>
         <td>{{ f.gastos }}</td>
         <td{% if f.resultado_neg %} class="neg"{% endif %}>{{ f.resultado }}</td>
+        <td>{{ f.retiros }}</td>
+        <td{% if f.final_neg %} class="neg"{% endif %}>{{ f.resultado_final }}</td>
         <td>{{ f.traspasos }}</td>
         <td>{{ f.canje_gc }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table></div>
-  <p class="sub">* El canje de giftcard no suma como ingreso nuevo: esa plata entró cuando se compró la giftcard.</p>
+  <p class="sub">* El canje de giftcard no suma como ingreso nuevo: esa plata entró cuando se compró la giftcard.
+     · <b>Resultado operacional</b> = ingresos − gastos del negocio (¿el spa se sostiene solo?);
+     <b>Resultado final</b> = después de los retiros de la familia.</p>
 
   <h2>Verificación Mercado Pago · últimos 14 días</h2>
   <p class="sub">Lo que el sistema registró como cobrado por MP contra lo que la API de Mercado Pago
@@ -126,12 +131,14 @@
   </table></div>
 
   {% if hay_gastos %}
-  <h2>Gastos por categoría</h2>
+  <h2>Gastos por plan de cuentas</h2>
   <div class="scroll"><table>
     <thead><tr><th>Categoría</th>{% for m in meses %}<th>{{ m|date:"Y-m" }}</th>{% endfor %}</tr></thead>
     <tbody>
       {% for fila in tabla_gastos %}
-      <tr><td>{{ fila.categoria }}</td>{% for c in fila.celdas %}<td>{{ c }}</td>{% endfor %}</tr>
+      <tr{% if fila.es_grupo %} class="tot"{% endif %}>
+        <td>{% if not fila.es_grupo %}&nbsp;&nbsp;&nbsp;{% endif %}{{ fila.nombre }}</td>
+        {% for c in fila.celdas %}<td>{{ c }}</td>{% endfor %}</tr>
       {% endfor %}
     </tbody>
   </table></div>

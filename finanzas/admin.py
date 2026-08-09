@@ -68,13 +68,15 @@ class MovimientoFinancieroAdmin(SoloSuperusuario, admin.ModelAdmin):
     change_list_template = 'finanzas/movimiento_changelist.html'
     list_display = ('fecha', 'cuenta', 'clase', 'sentido', 'monto_fmt',
                     'categoria', 'descripcion_corta', 'fuente', 'fecha_estimada')
-    list_filter = ('clase', 'cuenta', 'categoria', 'fuente', 'fecha_estimada')
+    list_filter = ('clase', 'categoria__grupo', 'cuenta', 'categoria', 'fuente',
+                   'fecha_estimada')
     search_fields = ('descripcion', 'referencia')
     date_hierarchy = 'fecha'
     list_select_related = ('cuenta', 'categoria')
-    # La reclasificación es el trabajo fino de la jornada P-22: cambiar la
-    # categoría de un gasto "por clasificar" debe costar un clic, no un form.
-    list_editable = ()
+    # La reclasificación es el trabajo fino de la jornada P-22: la categoría se
+    # edita EN LA LISTA (dropdown por fila + botón Guardar al pie). Flujo de
+    # Jorge: filtrar por «Por clasificar», asignar en lote, guardar.
+    list_editable = ('categoria',)
     autocomplete_fields = ('categoria',)
     readonly_fields = ('traspaso_par', 'creado_en', 'actualizado_en')
 

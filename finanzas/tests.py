@@ -234,11 +234,19 @@ class CorreosMPTest(TestCase):
         call_command('sembrar_finanzas')
         f = date(2026, 8, 7)
 
+        # Nombre desconocido → por clasificar (plan de cuentas 2026-08-08:
+        # ya no se asume que toda transferencia a persona es remuneración).
         d = parsear_transferencia_mp(self._html())
         self.assertEqual(registrar_transferencia_mp(d, f, 'correo:mp:t1'), ('creado', 1))
         m = MovimientoFinanciero.objects.get(referencia='correo:mp:t1')
         self.assertEqual((m.clase, m.fuente, m.cuenta.clave, m.categoria.clave),
-                         ('gasto', 'correo', 'mercado_pago', 'remuneraciones'))
+                         ('gasto', 'correo', 'mercado_pago', 'por_clasificar'))
+
+        # Masajista conocida por regla → honorarios.
+        dm = parsear_transferencia_mp(self._html(monto='120.000', nombre='Sofia Plaza Cue'))
+        registrar_transferencia_mp(dm, f, 'correo:mp:tm')
+        self.assertEqual(MovimientoFinanciero.objects.get(
+            referencia='correo:mp:tm').categoria.clave, 'honorarios_masajistas')
         # Mismo correo de nuevo → no duplica.
         self.assertEqual(registrar_transferencia_mp(d, f, 'correo:mp:t1'), ('ya_existe', 0))
 
@@ -607,3 +615,74 @@ class ComisionesSumUpTest(TestCase):
         self.assertNotIn('sumup_transito', CUENTAS_FLUJO)
         # Idempotente.
         self.assertEqual(registrar_payouts_sumup(items), (0, 4))
+
+
+class PlanCuentasTest(TestCase):
+    """El plan de cuentas de Jorge (2026-08-08): grupos, reglas y reclasificación."""
+
+    def test_reglas_puras(self):
+        from finanzas.reglas import clasificar_por_reglas
+        self.assertEqual(clasificar_por_reglas('TEF A VIDAL PANTOJA CAROLINA ANDREA'),
+                         'honorarios_masajistas')
+        self.assertEqual(clasificar_por_reglas('Cintia Brinzo'), 'personales_alda')
+        self.assertEqual(clasificar_por_reglas('TEF 7604892-4 jorge aguilera'),
+                         'personales_jorge')
+        self.assertEqual(clasificar_por_reglas('TEF A AGUILERA GONZALEZ CRISTIAN AN'),
+                         'infraestructura')
+        self.assertEqual(clasificar_por_reglas('PAGO CRELL PUERTO VARAS'),
+                         'energia_electrica')
+        self.assertEqual(clasificar_por_reglas('Rafael Perez Quintero'),
+                         'remuneraciones')
+        self.assertIsNone(clasificar_por_reglas('REDCOMPRA COMERCIO CUALQUIERA'))
+
+    def test_comando_sincroniza_y_reclasifica(self):
+        call_command('sembrar_finanzas')
+        call_command('cargar_historico_finanzas', '--aplicar')
+
+        # Lectura: no crea ni cambia nada.
+        call_command('aplicar_plan_cuentas')
+        self.assertFalse(CategoriaFinanciera.objects.filter(
+            clave='honorarios_masajistas').exists())
+
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.assertEqual(CategoriaFinanciera.objects.get(
+            clave='honorarios_masajistas').grupo, 'masajistas')
+        self.assertEqual(CategoriaFinanciera.objects.get(
+            clave='remuneraciones').grupo, 'personal')
+
+        # Del histórico: Angélica/Alda → personales_alda; Martín → personales_martin.
+        angelica = MovimientoFinanciero.objects.filter(
+            descripcion__icontains='Angelica Toloza').first()
+        self.assertEqual(angelica.categoria.clave, 'personales_alda')
+        martin = MovimientoFinanciero.objects.filter(
+            descripcion__icontains='Martin Aguilera').first()
+        self.assertEqual(martin.categoria.clave, 'personales_martin')
+        # Rafael era y sigue siendo remuneraciones (decisión de Jorge).
+        rafael = MovimientoFinanciero.objects.filter(
+            descripcion__icontains='Rafael Perez').first()
+        self.assertEqual(rafael.categoria.clave, 'remuneraciones')
+
+        # Idempotente: segunda corrida no cambia nada más.
+        antes = list(MovimientoFinanciero.objects.values_list('id', 'categoria__clave'))
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.assertEqual(antes, list(
+            MovimientoFinanciero.objects.values_list('id', 'categoria__clave')))
+
+    def test_tablero_separa_negocio_de_retiros(self):
+        call_command('sembrar_finanzas')
+        call_command('cargar_historico_finanzas', '--aplicar')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:tablero'))
+        self.assertContains(r, 'Resultado operacional')
+        self.assertContains(r, 'Retiros familia')
+        por_mes = {f['mes']: f for f in r.context['resumen']}
+        julio = por_mes[date(2026, 7, 1)]
+        # Julio tiene retiros de la familia (Alda/Jorge del histórico) > 0.
+        self.assertNotEqual(julio['retiros'], '')
+        self.assertNotEqual(julio['gastos'], '—')
+        # La tabla agrupada trae subtotales de grupo.
+        grupos = [f['nombre'] for f in r.context['tabla_gastos'] if f['es_grupo']]
+        self.assertIn('Personales Alda', grupos)
+        self.assertIn('Sueldos de personal', grupos)

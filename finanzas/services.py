@@ -161,11 +161,19 @@ def registrar_transferencia_mp(datos, fecha, referencia):
             sale.save(update_fields=['traspaso_par'])
             return 'creado', 2
 
-        clave_cat = 'insumos' if 'insumos sur' in benef.lower() else 'remuneraciones'
+        # Plan de cuentas 2026-08-08: el destinatario decide la categoría por
+        # reglas (masajistas, sueldos, personales…); un nombre desconocido va
+        # a «por clasificar» — mejor a mano que adivinado.
+        from .reglas import PLAN_CUENTAS, clasificar_por_reglas
+        clave_cat = clasificar_por_reglas(benef) or 'por_clasificar'
+        defn = PLAN_CUENTAS.get(clave_cat, ('Por clasificar', 'gasto', 'otros'))
+        cat, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=clave_cat, defaults={'nombre': defn[0], 'clase': defn[1],
+                                       'grupo': defn[2]})
         MovimientoFinanciero.objects.create(
             fecha=fecha, cuenta=cuentas['mercado_pago'], clase='gasto',
             sentido='sale', monto=datos['monto'],
-            categoria=CategoriaFinanciera.objects.get(clave=clave_cat),
+            categoria=cat,
             fuente='correo', referencia=referencia,
             descripcion=f'Transferencia MP a {benef}'[:255])
         return 'creado', 1

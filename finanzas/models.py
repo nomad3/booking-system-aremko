@@ -48,10 +48,31 @@ class CuentaFinanciera(models.Model):
 
 class CategoriaFinanciera(models.Model):
     CLASES = [('ingreso', 'Ingreso'), ('gasto', 'Gasto')]
+    # Plan de cuentas definido por Jorge el 2026-08-08: sus grupos, no los de
+    # un manual. Los "personales" separados permiten ver el resultado
+    # OPERACIONAL del negocio aparte de los retiros de la familia.
+    GRUPOS = [
+        ('personal', 'Sueldos de personal'),
+        ('masajistas', 'Honorarios masajistas'),
+        ('energia', 'Energía eléctrica'),
+        ('marketing', 'Marketing'),
+        ('infra_web', 'Infraestructura web e IA'),
+        ('admin_fin', 'Administración y financieros'),
+        ('operacion', 'Operación e insumos'),
+        ('combustibles', 'Combustibles'),
+        ('impuestos', 'Impuestos'),
+        ('personales_martin', 'Personales Martín'),
+        ('personales_alda', 'Personales Alda'),
+        ('personales_jorge', 'Personales Jorge'),
+        ('ingresos', 'Ingresos'),
+        ('otros', 'Otros / por clasificar'),
+    ]
 
     clave = models.SlugField(max_length=40, unique=True)
     nombre = models.CharField(max_length=100)
     clase = models.CharField(max_length=10, choices=CLASES, default='gasto')
+    grupo = models.CharField(max_length=30, choices=GRUPOS, default='otros',
+                             db_index=True)
     orden = models.PositiveSmallIntegerField(default=100)
 
     class Meta:

@@ -106,9 +106,23 @@ _Última revisión: 2026-08-06_
     vista /finanzas/flujo-caja/ día a día desde el 1-ago (hoy hacia atrás):
     entradas/salidas sin traspasos + saldo por cuenta (ancla + acumulado) +
     total, con frescura declarada por fuente y cuentas sin ancla en «—».
-    Pendiente: anclas de MP (saldo hoy → derivar 31-jul) y efectivo (estimación
-    de Jorge); cartola Scotiabank 1-16 julio (hueco REDCOMPRA); reporte de
-    diferencias en el briefing de Luna Interna.
+    **F6 PLAN DE CUENTAS DE JORGE (2026-08-08 noche):** 14 grupos definidos
+    por él (sueldos+imposiciones / masajistas / energía Crell / marketing /
+    infra web e IA / admin y financieros / operación e insumos / combustibles /
+    impuestos / personales Martín-Alda-Jorge) con categorías y REGLAS por
+    beneficiario en finanzas/reglas.py (Nancy-Claudio-Rafael=sueldos;
+    Carolina-Sandra-Paul-Sofía=masajistas; Cintia y Javiera=personal Alda;
+    Cristian=infraestructura; Martín además presupuesto $300k/mes vía TEF a
+    Jorge, se reasigna a mano). Migración 0002 (grupo), comando
+    aplicar_plan_cuentas (lectura/--aplicar), categoría editable EN LA LISTA
+    del admin (list_editable + filtro por grupo), tablero con subtotales por
+    grupo y Resumen con Resultado operacional vs Retiros familia. Retiros Alda
+    quedan «por analizar con ella». 4 anclas cargadas (flujo completo con
+    detalle expandible por día); barrido 05-08 \$1M repuesto a mano.
+    Pendiente: anclas — LISTAS; brecha residual Scotiabank ~\$54.240 (cazar con
+    cartola agosto fresca); cartolas se suben a diario (decisión de Jorge:
+    revisión diaria manual); combustibles y comercios REDCOMPRA ambiguos se
+    asignan a mano; reporte de diferencias en el briefing de Luna Interna.
     **Diagnóstico:** las bandejas están descuidadas (miles de correos sin leer, avisos
     de pago y de servicios enterrados) y no existe un registro consolidado de gastos
     ni de ingresos; la conciliación cubre solo Mercado Pago. Nadie tiene hoy el número
