@@ -177,7 +177,18 @@
 </h1>
 {% endblock %}
 
-{% block nav-global %}{% endblock %}
+{% block nav-global %}
+{% if user.is_superuser %}
+<div style="padding:6px 0 2px; font-size:14px; font-weight:600;">
+    <a href="{% url 'finanzas:tablero' %}" style="color:#A0522D; margin-right:14px;">
+        <i class="fas fa-chart-line me-1"></i>Tablero financiero</a>
+    <a href="{% url 'finanzas:flujo_caja' %}" style="color:#A0522D; margin-right:14px;">
+        <i class="fas fa-water me-1"></i>Flujo de caja</a>
+    <a href="{% url 'finanzas:cargar_cartola' %}" style="color:#A0522D;">
+        <i class="fas fa-file-upload me-1"></i>Cargar cartola</a>
+</div>
+{% endif %}
+{% endblock %}
 
 {% block footer %}
     {{ block.super }}
