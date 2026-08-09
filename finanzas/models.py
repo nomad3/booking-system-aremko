@@ -61,6 +61,7 @@ class CategoriaFinanciera(models.Model):
         ('operacion', 'Operación e insumos'),
         ('combustibles', 'Combustibles'),
         ('impuestos', 'Impuestos'),
+        ('devoluciones', 'Devoluciones a clientes'),
         ('personales_martin', 'Personales Martín'),
         ('personales_alda', 'Personales Alda'),
         ('personales_jorge', 'Personales Jorge'),

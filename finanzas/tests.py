@@ -686,3 +686,35 @@ class PlanCuentasTest(TestCase):
         grupos = [f['nombre'] for f in r.context['tabla_gastos'] if f['es_grupo']]
         self.assertIn('Personales Alda', grupos)
         self.assertIn('Sueldos de personal', grupos)
+
+
+class DevolucionesTest(TestCase):
+    """Devoluciones = contra-ingreso: restan de ingresos, no suman a gastos."""
+
+    def test_resumen_resta_de_ingresos(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        dev = CategoriaFinanciera.objects.get(clave='devoluciones')
+        self.assertEqual(dev.grupo, 'devoluciones')
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 6),
+            cuenta=CuentaFinanciera.objects.get(clave='bancoestado'),
+            clase='gasto', sentido='sale', monto=50000, categoria=dev,
+            fuente='manual', referencia='dev:test:1',
+            descripcion='Devolución reserva anulada')
+
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        r = self.client.get(reverse('finanzas:tablero'))
+        por_mes = {f['mes']: f for f in r.context['resumen']}
+        agosto = por_mes[date(2026, 8, 1)]
+        # La devolución aparece en su columna, NO en gastos del negocio,
+        # y los ingresos netos la restan (sin Pago en el test: 0 − 50.000).
+        self.assertEqual(agosto['devoluciones'], '$50.000')
+        self.assertEqual(agosto['gastos'], '$0')
+        self.assertEqual(agosto['ingresos'], '$-50.000')
+        self.assertEqual(agosto['resultado'], '$-50.000')
+        # En el flujo de caja SÍ es plata que sale (día con salida real).
+        rf = self.client.get(reverse('finanzas:flujo_caja'))
+        por_dia = {f['dia']: f for f in rf.context['filas']}
+        self.assertEqual(por_dia[date(2026, 8, 6)]['salidas'], '$50.000')

@@ -62,7 +62,7 @@
 
   <h2>Resumen mensual</h2>
   <div class="scroll"><table>
-    <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos del negocio</th>
+    <thead><tr><th>Mes</th><th>Ingresos netos</th><th>Devoluciones</th><th>Gastos del negocio</th>
                <th>Resultado operacional</th><th>Retiros familia</th>
                <th>Resultado final</th><th>Traspasos</th><th>Canje GC*</th></tr></thead>
     <tbody>
@@ -70,6 +70,7 @@
       <tr{% if f.es_actual %} class="actual"{% endif %}>
         <td>{{ f.mes|date:"Y-m" }}{% if f.es_actual %} (en curso){% endif %}</td>
         <td>{{ f.ingresos }}</td>
+        <td>{{ f.devoluciones }}</td>
         <td>{{ f.gastos }}</td>
         <td{% if f.resultado_neg %} class="neg"{% endif %}>{{ f.resultado }}</td>
         <td>{{ f.retiros }}</td>
@@ -81,7 +82,9 @@
     </tbody>
   </table></div>
   <p class="sub">* El canje de giftcard no suma como ingreso nuevo: esa plata entró cuando se compró la giftcard.
-     · <b>Resultado operacional</b> = ingresos − gastos del negocio (¿el spa se sostiene solo?);
+     · <b>Ingresos netos</b> = pagos registrados menos devoluciones a clientes (el gasto de
+     devolver NO cuenta como gasto del negocio: es ingreso que se revierte).
+     · <b>Resultado operacional</b> = ingresos netos − gastos del negocio (¿el spa se sostiene solo?);
      <b>Resultado final</b> = después de los retiros de la familia.</p>
 
   <h2>Verificación Mercado Pago · últimos 14 días</h2>

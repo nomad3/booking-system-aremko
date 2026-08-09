@@ -38,6 +38,11 @@ PLAN_CUENTAS = {
     'combustible': ('Combustible generador y vehículos', 'gasto', 'combustibles'),
     # Impuestos
     'impuestos': ('Impuestos (SII, patente municipal)', 'gasto', 'impuestos'),
+    # Devoluciones: NO son gasto — son ingreso que se revierte (el Pago
+    # original queda registrado, decisión de Jorge 2026-08-08). El Resumen las
+    # resta de los INGRESOS; en el flujo de caja salen normal (plata real).
+    # Se asignan A MANO en el admin (una TEF a cliente no se distingue sola).
+    'devoluciones': ('Devoluciones a clientes', 'gasto', 'devoluciones'),
     # Personales / retiros de la familia
     'personales_martin': ('Retiros Martín (presupuesto $300.000/mes)', 'gasto', 'personales_martin'),
     'personales_alda': ('Retiros Alda (por analizar con ella)', 'gasto', 'personales_alda'),
@@ -54,6 +59,9 @@ PLAN_CUENTAS = {
 # Los grupos que son retiro de la familia, NO gasto del negocio: el tablero
 # los resta aparte para mostrar el resultado operacional.
 GRUPOS_FAMILIA = ('personales_martin', 'personales_alda', 'personales_jorge')
+
+# Grupo contra-ingreso: se resta de los ingresos del Resumen, no de los gastos.
+GRUPO_DEVOLUCIONES = 'devoluciones'
 
 # (patrón en MAYÚSCULAS contenido en la descripción) → categoría.
 # Se evalúan en orden: la primera que calza gana — lo específico va primero.

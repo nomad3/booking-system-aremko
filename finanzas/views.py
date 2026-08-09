@@ -21,7 +21,7 @@ from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 from ventas.models import Pago
 
 from .models import CategoriaFinanciera, MovimientoFinanciero, SaldoMensual
-from .reglas import GRUPOS_FAMILIA
+from .reglas import GRUPO_DEVOLUCIONES, GRUPOS_FAMILIA
 
 # De los ~22 métodos de pago históricos a los canales reales. Los que no están
 # acá caen en "Otros" con su nombre crudo — mejor visible que escondido.
@@ -94,6 +94,7 @@ def tablero(request):
     # y se restan aparte para mostrar el resultado OPERACIONAL del negocio.
     gastos = defaultdict(lambda: defaultdict(int))
     familia_mes = defaultdict(int)
+    devoluciones_mes = defaultdict(int)
     filas_g = (MovimientoFinanciero.objects.filter(clase='gasto', fecha__gte=desde)
                .values('fecha__year', 'fecha__month', 'categoria__nombre',
                        'categoria__grupo')
@@ -106,6 +107,8 @@ def tablero(request):
         gastos[m][clave] += monto
         if clave[0] in GRUPOS_FAMILIA:
             familia_mes[m] += monto
+        elif clave[0] == GRUPO_DEVOLUCIONES:
+            devoluciones_mes[m] += monto
 
     # Congelar AQUÍ qué meses tienen gastos de verdad: cualquier acceso posterior
     # a gastos[m] crea la llave en el defaultdict y "todos los meses tendrían
@@ -172,10 +175,15 @@ def tablero(request):
         con_gastos = m in meses_con_gastos
         gas_total = sum((gastos.get(m) or {}).values()) if con_gastos else 0
         fam = familia_mes.get(m, 0)
-        gas_negocio = gas_total - fam
+        dev = devoluciones_mes.get(m, 0)
+        # Devoluciones: contra-ingreso (el Pago original queda registrado),
+        # así que restan de los ingresos y NO cuentan como gasto del negocio.
+        gas_negocio = gas_total - fam - dev
+        ing_neto = ing - dev
         resumen.append({
             'mes': m, 'es_actual': (m.year, m.month) == (hoy.year, hoy.month),
-            'ingresos': _clp(ing) if ing else '—',
+            'ingresos': _clp(ing_neto) if (ing or dev) else '—',
+            'devoluciones': (_clp(dev) if dev else '') if con_gastos else '',
             # "gastos" = los del NEGOCIO (sin retiros de la familia).
             'gastos': _clp(gas_negocio) if con_gastos else '—',
             'retiros': (_clp(fam) if fam else '') if con_gastos else '—',
@@ -184,10 +192,10 @@ def tablero(request):
             # `con_gastos` es el único guard honesto: los ingresos salen de Pago
             # (fuente siempre completa), así que ing=0 es un cero real — con
             # gastos cargados el resultado se muestra aunque sea todo pérdida.
-            'resultado': _clp(ing - gas_negocio) if con_gastos else '—',
-            'resultado_neg': con_gastos and (ing - gas_negocio) < 0,
-            'resultado_final': _clp(ing - gas_total) if con_gastos else '—',
-            'final_neg': con_gastos and (ing - gas_total) < 0,
+            'resultado': _clp(ing_neto - gas_negocio) if con_gastos else '—',
+            'resultado_neg': con_gastos and (ing_neto - gas_negocio) < 0,
+            'resultado_final': _clp(ing_neto - gas_negocio - fam) if con_gastos else '—',
+            'final_neg': con_gastos and (ing_neto - gas_negocio - fam) < 0,
         })
 
     tabla_ingresos = [{'canal': c,
