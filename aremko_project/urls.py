@@ -195,6 +195,7 @@ urlpatterns = [
 
     # Tablero financiero del dueño (P-22 F1, solo superusuario)
     path('finanzas/', include('finanzas.urls', namespace='finanzas')),
+    path('artesanias/', include('artesanias.urls', namespace='artesanias')),
 
     # Cola de publicaciones de la semana para aremko-cli (asistente community manager)
     path('marketing/', include('marketing_briefs.urls', namespace='marketing_briefs')),
