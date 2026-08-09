@@ -37,6 +37,7 @@
   <h1>Finanzas</h1>
   <p class="sub">Ingresos leídos del sistema de reservas · gastos y traspasos del registro propio ·
      <a href="{% url 'finanzas:flujo_caja' %}"><b>flujo de caja</b></a> ·
+     <a href="/admin/finanzas/movimientofinanciero/?clase__exact=gasto&categoria__grupo__exact=otros"><b>asignar gastos pendientes</b></a> ·
      <a href="/admin/finanzas/movimientofinanciero/">movimientos</a> ·
      <a href="/admin/finanzas/saldomensual/">saldos</a> ·
      <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola</a></p>
@@ -142,8 +143,10 @@
       {% endfor %}
     </tbody>
   </table></div>
-  <p class="sub">«Por clasificar» es trabajo de la jornada P-22: se reclasifica en el
-     <a href="/admin/finanzas/movimientofinanciero/?clase__exact=gasto">admin de movimientos</a>.</p>
+  <p class="sub">Para asignar lo pendiente: <a href="/admin/finanzas/movimientofinanciero/?clase__exact=gasto&categoria__grupo__exact=otros">abrir
+     los «por clasificar»</a> — cada fila tiene su menú de Categoría, cambias varias y un solo
+     botón «Guardar» al pie escribe todo. Las reglas clasifican solas lo conocido; esto es
+     únicamente el resto (REDCOMPRA, combustibles).</p>
   {% endif %}
 
   <h2>Saldos de cierre</h2>

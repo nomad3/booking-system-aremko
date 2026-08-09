@@ -214,6 +214,16 @@ def tablero(request):
                                      'celdas': [_clp(v) if v else ''
                                                 for v in celdas]})
 
+    # Pedido de Jorge 2026-08-08: todo lo mensual del más NUEVO al más viejo
+    # (el mes en curso primero), igual que el flujo de caja.
+    resumen.reverse()
+    verif_mp.reverse()
+    for fila in tabla_ingresos:
+        fila['celdas'].reverse()
+    for fila in tabla_gastos:
+        fila['celdas'].reverse()
+    meses = list(reversed(meses))
+
     return render(request, 'finanzas/tablero.html', {
         'meses': meses,
         'resumen': resumen,
