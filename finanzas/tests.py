@@ -778,3 +778,83 @@ class AccesoColaboradorTest(TestCase):
             name='Finanzas colaborador').exists())
         # La contraseña sigue funcionando (no se tocó).
         self.assertTrue(self.client.login(username='alda', password='x'))
+
+
+class ReportesGastosTest(TestCase):
+    """Reportes de Jorge 2026-08-09: plan de cuentas x cuenta financiera
+    (mes elegido) y plan de cuentas x meses del año."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        from django.contrib.auth.models import Group
+        grupo = Group.objects.create(name='Finanzas colaborador')
+        self.alda = User.objects.create_user('alda', password='x', is_staff=True)
+        self.alda.groups.add(grupo)
+
+        from .models import (CategoriaFinanciera, CuentaFinanciera,
+                             MovimientoFinanciero)
+        be = CuentaFinanciera.objects.get(clave='bancoestado')
+        mp = CuentaFinanciera.objects.get(clave='mercado_pago')
+        luz = CategoriaFinanciera.objects.create(
+            clave='test-luz', nombre='Luz Crell', clase='gasto', grupo='energia')
+        sueldo = CategoriaFinanciera.objects.create(
+            clave='test-sueldo', nombre='Sueldo Nancy', clase='gasto',
+            grupo='personal')
+        crear = MovimientoFinanciero.objects.create
+        crear(fecha=date(2026, 7, 15), cuenta=be, clase='gasto', sentido='sale',
+              monto=111000, descripcion='luz julio', categoria=luz,
+              fuente='manual', referencia='manual:test:1')
+        crear(fecha=date(2026, 8, 5), cuenta=be, clase='gasto', sentido='sale',
+              monto=222000, descripcion='luz agosto', categoria=luz,
+              fuente='manual', referencia='manual:test:2')
+        crear(fecha=date(2026, 8, 10), cuenta=mp, clase='gasto', sentido='sale',
+              monto=55000, descripcion='sueldo agosto', categoria=sueldo,
+              fuente='manual', referencia='manual:test:3')
+        # Un traspaso NO debe aparecer en ninguno de los dos reportes.
+        crear(fecha=date(2026, 8, 12), cuenta=be, clase='traspaso',
+              sentido='sale', monto=999999, descripcion='barrido',
+              fuente='manual', referencia='manual:test:4')
+        self.be, self.mp = be, mp
+
+    def test_gastos_mes_cruza_plan_con_cuentas(self):
+        self.client.login(username='alda', password='x')
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 8})
+        self.assertEqual(r.status_code, 200)
+        # Columnas: solo cuentas con gastos del mes, la mayor primero.
+        self.assertEqual(r.context['cuentas'],
+                         [self.be.nombre, self.mp.nombre])
+        # Grupo con una sola categoría → se muestra la fila del grupo
+        # (mismo criterio del tablero).
+        self.assertContains(r, 'Energía eléctrica')
+        self.assertContains(r, 'Sueldos de personal')
+        self.assertContains(r, '$222.000')
+        self.assertContains(r, '$55.000')
+        self.assertContains(r, '$277.000')          # total general del mes
+        self.assertNotContains(r, '$111.000')       # julio queda fuera
+        self.assertNotContains(r, '999.999')        # traspasos no son gasto
+
+    def test_gastos_mes_selector_de_mes(self):
+        self.client.login(username='alda', password='x')
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 7})
+        self.assertContains(r, '$111.000')
+        self.assertNotContains(r, '$222.000')
+
+    def test_gastos_ano_mes_a_mes(self):
+        self.client.login(username='alda', password='x')
+        r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
+        self.assertEqual(r.status_code, 200)
+        # 2026 parte en julio (corte de datos).
+        self.assertEqual(r.context['columnas'][0]['nombre'], 'Julio')
+        self.assertEqual(len(r.context['columnas']), 6)   # jul..dic
+        self.assertContains(r, '$333.000')   # fila luz: 111 + 222
+        self.assertContains(r, '$388.000')   # total general del anio
+        self.assertNotContains(r, '999.999')
+
+    def test_staff_comun_no_ve_los_reportes(self):
+        User.objects.create_user('deborah', password='x', is_staff=True)
+        self.client.login(username='deborah', password='x')
+        for nombre in ('finanzas:gastos_mes', 'finanzas:gastos_ano'):
+            self.assertEqual(self.client.get(reverse(nombre)).status_code,
+                             302, nombre)

@@ -261,6 +261,128 @@ def tablero(request):
     })
 
 
+MESES_ES = ('', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre')
+# Los gastos parten en julio 2026 (corte decidido 2026-08-08): antes de eso
+# no hay datos y las columnas vacías solo estorbarían.
+INICIO_GASTOS = date(2026, 7, 1)
+
+
+def _tabla_matriz(datos, columnas):
+    """Arma las filas del plan de cuentas contra columnas arbitrarias.
+
+    datos: {(grupo, categoría): {col: monto}} · columnas: claves ordenadas.
+    Misma agrupación del tablero: subtotal por grupo y debajo sus categorías
+    solo si el grupo tiene más de una. Devuelve (filas, totales_columna,
+    total_general) ya formateados.
+    """
+    filas = []
+    tot_col = {c: 0 for c in columnas}
+    tot_general = 0
+    for g, g_nombre in CategoriaFinanciera.GRUPOS:
+        if g == 'ingresos':
+            continue
+        cats_g = sorted({cat for (gg, cat) in datos if gg == g})
+        if not cats_g:
+            continue
+        celdas_g = []
+        for c in columnas:
+            v = sum(datos[(g, cat)].get(c, 0) for cat in cats_g)
+            celdas_g.append(v)
+            tot_col[c] += v
+        total_g = sum(celdas_g)
+        tot_general += total_g
+        filas.append({'es_grupo': True, 'nombre': g_nombre,
+                      'celdas': [_clp(v) if v else '' for v in celdas_g],
+                      'total': _clp(total_g)})
+        if len(cats_g) > 1:
+            for cat in cats_g:
+                celdas = [datos[(g, cat)].get(c, 0) for c in columnas]
+                filas.append({'es_grupo': False, 'nombre': cat,
+                              'celdas': [_clp(v) if v else '' for v in celdas],
+                              'total': _clp(sum(celdas))})
+    return (filas,
+            [_clp(tot_col[c]) if tot_col[c] else '—' for c in columnas],
+            _clp(tot_general))
+
+
+def _param_ano(request, hoy):
+    try:
+        return int(request.GET.get('ano', hoy.year))
+    except (TypeError, ValueError):
+        return hoy.year
+
+
+@user_passes_test(puede_ver_finanzas)
+def gastos_mes(request):
+    """Reporte de Jorge 2026-08-09: qué se gastó (plan de cuentas, filas)
+    cruzado con DESDE QUÉ cuenta salió la plata (columnas), mes a elección."""
+    hoy = date.today()
+    ano = _param_ano(request, hoy)
+    try:
+        mes = min(max(int(request.GET.get('mes', hoy.month)), 1), 12)
+    except (TypeError, ValueError):
+        mes = hoy.month
+
+    datos = defaultdict(lambda: defaultdict(int))
+    tot_cuenta = defaultdict(int)
+    for f in (MovimientoFinanciero.objects
+              .filter(clase='gasto', fecha__year=ano, fecha__month=mes)
+              .values('categoria__grupo', 'categoria__nombre', 'cuenta__nombre')
+              .annotate(t=Sum('monto'))):
+        clave = (f['categoria__grupo'] or 'otros',
+                 f['categoria__nombre'] or 'Sin categoría')
+        monto = int(f['t'] or 0)
+        datos[clave][f['cuenta__nombre']] += monto
+        tot_cuenta[f['cuenta__nombre']] += monto
+
+    # Solo las cuentas que generaron gastos este mes; la que más gasta primero.
+    cuentas = sorted(tot_cuenta, key=lambda c: -tot_cuenta[c])
+    filas, tot_columnas, tot_general = _tabla_matriz(datos, cuentas)
+
+    return render(request, 'finanzas/gastos_mes.html', {
+        'ano': ano, 'mes': mes, 'nombre_mes': MESES_ES[mes],
+        'anos': list(range(INICIO_GASTOS.year, hoy.year + 1)),
+        'meses_sel': [(i, MESES_ES[i]) for i in range(1, 13)],
+        'cuentas': cuentas,
+        'filas': filas,
+        'tot_columnas': tot_columnas,
+        'tot_general': tot_general,
+    })
+
+
+@user_passes_test(puede_ver_finanzas)
+def gastos_ano(request):
+    """Reporte de Jorge 2026-08-09: el plan de cuentas contra los meses del
+    año elegido — lo que se gasta mes a mes, de un vistazo."""
+    hoy = date.today()
+    ano = _param_ano(request, hoy)
+    m_ini = INICIO_GASTOS.month if ano == INICIO_GASTOS.year else 1
+    meses_nums = list(range(m_ini, 13))
+
+    datos = defaultdict(lambda: defaultdict(int))
+    for f in (MovimientoFinanciero.objects
+              .filter(clase='gasto', fecha__year=ano)
+              .values('categoria__grupo', 'categoria__nombre', 'fecha__month')
+              .annotate(t=Sum('monto'))):
+        clave = (f['categoria__grupo'] or 'otros',
+                 f['categoria__nombre'] or 'Sin categoría')
+        datos[clave][f['fecha__month']] += int(f['t'] or 0)
+
+    filas, tot_columnas, tot_general = _tabla_matriz(datos, meses_nums)
+
+    return render(request, 'finanzas/gastos_ano.html', {
+        'ano': ano,
+        'anos': list(range(INICIO_GASTOS.year, hoy.year + 1)),
+        'columnas': [{'num': m, 'nombre': MESES_ES[m],
+                      'es_actual': (ano, m) == (hoy.year, hoy.month)}
+                     for m in meses_nums],
+        'filas': filas,
+        'tot_columnas': tot_columnas,
+        'tot_general': tot_general,
+    })
+
+
 NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
                          'scotiabank': 'Scotiabank'}
 
