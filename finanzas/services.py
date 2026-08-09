@@ -611,11 +611,21 @@ CUENTA_ALDA_NUMERO = '99-00138'   # 99-00138-96, se compara por prefijo
 # clave → (nombre, clase, grupo). El default de un cargo es PERSONAL (decisión
 # F7): lo que sea de la empresa (p. ej. el vale vista de impuestos) se
 # reclasifica o cae por regla propia.
+RUT_ALDA_SIN_DV = '11744727'
+
 CATEGORIAS_ALDA = {
     'tarjeta_alda': ('Tarjeta de crédito (Alda)', 'gasto', 'personales_alda'),
-    'banco_alda': ('Comisiones y seguros banco (Alda)', 'gasto', 'personales_alda'),
-    'impuestos_alda': ('Impuestos pagados desde cta. Alda', 'gasto', 'impuestos'),
-    'personales_alda_pc': ('Personales Alda (por clasificar)', 'gasto', 'personales_alda'),
+    'banco_alda': ('Banco: comisiones, seguros e intereses (Alda)', 'gasto',
+                   'personales_alda'),
+    'traslado_alda': ('Traslado a otras cuentas de Alda', 'gasto',
+                      'personales_alda'),
+    'personales_alda_pc': ('Personales Alda (por clasificar)', 'gasto',
+                           'personales_alda'),
+    # Un vale vista es un INSTRUMENTO, no un destino: el de julio 2026 era
+    # impuestos de Aremko (dato de Jorge), pero el siguiente puede ser otra
+    # cosa. Queda por clasificar y VISIBLE, no adivinado.
+    'vale_vista_alda': ('Vale vista emitido (asignar destino)', 'gasto',
+                        'otros'),
 }
 
 
@@ -623,9 +633,10 @@ def clasificar_fila_alda(descripcion, cargo, abono):
     """(clase, sentido, categoria_clave, propio) para una fila del BSA.dat.
 
     - Abono desde Aremko → 'traspaso' (el retiro ya registrado se convierte).
-    - Abono de otra fuente → 'personal': plata de ella, no se registra.
-    - Cargo → gasto: tarjeta / banco / vale vista (impuestos, dato de Jorge
-      2026-08-08) / resto personal por clasificar.
+    - Abono de otra fuente (incluida su línea de crédito) → 'personal':
+      plata de ella, no se registra.
+    - Cargo → gasto, con el default PERSONAL: lo de la empresa se reclasifica
+      a mano (los comercios REDCOMPRA son ambiguos por naturaleza).
     """
     d = (descripcion or '').upper()
     if abono > 0:
@@ -634,10 +645,13 @@ def clasificar_fila_alda(descripcion, cargo, abono):
         return 'personal', 'entra', '', False
     if 'PAGO TARJ' in d:
         return 'gasto', 'sale', 'tarjeta_alda', False
-    if 'VALE VISTA' in d:
-        return 'gasto', 'sale', 'impuestos_alda', False
+    # Scotiabank llama «EMISION DE VIGENTE» a la emisión de un vale vista.
+    if 'VALE VISTA' in d or 'EMISION DE VIGENTE' in d:
+        return 'gasto', 'sale', 'vale_vista_alda', False
+    if RUT_ALDA_SIN_DV in d or 'ALDA TOLOZA' in d:
+        return 'gasto', 'sale', 'traslado_alda', False
     if ('SEG' in d or 'DESGRAVAMEN' in d or 'COMISION' in d
-            or d.startswith('IVA')):
+            or d.startswith('IVA') or 'LINEA' in d or 'L.CREDITO' in d):
         return 'gasto', 'sale', 'banco_alda', False
     return 'gasto', 'sale', 'personales_alda_pc', False
 

@@ -40,8 +40,8 @@
 <body>
 <div class="caja">
   <h1>Cargar cartola bancaria</h1>
-  <p class="sub">Acepta el .xlsx de BancoEstado (Cartola Histórica) y el .xls de Scotiabank —
-     el banco se detecta solo ·
+  <p class="sub">Acepta el .xlsx de BancoEstado (Cartola Histórica), el .xls de Scotiabank
+     y el BSA.dat de la cuenta personal de Alda — la cuenta se detecta sola ·
      <a href="{% url 'finanzas:tablero' %}">volver al tablero</a></p>
 
   {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
@@ -109,10 +109,14 @@
   {% else %}
   <h2>Subir el export</h2>
   <p class="sub">BancoEstado Empresas: movimientos de la Chequera → Exportar → Excel
-     (<code>Excel_Cartola_Historica_…xlsx</code>). Scotiabank: movimientos de la línea →
-     exportar Excel (<code>typeDesc.xls</code>). El banco se detecta solo.</p>
+     (<code>Excel_Cartola_Historica_…xlsx</code>). Scotiabank Aremko: movimientos de la
+     línea → exportar Excel (<code>typeDesc.xls</code>). Cuenta personal de Alda:
+     Scotia Connect → descargar cartola (<code>BSA.dat</code>).
+     La cuenta se detecta sola por el contenido del archivo.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    <p><input type="file" name="archivo" accept=".xlsx,.xls" required></p>
+    {# Sin accept: el BSA.dat de Scotia Connect quedaba GRIS en el selector
+       (visto por Jorge 2026-08-09). El tipo real se detecta por los bytes. #}
+    <p><input type="file" name="archivo" required></p>
     <button class="boton" type="submit">Revisar el archivo</button>
   </form>
   <p class="sub">Primero verás la propuesta con los chequeos (cadena de saldos, totales,

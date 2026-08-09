@@ -887,7 +887,7 @@ BSA_ALDA = ("\r\n".join([
     "   02072026;TEF 76485192-7 AREMKO HOTEL SP;00000000;;0000001000000,00;+0000001061836,00",
     "   02072026;820407_PAGO TARJ.CRED. POR SWE;00000000;0000001000000,00;;+0000000061836,00",
     "   06072026;CARGO SEG.Fraude              ;00000000;0000000010618,00;;+0000000051218,00",
-    "   10072026;VALE VISTA PAGO SII           ;00000000;0000000020000,00;;+0000000031218,00",
+    "   10072026;EMISION DE VIGENTE.     298494;00000000;0000000020000,00;;+0000000031218,00",
     "   13072026;TEF 11744727-8 ALDA ANGELICA T;00000000;;0000000400000,00;+0000000431218,00",
 ]) + "\r\n").encode("latin-1")
 
@@ -929,10 +929,34 @@ class CartolaAldaTest(TestCase):
         self.assertEqual(
             por_desc['820407_PAGO TARJ.CRED. POR SWE']['categoria'],
             'tarjeta_alda')
+        # Scotiabank llama «EMISION DE VIGENTE» al vale vista: no se adivina
+        # su destino, queda por clasificar y visible.
         self.assertEqual(
-            por_desc['VALE VISTA PAGO SII']['categoria'], 'impuestos_alda')
+            por_desc['EMISION DE VIGENTE.     298494']['categoria'],
+            'vale_vista_alda')
         self.assertEqual(
-            por_desc['VALE VISTA PAGO SII']['cargo'], 20000)
+            por_desc['EMISION DE VIGENTE.     298494']['cargo'], 20000)
+
+    def test_reglas_de_clasificacion(self):
+        from .services import clasificar_fila_alda
+        casos = [
+            ('TEF 11744727-8 alda Toloza BCI', 'traslado_alda'),
+            ('PAGO AUTOMATICO LINEA CREDITO', 'banco_alda'),
+            ('PAGO INTERES LINEA DE CREDITO', 'banco_alda'),
+            ('ABONO A L.CREDITO POR SGO', 'banco_alda'),
+            ('CARGO SEG.Fraude', 'banco_alda'),
+            ('820407_PAGO TARJ.CRED. POR SWE', 'tarjeta_alda'),
+            ('REDCOMPRA ARTESANIAS WILMA', 'personales_alda_pc'),
+            ('eCOMMERCE DL TEMUCOM', 'personales_alda_pc'),
+        ]
+        for desc, esperada in casos:
+            clase, sentido, cat, propio = clasificar_fila_alda(desc, 1000, 0)
+            self.assertEqual((clase, sentido, cat, propio),
+                             ('gasto', 'sale', esperada, False), desc)
+        # Los abonos de su línea de crédito no son ingreso de nadie.
+        self.assertEqual(
+            clasificar_fila_alda('TRANSFERENCIA DE LINEA CREDITO', 0, 5000)[0],
+            'personal')
 
     def test_registro_convierte_el_retiro_y_es_idempotente(self):
         import io
@@ -969,7 +993,8 @@ class CartolaAldaTest(TestCase):
         # El vale vista quedó como gasto de la EMPRESA (grupo impuestos).
         vale = MovimientoFinanciero.objects.get(monto=20000,
                                                 cuenta__clave='scotiabank_alda')
-        self.assertEqual(vale.categoria.grupo, 'impuestos')
+        self.assertEqual(vale.categoria.clave, 'vale_vista_alda')
+        self.assertEqual(vale.categoria.grupo, 'otros')
         # La tarjeta quedó personal.
         tarjeta = MovimientoFinanciero.objects.get(
             monto=1000000, cuenta__clave='scotiabank_alda', clase='gasto')
