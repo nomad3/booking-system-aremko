@@ -1,10 +1,12 @@
 {% extends "admin/change_list.html" %}
 
 {% block object-tools-items %}
+  {% if user.is_superuser %}
   <li>
     <a href="{% url 'admin:finanzas_registrar_traspaso' %}" class="addlink">
       Registrar traspaso (2 líneas)
     </a>
   </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}

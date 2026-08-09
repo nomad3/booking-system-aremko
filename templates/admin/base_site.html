@@ -1,5 +1,5 @@
 {% extends "admin/base.html" %}
-{% load static %}
+{% load static finanzas_extras %}
 
 {% block title %}Aremko - Sistema de Gestión{% endblock %}
 
@@ -180,7 +180,7 @@
 {% block nav-global %}
 {% if user.is_staff %}
 <div style="padding:6px 0 2px; font-size:14px; font-weight:600;">
-    {% if user.is_superuser %}
+    {% if user.is_superuser or user|puede_finanzas %}
     <a href="{% url 'finanzas:tablero' %}" style="color:#A0522D; margin-right:14px;">
         <i class="fas fa-chart-line me-1"></i>Tablero financiero</a>
     <a href="{% url 'finanzas:flujo_caja' %}" style="color:#A0522D; margin-right:14px;">

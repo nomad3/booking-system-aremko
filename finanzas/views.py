@@ -46,6 +46,16 @@ METODOS_EXCLUIDOS = ('giftcard', 'descuento')
 METODOS_MP = ('mercadopago', 'mercadopagoaremko', 'mercadopago_link')
 
 
+GRUPO_COLABORADOR = 'Finanzas colaborador'
+
+
+def puede_ver_finanzas(u):
+    """Superusuario, o miembro del grupo colaborador (Alda; mañana un
+    contador). El resto del staff NO ve finanzas — decisión de Jorge:
+    «no quiero que muchas personas metan mano en estos reportes»."""
+    return u.is_superuser or u.groups.filter(name=GRUPO_COLABORADOR).exists()
+
+
 def _clp(n):
     return '$' + format(int(n), ',d').replace(',', '.')
 
@@ -63,7 +73,7 @@ def _meses(n=13):
     return list(reversed(lista))
 
 
-@user_passes_test(lambda u: u.is_superuser)
+@user_passes_test(puede_ver_finanzas)
 def tablero(request):
     meses = _meses()
     desde = meses[0]
@@ -255,7 +265,7 @@ NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
                          'scotiabank': 'Scotiabank'}
 
 
-@user_passes_test(lambda u: u.is_superuser)
+@user_passes_test(puede_ver_finanzas)
 def cargar_cartola(request):
     """Carga de cartolas bancarias (P-22 F4 paso 3): BancoEstado (.xlsx) y
     Scotiabank (.xls) — el banco se detecta por los bytes del archivo.
@@ -354,7 +364,7 @@ CUENTAS_FLUJO = ('mercado_pago', 'bancoestado', 'scotiabank', 'efectivo')
 INICIO_FLUJO = date(2026, 8, 1)   # decisión de Jorge 2026-08-08
 
 
-@user_passes_test(lambda u: u.is_superuser)
+@user_passes_test(puede_ver_finanzas)
 def flujo_caja(request):
     """El flujo de la caja real (P-22 F4 paso 4): día a día desde hoy hacia
     el 1 de agosto — entradas, salidas y saldo por cuenta y total.

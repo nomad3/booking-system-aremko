@@ -63,8 +63,40 @@ class TraspasoForm(forms.Form):
         return datos
 
 
+def _es_colaborador(user):
+    return user.groups.filter(name='Finanzas colaborador').exists()
+
+
+class SuperusuarioOColaborador:
+    """Movimientos: el colaborador (Alda) VE y solo cambia la categoría.
+    Crear/borrar y el resto de los modelos siguen siendo del superusuario."""
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser or _es_colaborador(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def get_readonly_fields(self, request, obj=None):
+        base = super().get_readonly_fields(request, obj)
+        if request.user.is_superuser:
+            return base
+        # Colaborador: TODO readonly salvo la categoría (el triaje).
+        campos = [f.name for f in self.model._meta.fields if f.name != 'categoria']
+        return tuple(set(base) | set(campos))
+
+
 @admin.register(MovimientoFinanciero)
-class MovimientoFinancieroAdmin(SoloSuperusuario, admin.ModelAdmin):
+class MovimientoFinancieroAdmin(SuperusuarioOColaborador, admin.ModelAdmin):
     change_list_template = 'finanzas/movimiento_changelist.html'
     list_display = ('fecha', 'cuenta', 'clase', 'sentido', 'monto_fmt',
                     'categoria', 'descripcion_corta', 'fuente', 'fecha_estimada')
@@ -96,8 +128,10 @@ class MovimientoFinancieroAdmin(SoloSuperusuario, admin.ModelAdmin):
         return extra + urls
 
     def vista_traspaso(self, request):
+        # El traspaso crea movimientos: solo el dueño. El colaborador que
+        # llegue por URL vuelve al listado sin drama.
         if not request.user.is_superuser:
-            return redirect('admin:index')
+            return redirect('admin:finanzas_movimientofinanciero_changelist')
         form = TraspasoForm(request.POST or None)
         if request.method == 'POST' and form.is_valid():
             d = form.cleaned_data

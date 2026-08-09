@@ -718,3 +718,63 @@ class DevolucionesTest(TestCase):
         rf = self.client.get(reverse('finanzas:flujo_caja'))
         por_dia = {f['dia']: f for f in rf.context['filas']}
         self.assertEqual(por_dia[date(2026, 8, 6)]['salidas'], '$50.000')
+
+
+class AccesoColaboradorTest(TestCase):
+    """El grupo «Finanzas colaborador» (Alda): ve las 3 páginas y solo edita
+    la categoría de movimientos; el staff común sigue sin ver nada."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        from django.contrib.auth.models import Group
+        self.grupo = Group.objects.create(name='Finanzas colaborador')
+        self.alda = User.objects.create_user('alda', password='x', is_staff=True,
+                                             first_name='Alda')
+        self.alda.groups.add(self.grupo)
+
+    def test_colaboradora_ve_las_tres_paginas(self):
+        self.client.login(username='alda', password='x')
+        for nombre in ('finanzas:tablero', 'finanzas:flujo_caja',
+                       'finanzas:cargar_cartola'):
+            self.assertEqual(self.client.get(reverse(nombre)).status_code, 200,
+                             nombre)
+
+    def test_staff_comun_sigue_afuera(self):
+        User.objects.create_user('deborah', password='x', is_staff=True)
+        self.client.login(username='deborah', password='x')
+        for nombre in ('finanzas:tablero', 'finanzas:flujo_caja',
+                       'finanzas:cargar_cartola'):
+            self.assertEqual(self.client.get(reverse(nombre)).status_code, 302,
+                             nombre)
+
+    def test_admin_movimientos_solo_categoria_editable(self):
+        from django.contrib import admin as dj_admin
+
+        from .admin import MovimientoFinancieroAdmin
+        from .models import MovimientoFinanciero
+
+        ma = MovimientoFinancieroAdmin(MovimientoFinanciero, dj_admin.site)
+
+        class Req:
+            pass
+        r = Req()
+        r.user = self.alda
+        self.assertTrue(ma.has_view_permission(r))
+        self.assertTrue(ma.has_change_permission(r))
+        self.assertFalse(ma.has_add_permission(r))
+        self.assertFalse(ma.has_delete_permission(r))
+        readonly = ma.get_readonly_fields(r)
+        self.assertIn('monto', readonly)
+        self.assertIn('cuenta', readonly)
+        self.assertNotIn('categoria', readonly)
+
+    def test_comando_configura_al_usuario_existente(self):
+        from django.contrib.auth.models import Group
+        Group.objects.filter(name='Finanzas colaborador').delete()
+        self.alda.groups.clear()
+        call_command('configurar_acceso_alda')
+        self.alda.refresh_from_db()
+        self.assertTrue(self.alda.groups.filter(
+            name='Finanzas colaborador').exists())
+        # La contraseña sigue funcionando (no se tocó).
+        self.assertTrue(self.client.login(username='alda', password='x'))
