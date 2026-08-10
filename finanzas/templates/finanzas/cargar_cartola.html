@@ -117,11 +117,17 @@
 
   {% else %}
   <h2>Subir el export</h2>
-  <p class="sub">BancoEstado Empresas: movimientos de la Chequera → Exportar → Excel
-     (<code>Excel_Cartola_Historica_…xlsx</code>). Scotiabank Aremko: movimientos de la
+  <div class="aviso">Usar siempre la <b>cartola en línea</b>, no la mensual: la
+     mensual tiene su propia fecha de corte y nunca calza con el día calendario,
+     así que no sirve para ver el flujo día a día (decisión de Jorge 2026-08-10).
+     <br>Al empezar cada mes, descarga una que incluya los últimos días del mes
+     anterior: esa es la que deja guardado el cierre de ese mes.</div>
+  <p class="sub">BancoEstado: Chequera → cartola en línea
+     (<code>Cartola_en_linea_…xlsx</code>). Scotiabank Aremko: movimientos de la
      línea → exportar Excel (<code>typeDesc.xls</code>). Cuenta personal de Alda:
      Scotia Connect → descargar cartola (<code>BSA.dat</code>).
-     La cuenta se detecta sola por el contenido del archivo.</p>
+     La cuenta se detecta sola por el contenido del archivo; el
+     <code>Excel_Cartola_Historica</code> también se acepta.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
     {# Sin accept: el BSA.dat de Scotia Connect quedaba GRIS en el selector
        (visto por Jorge 2026-08-09). El tipo real se detecta por los bytes. #}
