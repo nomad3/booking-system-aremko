@@ -1911,3 +1911,68 @@ class TarjetaAldaTest(TestCase):
         registrar_filas_tarjeta(self._filas(), 'tarjeta_alda_1')
         self.assertFalse(MovimientoFinanciero.objects.filter(
             monto=5353).exists())
+
+
+class DetectarRecurrentesTest(TestCase):
+    """Detección de gastos recurrentes y sus fechas (Jorge 2026-08-10)."""
+
+    def test_normaliza_el_mismo_comercio_escrito_de_varias_formas(self):
+        from finanzas.management.commands.detectar_recurrentes import (
+            nombre_comercio)
+        # El banco escribe Meta de cinco maneras: sin alias serían cinco
+        # comercios distintos y la recurrencia no se vería.
+        for glosa in ('FACEBK *AB12CD', 'Cartola alda: PAGO Facebook Ireland',
+                      'META PLATFORMS IRELAND', 'Tarjeta: FACEBOOK ADS'):
+            self.assertEqual(nombre_comercio(glosa), 'Meta Ads', glosa)
+        self.assertEqual(nombre_comercio('Pago Google Ads Google'),
+                         'Google Ads')
+        self.assertEqual(nombre_comercio('Pago Render.com'), 'Render')
+
+    def test_limpia_identificadores_cuando_no_hay_alias(self):
+        from finanzas.management.commands.detectar_recurrentes import (
+            nombre_comercio)
+        # Los ids de transacción cambian en cada cobro: si no se sacan, el
+        # mismo comercio nunca se agrupa consigo mismo.
+        a = nombre_comercio('Cartola alda: MERPAGO*S 760803626 LAS CONDES')
+        b = nombre_comercio('Cartola alda: MERPAGO*S 998877665 LAS CONDES')
+        self.assertEqual(a, b)
+        self.assertEqual(nombre_comercio(''), 'Sin descripción')
+
+    def test_reconoce_los_tres_patrones_que_le_importan_a_jorge(self):
+        from finanzas.management.commands.detectar_recurrentes import patron_de
+        # Mensual, como el arriendo de un servicio.
+        mensual = [date(2026, 5, 10), date(2026, 6, 10), date(2026, 7, 10)]
+        etiqueta, dias = patron_de(mensual)
+        self.assertEqual(etiqueta, 'mensual')
+        self.assertIn(dias, (30, 31))
+        # Facebook: varias veces en el mismo mes.
+        seguido = [date(2026, 7, 2), date(2026, 7, 9), date(2026, 7, 16),
+                   date(2026, 7, 23), date(2026, 8, 1)]
+        etiqueta2, _ = patron_de(seguido)
+        self.assertIn('varias veces al mes', etiqueta2)
+        # Un cobro solo no es un patrón.
+        self.assertEqual(patron_de([date(2026, 7, 1)]), ('una sola vez', None))
+
+    def test_el_comando_corre_y_no_escribe_nada(self):
+        from io import StringIO
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        cuenta = CuentaFinanciera.objects.get(clave='bancoestado')
+        cat = CategoriaFinanciera.objects.get(clave='publicidad')
+        for i, dia in enumerate((5, 12, 19, 26)):
+            MovimientoFinanciero.objects.create(
+                fecha=date(2026, 7, dia), cuenta=cuenta, clase='gasto',
+                sentido='sale', monto=50000 + i, categoria=cat,
+                fuente='captura', referencia=f'rec:{i}',
+                descripcion=f'FACEBK *X{i}00{i}')
+        antes = MovimientoFinanciero.objects.count()
+
+        salida = StringIO()
+        call_command('detectar_recurrentes', '--desde', '2026-07-01',
+                     stdout=salida)
+        texto = salida.getvalue()
+        self.assertIn('Meta Ads', texto)
+        self.assertIn('varias veces al mes', texto)
+        self.assertIn('días del mes: 5, 12, 19, 26', texto)
+        self.assertIn('próximo cobro estimado', texto)
+        self.assertEqual(MovimientoFinanciero.objects.count(), antes)
