@@ -95,6 +95,7 @@ REGLAS = [
     # Servicios
     ('CRELL', 'energia_electrica'),
     ('MOVISTAR', 'servicios_basicos'),
+    ('BCI SEGUROS', 'seguros'),
     # Operación
     ('EXPRESS PUE', 'insumos'),
     ('EXPRESS PUERTO', 'insumos'),

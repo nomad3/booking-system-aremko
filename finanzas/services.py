@@ -1045,6 +1045,11 @@ def clasificar_fila_cuentarut(descripcion, cargo, abono):
         return 'gasto', 'sale', 'infraestructura', False
     if 'COMISION' in d:
         return 'gasto', 'sale', 'comisiones', False
+    # Seguro del auto: lo paga Jorge todos los meses desde su CuentaRUT y
+    # Aremko se lo devuelve (decisión de Jorge 2026-08-10). El gasto se anota
+    # ACÁ, donde se pagó; la devolución es un traspaso y no vuelve a sumar.
+    if 'BCI SEGUROS' in d:
+        return 'gasto', 'sale', 'seguros', False
     if 'MARTIN AGUILERA' in d:
         return 'gasto', 'sale', 'personales_martin', False
     if 'JORGE ANTONIO AGUILERA' in d or 'JORGE AGUILERA' in d:

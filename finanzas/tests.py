@@ -1131,6 +1131,35 @@ class MovimientosPegadosTest(TestCase):
         self.assertEqual(por_desc['Abono Convenio Afp Plan Vital']['clase'],
                          'personal')
 
+    def test_el_seguro_del_auto_es_gasto_de_aremko_y_la_devolucion_no(self):
+        """Jorge paga el seguro del BCI de su bolsillo y Aremko se lo devuelve
+        (2026-08-10). El costo tiene que contarse UNA vez: en la CuentaRUT
+        donde se pagó. La devolución es traspaso — si fuera gasto, un seguro
+        de $57.185 aparecería costando el doble."""
+        from .services import preparar_filas_manual
+        filas, errores = preparar_filas_manual(
+            "10-08-2026 ; Pago Bci Seguros Gener ; -57.185\n"
+            "12-08-2026 ; Tef De Aremko Hotel Spa ; 57.185\n",
+            'cuentarut_jorge')
+        self.assertEqual(errores, [])
+        seguro, devolucion = filas
+        self.assertEqual(seguro['categoria'], 'seguros')
+        self.assertEqual((seguro['clase'], seguro['cargo']), ('gasto', 57185))
+        self.assertEqual(devolucion['clase'], 'traspaso')
+        # El gasto de la empresa es uno solo, no dos.
+        self.assertEqual(sum(f['cargo'] for f in filas if f['clase'] == 'gasto'),
+                         57185)
+
+    def test_una_compra_personal_no_se_vuelve_gasto_de_aremko(self):
+        """La CuentaRUT es mixta y a propósito NO consulta las reglas
+        generales: ahí `JUMBO → insumos` convertiría el supermercado de Jorge
+        en costo del negocio. Lo dudoso queda por clasificar, a mano."""
+        from .services import preparar_filas_manual
+        filas, _ = preparar_filas_manual(
+            "09-08-2026 ; Compra Jumbo Puerto Varas ; -84.300\n",
+            'cuentarut_jorge')
+        self.assertEqual(filas[0]['categoria'], 'por_clasificar')
+
     def test_lineas_malas_se_reportan(self):
         from .services import preparar_filas_manual
         filas, errores = preparar_filas_manual(
