@@ -35,10 +35,16 @@
   .boton.sec{background:#fff; color:var(--acento); border:1px solid var(--acento);}
   input[type=file]{font-size:14px;}
   a{color:var(--acento);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Cargar cartola bancaria</h1>
   <p class="sub">Acepta el .xlsx de BancoEstado (Cartola Histórica), el .xls de Scotiabank
      y el BSA.dat de la cuenta personal de Alda — la cuenta se detecta sola ·

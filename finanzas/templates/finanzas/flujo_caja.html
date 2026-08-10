@@ -48,10 +48,16 @@
   .mini tr:last-child td{border-bottom:none;}
   .mini .m-desc{text-align:left; max-width:420px; white-space:normal;}
   .mini .m-cta{text-align:left; color:var(--suave);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Flujo de Caja</h1>
   <p class="sub">Día a día desde hoy hacia el {{ inicio|date:"d-m-Y" }} · saldo = ancla del cierre
      de julio + movimientos registrados · <a href="{% url 'finanzas:tablero' %}">tablero</a> ·

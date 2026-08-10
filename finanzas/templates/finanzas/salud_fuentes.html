@@ -32,10 +32,16 @@
   .mal{color:var(--rojo); font-weight:600;}
   .nota{color:var(--suave); font-size:12.5px;}
   a{color:var(--acento);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Salud de las fuentes</h1>
   <p class="sub">¿Está entrando todo? Cobertura de las cartolas y últimas señales de
      cada fuente automática, desde el {{ desde|date:"d-m-Y" }} ·

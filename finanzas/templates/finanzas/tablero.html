@@ -30,10 +30,16 @@
   .actual{color:var(--suave); font-style:italic;}
   .tot td{font-weight:700; border-top:2px solid var(--linea); background:#fcfbf8;}
   a{color:var(--acento);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Finanzas</h1>
   <p class="sub">Ingresos leídos del sistema de reservas · gastos y traspasos del registro propio ·
      <a href="{% url 'finanzas:flujo_caja' %}"><b>flujo de caja</b></a> ·

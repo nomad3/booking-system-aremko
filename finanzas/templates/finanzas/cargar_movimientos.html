@@ -38,10 +38,16 @@
   td.abono{color:var(--verde); font-weight:600;}
   code{background:#f4f1ea; padding:1px 5px; border-radius:4px; font-size:12.5px;}
   a{color:var(--acento);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Cargar movimientos pegados</h1>
   <p class="sub">Para las cuentas personales que no tienen export del banco ·
      <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola (archivo)</a> ·

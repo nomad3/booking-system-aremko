@@ -34,10 +34,16 @@
   .coltotal{font-weight:700;}
   .vacio{color:var(--suave); padding:26px 14px;}
   a{color:var(--acento);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
 </style>
 </head>
 <body>
 <div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
   <h1>Gastos del año, mes a mes</h1>
   <p class="sub">El plan de cuentas contra los meses de {{ ano }} ·
      <a href="{% url 'finanzas:gastos_mes' %}?ano={{ ano }}"><b>gastos del mes por cuenta</b></a> ·

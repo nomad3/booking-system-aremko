@@ -210,6 +210,18 @@
     </div>
 </div>
 
+<script>
+    // Al volver desde un reporte (?repo=1) la ficha REPO se abre sola y la
+    // página baja hasta ella: se sigue trabajando donde uno estaba.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.location.search.indexOf('repo=1') === -1) return;
+        var enlaces = document.getElementById('card-repo-links');
+        if (!enlaces) return;
+        enlaces.classList.remove('d-none');
+        enlaces.scrollIntoView({behavior: 'smooth', block: 'center'});
+    });
+</script>
+
 <style>
     .card-hover:hover {
         transform: translateY(-5px);
