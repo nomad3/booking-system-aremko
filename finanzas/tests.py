@@ -2057,16 +2057,39 @@ class DuplicadosTest(TestCase):
         self.assertEqual(M.objects.filter(monto=7392).count(), 2)
         self.assertIn('MISMA CUENTA (doble carga): 0 casos', salida.getvalue())
 
+    def test_dos_pagos_iguales_de_la_misma_carga_no_son_duplicado(self):
+        """Dos transferencias de $20.000 a Martín el mismo día, con la misma
+        glosa porque el pegado no lleva la hora. Entraron en la MISMA subida,
+        así que el archivo traía las dos — no es doble carga (visto en prod
+        2026-08-10)."""
+        from io import StringIO
+        M = MovimientoFinanciero
+        for i in (1, 2):
+            M.objects.create(
+                fecha=date(2026, 8, 4), cuenta=self.rut, clase='gasto',
+                sentido='sale', monto=20000, categoria=self.cat,
+                fuente='captura', referencia=f'man:mar:{i}',
+                descripcion='Cartola cuentarut jorge: Tef A Martin Aguilera')
+        salida = StringIO()
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     '--eliminar-de', 'cuentarut_jorge', stdout=salida)
+        self.assertEqual(M.objects.filter(monto=20000).count(), 2)
+        self.assertIn('MISMA CUENTA (doble carga): 0 casos', salida.getvalue())
+
     def test_el_comando_separa_los_dos_tipos_de_duplicado(self):
         from io import StringIO
         M = MovimientoFinanciero
-        # Doble carga: misma cuenta.
+        # Doble carga: misma cuenta, y en DOS subidas distintas (por eso se
+        # separa el creado_en: una doble carga nunca ocurre en el mismo
+        # segundo).
         for i in (1, 2):
-            M.objects.create(fecha=date(2026, 7, 20), cuenta=self.sc,
-                             clase='gasto', sentido='sale', monto=157433,
-                             categoria=self.cat, fuente='captura',
-                             referencia=f'dup:sc:{i}',
-                             descripcion='Cartola scotiabank: REDCOMPRA EXPRESS PUERTO')
+            m = M.objects.create(fecha=date(2026, 7, 20), cuenta=self.sc,
+                                 clase='gasto', sentido='sale', monto=157433,
+                                 categoria=self.cat, fuente='captura',
+                                 referencia=f'dup:sc:{i}',
+                                 descripcion='Cartola scotiabank: REDCOMPRA EXPRESS PUERTO')
+            M.objects.filter(pk=m.pk).update(
+                creado_en=timezone.now() - timedelta(hours=i))
         # Atribución: mismo cobro en dos cuentas distintas.
         for cuenta, i in ((self.rut, 3), (self.visa, 4)):
             M.objects.create(fecha=date(2026, 7, 14), cuenta=cuenta,
@@ -2102,10 +2125,12 @@ class DuplicadosTest(TestCase):
 
         # Si TODOS fueran de la cuenta objetivo, se conserva uno.
         for i in (5, 6):
-            M.objects.create(fecha=date(2026, 7, 15), cuenta=self.visa,
-                             clase='gasto', sentido='sale', monto=9990,
-                             categoria=self.cat, fuente='captura',
-                             referencia=f'el:{i}', descripcion='ALGO')
+            m = M.objects.create(fecha=date(2026, 7, 15), cuenta=self.visa,
+                                 clase='gasto', sentido='sale', monto=9990,
+                                 categoria=self.cat, fuente='captura',
+                                 referencia=f'el:{i}', descripcion='ALGO')
+            M.objects.filter(pk=m.pk).update(
+                creado_en=timezone.now() - timedelta(hours=i))
         call_command('revisar_duplicados', '--desde', '2026-07-01',
                      '--eliminar-de', 'visa_2936', stdout=StringIO())
         self.assertEqual(M.objects.filter(monto=9990).count(), 1)

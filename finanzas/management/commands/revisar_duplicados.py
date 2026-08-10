@@ -76,8 +76,23 @@ class Command(BaseCommand):
             por_exacta[firma_exacta(m)].append(m)
             por_comercio[firma_comercio(m)].append(m)
 
+        def _misma_carga(lista):
+            """True si todos entraron en la MISMA subida.
+
+            Una doble carga ocurre en sesiones distintas, con minutos u horas
+            de diferencia. Si dos movimientos idénticos se escribieron en el
+            mismo segundo, es porque el archivo traía los dos — y existen: dos
+            transferencias de $20.000 a Martín el mismo día, con la misma
+            glosa porque el pegado no lleva la hora (visto 2026-08-10).
+            """
+            momentos = [m.creado_en for m in lista if m.creado_en]
+            if len(momentos) < len(lista):
+                return False
+            return (max(momentos) - min(momentos)).total_seconds() < 120
+
         misma = {k: v for k, v in por_exacta.items()
-                 if len(v) > 1 and len({m.cuenta_id for m in v}) == 1}
+                 if len(v) > 1 and len({m.cuenta_id for m in v}) == 1
+                 and not _misma_carga(v)}
         distintas = {k: v for k, v in por_comercio.items()
                      if len(v) > 1 and len({m.cuenta_id for m in v}) > 1}
 
