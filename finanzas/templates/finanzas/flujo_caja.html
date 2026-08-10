@@ -55,7 +55,8 @@
   <h1>Flujo de Caja</h1>
   <p class="sub">Día a día desde hoy hacia el {{ inicio|date:"d-m-Y" }} · saldo = ancla del cierre
      de julio + movimientos registrados · <a href="{% url 'finanzas:tablero' %}">tablero</a> ·
-     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola</a></p>
+     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola</a> ·
+     <a href="{% url 'finanzas:calzar_retiros' %}">calzar retiros</a></p>
 
   <div class="chips">
     {% for nombre, detalle in frescura %}<span class="chip"><b>{{ nombre }}</b> · {{ detalle }}</span>{% endfor %}

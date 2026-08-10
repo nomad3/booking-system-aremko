@@ -54,6 +54,8 @@
     {% if resultado.convertidos %}<br><b>{{ resultado.convertidos }}</b> retiros
     Aremko→Alda convertidos en traspaso (calzaron con la cartola: dejan de
     contarse como gasto y el gasto real pasa a ser lo que ella paga).{% endif %}
+    <br>Los abonos desde Aremko que no calzaron por monto exacto quedan en
+    <a href="{% url 'finanzas:calzar_retiros' %}"><b>calzar retiros</b></a>.
     {% for m, s in resultado.cierres %}<br>Cierre {{ m }} guardado: <b>{{ s }}</b>.{% endfor %}
   </div>
   <p><a class="boton sec" href="{% url 'finanzas:tablero' %}">Ver el tablero</a>

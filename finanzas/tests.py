@@ -1152,13 +1152,14 @@ class MovimientosPegadosTest(TestCase):
         # El abono de AFP entra como personal; el de junio queda fuera.
         self.assertContains(r, 'abono personal')
         self.assertContains(r, 'fuera de cobertura')
-        # Sin retiro que calce, el abono de Aremko pide revisión.
-        self.assertContains(r, 'sin retiro que calce')
+        # El abono desde Aremko entra igual (queda por calzar): descartarlo
+        # dejaba el saldo de la cuenta corto.
+        self.assertContains(r, 'traspaso desde Aremko')
         payload = r.context['payload']
-        self.assertEqual(r.context['n_nuevas'], 5)   # 4 cargos + abono AFP
+        self.assertEqual(r.context['n_nuevas'], 6)   # 4 cargos + AFP + Aremko
 
         r2 = self.client.post(url, {'payload': payload, 'confirmar': '1'})
-        self.assertEqual(r2.context['resultado']['creados'], 5)
+        self.assertEqual(r2.context['resultado']['creados'], 6)
         google = MovimientoFinanciero.objects.get(monto=180000)
         self.assertEqual(google.cuenta.clave, 'cuentarut_jorge')
         self.assertEqual(google.categoria.grupo, 'marketing')
@@ -1169,7 +1170,7 @@ class MovimientosPegadosTest(TestCase):
                                     'texto': self.PEGADO})
         self.assertEqual(r3.context['n_nuevas'], 0)
         self.assertEqual(MovimientoFinanciero.objects.filter(
-            cuenta__clave='cuentarut_jorge').count(), 5)
+            cuenta__clave='cuentarut_jorge').count(), 6)
 
     def test_retiro_a_jorge_se_convierte_en_traspaso(self):
         from .services import registrar_filas_puente, preparar_filas_manual
@@ -1197,3 +1198,107 @@ class MovimientosPegadosTest(TestCase):
             "20-07-2026 ; Pago Farmacias Del Doc ; -3.090\n",
             'cuentarut_jorge')
         self.assertEqual(len({f['referencia'] for f in filas}), 2)
+
+
+class CalzarRetirosTest(TestCase):
+    """El calce a mano cuando los montos no coinciden exactos (Jorge
+    2026-08-09): $499.001 en Aremko contra $500.000 en la cuenta puente."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        self.mp = CuentaFinanciera.objects.get(clave='mercado_pago')
+
+    def _pendiente(self, monto=500000, fecha=date(2026, 8, 5)):
+        from .services import CLAVE_POR_CALZAR
+        cat, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=CLAVE_POR_CALZAR,
+            defaults={'nombre': 'Abono desde Aremko por calzar',
+                      'clase': 'ingreso', 'grupo': 'ingresos'})
+        return MovimientoFinanciero.objects.create(
+            fecha=fecha, cuenta=self.rut, clase='ingreso', sentido='entra',
+            monto=monto, categoria=cat, fuente='captura',
+            referencia=f'man:test:{monto}',
+            descripcion='Cartola cuentarut jorge: Tef De Aremko Hotel Spa')
+
+    def _retiro(self, monto=499001, fecha=date(2026, 8, 5)):
+        return MovimientoFinanciero.objects.create(
+            fecha=fecha, cuenta=self.mp, clase='gasto', sentido='sale',
+            monto=monto, fuente='correo', referencia=f'correo:mp:{monto}',
+            categoria=CategoriaFinanciera.objects.get(
+                clave='personales_jorge'),
+            descripcion='Transferencia a Jorge Aguilera')
+
+    def test_abono_sin_calce_queda_pendiente_y_no_se_pierde(self):
+        """Antes se descartaba y el saldo de la cuenta quedaba corto."""
+        from .services import preparar_filas_manual, registrar_filas_puente
+        filas, _ = preparar_filas_manual(
+            "05-08-2026 ; Tef De Aremko Hotel Spa ; 500.000",
+            'cuentarut_jorge')
+        creados, saltados, convertidos = registrar_filas_puente(
+            filas, 'cuentarut_jorge')
+        self.assertEqual((creados, convertidos), (1, 0))
+        mov = MovimientoFinanciero.objects.get(cuenta=self.rut)
+        self.assertEqual(mov.clase, 'ingreso')
+        self.assertEqual(mov.categoria.clave, 'abono_aremko_por_calzar')
+
+    def test_pagina_ofrece_candidatos_ordenados_por_parecido(self):
+        abono = self._pendiente()
+        self._retiro(monto=120000)              # lejano en monto
+        cerca = self._retiro(monto=499001)      # el correcto
+        r = self.client.get(reverse('finanzas:calzar_retiros'))
+        self.assertEqual(r.status_code, 200)
+        p = r.context['pendientes'][0]
+        self.assertEqual(p['obj'].id, abono.id)
+        self.assertEqual(p['candidatos'][0]['id'], cerca.id)
+        self.assertContains(r, '$499.001')
+
+    def test_calce_con_monto_distinto_deja_el_resto_visible(self):
+        abono = self._pendiente(monto=500000)
+        retiro = self._retiro(monto=499001)
+        r = self.client.post(reverse('finanzas:calzar_retiros'),
+                             {'abono': abono.id, 'retiro': retiro.id})
+        self.assertEqual(r.context['resultado']['comun'], '$499.001')
+        self.assertEqual(r.context['resultado']['resto_abono'], '$999')
+
+        abono.refresh_from_db()
+        retiro.refresh_from_db()
+        self.assertEqual((abono.clase, int(abono.monto)), ('traspaso', 499001))
+        self.assertEqual((retiro.clase, int(retiro.monto)), ('traspaso', 499001))
+        self.assertEqual(abono.traspaso_par_id, retiro.id)
+        self.assertIsNone(retiro.categoria)
+
+        # Los traspasos siguen sumando cero: la regla que sostiene todo.
+        agg = {x['sentido']: int(x['t']) for x in
+               MovimientoFinanciero.objects.filter(clase='traspaso')
+               .values('sentido').annotate(t=Sum('monto'))}
+        self.assertEqual(agg['entra'], agg['sale'])
+
+        # El resto del abono queda pendiente, no se inventa nada.
+        resto = MovimientoFinanciero.objects.get(monto=999)
+        self.assertEqual(resto.categoria.clave, 'abono_aremko_por_calzar')
+        self.assertEqual(r.context['pendientes'][0]['obj'].id, resto.id)
+
+    def test_calce_exacto_no_deja_restos(self):
+        abono = self._pendiente(monto=230000)
+        retiro = self._retiro(monto=230000)
+        r = self.client.post(reverse('finanzas:calzar_retiros'),
+                             {'abono': abono.id, 'retiro': retiro.id})
+        self.assertEqual(r.context['resultado']['resto_abono'], '')
+        self.assertEqual(r.context['resultado']['resto_retiro'], '')
+        self.assertEqual(r.context['pendientes'], [])
+
+    def test_par_inexistente_no_explota(self):
+        r = self.client.post(reverse('finanzas:calzar_retiros'),
+                             {'abono': 999999, 'retiro': 999998})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('error', r.context)
+
+    def test_staff_comun_no_entra(self):
+        User.objects.create_user('deborah', password='x', is_staff=True)
+        self.client.login(username='deborah', password='x')
+        self.assertEqual(self.client.get(
+            reverse('finanzas:calzar_retiros')).status_code, 302)

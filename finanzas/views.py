@@ -588,6 +588,55 @@ def cargar_movimientos(request):
     return render(request, 'finanzas/cargar_movimientos.html', ctx)
 
 
+@user_passes_test(puede_ver_finanzas)
+def calzar_retiros(request):
+    """Decir a mano qué retiro corresponde a cada abono desde Aremko.
+
+    Sin el calce, la misma plata se cuenta dos veces: como retiro al salir de
+    Aremko y como gasto al gastarse desde la cuenta puente. El automático
+    exige monto idéntico y a veces no coincide.
+    """
+    from .services import (abonos_por_calzar, calzar_abono_con_retiro,
+                           candidatos_de_calce)
+
+    ctx = {}
+
+    if request.method == 'POST':
+        try:
+            abono = MovimientoFinanciero.objects.get(
+                pk=request.POST.get('abono'), clase='ingreso',
+                categoria__clave='abono_aremko_por_calzar')
+            retiro = MovimientoFinanciero.objects.get(
+                pk=request.POST.get('retiro'), clase='gasto')
+        except (MovimientoFinanciero.DoesNotExist, ValueError):
+            ctx['error'] = ('No encontré ese par — quizá alguien ya lo calzó. '
+                            'Recarga la página.')
+        else:
+            comun, resto_a, resto_r = calzar_abono_con_retiro(abono, retiro)
+            ctx['resultado'] = {
+                'comun': _clp(comun),
+                'resto_abono': _clp(resto_a) if resto_a else '',
+                'resto_retiro': _clp(resto_r) if resto_r else '',
+                'cuenta': abono.cuenta.nombre,
+            }
+
+    pendientes = []
+    for a in abonos_por_calzar():
+        pendientes.append({
+            'obj': a, 'monto_fmt': _clp(a.monto),
+            'candidatos': [
+                {'id': c.id,
+                 'texto': (f"{c.fecha:%d-%m} · {_clp(c.monto)} · "
+                           f"{c.cuenta.nombre} · "
+                           f"{(c.descripcion or c.categoria.nombre)[:60]}"),
+                 'igual': int(c.monto) == int(a.monto)}
+                for c in candidatos_de_calce(a)[:12]],
+        })
+    ctx['pendientes'] = pendientes
+    ctx['total_pend'] = _clp(sum(int(p['obj'].monto) for p in pendientes))
+    return render(request, 'finanzas/calzar_retiros.html', ctx)
+
+
 # Orden fijo de las cuentas de caja en el flujo. La Visa queda FUERA a
 # propósito: es crédito (deuda), no caja — sus gastos igual están en el
 # tablero, y el pago de la tarjeta aparecerá como cargo en la cuenta que

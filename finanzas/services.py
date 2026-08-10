@@ -632,7 +632,15 @@ CATEGORIAS_ALDA = {
     # del negocio — los ingresos del tablero salen de las reservas.
     'abonos_personales': ('Abonos personales (no son de Aremko)', 'ingreso',
                           'ingresos'),
+    # Abono que SÍ viene de Aremko pero no calzó con ningún retiro por monto
+    # exacto (pasa seguido: la glosa del banco redondea o la transferencia se
+    # partió). Entra igual —si no, el saldo de la cuenta queda mal— y espera
+    # el calce a mano en /finanzas/calzar-retiros/.
+    'abono_aremko_por_calzar': ('Abono desde Aremko por calzar', 'ingreso',
+                                'ingresos'),
 }
+
+CLAVE_POR_CALZAR = 'abono_aremko_por_calzar'
 
 
 def clasificar_fila_alda(descripcion, cargo, abono):
@@ -947,7 +955,16 @@ def registrar_filas_puente(filas, cuenta_clave, cierres_mes=None):
                                   fecha + timedelta(days=2)))
                     .exclude(cuenta=cuenta))
                 if not candidatos:
-                    saltados += 1
+                    # Sin calce exacto NO se descarta: la plata entró de
+                    # verdad. Queda como abono por calzar para no dejar el
+                    # saldo de la cuenta corto (Jorge 2026-08-09).
+                    MovimientoFinanciero.objects.create(
+                        fecha=fecha, cuenta=cuenta, clase='ingreso',
+                        sentido='entra', monto=monto,
+                        categoria=_categoria(CLAVE_POR_CALZAR),
+                        fuente='captura', referencia=f['referencia'],
+                        descripcion=f"Cartola {etiqueta}: {f['descripcion']}"[:255])
+                    creados += 1
                     continue
                 retiro = min(candidatos,
                              key=lambda m: abs((m.fecha - fecha).days))
@@ -986,6 +1003,86 @@ def registrar_filas_alda(filas, cierres_mes=None):
     return registrar_filas_puente(filas, 'scotiabank_alda', cierres_mes)
 
 
+# ── Calce a mano de abonos con retiros (Jorge 2026-08-09) ───────────────────
+# El calce automático exige monto idéntico y a veces no coincide ($499.001
+# contra $500.000). Sin calce, la misma plata se cuenta dos veces: como
+# retiro al salir de Aremko y como gasto al gastarse desde la cuenta puente.
+
+def abonos_por_calzar():
+    """Los abonos desde Aremko que esperan que alguien diga a qué retiro
+    corresponden, del más nuevo al más viejo."""
+    from .models import MovimientoFinanciero
+    return (MovimientoFinanciero.objects
+            .filter(categoria__clave=CLAVE_POR_CALZAR, clase='ingreso')
+            .select_related('cuenta').order_by('-fecha', '-id'))
+
+
+def candidatos_de_calce(abono, dias=7):
+    """Retiros que podrían ser el otro lado de este abono.
+
+    Se ofrecen los gastos de la familia cercanos en fecha, con el monto más
+    parecido primero — que es como uno los reconoce a ojo.
+    """
+    from datetime import timedelta
+
+    from .models import MovimientoFinanciero
+    from .reglas import GRUPOS_FAMILIA
+
+    cercanos = (MovimientoFinanciero.objects
+                .filter(clase='gasto', sentido='sale',
+                        categoria__grupo__in=GRUPOS_FAMILIA,
+                        fecha__range=(abono.fecha - timedelta(days=dias),
+                                      abono.fecha + timedelta(days=dias)))
+                .exclude(cuenta=abono.cuenta)
+                .select_related('cuenta', 'categoria'))
+    return sorted(cercanos,
+                  key=lambda m: (abs(int(m.monto) - int(abono.monto)),
+                                 abs((m.fecha - abono.fecha).days)))
+
+
+def calzar_abono_con_retiro(abono, retiro):
+    """Convierte el par en un traspaso. Devuelve (común, resto_abono,
+    resto_retiro).
+
+    Si los montos no son iguales, la parte común pasa a traspaso (las dos
+    piernas siguen sumando cero) y la diferencia queda VISIBLE como resto:
+    un pedazo sin explicar es un dato, taparlo es un invento.
+    """
+    from django.db import transaction
+
+    from .models import MovimientoFinanciero
+
+    comun = min(int(abono.monto), int(retiro.monto))
+    resto_abono = int(abono.monto) - comun
+    resto_retiro = int(retiro.monto) - comun
+
+    with transaction.atomic():
+        if resto_abono:
+            MovimientoFinanciero.objects.create(
+                fecha=abono.fecha, cuenta=abono.cuenta, clase='ingreso',
+                sentido='entra', monto=resto_abono, categoria=abono.categoria,
+                fuente=abono.fuente,
+                referencia=f'{abono.referencia}:resto'[:120],
+                descripcion=f'{abono.descripcion} (resto sin calzar)'[:255])
+        if resto_retiro:
+            MovimientoFinanciero.objects.create(
+                fecha=retiro.fecha, cuenta=retiro.cuenta, clase='gasto',
+                sentido='sale', monto=resto_retiro, categoria=retiro.categoria,
+                fuente=retiro.fuente,
+                referencia=f'{retiro.referencia}:resto'[:120],
+                descripcion=f'{retiro.descripcion} (resto sin calzar)'[:255])
+
+        for mov, par in ((abono, retiro), (retiro, abono)):
+            mov.monto = comun
+            mov.clase = 'traspaso'
+            mov.categoria = None
+            mov.traspaso_par = par
+            mov.save(update_fields=['monto', 'clase', 'categoria',
+                                    'traspaso_par'])
+
+    return comun, resto_abono, resto_retiro
+
+
 def estado_fila_cartola(cuenta_clave, fila):
     """'nuevo' | 'ya_existe' | 'en_historico' | 'revisar' para una fila.
 
@@ -1015,17 +1112,12 @@ def estado_fila_cartola(cuenta_clave, fila):
                                        fecha + timedelta(days=2))).exists()
         if hay_par:
             return 'ya_existe'
+        # En una cuenta puente el abono desde Aremko SIEMPRE se escribe: con
+        # retiro que calce se convierte en traspaso, y sin él queda como
+        # «por calzar» (a mano). Lo que no se puede es descartarlo: la plata
+        # entró y el saldo tiene que reflejarlo.
         if cuenta_clave in CUENTAS_PUENTE:
-            # F7: si existe el retiro Aremko→persona (gasto de su grupo
-            # familia, mismo monto, ±2 días), la fila se puede CONVERTIR en
-            # traspaso al confirmar → cuenta como nueva. Sin calce → revisar.
-            _, grupo_retiro = CUENTAS_PUENTE[cuenta_clave]
-            hay_retiro = MovimientoFinanciero.objects.filter(
-                clase='gasto', sentido='sale', monto=monto,
-                categoria__grupo=grupo_retiro,
-                fecha__range=(fecha - timedelta(days=2),
-                              fecha + timedelta(days=2))).exists()
-            return 'nuevo' if hay_retiro else 'revisar'
+            return 'nuevo'
         return 'revisar'
 
     if cuenta_clave == 'scotiabank' and fila['clase'] == 'gasto':

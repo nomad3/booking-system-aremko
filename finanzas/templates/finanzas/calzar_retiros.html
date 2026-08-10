@@ -1,0 +1,99 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Calzar retiros · Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1000px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 18px;}
+  .aviso{border-radius:10px; padding:10px 14px; font-size:13.5px; margin:14px 0;
+         background:#f5eeda; border:1px solid #e3d5ac; color:#5c4d1f;}
+  .aviso.ok{background:#e8f2ea; border-color:#c4dccb; color:var(--verde);}
+  .aviso.mal{background:#f7e8e8; border-color:#e0bcbc; color:var(--rojo);}
+  .fila{background:#fff; border:1px solid var(--linea); border-radius:12px;
+        padding:14px 16px; margin-bottom:12px;}
+  .cab{display:flex; flex-wrap:wrap; gap:10px; align-items:baseline;
+       margin-bottom:10px;}
+  .monto{font-size:19px; font-weight:700; color:var(--verde);
+         font-variant-numeric:tabular-nums;}
+  .meta{color:var(--suave); font-size:13px;}
+  form.calce{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  select{padding:9px 10px; border:1px solid var(--linea); border-radius:10px;
+         font-size:13.5px; background:#fff; max-width:100%; flex:1; min-width:280px;}
+  .boton{background:var(--acento); color:#fff; border:none; border-radius:10px;
+         padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer;}
+  .boton.sec{background:#fff; color:var(--acento); border:1px solid var(--acento);
+             text-decoration:none; display:inline-block;}
+  .vacio{color:var(--suave);}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Calzar retiros</h1>
+  <p class="sub">Abonos que llegaron desde Aremko a una cuenta puente y no
+     encontraron su retiro por monto exacto ·
+     <a href="{% url 'finanzas:flujo_caja' %}">flujo de caja</a> ·
+     <a href="{% url 'finanzas:gastos_mes' %}">gastos del mes</a></p>
+
+  {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
+
+  {% if resultado %}
+  <div class="aviso ok">✓ Calzado en {{ resultado.cuenta }}: <b>{{ resultado.comun }}</b>
+    pasaron de retiro a traspaso — esa plata deja de contarse dos veces.
+    {% if resultado.resto_abono %}<br>Quedó un resto de <b>{{ resultado.resto_abono }}</b>
+    en el abono, esperando de dónde salió.{% endif %}
+    {% if resultado.resto_retiro %}<br>Quedó un resto de <b>{{ resultado.resto_retiro }}</b>
+    en el retiro, que sigue contando como salida a la familia.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if pendientes %}
+  <div class="aviso">Hay <b>{{ pendientes|length }}</b> abonos por calzar
+    ({{ total_pend }}). Mientras no se calcen, esa plata figura dos veces en el
+    resultado: una al salir de Aremko y otra al gastarse desde la cuenta.
+    Los candidatos van ordenados por parecido de monto — el primero suele ser
+    el correcto, pero mira la fecha antes de confirmar.</div>
+
+  {% for p in pendientes %}
+  <div class="fila">
+    <div class="cab">
+      <span class="monto">+{{ p.monto_fmt }}</span>
+      <span class="meta">{{ p.obj.fecha|date:"d-m-Y" }} · {{ p.obj.cuenta.nombre }}</span>
+      <span class="meta">{{ p.obj.descripcion }}</span>
+    </div>
+    {% if p.candidatos %}
+    <form class="calce" method="post"
+          onsubmit="return confirm('¿Calzar este abono de {{ p.monto_fmt }} con el retiro seleccionado?');">
+      {% csrf_token %}
+      <input type="hidden" name="abono" value="{{ p.obj.id }}">
+      <select name="retiro">
+        {% for c in p.candidatos %}
+        <option value="{{ c.id }}">{{ c.texto }}{% if c.igual %} · mismo monto{% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="boton" type="submit">Calzar</button>
+    </form>
+    {% else %}
+    <p class="vacio">Sin retiros candidatos a ±7 días. Puede que el movimiento
+       del lado de Aremko todavía no esté cargado (falta esa cartola) o que la
+       plata haya salido de una cuenta que no estamos siguiendo.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="aviso ok">✓ No hay abonos pendientes de calce.</div>
+  <p><a class="boton sec" href="{% url 'finanzas:flujo_caja' %}">Ver el flujo de caja</a></p>
+  {% endif %}
+</div>
+</body>
+</html>
