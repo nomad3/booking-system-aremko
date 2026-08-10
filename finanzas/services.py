@@ -270,7 +270,12 @@ def clasificar_fila_cartola(descripcion, cargo, abono):
         if 'FLOW' in d:
             return 'ingreso', 'entra', 'liquidacion_flow'
         return 'ingreso', 'entra', 'transferencias_recibidas'
-    return 'gasto', 'sale', 'por_clasificar'
+    # Los cargos pasan por el MISMO plan de cuentas que todo lo demás. Sin
+    # esto, un «TEF A TOLOZA POBLETE ALDA» entraba como por clasificar y ni
+    # se veía como retiro ni aparecía de candidato en Calzar retiros, aunque
+    # la regla existiera desde el principio (visto 2026-08-10).
+    from .reglas import clasificar_por_reglas
+    return 'gasto', 'sale', clasificar_por_reglas(descripcion) or 'por_clasificar'
 
 
 def parsear_cartola_bancoestado(archivo):
@@ -289,9 +294,16 @@ def parsear_cartola_bancoestado(archivo):
         warnings.simplefilter('ignore')
         wb = openpyxl.load_workbook(archivo, data_only=True, read_only=True)
 
+    if 'Resumen' in wb.sheetnames and 'Registros' in wb.sheetnames:
+        # Variante «Cartola en Línea» (verificada 2026-08-10): otra hoja, sin
+        # fechas de período y con las filas DESORDENADAS.
+        return _parsear_bancoestado_en_linea(wb)
+
     if 'Resumen' not in wb.sheetnames or 'Movimientos' not in wb.sheetnames:
-        raise ValueError('El archivo no tiene las hojas Resumen y Movimientos '
-                         'del export de BancoEstado.')
+        raise ValueError(
+            'El archivo no tiene las hojas del export de BancoEstado: se '
+            'esperan Resumen + Movimientos (Cartola Histórica) o Resumen + '
+            'Registros (Cartola en Línea).')
 
     # ── Resumen: rótulo en col A, valor en la primera celda no vacía después ──
     resumen = {}
@@ -411,6 +423,11 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
             cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
                 clave=clave, defaults={'nombre': nombre, 'clase': clase})
 
+    def _categoria(clave):
+        # Nunca dejar un gasto sin categoría: si la regla nombró una que no
+        # existe, cae en «por clasificar» y se ve en el triaje.
+        return cats.get(clave) or cats.get('por_clasificar')
+
     creados = saltados = 0
     with transaction.atomic():
         for f in filas:
@@ -423,7 +440,7 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
             MovimientoFinanciero.objects.create(
                 fecha=fecha, cuenta=cuenta, clase=f['clase'],
                 sentido=f['sentido'], monto=monto,
-                categoria=cats.get(f['categoria']),
+                categoria=_categoria(f['categoria']),
                 fuente='captura', referencia=f['referencia'],
                 descripcion=f"Cartola {cuenta_clave}: {f['descripcion']}"[:255])
             creados += 1
@@ -436,6 +453,124 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
                           'notas': 'Cierre derivado del export de cartola'})
 
     return creados, saltados
+
+
+def ordenar_por_cadena_de_saldos(movs, saldo_inicial):
+    """Ordena movimientos usando el saldo como hilo. Devuelve (orden, sueltos).
+
+    La Cartola en Línea de BancoEstado entrega las filas DESORDENADAS y con
+    varias del mismo día, así que ordenar por fecha no basta: el saldo de cada
+    fila dice cuál va después de cuál. Se arma la cadena desde el saldo
+    inicial; lo que no encaja se devuelve aparte en vez de inventarle un
+    lugar — una fila que no calza es justamente la señal de que falta algo.
+    """
+    pendientes = list(movs)
+    orden, saldo = [], saldo_inicial
+    while pendientes:
+        for i, m in enumerate(pendientes):
+            if saldo + m['abono'] - m['cargo'] == m['saldo']:
+                orden.append(m)
+                saldo = m['saldo']
+                pendientes.pop(i)
+                break
+        else:
+            break
+    return orden, pendientes
+
+
+def _parsear_bancoestado_en_linea(wb):
+    """Cartola en Línea de la Chequera: hojas Resumen + Registros."""
+    from datetime import datetime
+
+    resumen = {}
+    for fila in wb['Resumen'].iter_rows(values_only=True):
+        rotulo = str(fila[0] or '').strip()
+        if not rotulo:
+            continue
+        valor = next((c for c in fila[1:] if c not in (None, '')), None)
+        if valor is not None:
+            resumen[rotulo] = valor
+
+    saldo_inicial = _monto_celda(resumen.get('Inicial'))
+    saldo_final_resumen = _monto_celda(resumen.get('Saldo Contable')
+                                       or resumen.get('Disponible'))
+
+    crudas = list(wb['Registros'].iter_rows(values_only=True))
+    if len(crudas) < 2:
+        raise ValueError('La hoja Registros viene sin movimientos.')
+    encabezado = [str(c or '').lower() for c in crudas[0]]
+
+    def _col(pedazo):
+        for i, h in enumerate(encabezado):
+            if pedazo in h:
+                return i
+        raise ValueError(f'No encuentro la columna «{pedazo}» en Registros.')
+
+    c_f, c_d = _col('fecha'), _col('descrip')
+    c_c, c_a, c_s = _col('cargo'), _col('abono'), _col('saldo')
+
+    movs = []
+    for cruda in crudas[1:]:
+        crudo = cruda[c_f]
+        if crudo in (None, ''):
+            continue
+        if hasattr(crudo, 'year'):
+            fecha = crudo.date() if hasattr(crudo, 'date') else crudo
+        else:
+            try:
+                fecha = datetime.strptime(str(crudo).strip(), '%d/%m/%Y').date()
+            except ValueError:
+                continue
+        cargo, abono = _monto_celda(cruda[c_c]), _monto_celda(cruda[c_a])
+        if cargo == 0 and abono == 0:
+            continue
+        movs.append({'fecha': fecha,
+                     'desc': str(cruda[c_d] or '').strip(),
+                     'cargo': cargo, 'abono': abono,
+                     'saldo': _monto_celda(cruda[c_s])})
+
+    orden, sueltos = ordenar_por_cadena_de_saldos(movs, saldo_inicial)
+    # Los que no encajaron van al final por fecha: se muestran igual, pero la
+    # página avisa que la cadena está rota.
+    orden.extend(sorted(sueltos, key=lambda m: m['fecha']))
+
+    filas = []
+    for m in orden:
+        clase, sentido, cat = clasificar_fila_cartola(m['desc'], m['cargo'],
+                                                      m['abono'])
+        huella = (f"{m['fecha'].isoformat()}|{m['desc']}|{m['cargo']}|"
+                  f"{m['abono']}|{m['saldo']}")
+        filas.append({
+            'fecha': m['fecha'].isoformat(), 'descripcion': m['desc'],
+            'cargo': m['cargo'], 'abono': m['abono'], 'saldo': m['saldo'],
+            'clase': clase, 'sentido': sentido, 'categoria': cat,
+            'referencia': 'be:' + hashlib.sha1(huella.encode()).hexdigest()[:24],
+        })
+    if not filas:
+        raise ValueError('El archivo no trae movimientos.')
+
+    cierres = {}
+    for i, f in enumerate(filas):
+        mes_fila = f['fecha'][:7]
+        if any(g['fecha'][:7] > mes_fila for g in filas[i + 1:]):
+            cierres[mes_fila] = f['saldo']
+
+    saldo_final = filas[-1]['saldo']
+    return {
+        'cuenta_numero': str(resumen.get('Chequera Electrónica') or ''),
+        'fecha_inicio': min(f['fecha'] for f in filas),
+        'fecha_final': max(f['fecha'] for f in filas),
+        'saldo_inicial': saldo_inicial,
+        'saldo_final_resumen': saldo_final_resumen or saldo_final,
+        'saldo_final_calculado': saldo_final,
+        'total_cargos': sum(f['cargo'] for f in filas),
+        'total_abonos': sum(f['abono'] for f in filas),
+        'cadena_rota': len(sueltos),
+        'cuadra': (not sueltos and
+                   (not saldo_final_resumen or saldo_final_resumen == saldo_final)),
+        'cierres_mes': cierres,
+        'filas': filas,
+    }
 
 
 # ── F4 paso 3b: cartola Scotiabank (export .xls del portal) ──────────────────

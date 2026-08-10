@@ -1461,3 +1461,116 @@ class SaludFuentesTest(TestCase):
         self.client.login(username='deborah', password='x')
         self.assertEqual(self.client.get(
             reverse('finanzas:salud_fuentes')).status_code, 302)
+
+
+class CartolaBancoEstadoEnLineaTest(TestCase):
+    """Segunda variante real de BancoEstado (2026-08-10): «Cartola en Línea»,
+    hoja Registros, sin fechas de período y con las filas DESORDENADAS."""
+
+    RESUMEN = [
+        ('Rut Empresa', '', '', '', '76.485.192-7'),
+        ('Chequera Electrónica', '', '', '', '82370351925'),
+        ('Saldo', '', '', '', ''),
+        ('Inicial', '', '', '', '$ 16.127.957'),
+        ('Saldo Contable', '', '', '', '$ 16.203.323'),
+        ('Total Abonos', '', '', '', '$ 575.366'),
+        ('Total Cargos', '', '', '', '$ 500.000'),
+    ]
+    # Tal como las entrega el banco: fuera de orden.
+    REGISTROS = [
+        ('Fecha', 'Sucursal', 'N° Operación', 'Descripción', 'Cargos',
+         'Abonos', 'Saldo'),
+        ('06/08/2026', 'STGO', '1', 'TEF A TOLOZA POBLETE ALDA ANGELICA',
+         '$ 500.000', '', '$ 16.049.397'),
+        ('05/08/2026', 'STGO', '2', 'TEF DE FLOW PAGOS CHILE SPA', '',
+         '$ 202.029', '$ 16.491.675'),
+        ('04/08/2026', 'STGO', '3', 'TEF DE FLOW S A', '', '$ 48.102',
+         '$ 16.176.059'),
+        ('05/08/2026', 'STGO', '4', 'TEF DE FLOW S A', '', '$ 57.722',
+         '$ 16.549.397'),
+        ('07/08/2026', 'STGO', '5', 'TEF DE FLOW S A', '', '$ 96.204',
+         '$ 16.203.323'),
+        ('04/08/2026', 'STGO', '6', 'TEF DE SUMUP CHILE PAYMENTS S A', '',
+         '$ 113.587', '$ 16.289.646'),
+        ('06/08/2026', 'STGO', '7', 'TEF DE FLOW S A', '', '$ 57.722',
+         '$ 16.107.119'),
+    ]
+
+    def _archivo(self, registros=None):
+        import io
+
+        import openpyxl
+        wb = openpyxl.Workbook()
+        hoja = wb.active
+        hoja.title = 'Resumen'
+        for fila in self.RESUMEN:
+            hoja.append(list(fila))
+        reg = wb.create_sheet('Registros')
+        for fila in (registros or self.REGISTROS):
+            reg.append(list(fila))
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return buf
+
+    def test_ordena_por_la_cadena_de_saldos_no_por_fecha(self):
+        from .services import parsear_cartola_bancoestado
+        d = parsear_cartola_bancoestado(self._archivo())
+        self.assertEqual(d['cuenta_numero'], '82370351925')
+        self.assertEqual(d['cadena_rota'], 0)
+        self.assertTrue(d['cuadra'])
+        self.assertEqual(d['saldo_inicial'], 16127957)
+        self.assertEqual(d['saldo_final_calculado'], 16203323)
+        self.assertEqual(d['total_abonos'], 575366)
+        self.assertEqual(d['total_cargos'], 500000)
+        # El orden lo dicta el saldo: dentro del 04-08, FLOW va antes que
+        # SumUp aunque en el archivo venga al revés.
+        desc = [f['descripcion'][:20] for f in d['filas']]
+        self.assertEqual(desc[0], 'TEF DE FLOW S A')
+        self.assertEqual(desc[1], 'TEF DE SUMUP CHILE P')
+        # Y la cadena queda coherente de punta a punta.
+        saldo = d['saldo_inicial']
+        for f in d['filas']:
+            saldo += f['abono'] - f['cargo']
+            self.assertEqual(saldo, f['saldo'], f['descripcion'])
+        self.assertEqual(saldo, 16203323)
+
+    def test_clasifica_con_el_plan_de_cuentas(self):
+        from .services import parsear_cartola_bancoestado
+        d = parsear_cartola_bancoestado(self._archivo())
+        por_desc = {f['descripcion']: f for f in d['filas']}
+        self.assertEqual(por_desc['TEF DE SUMUP CHILE PAYMENTS S A']['categoria'],
+                         'liquidacion_sumup')
+        self.assertEqual(por_desc['TEF DE FLOW S A']['categoria'],
+                         'liquidacion_flow')
+        # El retiro a Alda se reconoce solo: si no, no aparecía de candidato
+        # en Calzar retiros (visto 2026-08-10).
+        self.assertEqual(
+            por_desc['TEF A TOLOZA POBLETE ALDA ANGELICA']['categoria'],
+            'personales_alda')
+
+    def test_una_fila_que_no_encaja_se_declara_cadena_rota(self):
+        from .services import parsear_cartola_bancoestado
+        rotas = list(self.REGISTROS)
+        rotas[3] = ('04/08/2026', 'STGO', '3', 'TEF DE FLOW S A', '',
+                    '$ 48.102', '$ 99.999.999')      # saldo imposible
+        d = parsear_cartola_bancoestado(self._archivo(rotas))
+        self.assertGreater(d['cadena_rota'], 0)
+        self.assertFalse(d['cuadra'])
+        # Igual se muestran todas las filas: nada se esconde.
+        self.assertEqual(len(d['filas']), 7)
+
+    def test_se_registra_y_es_idempotente(self):
+        from .services import (parsear_cartola_bancoestado,
+                               registrar_filas_cartola)
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        d = parsear_cartola_bancoestado(self._archivo())
+        creados, _ = registrar_filas_cartola(d['filas'], d['cierres_mes'],
+                                             cuenta_clave='bancoestado')
+        self.assertEqual(creados, 7)
+        retiro = MovimientoFinanciero.objects.get(monto=500000)
+        self.assertEqual(retiro.categoria.grupo, 'personales_alda')
+        creados2, _ = registrar_filas_cartola(d['filas'], d['cierres_mes'],
+                                              cuenta_clave='bancoestado')
+        self.assertEqual(creados2, 0)
