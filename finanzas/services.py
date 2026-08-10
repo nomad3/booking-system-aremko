@@ -1235,6 +1235,189 @@ def registrar_filas_alda(filas, cierres_mes=None):
     return registrar_filas_puente(filas, 'scotiabank_alda', cierres_mes)
 
 
+# ── F7c: tarjetas de crédito de Alda (PDF del portal Scotiabank) ─────────────
+# Formato real verificado 2026-08-10: impresión a PDF del portal. Cada línea es
+# «DD/MM/AAAA  COMERCIO  CIUDAD  $MONTO», las fechas vienen DESORDENADAS y las
+# descripciones largas se parten en dos renglones. Los montos NEGATIVOS («PAGO
+# EN EFECTIVO») son los pagos de la tarjeta, no compras. El archivo NO dice a
+# qué tarjeta corresponde: eso lo elige quien la sube.
+
+TARJETAS_ALDA = ('tarjeta_alda_1', 'tarjeta_alda_2')
+
+_RE_MOV_TARJETA = re.compile(
+    r'^(\d{2}/\d{2}/\d{4})\s+(.+?)\s+\$\s*(-?[\d.]+)\s*$')
+# Ruido de la impresión del navegador: encabezado repetido, hora y pie.
+_RE_RUIDO_TARJETA = re.compile(
+    r'^(about:blank|.*Página \d+ de \d+|\d{2}-\d{2}-\d{2},.*|F+E+C+H+A+.*)$')
+
+
+def clasificar_compra_tarjeta(descripcion):
+    """Categoría de una compra de la tarjeta.
+
+    Es una tarjeta MIXTA (Aremko y personal), así que el default es POR
+    CLASIFICAR y no «personal»: el punto del ejercicio es que ellos decidan
+    cuáles son de Aremko, no que el sistema lo adivine.
+    """
+    from .reglas import clasificar_por_reglas
+
+    d = (descripcion or '').upper()
+    if any(p in d for p in ('COMISION', 'INTERES', 'SERVICIO DE ACTIVIDAD',
+                            'SEGURO', 'DESGRAVAMEN')):
+        return 'banco_alda'
+    return clasificar_por_reglas(descripcion) or 'por_clasificar'
+
+
+def parsear_lineas_tarjeta(texto, cuenta_clave):
+    """Núcleo puro: el texto del PDF → filas. Testeable sin pdfplumber.
+
+    Las líneas sin fecha son la continuación de la descripción anterior (el
+    portal parte «PUERTO VARAS» en dos renglones); se pegan a la fila de
+    arriba en vez de descartarse, si no el comercio queda a medias.
+    """
+    from datetime import datetime
+
+    filas, vistas = [], {}
+    for cruda in (texto or '').splitlines():
+        linea = ' '.join(cruda.split())
+        if not linea or _RE_RUIDO_TARJETA.match(linea):
+            continue
+        m = _RE_MOV_TARJETA.match(linea)
+        if not m:
+            if filas:                      # continuación de la anterior
+                filas[-1]['descripcion'] = (
+                    f"{filas[-1]['descripcion']} {linea}")[:200]
+            continue
+        try:
+            fecha = datetime.strptime(m.group(1), '%d/%m/%Y').date()
+        except ValueError:
+            continue
+        monto = int(m.group(3).replace('.', ''))
+        if monto == 0:
+            continue
+        filas.append({'fecha': fecha.isoformat(),
+                      'descripcion': ' '.join(m.group(2).split())[:200],
+                      'monto': monto})
+
+    # Referencia idempotente: la misma compra que hoy está «por facturar» y
+    # mañana aparece «facturada» tiene la misma fecha, glosa y monto — se
+    # reconoce y no entra dos veces. El contador distingue dos compras
+    # idénticas el mismo día (dos cafés seguidos, por ejemplo).
+    for f in filas:
+        base = f"{cuenta_clave}|{f['fecha']}|{f['descripcion']}|{f['monto']}"
+        vistas[base] = vistas.get(base, 0) + 1
+        f['es_pago'] = f['monto'] < 0
+        f['cargo'] = 0 if f['es_pago'] else f['monto']
+        f['abono'] = -f['monto'] if f['es_pago'] else 0
+        f['categoria'] = ('' if f['es_pago']
+                          else clasificar_compra_tarjeta(f['descripcion']))
+        f['referencia'] = 'tar:' + hashlib.sha1(
+            f'{base}|{vistas[base]}'.encode()).hexdigest()[:24]
+    filas.sort(key=lambda f: f['fecha'])
+    return filas
+
+
+def parsear_tarjeta_alda(archivo, cuenta_clave):
+    """Capa fina: saca el texto del PDF y delega en el núcleo puro."""
+    import pdfplumber
+
+    with pdfplumber.open(archivo) as pdf:
+        texto = '\n'.join((p.extract_text() or '') for p in pdf.pages)
+    filas = parsear_lineas_tarjeta(texto, cuenta_clave)
+    if not filas:
+        raise ValueError('No encontré movimientos en el PDF — ¿es el listado '
+                         'de la tarjeta del portal Scotiabank?')
+    compras = [f for f in filas if not f['es_pago']]
+    pagos = [f for f in filas if f['es_pago']]
+    return {
+        'filas': filas,
+        'n_compras': len(compras), 'n_pagos': len(pagos),
+        'total_compras': sum(f['cargo'] for f in compras),
+        'total_pagos': sum(f['abono'] for f in pagos),
+        'fecha_inicio': filas[0]['fecha'], 'fecha_final': filas[-1]['fecha'],
+    }
+
+
+def registrar_filas_tarjeta(filas, cuenta_clave):
+    """Escribe las compras de la tarjeta y calza sus pagos.
+
+    Devuelve (creados, saltados, pagos_calzados, pagos_sin_calce).
+
+    - Compra → gasto de la tarjeta, con su categoría.
+    - Pago (monto negativo) → busca el cargo «PAGO TARJ.CRED.» en la cuenta
+      corriente de Alda (mismo monto, ±3 días) y lo convierte en TRASPASO
+      hacia la tarjeta. Sin ese cargo no se inventa nada: se informa, porque
+      significa que falta cargar su cartola.
+    """
+    from datetime import timedelta
+
+    from django.db import transaction
+
+    from .models import (CategoriaFinanciera, CuentaFinanciera,
+                         MovimientoFinanciero)
+    from .reglas import PLAN_CUENTAS
+
+    tarjeta = CuentaFinanciera.objects.get(clave=cuenta_clave)
+    corriente = CuentaFinanciera.objects.filter(
+        clave='scotiabank_alda').first()
+
+    definiciones = dict(PLAN_CUENTAS)
+    definiciones.update(CATEGORIAS_ALDA)
+    cats = {}
+
+    def _categoria(clave):
+        if clave not in cats:
+            nombre, clase, grupo = definiciones.get(
+                clave, (clave.replace('_', ' ').title(), 'gasto', 'otros'))
+            cats[clave], _ = CategoriaFinanciera.objects.get_or_create(
+                clave=clave,
+                defaults={'nombre': nombre, 'clase': clase, 'grupo': grupo})
+        return cats[clave]
+
+    creados = saltados = calzados = sin_calce = 0
+    with transaction.atomic():
+        for f in filas:
+            fecha = date.fromisoformat(f['fecha'])
+            monto = f['cargo'] or f['abono']
+            if (fecha < COBERTURA_GASTOS_DESDE or monto <= 0
+                    or MovimientoFinanciero.objects.filter(
+                        referencia=f['referencia']).exists()):
+                saltados += 1
+                continue
+
+            if f['es_pago']:
+                pago_cta = None
+                if corriente is not None:
+                    pago_cta = MovimientoFinanciero.objects.filter(
+                        cuenta=corriente, clase='gasto', monto=monto,
+                        fecha__range=(fecha - timedelta(days=3),
+                                      fecha + timedelta(days=3))
+                    ).filter(descripcion__icontains='TARJ').first()
+                if pago_cta is None:
+                    sin_calce += 1
+                    continue
+                entra = MovimientoFinanciero.objects.create(
+                    fecha=fecha, cuenta=tarjeta, clase='traspaso',
+                    sentido='entra', monto=monto, fuente='captura',
+                    referencia=f['referencia'], traspaso_par=pago_cta,
+                    descripcion=f"Pago de la tarjeta: {f['descripcion']}"[:255])
+                pago_cta.clase = 'traspaso'
+                pago_cta.categoria = None
+                pago_cta.traspaso_par = entra
+                pago_cta.save(update_fields=['clase', 'categoria',
+                                             'traspaso_par'])
+                calzados += 1
+                continue
+
+            MovimientoFinanciero.objects.create(
+                fecha=fecha, cuenta=tarjeta, clase='gasto', sentido='sale',
+                monto=monto, categoria=_categoria(f['categoria']),
+                fuente='captura', referencia=f['referencia'],
+                descripcion=f"Tarjeta: {f['descripcion']}"[:255])
+            creados += 1
+
+    return creados, saltados, calzados, sin_calce
+
+
 # ── Calce a mano de abonos con retiros (Jorge 2026-08-09) ───────────────────
 # El calce automático exige monto idéntico y a veces no coincide ($499.001
 # contra $500.000). Sin calce, la misma plata se cuenta dos veces: como

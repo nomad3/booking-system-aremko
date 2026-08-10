@@ -1800,3 +1800,114 @@ class ComisionDeMPTest(TestCase):
         from finanzas.management.commands.comparar_comisiones_mp import comision_de
         self.assertEqual(comision_de({}), 0)
         self.assertEqual(comision_de({'fee_details': []}), 0)
+
+
+TEXTO_TARJETA = """10-08-26, 1:35 p. m.
+FFFFEEEECCCCHHHHAAAA DDDDEEEESSSSCCCCRRRRIIIIPPPPCCCCIIIIÓÓÓÓNNNN CCCCIIIIUUUUDDDDAAAADDDD MMMMOOOONNNNTTTTOOOO
+02/07/2026 PAGO EN EFECTIVO $-1.000.000
+23/06/2026 CASA TRONCO PUERTO LLANQUIHUE $298.000
+VARAS
+28/06/2026 JUMBO SUPER DONA EMA PUERTO $71.137
+VARAS
+06/07/2026 COPEC ASISTIDO LAS CONDES $79.465
+14/07/2026 COMISION COMPRA $745
+INTERNACIONAL
+18/05/2025 MARKETING Y EVENTOS SANTIAGO ORGAN TASA INT. $5.353
+about:blank Página 1 de 5"""
+
+
+class TarjetaAldaTest(TestCase):
+    """F7c: el PDF de la tarjeta de Alda. Las COMPRAS son el gasto real; el
+    pago de la tarjeta es traspaso desde su cuenta corriente, no gasto."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.tarjeta = CuentaFinanciera.objects.get(clave='tarjeta_alda_1')
+        self.corriente = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+
+    def _filas(self):
+        from .services import parsear_lineas_tarjeta
+        return parsear_lineas_tarjeta(TEXTO_TARJETA, 'tarjeta_alda_1')
+
+    def test_lee_las_lineas_y_pega_las_continuaciones(self):
+        filas = self._filas()
+        self.assertEqual(len(filas), 6)
+        por_monto = {f['cargo'] or f['abono']: f for f in filas}
+        # La ciudad partida en dos renglones se pega a su compra.
+        self.assertIn('VARAS', por_monto[298000]['descripcion'])
+        # El pago viene negativo y se marca como tal.
+        pago = por_monto[1000000]
+        self.assertTrue(pago['es_pago'])
+        self.assertEqual(pago['abono'], 1000000)
+        self.assertEqual(pago['cargo'], 0)
+        # Las líneas de ruido del navegador no entran.
+        self.assertFalse(any('about:blank' in f['descripcion'] for f in filas))
+        self.assertFalse(any('FFFF' in f['descripcion'] for f in filas))
+
+    def test_clasificacion_default_es_por_clasificar(self):
+        """Es tarjeta mixta: el sistema no adivina qué es de Aremko."""
+        filas = {f['descripcion'][:12]: f for f in self._filas()}
+        self.assertEqual(filas['CASA TRONCO ']['categoria'], 'por_clasificar')
+        # Las comisiones del banco sí se reconocen.
+        self.assertEqual(filas['COMISION COM']['categoria'], 'banco_alda')
+
+    def test_repetir_el_archivo_no_duplica(self):
+        """La compra que hoy está «por facturar» y mañana «facturada» tiene
+        la misma fecha, glosa y monto: se reconoce sola."""
+        from .services import registrar_filas_tarjeta
+        # De las 6 líneas: 2 compras de julio entran; 3 son de junio o de
+        # 2025 (fuera del corte) y 1 es el pago, que espera su cargo.
+        creados, saltados, _, sin_calce = registrar_filas_tarjeta(
+            self._filas(), 'tarjeta_alda_1')
+        self.assertEqual((creados, saltados, sin_calce), (2, 3, 1))
+
+        creados2, saltados2, _, _ = registrar_filas_tarjeta(
+            self._filas(), 'tarjeta_alda_1')
+        self.assertEqual(creados2, 0)
+        self.assertEqual(saltados2, 5)   # las 2 ya escritas + las 3 de fuera
+
+    def test_el_pago_calza_con_el_cargo_de_la_cuenta_corriente(self):
+        from .services import registrar_filas_tarjeta
+        cat, _ = CategoriaFinanciera.objects.get_or_create(
+            clave='tarjeta_alda',
+            defaults={'nombre': 'Tarjeta de crédito (Alda)', 'clase': 'gasto',
+                      'grupo': 'personales_alda'})
+        cargo = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 2), cuenta=self.corriente, clase='gasto',
+            sentido='sale', monto=1000000, fuente='captura',
+            referencia='alda:pagotarj', categoria=cat,
+            descripcion='Cartola alda: 820407_PAGO TARJ.CRED. POR SWE')
+
+        creados, _, calzados, sin_calce = registrar_filas_tarjeta(
+            self._filas(), 'tarjeta_alda_1')
+        self.assertEqual((calzados, sin_calce), (1, 0))
+
+        cargo.refresh_from_db()
+        # Deja de ser gasto: era plata que cambiaba de bolsillo.
+        self.assertEqual(cargo.clase, 'traspaso')
+        self.assertIsNone(cargo.categoria)
+        self.assertEqual(cargo.traspaso_par.cuenta.clave, 'tarjeta_alda_1')
+        agg = {r['sentido']: int(r['t']) for r in
+               MovimientoFinanciero.objects.filter(clase='traspaso')
+               .values('sentido').annotate(t=Sum('monto'))}
+        self.assertEqual(agg['entra'], agg['sale'])
+
+    def test_pago_sin_su_cargo_se_informa_y_no_se_inventa(self):
+        """Sin la cartola de la cuenta corriente cargada, el pago espera."""
+        from .services import registrar_filas_tarjeta
+        creados, _, calzados, sin_calce = registrar_filas_tarjeta(
+            self._filas(), 'tarjeta_alda_1')
+        self.assertEqual((calzados, sin_calce), (0, 1))
+        # No quedó una pierna suelta que rompa la suma cero.
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            clase='traspaso').count(), 0)
+
+    def test_las_cuotas_viejas_quedan_fuera_del_corte(self):
+        """Las compras en cuotas de meses anteriores (dicen «TASA INT.»)
+        traen la fecha de la compra ORIGINAL, así que caen antes de julio
+        2026 y no entran. Se ven en la propuesta como fuera de cobertura."""
+        from .services import registrar_filas_tarjeta
+        registrar_filas_tarjeta(self._filas(), 'tarjeta_alda_1')
+        self.assertFalse(MovimientoFinanciero.objects.filter(
+            monto=5353).exists())

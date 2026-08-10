@@ -60,12 +60,55 @@
     {% if resultado.convertidos %}<br><b>{{ resultado.convertidos }}</b> retiros
     Aremko→Alda convertidos en traspaso (calzaron con la cartola: dejan de
     contarse como gasto y el gasto real pasa a ser lo que ella paga).{% endif %}
+    {% if resultado.sin_calce %}<br>⚠️ <b>{{ resultado.sin_calce }}</b> pagos de la
+    tarjeta no encontraron su cargo en la cuenta corriente de Alda — carga esa
+    cartola y vuelve a subir este PDF.{% endif %}
     <br>Los abonos desde Aremko que no calzaron por monto exacto quedan en
     <a href="{% url 'finanzas:calzar_retiros' %}"><b>calzar retiros</b></a>.
     {% for m, s in resultado.cierres %}<br>Cierre {{ m }} guardado: <b>{{ s }}</b>.{% endfor %}
   </div>
   <p><a class="boton sec" href="{% url 'finanzas:tablero' %}">Ver el tablero</a>
      <a class="boton sec" href="/admin/finanzas/movimientofinanciero/?fuente__exact=captura">Ver los movimientos</a></p>
+
+  {% elif datos and es_tarjeta %}
+  <div class="aviso">Las <b>compras</b> de la tarjeta son el gasto real y entran
+    <b>por clasificar</b>: es una tarjeta mixta y ustedes deciden cuáles son de
+    Aremko. Los <b>pagos</b> de la tarjeta no son gasto: buscan el cargo
+    «PAGO TARJ.CRED.» en la cuenta corriente de Alda y lo convierten en
+    traspaso. Si algún pago no encuentra su cargo, falta cargar esa cartola.</div>
+  <p class="sub"><b>{{ cuenta_nombre }}</b> · período {{ datos.fecha_inicio }} →
+     {{ datos.fecha_final }} · {{ datos.n_compras }} compras por
+     <b>{{ compras_fmt }}</b> y {{ datos.n_pagos }} pagos por
+     <b>{{ pagos_fmt }}</b> · <b>{{ n_nuevas }} nuevos</b> ·
+     {{ n_ya }} que no se escriben.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Fecha</th><th class="izq">Comercio</th>
+               <th class="izq">Clasificación</th><th>Monto</th>
+               <th class="izq">Estado</th></tr></thead>
+    <tbody>
+      {% for f in datos.filas %}
+      <tr{% if f.estado != 'nuevo' %} class="ya"{% endif %}>
+        <td>{{ f.fecha }}</td>
+        <td class="izq">{{ f.descripcion }}</td>
+        <td class="izq">{{ f.categoria }}</td>
+        <td class="{% if f.es_pago %}entra{% else %}sale{% endif %}">{% if f.es_pago %}+{% else %}−{% endif %}{{ f.monto_fmt }}</td>
+        <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% else %}fuera de cobertura{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% if payload %}
+  <form method="post" style="margin-top:18px;">{% csrf_token %}
+    <input type="hidden" name="payload" value="{{ payload }}">
+    <button class="boton" type="submit" name="confirmar" value="1">
+      Confirmar y escribir {{ n_nuevas }} movimientos</button>
+    <a class="boton sec" href="{% url 'finanzas:cargar_cartola' %}">Cancelar</a>
+  </form>
+  {% else %}
+  <div class="aviso">Nada nuevo que escribir: todo el archivo ya está registrado.</div>
+  {% endif %}
 
   {% elif datos %}
   {% if datos.cuadra %}
@@ -129,6 +172,17 @@
      La cuenta se detecta sola por el contenido del archivo; el
      <code>Excel_Cartola_Historica</code> también se acepta.</p>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    {% if tarjetas %}
+    <p class="sub" style="margin-bottom:6px;">Si subes el <b>PDF de una tarjeta de
+       Alda</b>, elige cuál: el archivo no dice a cuál pertenece.</p>
+    <p><select name="tarjeta" style="padding:9px 10px;border:1px solid var(--linea);
+         border-radius:10px;font-size:14px;">
+      <option value="">— no es PDF de tarjeta —</option>
+      {% for t in tarjetas %}
+      <option value="{{ t.clave }}" {% if t.clave == tarjeta_sel %}selected{% endif %}>{{ t.nombre }}</option>
+      {% endfor %}
+    </select></p>
+    {% endif %}
     {# Sin accept: el BSA.dat de Scotia Connect quedaba GRIS en el selector
        (visto por Jorge 2026-08-09). El tipo real se detecta por los bytes. #}
     <p><input type="file" name="archivo" required></p>

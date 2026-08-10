@@ -42,6 +42,17 @@ CUENTAS = [
     ('cuentarut_jorge', 'CuentaRUT Jorge (personal)', 'banco',
      'CuentaRUT personal de Jorge. Canaliza el presupuesto de Martín '
      '($300k/mes) y gastos mixtos. Formato de cartola pendiente de sondear.'),
+    # F7c: las tarjetas de Alda son cuentas propias, como la Visa de Aremko.
+    # Sus COMPRAS son el gasto real (con detalle de comercio); el pago de la
+    # tarjeta desde su cuenta corriente es un TRASPASO, no un gasto — contar
+    # las dos cosas sería el doble conteo que advirtió Jorge.
+    ('tarjeta_alda_1', 'Tarjeta Alda 1 (Scotiabank)', 'tarjeta_credito',
+     'Tarjeta de crédito de Alda usada para gastos de Aremko y personales. '
+     'Se carga el PDF del portal en /finanzas/cargar-cartola/ eligiendo la '
+     'tarjeta (el archivo no dice cuál es). Renombrar con los últimos 4 '
+     'dígitos cuando se sepan.'),
+    ('tarjeta_alda_2', 'Tarjeta Alda 2 (Scotiabank)', 'tarjeta_credito',
+     'Segunda tarjeta de crédito de Alda. Mismo tratamiento que la primera.'),
 ]
 
 CATEGORIAS = [

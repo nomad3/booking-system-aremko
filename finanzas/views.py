@@ -472,7 +472,9 @@ def gastos_ano(request):
 NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
                          'scotiabank': 'Scotiabank',
                          'scotiabank_alda': 'Scotiabank Alda (personal)',
-                         'cuentarut_jorge': 'CuentaRUT Jorge (personal)'}
+                         'cuentarut_jorge': 'CuentaRUT Jorge (personal)',
+                         'tarjeta_alda_1': 'Tarjeta Alda 1 (Scotiabank)',
+                         'tarjeta_alda_2': 'Tarjeta Alda 2 (Scotiabank)'}
 
 
 @user_passes_test(puede_ver_finanzas)
@@ -488,12 +490,17 @@ def cargar_cartola(request):
     """
     from django.core import signing
 
-    from .services import (CUENTA_ALDA_NUMERO, estado_fila_cartola,
-                           parsear_cartola_alda, parsear_cartola_bancoestado,
-                           parsear_cartola_scotiabank, registrar_filas_alda,
-                           registrar_filas_cartola)
+    from .services import (CUENTA_ALDA_NUMERO, TARJETAS_ALDA,
+                           estado_fila_cartola, parsear_cartola_alda,
+                           parsear_cartola_bancoestado,
+                           parsear_cartola_scotiabank, parsear_tarjeta_alda,
+                           registrar_filas_alda, registrar_filas_cartola,
+                           registrar_filas_tarjeta)
 
-    ctx = {}
+    ctx = {'tarjetas': list(CuentaFinanciera.objects
+                            .filter(clave__in=TARJETAS_ALDA)
+                            .order_by('clave')),
+           'tarjeta_sel': request.POST.get('tarjeta', '')}
 
     if request.method == 'POST' and request.POST.get('confirmar'):
         try:
@@ -504,6 +511,17 @@ def cargar_cartola(request):
         else:
             cuenta_clave = payload.get('cuenta', 'bancoestado')
             convertidos = 0
+            if cuenta_clave in TARJETAS_ALDA:
+                creados, saltados, calzados, sin_calce = \
+                    registrar_filas_tarjeta(payload['filas'], cuenta_clave)
+                ctx['resultado'] = {
+                    'creados': creados, 'saltados': saltados,
+                    'convertidos': calzados, 'sin_calce': sin_calce,
+                    'cuenta': NOMBRE_CUENTA_CARTOLA.get(cuenta_clave,
+                                                        cuenta_clave),
+                    'cierres': [],
+                }
+                return render(request, 'finanzas/cargar_cartola.html', ctx)
             if cuenta_clave == 'scotiabank_alda':
                 creados, saltados, convertidos = registrar_filas_alda(
                     payload['filas'], payload.get('cierres_mes'))
@@ -530,6 +548,16 @@ def cargar_cartola(request):
             elif magia.startswith(b'\xd0\xcf'):    # OLE2 → xls Scotiabank
                 cuenta_clave = 'scotiabank'
                 datos = parsear_cartola_scotiabank(archivo)
+            elif magia.startswith(b'%PDF'):        # PDF → tarjeta de Alda
+                # El PDF no dice a qué tarjeta pertenece (verificado
+                # 2026-08-10): sin el selector, adivinar sería inventar.
+                cuenta_clave = ctx['tarjeta_sel']
+                if cuenta_clave not in TARJETAS_ALDA:
+                    raise ValueError(
+                        'Es un PDF de tarjeta: elige ARRIBA a cuál de las dos '
+                        'tarjetas corresponde antes de subirlo — el archivo '
+                        'no lo dice.')
+                datos = parsear_tarjeta_alda(archivo, cuenta_clave)
             elif magia.startswith(b';'):           # texto ';' → BSA.dat Alda
                 datos = parsear_cartola_alda(archivo)
                 if CUENTA_ALDA_NUMERO not in datos['cuenta_numero']:
@@ -540,14 +568,45 @@ def cargar_cartola(request):
                 cuenta_clave = 'scotiabank_alda'
             else:
                 raise ValueError('No reconozco el archivo: se esperan el .xlsx '
-                                 'de BancoEstado, el .xls de Scotiabank o el '
-                                 'BSA.dat de la cuenta de Alda.')
+                                 'de BancoEstado, el .xls de Scotiabank, el '
+                                 'BSA.dat de la cuenta de Alda o el PDF de '
+                                 'una de sus tarjetas.')
         except ValueError as e:
             ctx['error'] = str(e)
         except Exception:
             ctx['error'] = ('No pude leer el archivo — ¿es el export del '
                             'portal del banco?')
         else:
+            if cuenta_clave in TARJETAS_ALDA:
+                # La tarjeta no tiene saldo encadenado ni cierres de mes: son
+                # compras sueltas, así que lleva su propia vista previa.
+                for f in datos['filas']:
+                    if MovimientoFinanciero.objects.filter(
+                            referencia=f['referencia']).exists():
+                        f['estado'] = 'ya_existe'
+                    elif date.fromisoformat(f['fecha']) < date(2026, 7, 1):
+                        f['estado'] = 'fuera_cobertura'
+                    else:
+                        f['estado'] = 'nuevo'
+                    f['clase'] = 'traspaso' if f['es_pago'] else 'gasto'
+                    f['monto_fmt'] = _clp(f['cargo'] or f['abono'])
+                    if f['es_pago']:
+                        f['categoria'] = 'pago de la tarjeta'
+                nuevas = [f for f in datos['filas'] if f['estado'] == 'nuevo']
+                ctx.update({
+                    'datos': datos, 'es_tarjeta': True,
+                    'cuenta_nombre': NOMBRE_CUENTA_CARTOLA.get(cuenta_clave,
+                                                               cuenta_clave),
+                    'n_nuevas': len(nuevas),
+                    'n_ya': len(datos['filas']) - len(nuevas),
+                    'compras_fmt': _clp(datos['total_compras']),
+                    'pagos_fmt': _clp(datos['total_pagos']),
+                })
+                if nuevas:
+                    ctx['payload'] = signing.dumps({'cuenta': cuenta_clave,
+                                                    'filas': nuevas})
+                return render(request, 'finanzas/cargar_cartola.html', ctx)
+
             from .services import destino_puente
             nombres_cta = dict(CuentaFinanciera.objects.values_list(
                 'clave', 'nombre'))
