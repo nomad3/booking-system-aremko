@@ -149,29 +149,41 @@ def tablero(request):
     # (Aremko pagador); lo que Deborah ignoró para SU tarea igual es plata que
     # entró y acá cuenta. El desfase de un día (MP aprueba de noche, se registra
     # a la mañana) es normal — la señal real es el TOTAL de la ventana.
+    # Los COBROS se comparan contra los cobros: la API de MP no reporta las
+    # devoluciones, así que netearlas de este lado hacía aparecer cada
+    # devolución como «plata que entró sin registrarse» (visto por Jorge
+    # 2026-08-10 con una reserva anulada y vuelta a tomar). Van en su propia
+    # columna: son un hecho, no un descuadre.
     corte_mp = hoy - timedelta(days=13)
     por_dia = defaultdict(dict)
-    for r in (Pago.objects.filter(metodo_pago__in=METODOS_MP,
-                                  fecha_pago__date__gte=corte_mp)
+    base_pagos = Pago.objects.filter(metodo_pago__in=METODOS_MP,
+                                     fecha_pago__date__gte=corte_mp)
+    for r in (base_pagos.filter(monto__gt=0)
               .annotate(d=TruncDate('fecha_pago')).values('d')
               .annotate(t=Sum('monto'), n=Count('id'))):
         por_dia[r['d']].update(sis=int(r['t'] or 0), sis_n=r['n'])
+    for r in (base_pagos.filter(monto__lt=0)
+              .annotate(d=TruncDate('fecha_pago')).values('d')
+              .annotate(t=Sum('monto'), n=Count('id'))):
+        por_dia[r['d']].update(dev=abs(int(r['t'] or 0)), dev_n=r['n'])
     for r in (MovimientoMP.objects.filter(fecha__date__gte=corte_mp)
               .exclude(sugerencia_motivo=MOTIVO_NO_ES_COBRO)
               .annotate(d=TruncDate('fecha')).values('d')
               .annotate(t=Sum('monto'), n=Count('id'))):
         por_dia[r['d']].update(mp=int(r['t'] or 0), mp_n=r['n'])
 
-    verif_mp, v_sis, v_mp = [], 0, 0
+    verif_mp, v_sis, v_mp, v_dev = [], 0, 0, 0
     for d in sorted(por_dia):
         v = por_dia[d]
-        sis, mp_t = v.get('sis', 0), v.get('mp', 0)
+        sis, mp_t, dev_d = v.get('sis', 0), v.get('mp', 0), v.get('dev', 0)
         dif = mp_t - sis
         v_sis += sis
         v_mp += mp_t
+        v_dev += dev_d
         verif_mp.append({
             'dia': d,
             'sistema': _clp(sis) if sis else '—', 'sistema_n': v.get('sis_n', 0),
+            'dev': _clp(dev_d) if dev_d else '', 'dev_n': v.get('dev_n', 0),
             'mp': _clp(mp_t) if mp_t else '—', 'mp_n': v.get('mp_n', 0),
             'dif': (f'+{_clp(dif)}' if dif > 0 else f'−{_clp(-dif)}') if dif else '',
             'dif_alerta': dif != 0,
@@ -258,6 +270,7 @@ def tablero(request):
         'verif_dif': ((f'+{_clp(verif_dif)}' if verif_dif > 0 else f'−{_clp(-verif_dif)}')
                       if verif_dif else '$0'),
         'verif_cuadra': verif_dif == 0,
+        'verif_dev': _clp(v_dev) if v_dev else '',
         'mp_al_dia': mp_al_dia,
     })
 

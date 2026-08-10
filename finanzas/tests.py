@@ -1684,3 +1684,99 @@ class TraspasoACuentaPuenteTest(TestCase):
                                          'cuentarut_jorge'))
         self.assertEqual(destino_puente('TEF A JORGE ANTONIO AGUILERA',
                                         'bancoestado'), 'cuentarut_jorge')
+
+
+class VerificacionMPDevolucionesTest(TestCase):
+    """Caso real de Jorge (2026-08-10): un cliente anula, se le devuelve la
+    plata y vuelve a tomar la reserva. La API de MP no reporta devoluciones,
+    así que restarlas del lado sistema las hacía aparecer como descuadre."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        """Las señales CRM/Meta piden tablas del drift AR-033/034 que el shim
+        de tests no migra — mismo patrón que tests_checkout_agenda."""
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        # Limpiar ANTES también: otra suite pudo dejar en el thread-local un
+        # usuario que ya no existe (su transacción se revirtió), y el Pago que
+        # creamos acá heredaría esa FK muerta. Pasaba solo en conjunto.
+        self._limpiar_thread_local()
+        call_command('sembrar_finanzas')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+
+    def tearDown(self):
+        self._limpiar_thread_local()
+        super().tearDown()
+
+    @staticmethod
+    def _limpiar_thread_local():
+        """ThreadLocalMiddleware guarda el usuario del request y nadie lo
+        limpia — mismo remedio que tests_comandas_cocina."""
+        from ventas import middleware
+        middleware._thread_locals.user = None
+
+    def _pago(self, monto, cuando):
+        from ventas.models import Cliente, Pago, VentaReserva
+        cliente, _ = Cliente.objects.get_or_create(
+            telefono='+56900000123', defaults={'nombre': 'Cliente Prueba'})
+        reserva, _ = VentaReserva.objects.get_or_create(
+            cliente=cliente, defaults={'fecha_reserva': timezone.now()})
+        return Pago.objects.create(venta_reserva=reserva, monto=monto,
+                                   metodo_pago='mercadopago_link',
+                                   fecha_pago=cuando)
+
+    def test_la_devolucion_no_se_cuenta_como_descuadre(self):
+        cuando = timezone.now() - timedelta(days=1)
+        dia = timezone.localtime(cuando).date()
+        # Cobró 200.000, se devolvió, volvió a tomar por 200.000.
+        self._pago(200000, cuando)
+        self._pago(-200000, cuando)
+        self._pago(200000, cuando)
+        # MP solo ve los DOS cobros: no reporta la devolución.
+        for i, monto in enumerate((200000, 200000)):
+            MovimientoMP.objects.create(mp_payment_id=f'dev{i}', monto=monto,
+                                        fecha=cuando)
+
+        r = self.client.get(reverse('finanzas:tablero'))
+        fila = [f for f in r.context['verif_mp'] if f['dia'] == dia][0]
+        self.assertEqual(fila['sistema'], '$400.000')   # cobros, sin netear
+        self.assertEqual(fila['dev'], '$200.000')       # la devolución, aparte
+        self.assertEqual(fila['mp'], '$400.000')
+        self.assertEqual(fila['dif'], '')               # ya no hay descuadre
+        self.assertFalse(fila['dif_alerta'])
+        self.assertTrue(r.context['verif_cuadra'])
+        self.assertEqual(r.context['verif_dev'], '$200.000')
+
+    def test_una_diferencia_de_verdad_sigue_saltando(self):
+        """El arreglo no puede tapar la plata que sí falta registrar."""
+        cuando = timezone.now() - timedelta(days=1)
+        self._pago(100000, cuando)
+        MovimientoMP.objects.create(mp_payment_id='real1', monto=100000,
+                                    fecha=cuando)
+        MovimientoMP.objects.create(mp_payment_id='real2', monto=50000,
+                                    fecha=cuando)
+        r = self.client.get(reverse('finanzas:tablero'))
+        self.assertFalse(r.context['verif_cuadra'])
+        self.assertEqual(r.context['verif_dif'], '+$50.000')

@@ -96,12 +96,16 @@
      <b>Resultado final</b> = después de los retiros de la familia.</p>
 
   <h2>Verificación Mercado Pago · últimos 14 días</h2>
-  <p class="sub">Lo que el sistema registró como cobrado por MP contra lo que la API de Mercado Pago
-     dice que entró (sin las compras donde Aremko es el pagador).
+  <p class="sub">Los COBROS que el sistema registró por MP contra los que la API de Mercado Pago
+     dice que entraron (sin las compras donde Aremko es el pagador). Las devoluciones van
+     en su propia columna y NO se restan de este lado: la API de MP tampoco las reporta,
+     así que restarlas acá haría aparecer cada devolución como un descuadre.
      {% if mp_al_dia %}Datos MP hasta el {{ mp_al_dia|date:"d-m-Y H:i" }}.{% endif %}</p>
   {% if verif_mp %}
   {% if verif_cuadra %}
-  <div class="aviso ok">✓ Cuadra: en la ventana, el sistema y Mercado Pago dicen lo mismo.</div>
+  <div class="aviso ok">✓ Cuadra: en la ventana, el sistema y Mercado Pago dicen lo mismo.
+    {% if verif_dev %}Además hubo <b>{{ verif_dev }}</b> en devoluciones a clientes, que ya
+    están descontadas de los ingresos del resumen.{% endif %}</div>
   {% else %}
   <div class="aviso">Diferencia de la ventana: <b>{{ verif_dif }}</b>
     (MP {{ verif_mp_total }} vs sistema {{ verif_sis }}).
@@ -111,16 +115,19 @@
     <a href="/admin/conciliacion/movimientomp/">conciliación</a>.</div>
   {% endif %}
   <div class="scroll"><table>
-    <thead><tr><th>Día</th><th>Sistema (Django)</th><th>N</th>
+    <thead><tr><th>Día</th><th>Cobros sistema</th><th>N</th>
+               <th>Devoluciones</th>
                <th>Mercado Pago (API)</th><th>N</th><th>Diferencia</th></tr></thead>
     <tbody>
       {% for f in verif_mp %}
       <tr><td>{{ f.dia|date:"D d-m" }}</td>
           <td>{{ f.sistema }}</td><td>{{ f.sistema_n|default:'' }}</td>
+          <td>{% if f.dev %}−{{ f.dev }}{% endif %}</td>
           <td>{{ f.mp }}</td><td>{{ f.mp_n|default:'' }}</td>
           <td{% if f.dif_alerta %} class="neg"{% endif %}>{{ f.dif }}</td></tr>
       {% endfor %}
       <tr class="tot"><td>Total ventana</td><td>{{ verif_sis }}</td><td></td>
+          <td>{% if verif_dev %}−{{ verif_dev }}{% endif %}</td>
           <td>{{ verif_mp_total }}</td><td></td>
           <td{% if not verif_cuadra %} class="neg"{% endif %}>{{ verif_dif }}</td></tr>
     </tbody>
