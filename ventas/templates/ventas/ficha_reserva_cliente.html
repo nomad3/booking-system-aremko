@@ -86,6 +86,17 @@
       border-radius:14px;padding:14px 18px;text-align:center;text-decoration:none;font-weight:700;
       font-size:15px;margin:0 0 12px;box-shadow:0 6px 18px rgba(20,40,32,.22)}
     .btn-pagar small{display:block;font-weight:400;color:#cdbf9d;font-size:12px;margin-top:3px}
+    /* La transferencia es la opción destacada: mismo peso visual que tenía
+       el botón de pagar online. */
+    .pago-principal>summary{background:linear-gradient(160deg,#10231d,#1e4438);color:#fff;
+      border-radius:14px;box-shadow:0 6px 18px rgba(20,40,32,.22)}
+    .pago-principal>summary .s-sub{color:#cdbf9d}
+    .pago-cuotas{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center}
+    .pago-cuotas p{font-size:13.5px;color:var(--ink);margin:0 0 8px}
+    .btn-wa{display:block;background:#25d366;color:#0b2a17;border-radius:12px;padding:11px 14px;
+      text-decoration:none;font-weight:700;font-size:14px}
+    .link-tarjeta{display:inline-block;margin-top:9px;font-size:12.5px;color:var(--hint);
+      text-decoration:underline}
     .pago-texto{white-space:pre-wrap;font-size:13.5px;color:var(--ink);margin:0 0 12px;background:var(--bg);
       border-radius:10px;padding:12px}
     .pago-campo{margin-bottom:10px}
@@ -269,14 +280,13 @@
         {% endif %}
 
         {% if not es_cotizacion and saldo > 0 %}
-        <a class="btn-pagar" href="{{ pagar_url }}">
-          💳 Pagar online — hasta 12 cuotas
-          <small>Tarjeta de crédito, débito o Mercado Pago · saldo {{ saldo_str }}</small>
-        </a>
-        <details>
+        {# Transferencia primero: para Aremko no tiene comisión y la tarjeta
+           cuesta ~3,1% (medido junio vs julio 2026). La tarjeta sigue
+           disponible, pero como segunda opción. #}
+        <details class="pago-principal">
           <summary>
             <span class="ic i-pay">🏦</span>
-            <span><span class="s-tt">Datos para transferir</span><br><span class="s-sub">Copia los datos y paga tu saldo</span></span>
+            <span><span class="s-tt">Datos de Transferencia</span><br><span class="s-sub">Paga tu saldo {{ saldo_str }} por transferencia</span></span>
             <span class="chev">▾</span>
           </summary>
           <div class="acc-bd">
@@ -312,6 +322,13 @@
             {% else %}
               <p class="pago-texto">Escríbenos a ventas@aremko.cl y te enviamos los datos para transferir.</p>
             {% endif %}
+
+            <div class="pago-cuotas">
+              <p>¿Prefieres pagar con <strong>tarjeta en hasta 12 cuotas</strong>?</p>
+              <a class="btn-wa" href="{{ whatsapp_pago_url }}" target="_blank" rel="noopener">
+                💬 Escríbenos por WhatsApp y te enviamos el link</a>
+              <a class="link-tarjeta" href="{{ pagar_url }}">o paga con tarjeta ahora →</a>
+            </div>
           </div>
         </details>
         {% endif %}

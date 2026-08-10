@@ -13,12 +13,22 @@ SECRET_KEY, así nadie ve la reserva de otro cambiando el id en la URL.
 
 import logging
 
+from django.conf import settings
 from django.core import signing
 from django.http import Http404
 from django.shortcuts import render, redirect
 
 from ..models import VentaReserva, ConfiguracionTips, ConfiguracionResumen
 from .tips_reserva_view import _generar_texto_tips
+
+# El Pase ofrece transferencia primero (Jorge 2026-08-10: la tarjeta cuesta
+# ~3,1% de comisión y la transferencia por Mercado Pago no cuesta nada). Quien
+# quiera cuotas escribe por WhatsApp y le mandan el link. Configurable por
+# variable de entorno para no repetir el número en el código.
+WHATSAPP_PAGO_URL = getattr(
+    settings, 'WHATSAPP_VENTAS_URL',
+    'https://wa.me/56957902525?text='
+    'Hola%2C%20quiero%20pagar%20mi%20reserva%20con%20tarjeta%20en%20cuotas')
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +299,7 @@ def ficha_reserva_cliente(request, token):
         'datos_transferencia': datos_transferencia,
         'pago_nombre': pago_nombre,
         'pago_cuenta': pago_cuenta,
+        'whatsapp_pago_url': WHATSAPP_PAGO_URL,
         'pago_correo': pago_correo,
         'maps_url': config_tips.link_google_maps,
         'participantes_masaje': participantes_masaje,
