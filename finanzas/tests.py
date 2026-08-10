@@ -1569,8 +1569,118 @@ class CartolaBancoEstadoEnLineaTest(TestCase):
         creados, _ = registrar_filas_cartola(d['filas'], d['cierres_mes'],
                                              cuenta_clave='bancoestado')
         self.assertEqual(creados, 7)
-        retiro = MovimientoFinanciero.objects.get(monto=500000)
-        self.assertEqual(retiro.categoria.grupo, 'personales_alda')
+        # La transferencia a Alda es TRASPASO (dos piernas), no retiro:
+        # esa plata cambió de bolsillo, no salió del negocio.
+        piernas = MovimientoFinanciero.objects.filter(monto=500000)
+        self.assertEqual(piernas.count(), 2)
+        self.assertEqual({p.clase for p in piernas}, {'traspaso'})
+        self.assertEqual({p.cuenta.clave for p in piernas},
+                         {'bancoestado', 'scotiabank_alda'})
         creados2, _ = registrar_filas_cartola(d['filas'], d['cierres_mes'],
                                               cuenta_clave='bancoestado')
         self.assertEqual(creados2, 0)
+
+
+class TraspasoACuentaPuenteTest(TestCase):
+    """Corrección de Jorge (2026-08-10): la plata que Aremko manda a la
+    cuenta de Alda NO es retiro, es traspaso — cambia de bolsillo. El retiro
+    ocurre después, cuando ella gasta en algo personal."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+        self.alda = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+
+    def _fila(self, desc, monto=500000, dia=date(2026, 8, 6), ref='be:t1'):
+        return {'fecha': dia.isoformat(), 'descripcion': desc,
+                'cargo': monto, 'abono': 0, 'saldo': 0, 'clase': 'gasto',
+                'sentido': 'sale', 'categoria': 'personales_alda',
+                'referencia': ref}
+
+    def test_a_cuenta_seguida_es_traspaso_con_dos_piernas(self):
+        from .services import registrar_filas_cartola
+        creados, _ = registrar_filas_cartola(
+            [self._fila('TEF A TOLOZA POBLETE ALDA ANGELICA')],
+            cuenta_clave='bancoestado')
+        self.assertEqual(creados, 1)
+
+        sale = MovimientoFinanciero.objects.get(cuenta=self.be)
+        entra = MovimientoFinanciero.objects.get(cuenta=self.alda)
+        self.assertEqual(sale.clase, 'traspaso')
+        self.assertIsNone(sale.categoria)
+        self.assertEqual((entra.clase, entra.sentido), ('traspaso', 'entra'))
+        self.assertEqual(sale.traspaso_par_id, entra.id)
+        self.assertEqual(entra.traspaso_par_id, sale.id)
+        # Y NO cuenta como retiro de la familia.
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            clase='gasto', categoria__grupo='personales_alda').count(), 0)
+
+    def test_a_una_cuenta_que_no_seguimos_sigue_siendo_retiro(self):
+        from .services import registrar_filas_cartola
+        registrar_filas_cartola(
+            [self._fila('TEF A ALDA BCI', ref='be:t2')],
+            cuenta_clave='bancoestado')
+        mov = MovimientoFinanciero.objects.get(cuenta=self.be)
+        self.assertEqual(mov.clase, 'gasto')
+        self.assertEqual(mov.categoria.grupo, 'personales_alda')
+        # Nada entró a la cuenta puente: esa plata salió de nuestra vista.
+        self.assertEqual(
+            MovimientoFinanciero.objects.filter(cuenta=self.alda).count(), 0)
+
+    def test_usa_el_abono_que_ya_esperaba_en_vez_de_duplicar(self):
+        """Si su cartola se cargó primero, ese abono ES la pierna que entra."""
+        from .services import CLAVE_POR_CALZAR, registrar_filas_cartola
+        cat, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=CLAVE_POR_CALZAR,
+            defaults={'nombre': 'Abono desde Aremko por calzar',
+                      'clase': 'ingreso', 'grupo': 'ingresos'})
+        pendiente = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 5), cuenta=self.alda, clase='ingreso',
+            sentido='entra', monto=500000, categoria=cat, fuente='captura',
+            referencia='alda:x', descripcion='TEF AREMKO HOTEL SPA')
+
+        registrar_filas_cartola(
+            [self._fila('TEF A TOLOZA POBLETE ALDA ANGELICA')],
+            cuenta_clave='bancoestado')
+
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.clase, 'traspaso')
+        self.assertIsNone(pendiente.categoria)
+        # Una sola pierna que entra: la plata no se duplicó en su cuenta.
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            cuenta=self.alda, sentido='entra').count(), 1)
+        agg = {r['sentido']: int(r['t']) for r in
+               MovimientoFinanciero.objects.filter(clase='traspaso')
+               .values('sentido').annotate(t=Sum('monto'))}
+        self.assertEqual(agg['entra'], agg['sale'])
+
+    def test_su_cartola_despues_no_vuelve_a_meter_la_plata(self):
+        """Orden inverso: primero Aremko, después la cartola de ella."""
+        from .services import registrar_filas_cartola, registrar_filas_puente
+        registrar_filas_cartola(
+            [self._fila('TEF A TOLOZA POBLETE ALDA ANGELICA')],
+            cuenta_clave='bancoestado')
+        antes = MovimientoFinanciero.objects.filter(cuenta=self.alda).count()
+
+        fila_de_ella = {'fecha': '2026-08-05',
+                        'descripcion': 'TEF 76485192-7 AREMKO',
+                        'cargo': 0, 'abono': 500000, 'saldo': 0,
+                        'clase': 'traspaso', 'sentido': 'entra',
+                        'categoria': '', 'propio': True,
+                        'referencia': 'alda:zz'}
+        creados, saltados, convertidos = registrar_filas_puente(
+            [fila_de_ella], 'scotiabank_alda')
+        self.assertEqual((creados, convertidos), (0, 0))
+        self.assertEqual(saltados, 1)
+        self.assertEqual(
+            MovimientoFinanciero.objects.filter(cuenta=self.alda).count(),
+            antes)
+
+    def test_traslado_a_si_mismo_no_es_traspaso(self):
+        """Desde la CuentaRUT a otra cuenta de Jorge: no hay a dónde ir."""
+        from .services import destino_puente
+        self.assertIsNone(destino_puente('TEF A JORGE ANTONIO AGUILERA',
+                                         'cuentarut_jorge'))
+        self.assertEqual(destino_puente('TEF A JORGE ANTONIO AGUILERA',
+                                        'bancoestado'), 'cuentarut_jorge')

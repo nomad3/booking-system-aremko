@@ -437,6 +437,15 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
                     or estado_fila_cartola(cuenta_clave, f) != 'nuevo'):
                 saltados += 1
                 continue
+
+            destino = (destino_puente(f['descripcion'], cuenta_clave)
+                       if f['clase'] == 'gasto' else None)
+            if destino and _traspaso_a_puente(
+                    fecha, monto, f['descripcion'], f['referencia'],
+                    cuenta, destino):
+                creados += 1
+                continue
+
             MovimientoFinanciero.objects.create(
                 fecha=fecha, cuenta=cuenta, clase=f['clase'],
                 sentido=f['sentido'], monto=monto,
@@ -453,6 +462,58 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
                           'notas': 'Cierre derivado del export de cartola'})
 
     return creados, saltados
+
+
+def _traspaso_a_puente(fecha, monto, descripcion, referencia, cuenta_origen,
+                       destino_clave):
+    """Registra Aremko → cuenta puente como traspaso, con sus dos piernas.
+
+    No es un retiro: la plata sigue existiendo, solo cambió de bolsillo. Si
+    la cartola de la cuenta puente ya se cargó y ese abono quedó esperando
+    («por calzar»), se usa ESE como pierna que entra en vez de crear otra —
+    si no, la misma plata entraría dos veces a su cuenta.
+    Devuelve True si registró; False si la cuenta destino no existe todavía
+    (mejor caer al camino normal que inventar una pierna suelta).
+    """
+    from datetime import timedelta
+
+    from .models import CuentaFinanciera, MovimientoFinanciero
+
+    destino = CuentaFinanciera.objects.filter(clave=destino_clave).first()
+    if destino is None:
+        return False
+
+    ventana = (fecha - timedelta(days=2), fecha + timedelta(days=2))
+    entra = MovimientoFinanciero.objects.filter(
+        cuenta=destino, clase='traspaso', sentido='entra', monto=monto,
+        traspaso_par__isnull=True, fecha__range=ventana).first()
+    if entra is None:
+        entra = MovimientoFinanciero.objects.filter(
+            cuenta=destino, clase='ingreso', monto=monto,
+            categoria__clave=CLAVE_POR_CALZAR, fecha__range=ventana).first()
+
+    sale = MovimientoFinanciero.objects.create(
+        fecha=fecha, cuenta=cuenta_origen, clase='traspaso', sentido='sale',
+        monto=monto, fuente='captura', referencia=referencia,
+        descripcion=f'Traspaso a {destino.nombre}: {descripcion}'[:255])
+
+    if entra is not None:
+        entra.clase = 'traspaso'
+        entra.sentido = 'entra'
+        entra.categoria = None
+        entra.traspaso_par = sale
+        entra.save(update_fields=['clase', 'sentido', 'categoria',
+                                  'traspaso_par'])
+    else:
+        entra = MovimientoFinanciero.objects.create(
+            fecha=fecha, cuenta=destino, clase='traspaso', sentido='entra',
+            monto=monto, fuente='captura',
+            referencia=f'{referencia}:entra'[:120], traspaso_par=sale,
+            descripcion=f'Traspaso desde {cuenta_origen.nombre}: '
+                        f'{descripcion}'[:255])
+    sale.traspaso_par = entra
+    sale.save(update_fields=['traspaso_par'])
+    return True
 
 
 def ordenar_por_cadena_de_saldos(movs, saldo_inicial):
@@ -777,6 +838,36 @@ CATEGORIAS_ALDA = {
 
 CLAVE_POR_CALZAR = 'abono_aremko_por_calzar'
 
+# Transferencias de Aremko a una cuenta que SÍ seguimos: no son retiro, son
+# traspaso — la plata cambió de bolsillo y desde ahí se pagan cuentas de
+# Aremko y gastos personales (Jorge 2026-08-10). El retiro de verdad ocurre
+# después, cuando esa plata se gasta en algo personal, y ahí lo dice la
+# cartola de esa cuenta. A una cuenta que NO seguimos (el BCI de Alda, Mach,
+# Martín) sí es retiro: la plata sale de nuestra vista.
+# Se evalúan en orden: lo que va a None es retiro aunque el nombre calce.
+DESTINO_PUENTE = [
+    ('ALDA BCI', None), ('BCI ALDA', None), ('MACH', None),
+    ('TOLOZA POBLETE ALDA', 'scotiabank_alda'),
+    ('ALDA ANGELICA TOLOZA', 'scotiabank_alda'),
+    ('ANGELICA TOLOZA', 'scotiabank_alda'),
+    ('ALDA TOLOZA', 'scotiabank_alda'),
+    ('JORGE ANTONIO AGUILERA', 'cuentarut_jorge'),
+    ('JORGE AGUILERA', 'cuentarut_jorge'),
+]
+
+
+def destino_puente(descripcion, cuenta_origen=None):
+    """A qué cuenta puente va este cargo, o None si es retiro de verdad.
+
+    Si el destino es la MISMA cuenta que lo origina, no hay traspaso: es un
+    traslado a otra cuenta de esa persona que no seguimos.
+    """
+    d = (descripcion or '').upper()
+    for patron, destino in DESTINO_PUENTE:
+        if patron in d:
+            return None if destino == cuenta_origen else destino
+    return None
+
 
 def clasificar_fila_alda(descripcion, cargo, abono):
     """(clase, sentido, categoria_clave, propio) para una fila del BSA.dat.
@@ -1083,11 +1174,17 @@ def registrar_filas_puente(filas, cuenta_clave, cierres_mes=None):
                 continue
 
             if f.get('propio') and f['clase'] == 'traspaso':
+                ventana = (fecha - timedelta(days=2), fecha + timedelta(days=2))
+                # Si la cartola de Aremko ya se cargó, la pierna que entra
+                # existe: repetirla metería la misma plata dos veces.
+                if MovimientoFinanciero.objects.filter(
+                        cuenta=cuenta, clase='traspaso', sentido='entra',
+                        monto=monto, fecha__range=ventana).exists():
+                    saltados += 1
+                    continue
                 candidatos = list(MovimientoFinanciero.objects.filter(
                     clase='gasto', sentido='sale', monto=monto,
-                    categoria__grupo=grupo_retiro,
-                    fecha__range=(fecha - timedelta(days=2),
-                                  fecha + timedelta(days=2)))
+                    categoria__grupo=grupo_retiro, fecha__range=ventana)
                     .exclude(cuenta=cuenta))
                 if not candidatos:
                     # Sin calce exacto NO se descarta: la plata entró de

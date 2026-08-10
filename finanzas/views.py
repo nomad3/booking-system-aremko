@@ -527,8 +527,17 @@ def cargar_cartola(request):
             ctx['error'] = ('No pude leer el archivo — ¿es el export del '
                             'portal del banco?')
         else:
+            from .services import destino_puente
+            nombres_cta = dict(CuentaFinanciera.objects.values_list(
+                'clave', 'nombre'))
             for f in datos['filas']:
                 f['estado'] = estado_fila_cartola(cuenta_clave, f)
+                destino = (destino_puente(f['descripcion'], cuenta_clave)
+                           if f['clase'] == 'gasto' else None)
+                if destino:
+                    # No es retiro: la plata cambia de bolsillo (Jorge).
+                    f['clase'] = 'traspaso'
+                    f['categoria'] = f'a {nombres_cta.get(destino, destino)}'
                 if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
                     f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
