@@ -720,6 +720,19 @@ def cargar_movimientos(request):
     return render(request, 'finanzas/cargar_movimientos.html', ctx)
 
 
+# Cuentas de Aremko con cartola: son las únicas contra las que se puede
+# verificar un ingreso por transferencia. Las personales quedan fuera a
+# propósito — sus abonos de clientes no se registran como ingreso.
+CUENTAS_VERIFICABLES = ('bancoestado', 'scotiabank')
+# Métodos de pago que dicen «esto llegó por transferencia a una cuenta que
+# seguimos». Los de cuentas personales (bcialda, machjorge…) se informan
+# aparte: no hay contra qué cruzarlos.
+METODOS_TRANSFERENCIA = ('transferencia', 'bancoestado', 'scotiabank')
+METODOS_TRANSFERENCIA_SIN_CARTOLA = (
+    'cuentarut', 'scotiabankalda', 'bcialda', 'bicegoalda', 'andesalda',
+    'machjorge', 'machalda')
+VENTANA_CALCE_DIAS = 5     # decisión de Jorge 2026-08-10
+
 CUENTAS_CON_CARTOLA = ('bancoestado', 'scotiabank', 'scotiabank_alda',
                        'cuentarut_jorge')
 HUECO_SOSPECHOSO = 4      # días seguidos sin un solo movimiento
@@ -742,6 +755,130 @@ def _tramos_vacios(fechas, desde, hasta, minimo=HUECO_SOSPECHOSO):
     if len(corrida) >= minimo:
         tramos.append((corrida[0], corrida[-1], len(corrida)))
     return tramos
+
+
+def calzar_abonos_con_pagos(abonos, pagos, dias=VENTANA_CALCE_DIAS):
+    """Empareja cada abono del banco con un pago del sistema del MISMO monto
+    dentro de la ventana. Devuelve (pares, abonos_solos, pagos_solos).
+
+    Uno a uno: cada pago se consume una sola vez. Función pura sobre listas
+    de (fecha, monto, objeto) — así se puede probar sin base de datos.
+    """
+    libres = sorted(pagos, key=lambda p: p[0])
+    usados = set()
+    pares, solos = [], []
+    for fecha, monto, obj in sorted(abonos, key=lambda a: a[0]):
+        elegido = None
+        for i, (pf, pm, po) in enumerate(libres):
+            if i in usados or pm != monto:
+                continue
+            if abs((pf - fecha).days) <= dias:
+                elegido = i
+                break
+        if elegido is None:
+            solos.append((fecha, monto, obj))
+        else:
+            usados.add(elegido)
+            pares.append(((fecha, monto, obj), libres[elegido]))
+    sin_abono = [p for i, p in enumerate(libres) if i not in usados]
+    return pares, solos, sin_abono
+
+
+@user_passes_test(puede_ver_finanzas)
+def verificar_transferencias(request):
+    """El equivalente del panel de Mercado Pago para las transferencias
+    (pedido de Jorge 2026-08-10).
+
+    Compara los abonos de clientes que muestran las cartolas contra los pagos
+    que el equipo registró con método de transferencia. Lo que no calza en un
+    lado o en el otro es lo que hay que mirar.
+    """
+    hoy = date.today()
+    desde = date(2026, 7, 1)
+
+    # Hasta dónde se puede verificar: la cartola menos avanzada manda. Más
+    # allá de esa fecha no hay con qué comparar, y decirlo importa tanto como
+    # el número — si no, la falta de datos se lee como plata perdida.
+    coberturas = {}
+    for clave in CUENTAS_VERIFICABLES:
+        ult = (MovimientoFinanciero.objects
+               .filter(cuenta__clave=clave, fuente='captura')
+               .aggregate(m=Max('fecha'))['m'])
+        coberturas[clave] = ult
+    con_datos = [f for f in coberturas.values() if f]
+    hasta = min(con_datos) if con_datos else None
+
+    ctx = {
+        'desde': desde, 'hasta': hasta, 'ventana': VENTANA_CALCE_DIAS,
+        'coberturas': [(NOMBRE_CORTO_CUENTA.get(c, c), coberturas[c])
+                       for c in CUENTAS_VERIFICABLES],
+    }
+    if hasta is None:
+        return render(request, 'finanzas/verificar_transferencias.html', ctx)
+
+    abonos = [
+        (m.fecha, int(m.monto), m) for m in
+        MovimientoFinanciero.objects
+        .filter(clase='ingreso', categoria__clave='transferencias_recibidas',
+                cuenta__clave__in=CUENTAS_VERIFICABLES,
+                fecha__gte=desde, fecha__lte=hasta)
+        .select_related('cuenta').order_by('fecha')]
+
+    from django.utils import timezone as _tz
+
+    pagos_qs = (Pago.objects
+                .filter(metodo_pago__in=METODOS_TRANSFERENCIA, monto__gt=0,
+                        fecha_pago__date__gte=desde,
+                        fecha_pago__date__lte=hasta)
+                .select_related('venta_reserva', 'venta_reserva__cliente')
+                .order_by('fecha_pago'))
+    pagos = [(_tz.localtime(p.fecha_pago).date(), int(p.monto), p)
+             for p in pagos_qs]
+
+    pares, sin_pago, sin_abono = calzar_abonos_con_pagos(abonos, pagos)
+
+    # Resumen por mes de los dos lados.
+    por_mes = defaultdict(lambda: {'banco': 0, 'sistema': 0})
+    for fecha, monto, _ in abonos:
+        por_mes[date(fecha.year, fecha.month, 1)]['banco'] += monto
+    for fecha, monto, _ in pagos:
+        por_mes[date(fecha.year, fecha.month, 1)]['sistema'] += monto
+    resumen = []
+    for mes in sorted(por_mes, reverse=True):
+        d = por_mes[mes]
+        dif = d['banco'] - d['sistema']
+        resumen.append({
+            'mes': mes, 'banco': _clp(d['banco']), 'sistema': _clp(d['sistema']),
+            'dif': (f'+{_clp(dif)}' if dif > 0 else f'−{_clp(-dif)}') if dif else '',
+            'alerta': dif != 0,
+        })
+
+    otros = (Pago.objects
+             .filter(metodo_pago__in=METODOS_TRANSFERENCIA_SIN_CARTOLA,
+                     monto__gt=0, fecha_pago__date__gte=desde,
+                     fecha_pago__date__lte=hasta)
+             .aggregate(t=Sum('monto'), n=Count('id')))
+
+    ctx.update({
+        'resumen': resumen,
+        'n_calzados': len(pares),
+        'monto_calzado': _clp(sum(m for (_, m, _), _ in pares)),
+        'sin_pago': [{'fecha': f, 'monto': _clp(m),
+                      'cuenta': NOMBRE_CORTO_CUENTA.get(o.cuenta.clave,
+                                                        o.cuenta.nombre),
+                      'glosa': (o.descripcion or '')[:70]}
+                     for f, m, o in sin_pago],
+        'total_sin_pago': _clp(sum(m for _, m, _ in sin_pago)),
+        'sin_abono': [{'fecha': f, 'monto': _clp(m), 'metodo': o.metodo_pago,
+                       'reserva': o.venta_reserva_id,
+                       'cliente': (getattr(getattr(o.venta_reserva, 'cliente',
+                                                   None), 'nombre', '') or '')[:40]}
+                      for f, m, o in sin_abono],
+        'total_sin_abono': _clp(sum(m for _, m, _ in sin_abono)),
+        'otros_n': otros['n'] or 0,
+        'otros_monto': _clp(otros['t'] or 0),
+    })
+    return render(request, 'finanzas/verificar_transferencias.html', ctx)
 
 
 @user_passes_test(puede_ver_finanzas)

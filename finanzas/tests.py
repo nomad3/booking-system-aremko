@@ -2134,3 +2134,167 @@ class DuplicadosTest(TestCase):
         call_command('revisar_duplicados', '--desde', '2026-07-01',
                      '--eliminar-de', 'visa_2936', stdout=StringIO())
         self.assertEqual(M.objects.filter(monto=9990).count(), 1)
+
+
+class VerificarTransferenciasTest(TestCase):
+    """El control de ingresos por transferencia (Jorge 2026-08-10): el
+    equivalente del panel de Mercado Pago, pero para la plata que llega por
+    transferencia al banco."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        self._limpiar_thread_local()
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+        self.sc = CuentaFinanciera.objects.get(clave='scotiabank')
+        self.cat, _ = CategoriaFinanciera.objects.get_or_create(
+            clave='transferencias_recibidas',
+            defaults={'nombre': 'Transferencias recibidas', 'clase': 'ingreso'})
+
+    def tearDown(self):
+        self._limpiar_thread_local()
+        super().tearDown()
+
+    @staticmethod
+    def _limpiar_thread_local():
+        from ventas import middleware
+        middleware._thread_locals.user = None
+
+    def _abono(self, dia, monto, cuenta=None, glosa='TRANSFERENCIA DE CLIENTE'):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=cuenta or self.be, clase='ingreso',
+            sentido='entra', monto=monto, categoria=self.cat, fuente='captura',
+            referencia=f'ab:{cuenta and cuenta.clave or "be"}:{dia}:{monto}',
+            descripcion=glosa)
+
+    def _cobertura(self, dia):
+        """Un gasto cualquiera en cada cuenta: estira hasta dónde llega la
+        cartola sin sumar a los abonos."""
+        gasto = CategoriaFinanciera.objects.get(clave='por_clasificar')
+        for cuenta in (self.be, self.sc):
+            MovimientoFinanciero.objects.create(
+                fecha=dia, cuenta=cuenta, clase='gasto', sentido='sale',
+                monto=500, categoria=gasto, fuente='captura',
+                referencia=f'cob:{cuenta.clave}:{dia}')
+
+    def _pago(self, dia, monto, metodo='transferencia'):
+        from ventas.models import Cliente, Pago, VentaReserva
+        cliente, _ = Cliente.objects.get_or_create(
+            telefono='+56900000777', defaults={'nombre': 'Cliente Prueba'})
+        reserva, _ = VentaReserva.objects.get_or_create(
+            cliente=cliente, defaults={'fecha_reserva': timezone.now()})
+        cuando = timezone.make_aware(datetime(dia.year, dia.month, dia.day, 12))
+        return Pago.objects.create(venta_reserva=reserva, monto=monto,
+                                   metodo_pago=metodo, fecha_pago=cuando)
+
+    # ── el emparejador puro ────────────────────────────────────────────────
+    def test_calza_mismo_monto_dentro_de_la_ventana(self):
+        from .views import calzar_abonos_con_pagos
+        abonos = [(date(2026, 7, 10), 50000, 'A')]
+        pagos = [(date(2026, 7, 13), 50000, 'P')]      # 3 días después
+        pares, solos, sin_abono = calzar_abonos_con_pagos(abonos, pagos)
+        self.assertEqual(len(pares), 1)
+        self.assertEqual((solos, sin_abono), ([], []))
+
+    def test_no_calza_fuera_de_la_ventana_ni_con_otro_monto(self):
+        from .views import calzar_abonos_con_pagos
+        lejos = calzar_abonos_con_pagos([(date(2026, 7, 1), 50000, 'A')],
+                                        [(date(2026, 7, 10), 50000, 'P')])
+        self.assertEqual(len(lejos[0]), 0)
+        self.assertEqual(len(lejos[1]), 1)      # el abono queda solo
+        self.assertEqual(len(lejos[2]), 1)      # el pago también
+
+        distinto = calzar_abonos_con_pagos([(date(2026, 7, 1), 50000, 'A')],
+                                           [(date(2026, 7, 2), 49000, 'P')])
+        self.assertEqual(len(distinto[0]), 0)
+
+    def test_un_pago_no_se_usa_dos_veces(self):
+        """Dos abonos iguales y un solo pago: uno calza, el otro queda solo.
+        Si el pago se reusara, el descuadre real se escondería."""
+        from .views import calzar_abonos_con_pagos
+        pares, solos, _ = calzar_abonos_con_pagos(
+            [(date(2026, 7, 5), 30000, 'A1'), (date(2026, 7, 6), 30000, 'A2')],
+            [(date(2026, 7, 5), 30000, 'P1')])
+        self.assertEqual(len(pares), 1)
+        self.assertEqual(len(solos), 1)
+
+    # ── la página ──────────────────────────────────────────────────────────
+    def test_la_cobertura_la_manda_la_cartola_menos_avanzada(self):
+        self._abono(date(2026, 7, 20), 10000, cuenta=self.be)
+        self._abono(date(2026, 7, 10), 10000, cuenta=self.sc)
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['hasta'], date(2026, 7, 10))
+
+    def test_sin_cartolas_lo_dice_en_vez_de_mostrar_ceros(self):
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertIsNone(r.context['hasta'])
+        self.assertContains(r, 'no hay nada contra qué comparar')
+
+    def test_separa_lo_que_calza_de_lo_que_falta_en_cada_lado(self):
+        self._cobertura(date(2026, 7, 20))            # las dos cartolas al 20
+        self._abono(date(2026, 7, 5), 80000)          # calza con su pago
+        self._pago(date(2026, 7, 7), 80000)
+        self._abono(date(2026, 7, 8), 45000)          # llegó plata, sin pago
+        self._pago(date(2026, 7, 9), 33000)           # pago sin plata en el banco
+
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertEqual(r.context['hasta'], date(2026, 7, 20))
+        self.assertEqual(r.context['n_calzados'], 1)
+        self.assertEqual([f['monto'] for f in r.context['sin_pago']],
+                         ['$45.000'])
+        self.assertEqual([f['monto'] for f in r.context['sin_abono']],
+                         ['$33.000'])
+        self.assertEqual(r.context['resumen'][0]['banco'], '$125.000')
+        self.assertEqual(r.context['resumen'][0]['sistema'], '$113.000')
+
+    def test_los_pagos_a_cuentas_sin_cartola_se_declaran_aparte(self):
+        """Un pago a la CuentaRUT no es un descuadre: no hay cartola de esa
+        cuenta con abonos de clientes. Mezclarlos sería inventar un problema."""
+        self._abono(date(2026, 7, 20), 1000)
+        self._pago(date(2026, 7, 10), 70000, metodo='cuentarut')
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertEqual(r.context['otros_n'], 1)
+        self.assertEqual(r.context['otros_monto'], '$70.000')
+        self.assertEqual(r.context['sin_abono'], [])
+
+    def test_no_mira_mas_alla_de_donde_llega_la_cartola(self):
+        """Un pago posterior al corte no se cuenta como faltante: ahí no falta
+        plata, falta cartola."""
+        self._abono(date(2026, 7, 15), 1000)
+        self._pago(date(2026, 7, 28), 99000)
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertEqual(r.context['sin_abono'], [])
+
+    def test_alda_tambien_puede_verla_y_un_recepcionista_no(self):
+        User.objects.create_user('recep', 'r@r.cl', 'x', is_staff=True)
+        self.client.logout()
+        self.client.login(username='recep', password='x')
+        r = self.client.get(reverse('finanzas:verificar_transferencias'))
+        self.assertEqual(r.status_code, 302)

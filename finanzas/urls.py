@@ -12,6 +12,8 @@ urlpatterns = [
          name='cargar_movimientos'),
     path('calzar-retiros/', views.calzar_retiros, name='calzar_retiros'),
     path('salud/', views.salud_fuentes, name='salud_fuentes'),
+    path('verificar-transferencias/', views.verificar_transferencias,
+         name='verificar_transferencias'),
     path('gastos-mes/', views.gastos_mes, name='gastos_mes'),
     path('gastos-ano/', views.gastos_ano, name='gastos_ano'),
 ]
