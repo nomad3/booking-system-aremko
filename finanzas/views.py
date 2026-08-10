@@ -32,11 +32,19 @@ CANAL_POR_METODO = {
     'flow': 'Flow', 'webpay': 'Flow',
     'tarjeta': 'Tarjeta (SumUp)',
     'efectivo': 'Efectivo',
-    'transferencia': 'Transferencia', 'scotiabank': 'Transferencia',
-    'bancoestado': 'Transferencia', 'cuentarut': 'Transferencia',
-    'scotiabankalda': 'Transferencia', 'bcialda': 'Transferencia',
-    'bicegoalda': 'Transferencia', 'andesalda': 'Transferencia',
-    'machjorge': 'Transferencia', 'machalda': 'Transferencia',
+    # Cada transferencia a SU cuenta (Jorge 2026-08-10: «¿a qué cuenta? son
+    # varias, deberían mostrarse todas»). Juntarlas en un solo «Transferencia»
+    # escondía en qué bolsillo cayó cada peso.
+    'transferencia': 'Transferencia (cuenta sin especificar)',
+    'bancoestado': 'Transferencia · BancoEstado',
+    'scotiabank': 'Transferencia · Scotiabank',
+    'cuentarut': 'Transferencia · CuentaRUT Jorge',
+    'scotiabankalda': 'Transferencia · Scotiabank Alda',
+    'bcialda': 'Transferencia · BCI Alda',
+    'bicegoalda': 'Transferencia · Bicego Alda',
+    'andesalda': 'Transferencia · Andes Alda',
+    'machjorge': 'Mach Jorge', 'machalda': 'Mach Alda',
+    'copecjorge': 'Copec Jorge', 'copecalda': 'Copec Alda',
     'booking': 'Booking',
 }
 # NO son ingreso nuevo: el canje de giftcard es un pasivo que se libera (la
