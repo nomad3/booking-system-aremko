@@ -428,9 +428,33 @@ def registrar_filas_cartola(filas, cierres_mes=None, cuenta_clave='bancoestado')
         # existe, cae en «por clasificar» y se ve en el triaje.
         return cats.get(clave) or cats.get('por_clasificar')
 
+    # Guardia contra la DOBLE CARGA desde dos exports distintos del mismo
+    # período (Jorge 2026-08-10: los mismos gastos aparecían dos veces en
+    # Scotiabank). La referencia incluye el saldo, y ese valor cambia entre el
+    # export de movimientos y el estado mensual, así que no reconocía la fila
+    # como repetida. Acá se compara por lo que NO cambia —fecha, monto y
+    # glosa— y se permite crear solo las que falten: si el archivo trae dos
+    # compras idénticas y en la base ya hay una, se crea una.
+    from collections import Counter
+    pendientes = Counter()
+    for f in filas:
+        firma = (f['fecha'], f['abono'] or f['cargo'], f['descripcion'])
+        pendientes[firma] += 1
+    for firma, en_archivo in list(pendientes.items()):
+        fecha_iso, monto, desc = firma
+        ya = MovimientoFinanciero.objects.filter(
+            cuenta=cuenta, fecha=date.fromisoformat(fecha_iso), monto=monto,
+            descripcion__endswith=desc[:180]).count()
+        pendientes[firma] = max(0, en_archivo - ya)
+
     creados = saltados = 0
     with transaction.atomic():
         for f in filas:
+            firma = (f['fecha'], f['abono'] or f['cargo'], f['descripcion'])
+            if pendientes[firma] <= 0:
+                saltados += 1
+                continue
+            pendientes[firma] -= 1
             fecha = date.fromisoformat(f['fecha'])
             monto = f['abono'] or f['cargo']
             if (fecha < COBERTURA_GASTOS_DESDE or monto <= 0

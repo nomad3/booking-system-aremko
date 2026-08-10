@@ -1976,3 +1976,100 @@ class DetectarRecurrentesTest(TestCase):
         self.assertIn('días del mes: 5, 12, 19, 26', texto)
         self.assertIn('próximo cobro estimado', texto)
         self.assertEqual(MovimientoFinanciero.objects.count(), antes)
+
+
+class DuplicadosTest(TestCase):
+    """Doble carga y atribución doble (Jorge 2026-08-10)."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.sc = CuentaFinanciera.objects.get(clave='scotiabank')
+        self.visa = CuentaFinanciera.objects.get(clave='visa_2936')
+        self.rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        self.cat = CategoriaFinanciera.objects.get(clave='por_clasificar')
+
+    def _fila(self, desc, monto, saldo, ref):
+        return {'fecha': '2026-07-20', 'descripcion': desc, 'cargo': monto,
+                'abono': 0, 'saldo': saldo, 'clase': 'gasto',
+                'sentido': 'sale', 'categoria': 'por_clasificar',
+                'referencia': ref}
+
+    def test_dos_exports_del_mismo_periodo_no_duplican(self):
+        """El saldo cambia entre exports y por eso la referencia difería;
+        ahora se compara por fecha, monto y glosa."""
+        from .services import registrar_filas_cartola
+        creados, _ = registrar_filas_cartola(
+            [self._fila('REDCOMPRA EXPRESS PUERTO', 157433, 900000, 'sc:a')],
+            cuenta_clave='scotiabank')
+        self.assertEqual(creados, 1)
+        # Mismo movimiento, otro export: otro saldo → otra referencia.
+        creados2, saltados2 = registrar_filas_cartola(
+            [self._fila('REDCOMPRA EXPRESS PUERTO', 157433, 111111, 'sc:b')],
+            cuenta_clave='scotiabank')
+        self.assertEqual((creados2, saltados2), (0, 1))
+        self.assertEqual(MovimientoFinanciero.objects.filter(
+            cuenta=self.sc).count(), 1)
+
+    def test_dos_compras_iguales_de_verdad_entran_las_dos(self):
+        """Dos cobros idénticos el mismo día existen (dos cafés seguidos):
+        el guardián permite tantos como traiga el archivo."""
+        from .services import registrar_filas_cartola
+        creados, _ = registrar_filas_cartola(
+            [self._fila('FARMACIA', 3090, 900000, 'sc:1'),
+             self._fila('FARMACIA', 3090, 896910, 'sc:2')],
+            cuenta_clave='scotiabank')
+        self.assertEqual(creados, 2)
+
+    def test_el_comando_separa_los_dos_tipos_de_duplicado(self):
+        from io import StringIO
+        M = MovimientoFinanciero
+        # Doble carga: misma cuenta.
+        for i in (1, 2):
+            M.objects.create(fecha=date(2026, 7, 20), cuenta=self.sc,
+                             clase='gasto', sentido='sale', monto=157433,
+                             categoria=self.cat, fuente='captura',
+                             referencia=f'dup:sc:{i}',
+                             descripcion='Cartola scotiabank: REDCOMPRA EXPRESS PUERTO')
+        # Atribución: mismo cobro en dos cuentas distintas.
+        for cuenta, i in ((self.rut, 3), (self.visa, 4)):
+            M.objects.create(fecha=date(2026, 7, 14), cuenta=cuenta,
+                             clase='gasto', sentido='sale', monto=180000,
+                             categoria=self.cat, fuente='captura',
+                             referencia=f'dup:g:{i}',
+                             descripcion='Pago Google Ads Google')
+
+        salida = StringIO()
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     stdout=salida)
+        texto = salida.getvalue()
+        self.assertIn('MISMA CUENTA (doble carga): 1 casos', texto)
+        self.assertIn('CUENTAS DISTINTAS (atribución): 1 casos', texto)
+        self.assertIn('Google Ads', texto)
+        self.assertIn('Nada se borró', texto)
+        self.assertEqual(M.objects.count(), 4)   # solo miró
+
+    def test_eliminar_de_borra_solo_esa_cuenta_y_nunca_deja_vacio(self):
+        from io import StringIO
+        M = MovimientoFinanciero
+        for cuenta, i in ((self.rut, 1), (self.visa, 2)):
+            M.objects.create(fecha=date(2026, 7, 14), cuenta=cuenta,
+                             clase='gasto', sentido='sale', monto=180000,
+                             categoria=self.cat, fuente='captura',
+                             referencia=f'el:{i}',
+                             descripcion='Pago Google Ads Google')
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     '--eliminar-de', 'visa_2936', stdout=StringIO())
+        # Se fue el de la Visa; queda el de la CuentaRUT, que es el bueno.
+        self.assertEqual(M.objects.count(), 1)
+        self.assertEqual(M.objects.first().cuenta.clave, 'cuentarut_jorge')
+
+        # Si TODOS fueran de la cuenta objetivo, se conserva uno.
+        for i in (5, 6):
+            M.objects.create(fecha=date(2026, 7, 15), cuenta=self.visa,
+                             clase='gasto', sentido='sale', monto=9990,
+                             categoria=self.cat, fuente='captura',
+                             referencia=f'el:{i}', descripcion='ALGO')
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     '--eliminar-de', 'visa_2936', stdout=StringIO())
+        self.assertEqual(M.objects.filter(monto=9990).count(), 1)
