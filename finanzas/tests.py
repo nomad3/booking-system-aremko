@@ -1780,3 +1780,23 @@ class VerificacionMPDevolucionesTest(TestCase):
         r = self.client.get(reverse('finanzas:tablero'))
         self.assertFalse(r.context['verif_cuadra'])
         self.assertEqual(r.context['verif_dif'], '+$50.000')
+
+
+class ComisionDeMPTest(TestCase):
+    """El cálculo que responde «¿subió la comisión o subieron las ventas?»."""
+
+    def test_solo_cuenta_lo_que_paga_el_vendedor(self):
+        from finanzas.management.commands.comparar_comisiones_mp import comision_de
+        pago = {'fee_details': [
+            {'type': 'mercadopago_fee', 'amount': 3500, 'fee_payer': 'collector'},
+            {'type': 'financing_fee', 'amount': 8000, 'fee_payer': 'payer'},
+            {'type': 'application_fee', 'amount': 500},   # sin fee_payer
+        ]}
+        # 3.500 del vendedor + 500 del que no declara pagador (default
+        # collector); los 8.000 que paga el cliente NO son costo nuestro.
+        self.assertEqual(comision_de(pago), 4000)
+
+    def test_sin_comisiones_devuelve_cero(self):
+        from finanzas.management.commands.comparar_comisiones_mp import comision_de
+        self.assertEqual(comision_de({}), 0)
+        self.assertEqual(comision_de({'fee_details': []}), 0)
