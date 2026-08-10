@@ -1,0 +1,127 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Salud de las fuentes · Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1060px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  h2{font-size:17px; margin:32px 0 8px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 18px;}
+  .aviso{border-radius:10px; padding:10px 14px; font-size:13.5px; margin:12px 0;
+         background:#f5eeda; border:1px solid #e3d5ac; color:#5c4d1f;}
+  .aviso.ok{background:#e8f2ea; border-color:#c4dccb; color:var(--verde);}
+  .aviso.mal{background:#f7e8e8; border-color:#e0bcbc; color:var(--rojo);}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px; background:#fff;}
+  table{border-collapse:collapse; width:100%; font-size:13.5px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:7px 10px; border-bottom:1px solid var(--linea); text-align:right;
+        white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left; white-space:normal;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:11.5px;
+           text-transform:uppercase; letter-spacing:.03em;}
+  tr:last-child td{border-bottom:none;}
+  .bien{color:var(--verde); font-weight:600;}
+  .mal{color:var(--rojo); font-weight:600;}
+  .nota{color:var(--suave); font-size:12.5px;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Salud de las fuentes</h1>
+  <p class="sub">¿Está entrando todo? Cobertura de las cartolas y últimas señales de
+     cada fuente automática, desde el {{ desde|date:"d-m-Y" }} ·
+     <a href="{% url 'finanzas:flujo_caja' %}">flujo de caja</a> ·
+     <a href="{% url 'finanzas:cargar_cartola' %}">cargar cartola</a></p>
+
+  <h2>Fuentes automáticas</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Fuente</th><th>Último dato</th><th>Hace</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for f in fuentes %}
+      <tr>
+        <td>{{ f.nombre }}</td>
+        <td>{% if f.ultimo %}{{ f.ultimo|date:"d-m-Y" }}{% else %}—{% endif %}</td>
+        <td class="{% if f.alerta %}mal{% else %}bien{% endif %}">
+          {% if f.dias is None %}sin datos{% elif f.dias == 0 %}hoy{% elif f.dias == 1 %}1 día{% else %}{{ f.dias }} días{% endif %}</td>
+        <td class="nota">{{ f.detalle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="sub">El cron corre cada hora y trae Mercado Pago, los correos de
+     transferencia y SumUp. Si alguna fila está en rojo, esa fuente dejó de llegar —
+     revisar el log del cron en Render.
+     {% if sin_cobros_mp %}<br>Días sin ningún cobro por Mercado Pago en las últimas
+     dos semanas: <b>{% for d in sin_cobros_mp %}{{ d|date:"d-m" }}{% if not forloop.last %} · {% endif %}{% endfor %}</b>
+     — normal si no hubo ventas por ese canal, sospechoso si sí las hubo.{% endif %}</p>
+
+  <h2>Cartolas: ¿cubren el período completo?</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Cuenta</th><th>Desde</th><th>Hasta</th><th>Días con movimiento</th>
+               <th>Movimientos</th><th>Atraso</th><th>Ancla julio</th></tr></thead>
+    <tbody>
+      {% for c in cartolas %}
+      <tr>
+        <td>{{ c.nombre }}</td>
+        {% if c.vacia %}
+        <td colspan="5" class="nota" style="text-align:left;">Sin ningún movimiento cargado</td>
+        {% else %}
+        <td>{{ c.primera|date:"d-m" }}</td>
+        <td>{{ c.ultima|date:"d-m" }}</td>
+        <td>{{ c.n_dias }}</td>
+        <td>{{ c.n_movs }}</td>
+        <td class="{% if c.atrasada %}mal{% else %}bien{% endif %}">
+          {% if c.atraso == 0 %}al día{% else %}{{ c.atraso }} días{% endif %}</td>
+        {% endif %}
+        <td class="{% if c.ancla %}bien{% else %}mal{% endif %}">{% if c.ancla %}sí{% else %}falta{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+
+  {% for c in cartolas %}{% if c.tramos %}
+  <div class="aviso"><b>{{ c.nombre }}</b> — {{ c.tramos|length }} salto{{ c.tramos|length|pluralize:"s" }}
+    de 4 días o más sin ningún movimiento, dentro del rango que la cartola dice cubrir:
+    {% for t in c.tramos %}<br>· del <b>{{ t.desde|date:"d-m" }}</b> al
+    <b>{{ t.hasta|date:"d-m" }}</b> ({{ t.dias }} días){% endfor %}
+    <br><span class="nota">Puede ser real (una cuenta puede pasar días quieta) o una
+    cartola que quedó fuera. Vale la pena comparar con el banco.</span>
+  </div>
+  {% endif %}{% endfor %}
+
+  <h2>Controles</h2>
+  {% if traspasos_cuadran %}
+  <div class="aviso ok">✓ Los traspasos cuadran: cada peso que salió de una cuenta
+    entró en otra. Es el control que atrapa la plata que nadie avisa.</div>
+  {% else %}
+  <div class="aviso mal">⚠️ Los traspasos NO cuadran por {{ descalce }} — hay un
+    traspaso registrado por un solo lado.</div>
+  {% endif %}
+
+  {% if n_por_calzar %}
+  <div class="aviso">Hay <b>{{ n_por_calzar }}</b> abonos desde Aremko sin calzar
+    ({{ monto_por_calzar }}): esa plata se está contando dos veces en el resultado.
+    <a href="{% url 'finanzas:calzar_retiros' %}"><b>Calzarlos</b></a></div>
+  {% else %}
+  <div class="aviso ok">✓ No hay abonos pendientes de calce.</div>
+  {% endif %}
+
+  {% if n_sin_clasificar %}
+  <div class="aviso">Quedan <b>{{ n_sin_clasificar }}</b> gastos por clasificar
+    ({{ monto_sin_clasificar }}) — mientras estén ahí no se sabe en qué se fue esa plata.
+    <a href="/admin/finanzas/movimientofinanciero/?clase__exact=gasto&categoria__grupo__exact=otros"><b>Asignarlos</b></a></div>
+  {% else %}
+  <div class="aviso ok">✓ Todo el gasto del período está clasificado.</div>
+  {% endif %}
+</div>
+</body>
+</html>

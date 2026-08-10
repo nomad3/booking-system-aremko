@@ -631,6 +631,147 @@ def cargar_movimientos(request):
     return render(request, 'finanzas/cargar_movimientos.html', ctx)
 
 
+CUENTAS_CON_CARTOLA = ('bancoestado', 'scotiabank', 'scotiabank_alda',
+                       'cuentarut_jorge')
+HUECO_SOSPECHOSO = 4      # días seguidos sin un solo movimiento
+
+
+def _tramos_vacios(fechas, desde, hasta, minimo=HUECO_SOSPECHOSO):
+    """Tramos de `minimo` días o más sin ningún movimiento, dentro del rango
+    que la cartola dice cubrir. Un banco puede pasar un fin de semana quieto;
+    una semana entera en blanco casi siempre es cartola que falta."""
+    tramos, corrida = [], []
+    d = desde
+    while d <= hasta:
+        if d in fechas:
+            if len(corrida) >= minimo:
+                tramos.append((corrida[0], corrida[-1], len(corrida)))
+            corrida = []
+        else:
+            corrida.append(d)
+        d += timedelta(days=1)
+    if len(corrida) >= minimo:
+        tramos.append((corrida[0], corrida[-1], len(corrida)))
+    return tramos
+
+
+@user_passes_test(puede_ver_finanzas)
+def salud_fuentes(request):
+    """¿Está entrando todo? (P-22, pedido de Jorge 2026-08-10)
+
+    Dos preguntas: las cartolas ¿cubren el mes completo o hay saltos?, y las
+    fuentes automáticas (MP, SumUp, correos) ¿siguen llegando? Un tablero que
+    no se puede auditar a sí mismo no sirve para auditar nada.
+    """
+    hoy = date.today()
+    desde = date(2026, 7, 1)
+
+    # ── Cartolas: cobertura y huecos ────────────────────────────────────────
+    cuentas = {c.clave: c for c in
+               CuentaFinanciera.objects.filter(clave__in=CUENTAS_CON_CARTOLA)}
+    anclas = set(SaldoMensual.objects
+                 .filter(periodo=date(2026, 7, 1))
+                 .values_list('cuenta__clave', flat=True))
+    cartolas = []
+    for clave in CUENTAS_CON_CARTOLA:
+        if clave not in cuentas:
+            continue
+        movs = (MovimientoFinanciero.objects
+                .filter(cuenta__clave=clave, fecha__gte=desde)
+                .values_list('fecha', flat=True))
+        fechas = set(movs)
+        if not fechas:
+            cartolas.append({
+                'nombre': NOMBRE_CORTO_CUENTA.get(clave, cuentas[clave].nombre),
+                'vacia': True, 'ancla': clave in anclas})
+            continue
+        primera, ultima = min(fechas), max(fechas)
+        atraso = (hoy - ultima).days
+        cartolas.append({
+            'nombre': NOMBRE_CORTO_CUENTA.get(clave, cuentas[clave].nombre),
+            'vacia': False,
+            'primera': primera, 'ultima': ultima,
+            'n_movs': len(movs), 'n_dias': len(fechas),
+            'atraso': atraso,
+            'atrasada': atraso >= 3,
+            'ancla': clave in anclas,
+            'tramos': [{'desde': a, 'hasta': b, 'dias': n}
+                       for a, b, n in _tramos_vacios(fechas, primera, ultima)],
+        })
+
+    # ── Fuentes automáticas: ¿cuándo llegó el último dato? ──────────────────
+    def _ultimo(**filtros):
+        return (MovimientoFinanciero.objects.filter(**filtros)
+                .aggregate(m=Max('fecha'))['m'])
+
+    from django.utils import timezone as _tz
+
+    mp_ultimo = MovimientoMP.objects.aggregate(m=Max('fecha'))['m']
+    mp_ultimo_dia = _tz.localtime(mp_ultimo).date() if mp_ultimo else None
+    corte14 = hoy - timedelta(days=13)
+    dias_con_mp = set(MovimientoMP.objects
+                      .filter(fecha__date__gte=corte14)
+                      .annotate(d=TruncDate('fecha'))
+                      .values_list('d', flat=True))
+    sin_cobros = [d for d in (corte14 + timedelta(days=i) for i in range(14))
+                  if d <= hoy and d not in dias_con_mp]
+
+    fuentes = [
+        {'nombre': 'Mercado Pago · cobros (API)',
+         'ultimo': mp_ultimo_dia,
+         'detalle': (f'{MovimientoMP.objects.filter(fecha__date__gte=corte14).count()}'
+                     ' cobros en 14 días'),
+         'tope': 2},
+        {'nombre': 'Mercado Pago · comisiones',
+         'ultimo': _ultimo(referencia__startswith='mp:fee:'),
+         'detalle': f"{MovimientoFinanciero.objects.filter(referencia__startswith='mp:fee:').count()} registradas",
+         'tope': 3},
+        {'nombre': 'Mercado Pago · compras de Aremko',
+         'ultimo': (MovimientoFinanciero.objects
+                    .filter(referencia__startswith='mp:', clase='gasto')
+                    .exclude(referencia__startswith='mp:fee:')
+                    .aggregate(m=Max('fecha'))['m']),
+         'detalle': 'gastos que Aremko pagó con Mercado Pago',
+         'tope': 15},
+        {'nombre': 'Correos de transferencia (IMAP)',
+         'ultimo': _ultimo(referencia__startswith='correo:'),
+         'detalle': f"{MovimientoFinanciero.objects.filter(referencia__startswith='correo:').count()} movimientos",
+         'tope': 5},
+        {'nombre': 'SumUp · comisiones (API)',
+         'ultimo': _ultimo(referencia__startswith='sumup:fee:'),
+         'detalle': f"{MovimientoFinanciero.objects.filter(referencia__startswith='sumup:fee:').count()} registradas",
+         'tope': 5},
+    ]
+    for f in fuentes:
+        f['dias'] = (hoy - f['ultimo']).days if f['ultimo'] else None
+        f['alerta'] = f['ultimo'] is None or f['dias'] > f['tope']
+
+    # ── Traspasos: el control que atrapa lo que nadie avisa ─────────────────
+    agg = {r['sentido']: int(r['t'] or 0) for r in
+           MovimientoFinanciero.objects.filter(clase='traspaso')
+           .values('sentido').annotate(t=Sum('monto'))}
+    descalce = agg.get('entra', 0) - agg.get('sale', 0)
+
+    por_calzar = MovimientoFinanciero.objects.filter(
+        categoria__clave='abono_aremko_por_calzar', clase='ingreso')
+    sin_clasificar = MovimientoFinanciero.objects.filter(
+        clase='gasto', categoria__grupo='otros', fecha__gte=desde)
+
+    return render(request, 'finanzas/salud_fuentes.html', {
+        'hoy': hoy, 'desde': desde,
+        'cartolas': cartolas,
+        'fuentes': fuentes,
+        'traspasos_cuadran': descalce == 0,
+        'descalce': _clp(abs(descalce)),
+        'n_por_calzar': por_calzar.count(),
+        'monto_por_calzar': _clp(sum(int(m.monto) for m in por_calzar)),
+        'n_sin_clasificar': sin_clasificar.count(),
+        'monto_sin_clasificar': _clp(
+            sum(int(m.monto) for m in sin_clasificar)),
+        'sin_cobros_mp': sin_cobros,
+    })
+
+
 @user_passes_test(puede_ver_finanzas)
 def calzar_retiros(request):
     """Decir a mano qué retiro corresponde a cada abono desde Aremko.

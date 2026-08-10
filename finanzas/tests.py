@@ -1356,3 +1356,90 @@ class EnlacesReportesTest(TestCase):
         self.assertIn(f'cuenta__id__exact={self.be.id}', celda['url'])
         # El total de la fila NO filtra por cuenta: son todas.
         self.assertNotIn('cuenta__id__exact', fila['total']['url'])
+
+
+class SaludFuentesTest(TestCase):
+    """La página que audita a la máquina (Jorge 2026-08-10): ¿las cartolas
+    cubren el período? ¿siguen llegando MP y SumUp?"""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+        self.pc = CategoriaFinanciera.objects.get(clave='por_clasificar')
+
+    def _mov(self, dia, monto=1000, ref=None, cuenta=None):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=cuenta or self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=self.pc, fuente='captura',
+            referencia=ref or f'sal:{dia}:{monto}')
+
+    def test_tramos_vacios_detecta_el_hueco_largo_y_no_un_dia_suelto(self):
+        from .views import _tramos_vacios
+        fechas = {date(2026, 7, 1), date(2026, 7, 3), date(2026, 7, 15)}
+        tramos = _tramos_vacios(fechas, date(2026, 7, 1), date(2026, 7, 15))
+        # El 2 de julio solo (1 día) no es salto; del 4 al 14 sí (11 días).
+        self.assertEqual(len(tramos), 1)
+        self.assertEqual((tramos[0][0], tramos[0][1], tramos[0][2]),
+                         (date(2026, 7, 4), date(2026, 7, 14), 11))
+
+    def test_pagina_reporta_cobertura_atraso_y_saltos(self):
+        self._mov(date(2026, 7, 1))
+        self._mov(date(2026, 7, 2))
+        self._mov(date(2026, 7, 20))        # deja un salto largo en medio
+        SaldoMensual.objects.create(cuenta=self.be, periodo=date(2026, 7, 1),
+                                    saldo_cierre=100, fuente='cartola')
+
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        self.assertEqual(r.status_code, 200)
+        fila = [c for c in r.context['cartolas']
+                if 'BancoEstado' in c['nombre']][0]
+        self.assertEqual(fila['primera'], date(2026, 7, 1))
+        self.assertEqual(fila['ultima'], date(2026, 7, 20))
+        self.assertEqual(fila['n_movs'], 3)
+        self.assertTrue(fila['atrasada'])       # nada nuevo hace semanas
+        self.assertTrue(fila['ancla'])
+        self.assertEqual(len(fila['tramos']), 1)
+        self.assertContains(r, 'salto')
+
+        # Una cuenta sin nada cargado se declara vacía, no se esconde.
+        vacia = [c for c in r.context['cartolas']
+                 if c['nombre'] == 'Scotiabank'][0]
+        self.assertTrue(vacia['vacia'])
+
+    def test_fuentes_automaticas_marcan_alerta_cuando_dejan_de_llegar(self):
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        por_nombre = {f['nombre']: f for f in r.context['fuentes']}
+        sumup = por_nombre['SumUp · comisiones (API)']
+        self.assertIsNone(sumup['ultimo'])
+        self.assertTrue(sumup['alerta'])
+
+        # Con un dato de hoy deja de alertar.
+        self._mov(date.today(), ref='sumup:fee:1')
+        r2 = self.client.get(reverse('finanzas:salud_fuentes'))
+        sumup2 = {f['nombre']: f for f in
+                  r2.context['fuentes']}['SumUp · comisiones (API)']
+        self.assertEqual(sumup2['dias'], 0)
+        self.assertFalse(sumup2['alerta'])
+
+    def test_controles_de_traspasos_y_pendientes(self):
+        # Un traspaso por un solo lado: el descalce se declara.
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 1), cuenta=self.be, clase='traspaso',
+            sentido='sale', monto=50000, fuente='manual', referencia='t:1')
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        self.assertFalse(r.context['traspasos_cuadran'])
+        self.assertEqual(r.context['descalce'], '$50.000')
+        # Y los gastos por clasificar se cuentan.
+        self._mov(date(2026, 8, 2), monto=7000)
+        r2 = self.client.get(reverse('finanzas:salud_fuentes'))
+        self.assertEqual(r2.context['n_sin_clasificar'], 1)
+        self.assertEqual(r2.context['monto_sin_clasificar'], '$7.000')
+
+    def test_staff_comun_no_entra(self):
+        User.objects.create_user('deborah', password='x', is_staff=True)
+        self.client.login(username='deborah', password='x')
+        self.assertEqual(self.client.get(
+            reverse('finanzas:salud_fuentes')).status_code, 302)
