@@ -1302,3 +1302,57 @@ class CalzarRetirosTest(TestCase):
         self.client.login(username='deborah', password='x')
         self.assertEqual(self.client.get(
             reverse('finanzas:calzar_retiros')).status_code, 302)
+
+
+class EnlacesReportesTest(TestCase):
+    """Cada cifra del reporte abre sus movimientos ya filtrados — el camino
+    para reasignar un gasto mal clasificado (Jorge 2026-08-09)."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.infra = CategoriaFinanciera.objects.get(clave='infraestructura')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10), cuenta=self.be, clase='gasto',
+            sentido='sale', monto=954118, categoria=self.infra,
+            fuente='captura', referencia='enl:1', descripcion='Render y otros')
+
+    def test_url_movimientos_arma_los_filtros(self):
+        from .views import url_movimientos
+        url = url_movimientos(grupo='infra_web', ano=2026, mes=7)
+        self.assertIn('/admin/finanzas/movimientofinanciero/', url)
+        self.assertIn('clase__exact=gasto', url)
+        self.assertIn('categoria__grupo__exact=infra_web', url)
+        self.assertIn('fecha__year=2026', url)
+        self.assertIn('fecha__month=7', url)
+        # Con categoría concreta manda la categoría, no el grupo.
+        url2 = url_movimientos(grupo='infra_web', cat_id=7, ano=2026)
+        self.assertIn('categoria__id__exact=7', url2)
+        self.assertNotIn('categoria__grupo', url2)
+
+    def test_celdas_del_ano_enlazan_al_mes_correcto(self):
+        r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
+        fila = [f for f in r.context['filas']
+                if f['nombre'] == 'Infraestructura web e IA'][0]
+        julio = fila['celdas'][0]
+        self.assertEqual(julio['txt'], '$954.118')
+        self.assertIn('categoria__grupo__exact=infra_web', julio['url'])
+        self.assertIn('fecha__month=7', julio['url'])
+        # Un mes sin gasto no lleva enlace: no hay nada que abrir.
+        self.assertEqual(fila['celdas'][1]['txt'], '')
+        self.assertEqual(fila['celdas'][1]['url'], '')
+        # Y el enlace vive en el HTML.
+        self.assertContains(r, 'categoria__grupo__exact=infra_web')
+
+    def test_celdas_del_mes_enlazan_tambien_por_cuenta(self):
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 7})
+        fila = [f for f in r.context['filas']
+                if f['nombre'] == 'Infraestructura web e IA'][0]
+        celda = fila['celdas'][0]
+        self.assertIn(f'cuenta__id__exact={self.be.id}', celda['url'])
+        # El total de la fila NO filtra por cuenta: son todas.
+        self.assertNotIn('cuenta__id__exact', fila['total']['url'])

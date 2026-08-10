@@ -284,17 +284,44 @@ NOMBRE_CORTO_CUENTA = {
 INICIO_GASTOS = date(2026, 7, 1)
 
 
-def _tabla_matriz(datos, columnas):
+def url_movimientos(grupo=None, cat_id=None, ano=None, mes=None,
+                    cuenta_id=None):
+    """Enlace al listado de movimientos del admin, ya filtrado — ahí mismo se
+    reasigna la categoría en la lista (Jorge 2026-08-09: «cómo abro esa
+    cuenta para cambiar el gasto de cuenta»)."""
+    partes = ['clase__exact=gasto']
+    if cat_id:
+        partes.append(f'categoria__id__exact={cat_id}')
+    elif grupo:
+        partes.append(f'categoria__grupo__exact={grupo}')
+    if ano:
+        partes.append(f'fecha__year={ano}')
+    if mes:
+        partes.append(f'fecha__month={mes}')
+    if cuenta_id:
+        partes.append(f'cuenta__id__exact={cuenta_id}')
+    return '/admin/finanzas/movimientofinanciero/?' + '&'.join(partes)
+
+
+def _tabla_matriz(datos, columnas, ids=None, enlace=None):
     """Arma las filas del plan de cuentas contra columnas arbitrarias.
 
     datos: {(grupo, categoría): {col: monto}} · columnas: claves ordenadas.
+    ids: {(grupo, categoría): id} para enlazar la fila de categoría.
+    enlace: f(grupo, cat_id, columna_o_None) → URL. Cada cifra con plata
+    queda clicable hacia los movimientos que la componen.
     Misma agrupación del tablero: subtotal por grupo y debajo sus categorías
-    solo si el grupo tiene más de una. Devuelve (filas, totales_columna,
-    total_general) ya formateados.
+    solo si el grupo tiene más de una.
     """
+    ids = ids or {}
     filas = []
     tot_col = {c: 0 for c in columnas}
     tot_general = 0
+
+    def _celda(valor, grupo, cat_id, col):
+        return {'txt': _clp(valor) if valor else '',
+                'url': enlace(grupo, cat_id, col) if (enlace and valor) else ''}
+
     for g, g_nombre in CategoriaFinanciera.GRUPOS:
         if g == 'ingresos':
             continue
@@ -308,15 +335,20 @@ def _tabla_matriz(datos, columnas):
             tot_col[c] += v
         total_g = sum(celdas_g)
         tot_general += total_g
-        filas.append({'es_grupo': True, 'nombre': g_nombre,
-                      'celdas': [_clp(v) if v else '' for v in celdas_g],
-                      'total': _clp(total_g)})
+        filas.append({
+            'es_grupo': True, 'nombre': g_nombre,
+            'celdas': [_celda(v, g, None, c)
+                       for v, c in zip(celdas_g, columnas)],
+            'total': _celda(total_g, g, None, None)})
         if len(cats_g) > 1:
             for cat in cats_g:
+                cat_id = ids.get((g, cat))
                 celdas = [datos[(g, cat)].get(c, 0) for c in columnas]
-                filas.append({'es_grupo': False, 'nombre': cat,
-                              'celdas': [_clp(v) if v else '' for v in celdas],
-                              'total': _clp(sum(celdas))})
+                filas.append({
+                    'es_grupo': False, 'nombre': cat,
+                    'celdas': [_celda(v, g, cat_id, c)
+                               for v, c in zip(celdas, columnas)],
+                    'total': _celda(sum(celdas), g, cat_id, None)})
     return (filas,
             [_clp(tot_col[c]) if tot_col[c] else '—' for c in columnas],
             _clp(tot_general))
@@ -342,23 +374,29 @@ def gastos_mes(request):
 
     datos = defaultdict(lambda: defaultdict(int))
     tot_cuenta = defaultdict(int)
-    nombres = {}
+    nombres, ids, cuenta_ids = {}, {}, {}
     for f in (MovimientoFinanciero.objects
               .filter(clase='gasto', fecha__year=ano, fecha__month=mes)
-              .values('categoria__grupo', 'categoria__nombre',
-                      'cuenta__clave', 'cuenta__nombre')
+              .values('categoria__grupo', 'categoria__nombre', 'categoria__id',
+                      'cuenta__clave', 'cuenta__nombre', 'cuenta__id')
               .annotate(t=Sum('monto'))):
         clave = (f['categoria__grupo'] or 'otros',
                  f['categoria__nombre'] or 'Sin categoría')
         monto = int(f['t'] or 0)
         cta = f['cuenta__clave']
         nombres[cta] = f['cuenta__nombre']
+        cuenta_ids[cta] = f['cuenta__id']
+        ids[clave] = f['categoria__id']
         datos[clave][cta] += monto
         tot_cuenta[cta] += monto
 
     # Solo las cuentas que generaron gastos este mes; la que más gasta primero.
     claves = sorted(tot_cuenta, key=lambda c: -tot_cuenta[c])
-    filas, tot_columnas, tot_general = _tabla_matriz(datos, claves)
+    filas, tot_columnas, tot_general = _tabla_matriz(
+        datos, claves, ids,
+        lambda g, cid, cta: url_movimientos(
+            grupo=g, cat_id=cid, ano=ano, mes=mes,
+            cuenta_id=cuenta_ids.get(cta) if cta else None))
 
     return render(request, 'finanzas/gastos_mes.html', {
         'ano': ano, 'mes': mes, 'nombre_mes': MESES_ES[mes],
@@ -382,15 +420,20 @@ def gastos_ano(request):
     meses_nums = list(range(m_ini, 13))
 
     datos = defaultdict(lambda: defaultdict(int))
+    ids = {}
     for f in (MovimientoFinanciero.objects
               .filter(clase='gasto', fecha__year=ano)
-              .values('categoria__grupo', 'categoria__nombre', 'fecha__month')
+              .values('categoria__grupo', 'categoria__nombre', 'categoria__id',
+                      'fecha__month')
               .annotate(t=Sum('monto'))):
         clave = (f['categoria__grupo'] or 'otros',
                  f['categoria__nombre'] or 'Sin categoría')
+        ids[clave] = f['categoria__id']
         datos[clave][f['fecha__month']] += int(f['t'] or 0)
 
-    filas, tot_columnas, tot_general = _tabla_matriz(datos, meses_nums)
+    filas, tot_columnas, tot_general = _tabla_matriz(
+        datos, meses_nums, ids,
+        lambda g, cid, m: url_movimientos(grupo=g, cat_id=cid, ano=ano, mes=m))
 
     return render(request, 'finanzas/gastos_ano.html', {
         'ano': ano,

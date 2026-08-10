@@ -71,8 +71,8 @@
       {% for f in filas %}
       <tr class="{% if f.es_grupo %}grupo{% else %}cat{% endif %}">
         <td>{{ f.nombre }}</td>
-        {% for celda in f.celdas %}<td>{{ celda }}</td>{% endfor %}
-        <td class="coltotal">{{ f.total }}</td>
+        {% for c in f.celdas %}<td>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
+        <td class="coltotal">{% if f.total.url %}<a href="{{ f.total.url }}">{{ f.total.txt }}</a>{% else %}{{ f.total.txt }}{% endif %}</td>
       </tr>
       {% endfor %}
       <tr class="tot">
