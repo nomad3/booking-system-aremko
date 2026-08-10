@@ -1409,6 +1409,24 @@ class SaludFuentesTest(TestCase):
                  if c['nombre'] == 'Scotiabank'][0]
         self.assertTrue(vacia['vacia'])
 
+    def test_avisa_cuando_la_cartola_no_cubre_el_inicio(self):
+        """El hueco que más fácil se pasa por alto: la cartola empieza
+        despues del 1 de julio (BancoEstado partia el 14-07 en prod)."""
+        self._mov(date(2026, 7, 14))
+        self._mov(date(2026, 7, 15))
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        fila = [c for c in r.context['cartolas']
+                if 'BancoEstado' in c['nombre']][0]
+        self.assertEqual(fila['falta_inicio'], 13)
+        self.assertContains(r, 'no cubre el comienzo del')
+
+        # Si parte el dia 1, no hay nada que avisar.
+        self._mov(date(2026, 7, 1))
+        r2 = self.client.get(reverse('finanzas:salud_fuentes'))
+        fila2 = [c for c in r2.context['cartolas']
+                 if 'BancoEstado' in c['nombre']][0]
+        self.assertEqual(fila2['falta_inicio'], 0)
+
     def test_fuentes_automaticas_marcan_alerta_cuando_dejan_de_llegar(self):
         r = self.client.get(reverse('finanzas:salud_fuentes'))
         por_nombre = {f['nombre']: f for f in r.context['fuentes']}

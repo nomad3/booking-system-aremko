@@ -690,6 +690,11 @@ def salud_fuentes(request):
         cartolas.append({
             'nombre': NOMBRE_CORTO_CUENTA.get(clave, cuentas[clave].nombre),
             'vacia': False,
+            # El hueco más fácil de no ver: la cartola no empieza donde
+            # empieza el período. No es un «salto» (está antes del rango
+            # cubierto) y por eso pasaba piola — BancoEstado partía el 14-07.
+            'falta_inicio': (primera - desde).days if primera > desde else 0,
+            'inicio_esperado': desde,
             'primera': primera, 'ultima': ultima,
             'n_movs': len(movs), 'n_dias': len(fechas),
             'atraso': atraso,

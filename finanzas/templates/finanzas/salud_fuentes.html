@@ -94,6 +94,14 @@
     </tbody>
   </table></div>
 
+  {% for c in cartolas %}{% if c.falta_inicio %}
+  <div class="aviso mal">⚠️ <b>{{ c.nombre }}</b> no cubre el comienzo del período:
+    el primer movimiento cargado es del <b>{{ c.primera|date:"d-m" }}</b> y el período
+    parte el {{ c.inicio_esperado|date:"d-m" }} — faltan <b>{{ c.falta_inicio }} días</b>.
+    Todo lo que pasó en esa cuenta antes del {{ c.primera|date:"d-m" }} no está en
+    ningún reporte. Hay que descargar esa cartola y subirla.</div>
+  {% endif %}{% endfor %}
+
   {% for c in cartolas %}{% if c.tramos %}
   <div class="aviso"><b>{{ c.nombre }}</b> — {{ c.tramos|length }} salto{{ c.tramos|length|pluralize:"s" }}
     de 4 días o más sin ningún movimiento, dentro del rango que la cartola dice cubrir:
