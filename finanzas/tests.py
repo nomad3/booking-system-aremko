@@ -2021,6 +2021,42 @@ class DuplicadosTest(TestCase):
             cuenta_clave='scotiabank')
         self.assertEqual(creados, 2)
 
+    def test_no_toca_los_de_fecha_estimada(self):
+        """El histórico cargó al día 1 los movimientos cuyo día no venía en
+        el correo. Ahí «mismo día y mismo monto» no prueba nada: pueden ser
+        dos pagos distintos del mismo monto. Borrarlos destruía pagos reales
+        (pasó en prod el 2026-08-10)."""
+        from io import StringIO
+        M = MovimientoFinanciero
+        for i in (1, 2):
+            M.objects.create(
+                fecha=date(2026, 7, 1), cuenta=self.sc, clase='gasto',
+                sentido='sale', monto=54240, categoria=self.cat,
+                fuente='correo', referencia=f'hist:{i}', fecha_estimada=True,
+                descripcion='Transferencia saliente Scotiabank (día no capturado)')
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     '--eliminar-de', 'scotiabank', stdout=StringIO())
+        self.assertEqual(M.objects.filter(monto=54240).count(), 2)
+
+    def test_dos_comisiones_de_ventas_distintas_no_son_duplicado(self):
+        """Las comisiones de MP y SumUp llevan el id de la venta en la glosa.
+        Agrupar por comercio normalizado se lo comía y dos comisiones de
+        ventas distintas con el mismo monto parecían la misma."""
+        from io import StringIO
+        M = MovimientoFinanciero
+        mp = CuentaFinanciera.objects.get(clave='mercado_pago')
+        for ident in ('170402030994', '169395340059'):
+            M.objects.create(
+                fecha=date(2026, 7, 24), cuenta=mp, clase='gasto',
+                sentido='sale', monto=7392, categoria=self.cat, fuente='api',
+                referencia=f'mp:fee:{ident}',
+                descripcion=f'Comisión MP del cobro {ident} (Reserva #1)')
+        salida = StringIO()
+        call_command('revisar_duplicados', '--desde', '2026-07-01',
+                     '--eliminar-de', 'mercado_pago', stdout=salida)
+        self.assertEqual(M.objects.filter(monto=7392).count(), 2)
+        self.assertIn('MISMA CUENTA (doble carga): 0 casos', salida.getvalue())
+
     def test_el_comando_separa_los_dos_tipos_de_duplicado(self):
         from io import StringIO
         M = MovimientoFinanciero

@@ -27,9 +27,21 @@ def _clp(n):
     return '$' + format(int(n), ',d').replace(',', '.')
 
 
-def firma_de(mov):
-    """Lo que identifica al mismo cobro visto desde donde sea: día, monto y
-    comercio. La glosa se normaliza porque cada fuente le pone su prefijo."""
+def firma_exacta(mov):
+    """Para la DOBLE CARGA: mismo día, monto y glosa IDÉNTICA.
+
+    Comparar por comercio normalizado acá era un error peligroso: las
+    comisiones de Mercado Pago y SumUp llevan el id de la venta en la glosa
+    («Comisión MP del cobro 170402030994»), el normalizador se lo comía y dos
+    comisiones de ventas DISTINTAS con el mismo monto parecían la misma
+    (2026-08-10). Con la glosa completa eso no pasa.
+    """
+    return (mov.fecha, int(mov.monto), (mov.descripcion or '').strip())
+
+
+def firma_comercio(mov):
+    """Para la ATRIBUCIÓN doble: el mismo cobro visto desde dos medios de
+    pago, donde cada fuente escribe la glosa a su manera."""
     from finanzas.management.commands.detectar_recurrentes import (
         nombre_comercio)
     return (mov.fecha, int(mov.monto), nombre_comercio(mov.descripcion))
@@ -53,20 +65,27 @@ class Command(BaseCommand):
                 .filter(clase='gasto', fecha__gte=desde)
                 .select_related('cuenta', 'categoria').order_by('id'))
 
-        grupos = defaultdict(list)
-        for m in movs:
-            grupos[firma_de(m)].append(m)
+        # Las de fecha ESTIMADA quedan fuera: el histórico las cargó todas al
+        # día 1 porque el correo no traía el día. Ahí «mismo día y mismo
+        # monto» NO es señal de duplicado — es señal de que no sabemos las
+        # fechas. Borrarlas era destruir pagos reales (Jorge 2026-08-10).
+        movs = [m for m in movs if not m.fecha_estimada]
 
-        repetidos = {k: v for k, v in grupos.items() if len(v) > 1}
+        por_exacta, por_comercio = defaultdict(list), defaultdict(list)
+        for m in movs:
+            por_exacta[firma_exacta(m)].append(m)
+            por_comercio[firma_comercio(m)].append(m)
+
+        misma = {k: v for k, v in por_exacta.items()
+                 if len(v) > 1 and len({m.cuenta_id for m in v}) == 1}
+        distintas = {k: v for k, v in por_comercio.items()
+                     if len(v) > 1 and len({m.cuenta_id for m in v}) > 1}
+
         if opts['solo']:
             aguja = opts['solo'].upper()
-            repetidos = {k: v for k, v in repetidos.items()
+            misma = {k: v for k, v in misma.items() if aguja in k[2].upper()}
+            distintas = {k: v for k, v in distintas.items()
                          if aguja in k[2].upper()}
-
-        misma, distintas = {}, {}
-        for firma, lista in repetidos.items():
-            cuentas = {m.cuenta_id for m in lista}
-            (misma if len(cuentas) == 1 else distintas)[firma] = lista
 
         def _mostrar(titulo, grupo):
             total = sum(int(m.monto) for lista in grupo.values()
