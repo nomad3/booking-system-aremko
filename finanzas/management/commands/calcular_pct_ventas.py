@@ -53,6 +53,14 @@ class Command(BaseCommand):
     help = 'Calcula qué % de las ventas representó cada gasto en un mes.'
 
     def add_arguments(self, parser):
+        # SIN GUIONES: Jorge escribe esto en la shell de Render desde el
+        # iPhone, y el teclado le mete un espacio después de «--». Con eso el
+        # nombre del parámetro nunca llega («-- items» en vez de «--items») y
+        # argparse rechaza todo. Las palabras sueltas no tienen ese problema:
+        #     calcular_pct_ventas aplicar insumos comisiones impuestos
+        parser.add_argument('sueltos', nargs='*', default=[],
+                            help='Palabras sueltas, sin guiones: «aplicar», un '
+                                 'mes AAAA-MM, y/o las claves a escribir.')
         parser.add_argument('--mes', default='2026-07')
         # nargs='*' y no un string suelto: Jorge corre esto desde el celular y
         # el teclado mete un espacio después de cada coma, con lo que la shell
@@ -65,9 +73,28 @@ class Command(BaseCommand):
         parser.add_argument('--aplicar', action='store_true')
 
     def handle(self, *args, **opts):
+        import re
+
         from finanzas.views import ventas_por_mes
 
-        anio, mes = (int(x) for x in opts['mes'].split('-'))
+        # Las palabras sueltas se reparten solas: «aplicar», un AAAA-MM, y el
+        # resto son claves de ítems.
+        sueltos = [str(s).strip() for s in (opts.get('sueltos') or [])]
+        aplicar = opts['aplicar'] or any(
+            s.lower().rstrip(',') in ('aplicar', 'aplica') for s in sueltos)
+        mes_txt = opts['mes']
+        claves_sueltas = []
+        for s in sueltos:
+            limpio = s.lower().rstrip(',')
+            if limpio in ('aplicar', 'aplica'):
+                continue
+            if re.fullmatch(r'\d{4}-\d{1,2}', limpio):
+                mes_txt = limpio
+                continue
+            claves_sueltas.append(s)
+
+        anio, mes = (int(x) for x in mes_txt.split('-'))
+        opts = dict(opts, mes=mes_txt, aplicar=aplicar)
         ventas = ventas_por_mes(anio, mes).get(date(anio, mes, 1), 0)
         if not ventas:
             self.stdout.write(self.style.ERROR(
@@ -139,12 +166,14 @@ class Command(BaseCommand):
         # ── Escritura, solo lo que se nombre ───────────────────────────────
         # Cada trozo puede venir con comas pegadas («insumos,comisiones») o ser
         # una clave suelta con la coma colgando («insumos,»).
-        claves = [c.strip() for trozo in opts['items']
+        claves = [c.strip() for trozo in list(opts['items']) + claves_sueltas
                   for c in str(trozo).split(',') if c.strip()]
         if not claves:
             self.stdout.write(self.style.WARNING(
-                '\nNo se escribió nada. Para fijar un %, nombrá los ítems:\n'
-                '  --aplicar --items insumos,comisiones,impuestos'))
+                '\nNo se escribió nada. Para fijar un %, nombrá los ítems '
+                '(sin guiones, que el celular los rompe):\n'
+                '  python manage.py calcular_pct_ventas aplicar insumos '
+                'comisiones impuestos'))
             return
 
         desconocidas = [c for c in claves if c not in calculado]

@@ -3259,6 +3259,35 @@ class CalcularPctVentasTest(TestCase):
             int(CategoriaFinanciera.objects.get(
                 clave='publicidad').presupuesto_pct_ventas), 0)
 
+    def test_funciona_sin_un_solo_guion(self):
+        """El teclado del iPhone mete un espacio después de «--» y el nombre
+        del parámetro nunca llega. Con palabras sueltas no hay guion que
+        romper (captura de Jorge, 2026-08-11)."""
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        self._gasto('comisiones', 300000)
+        self._correr('aplicar', 'insumos', 'comisiones')
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='insumos').presupuesto_pct_ventas), 20.0)
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='comisiones').presupuesto_pct_ventas), 3.0)
+
+    def test_sin_la_palabra_aplicar_sigue_sin_escribir(self):
+        """La red de seguridad no se pierde: nombrar ítems no basta."""
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        salida = self._correr('insumos')
+        self.assertIn('MODO LECTURA', salida)
+        self.assertEqual(int(CategoriaFinanciera.objects.get(
+            clave='insumos').presupuesto_pct_ventas), 0)
+
+    def test_un_mes_suelto_cambia_el_periodo(self):
+        self._venta(10000000, dia=date(2026, 8, 5))
+        self._gasto('insumos', 2000000, dia=date(2026, 8, 10))
+        self._correr('2026-08', 'aplicar', 'insumos')
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='insumos').presupuesto_pct_ventas), 20.0)
+
     def test_tolera_como_el_celular_separa_las_comas(self):
         """Jorge corre esto desde el teléfono y el teclado mete un espacio
         después de cada coma: la shell parte «insumos, comisiones» en dos
