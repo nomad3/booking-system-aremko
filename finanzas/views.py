@@ -1219,3 +1219,104 @@ def flujo_caja(request):
         'inicio': INICIO_FLUJO,
         'n_columnas': len(presentes) + 6,
     })
+
+
+# ── Cuenta corriente con Aremko (pedido de Jorge 2026-08-10) ────────────────
+# Jorge paga el seguro del auto de su bolsillo y Aremko se lo devuelve; Alda
+# pone gastos de la empresa desde su cuenta y su tarjeta. Nadie estaba
+# haciendo la resta. Las tarjetas de Alda entran acá porque una compra de
+# Aremko con SU tarjeta también es plata que ella puso.
+CUENTAS_POR_PERSONA = (
+    ('Jorge', ('cuentarut_jorge',)),
+    ('Alda', ('scotiabank_alda', 'tarjeta_alda_1', 'tarjeta_alda_2')),
+)
+# El grupo de lo que todavía no tiene dueño declarado (por clasificar, vale
+# vista sin destino). No entra al saldo: adivinar acá es inventar una deuda.
+GRUPO_SIN_DECIDIR = 'otros'
+
+
+def saldo_cuenta_corriente(gastos_empresa, recibido_de_aremko):
+    """Lo que Aremko debe: lo que la persona pagó por la empresa menos lo que
+    Aremko ya le transfirió. Positivo = Aremko debe."""
+    return gastos_empresa - recibido_de_aremko
+
+
+@user_passes_test(puede_ver_finanzas)
+def cuenta_corriente(request):
+    from .reglas import GRUPOS_FAMILIA
+
+    personas = []
+    for nombre, claves in CUENTAS_POR_PERSONA:
+        existentes = list(CuentaFinanciera.objects.filter(clave__in=claves)
+                          .values_list('clave', flat=True))
+        if not existentes:
+            continue
+        base = (MovimientoFinanciero.objects
+                .filter(cuenta__clave__in=existentes)
+                .select_related('cuenta', 'categoria'))
+
+        # A favor de la persona: gastos del NEGOCIO pagados desde sus cuentas.
+        de_aremko = (base.filter(clase='gasto')
+                     .exclude(categoria__grupo__in=GRUPOS_FAMILIA)
+                     .exclude(categoria__grupo=GRUPO_SIN_DECIDIR))
+        # A favor de Aremko: lo que le mandó. Se excluyen los traspasos entre
+        # las cuentas de la MISMA persona (su cuenta paga su tarjeta): esa
+        # plata no viene de Aremko y contarla borraría deuda que sí existe.
+        recibido = (base.filter(clase='traspaso', sentido='entra')
+                    .exclude(traspaso_par__cuenta__clave__in=existentes))
+        # Abonos que vinieron de Aremko pero no calzaron con ningún retiro:
+        # son plata de Aremko igual, y dejarlos fuera inflaría la deuda.
+        por_calzar = base.filter(clase='ingreso',
+                                 categoria__clave='abono_aremko_por_calzar')
+
+        total_gastos = sum(int(m.monto) for m in de_aremko)
+        total_recibido = (sum(int(m.monto) for m in recibido)
+                          + sum(int(m.monto) for m in por_calzar))
+        saldo = saldo_cuenta_corriente(total_gastos, total_recibido)
+
+        # Lo que NO entra al saldo, dicho en voz alta.
+        retiros = sum(int(m.monto) for m in
+                      base.filter(clase='gasto',
+                                  categoria__grupo__in=GRUPOS_FAMILIA))
+        sin_decidir = base.filter(clase='gasto',
+                                  categoria__grupo=GRUPO_SIN_DECIDIR)
+        propios = sum(int(m.monto) for m in base.filter(
+            clase='ingreso', categoria__clave='abonos_personales'))
+
+        # Detalle en orden de fecha, con saldo corrido.
+        lineas = ([(m, 1) for m in de_aremko]
+                  + [(m, -1) for m in list(recibido) + list(por_calzar)])
+        detalle, corrido = [], 0
+        for m, signo in sorted(lineas, key=lambda x: (x[0].fecha, x[0].id)):
+            corrido += signo * int(m.monto)
+            detalle.append({
+                'fecha': m.fecha,
+                'glosa': (m.descripcion or '')[:70],
+                'cuenta': NOMBRE_CORTO_CUENTA.get(m.cuenta.clave,
+                                                  m.cuenta.nombre),
+                'categoria': m.categoria.nombre if m.categoria else 'Traspaso',
+                'a_favor': _clp(m.monto) if signo > 0 else '',
+                'devuelto': _clp(m.monto) if signo < 0 else '',
+                'corrido': _clp(corrido),
+            })
+        detalle.reverse()
+
+        personas.append({
+            'nombre': nombre,
+            'cuentas': ', '.join(NOMBRE_CORTO_CUENTA.get(c, c)
+                                 for c in existentes),
+            'gastos': _clp(total_gastos),
+            'recibido': _clp(total_recibido),
+            'saldo_abs': _clp(abs(saldo)),
+            'debe_aremko': saldo > 0,
+            'cuadrado': saldo == 0,
+            'retiros': _clp(retiros),
+            'sin_decidir': _clp(sum(int(m.monto) for m in sin_decidir)),
+            'n_sin_decidir': sin_decidir.count(),
+            'propios': _clp(propios),
+            'detalle': detalle,
+            'ultima': base.aggregate(m=Max('fecha'))['m'],
+        })
+
+    return render(request, 'finanzas/cuenta_corriente.html',
+                  {'personas': personas, 'desde': date(2026, 7, 1)})

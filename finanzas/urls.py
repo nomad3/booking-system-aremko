@@ -14,6 +14,7 @@ urlpatterns = [
     path('salud/', views.salud_fuentes, name='salud_fuentes'),
     path('verificar-transferencias/', views.verificar_transferencias,
          name='verificar_transferencias'),
+    path('cuenta-corriente/', views.cuenta_corriente, name='cuenta_corriente'),
     path('gastos-mes/', views.gastos_mes, name='gastos_mes'),
     path('gastos-ano/', views.gastos_ano, name='gastos_ano'),
 ]

@@ -2327,3 +2327,152 @@ class VerificarTransferenciasTest(TestCase):
         self.client.login(username='recep', password='x')
         r = self.client.get(reverse('finanzas:verificar_transferencias'))
         self.assertEqual(r.status_code, 302)
+
+
+class CuentaCorrienteTest(TestCase):
+    """«¿Cuánto me debe Aremko?» (Jorge 2026-08-10). Lo que él y Alda pagan
+    de su bolsillo por la empresa, contra lo que la empresa les transfirió."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def _cat(self, clave, grupo='admin_fin', clase='gasto'):
+        c, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=clave, defaults={'nombre': clave, 'clase': clase,
+                                   'grupo': grupo})
+        return c
+
+    def _gasto(self, dia, monto, categoria, cuenta=None, glosa='X'):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=cuenta or self.rut, clase='gasto', sentido='sale',
+            monto=monto, categoria=categoria, fuente='captura',
+            referencia=f'cc:g:{dia}:{monto}:{categoria.clave}', descripcion=glosa)
+
+    def _traspaso_desde_aremko(self, dia, monto):
+        sale = MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='traspaso', sentido='sale',
+            monto=monto, fuente='captura', referencia=f'cc:ts:{dia}:{monto}')
+        entra = MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.rut, clase='traspaso', sentido='entra',
+            monto=monto, fuente='captura', referencia=f'cc:te:{dia}:{monto}',
+            traspaso_par=sale)
+        sale.traspaso_par = entra
+        sale.save(update_fields=['traspaso_par'])
+        return entra
+
+    def _jorge(self, respuesta):
+        return [p for p in respuesta.context['personas']
+                if p['nombre'] == 'Jorge'][0]
+
+    def test_el_seguro_sin_devolucion_es_deuda_de_aremko(self):
+        """El caso que originó la página: Jorge paga el seguro del auto y
+        nadie le devolvió todavía."""
+        self._gasto(date(2026, 8, 10), 57185, self._cat('seguros'),
+                    glosa='Cartola cuentarut jorge: Pago Bci Seguros Gener')
+        r = self.client.get(reverse('finanzas:cuenta_corriente'))
+        self.assertEqual(r.status_code, 200)
+        jorge = self._jorge(r)
+        self.assertTrue(jorge['debe_aremko'])
+        self.assertEqual(jorge['saldo_abs'], '$57.185')
+        self.assertContains(r, 'Aremko le debe $57.185')
+
+    def test_cuando_aremko_devuelve_el_saldo_vuelve_a_cero(self):
+        self._gasto(date(2026, 8, 10), 57185, self._cat('seguros'))
+        self._traspaso_desde_aremko(date(2026, 8, 12), 57185)
+        jorge = self._jorge(self.client.get(
+            reverse('finanzas:cuenta_corriente')))
+        self.assertTrue(jorge['cuadrado'])
+        self.assertEqual(jorge['saldo_abs'], '$0')
+        # Las dos líneas quedan en el detalle, con el saldo corrido en cero.
+        self.assertEqual(len(jorge['detalle']), 2)
+        self.assertEqual(jorge['detalle'][0]['corrido'], '$0')
+
+    def test_los_retiros_no_son_deuda_pero_se_declaran(self):
+        """Un gasto personal desde la CuentaRUT es retiro, no algo que Aremko
+        deba devolver. Si contara, cada retiro inflaría la deuda."""
+        self._gasto(date(2026, 8, 3), 300000,
+                    self._cat('personales_martin', grupo='personales_martin'))
+        self._gasto(date(2026, 8, 10), 57185, self._cat('seguros'))
+        jorge = self._jorge(self.client.get(
+            reverse('finanzas:cuenta_corriente')))
+        self.assertEqual(jorge['saldo_abs'], '$57.185')
+        self.assertEqual(jorge['retiros'], '$300.000')
+
+    def test_lo_no_clasificado_queda_fuera_y_se_avisa(self):
+        """Adivinar acá es inventar una deuda: lo dudoso se declara aparte."""
+        self._gasto(date(2026, 8, 5), 84300,
+                    self._cat('por_clasificar', grupo='otros'))
+        jorge = self._jorge(self.client.get(
+            reverse('finanzas:cuenta_corriente')))
+        self.assertEqual(jorge['saldo_abs'], '$0')
+        self.assertEqual(jorge['sin_decidir'], '$84.300')
+        self.assertEqual(jorge['n_sin_decidir'], 1)
+
+    def test_la_plata_propia_no_cuenta_para_ningun_lado(self):
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 4), cuenta=self.rut, clase='ingreso',
+            sentido='entra', monto=162154,
+            categoria=self._cat('abonos_personales', grupo='ingresos',
+                                clase='ingreso'),
+            fuente='captura', referencia='cc:prop:1')
+        self._gasto(date(2026, 8, 10), 57185, self._cat('seguros'))
+        jorge = self._jorge(self.client.get(
+            reverse('finanzas:cuenta_corriente')))
+        self.assertEqual(jorge['saldo_abs'], '$57.185')
+        self.assertEqual(jorge['propios'], '$162.154')
+
+    def test_un_abono_de_aremko_sin_calzar_igual_descuenta(self):
+        """Si el abono vino de Aremko pero no calzó con ningún retiro, sigue
+        siendo plata de Aremko: dejarlo fuera inflaría la deuda."""
+        self._gasto(date(2026, 8, 10), 57185, self._cat('seguros'))
+        MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 11), cuenta=self.rut, clase='ingreso',
+            sentido='entra', monto=57185,
+            categoria=self._cat('abono_aremko_por_calzar', grupo='ingresos',
+                                clase='ingreso'),
+            fuente='captura', referencia='cc:pc:1')
+        jorge = self._jorge(self.client.get(
+            reverse('finanzas:cuenta_corriente')))
+        self.assertTrue(jorge['cuadrado'])
+
+    def test_el_traspaso_entre_cuentas_propias_no_borra_deuda(self):
+        """La cuenta de Alda pagando SU tarjeta no es plata de Aremko. Si
+        contara como devolución, taparía deuda real."""
+        tarjeta = CuentaFinanciera.objects.filter(
+            clave='tarjeta_alda_1').first()
+        scotia = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+        self.assertIsNotNone(tarjeta, 'sembrar_finanzas debe crear la tarjeta')
+        compra = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 2), cuenta=tarjeta, clase='gasto',
+            sentido='sale', monto=40000, categoria=self._cat('insumos',
+                                                             grupo='operacion'),
+            fuente='captura', referencia='cc:t:compra')
+        sale = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 6), cuenta=scotia, clase='traspaso',
+            sentido='sale', monto=40000, fuente='captura', referencia='cc:t:s')
+        entra = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 6), cuenta=tarjeta, clase='traspaso',
+            sentido='entra', monto=40000, fuente='captura',
+            referencia='cc:t:e', traspaso_par=sale)
+        sale.traspaso_par = entra
+        sale.save(update_fields=['traspaso_par'])
+
+        r = self.client.get(reverse('finanzas:cuenta_corriente'))
+        alda = [p for p in r.context['personas'] if p['nombre'] == 'Alda'][0]
+        self.assertTrue(alda['debe_aremko'])
+        self.assertEqual(alda['saldo_abs'], '$40.000')
+        self.assertEqual(compra.cuenta, tarjeta)
+
+    def test_saldo_negativo_se_explica_como_retiros_cubiertos(self):
+        self._gasto(date(2026, 8, 10), 50000, self._cat('seguros'))
+        self._traspaso_desde_aremko(date(2026, 8, 1), 500000)
+        r = self.client.get(reverse('finanzas:cuenta_corriente'))
+        jorge = self._jorge(r)
+        self.assertFalse(jorge['debe_aremko'])
+        self.assertEqual(jorge['saldo_abs'], '$450.000')
+        self.assertContains(r, 'más de lo')

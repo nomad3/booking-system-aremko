@@ -1,0 +1,137 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cuenta corriente con Aremko</title>
+<style>
+  :root{--tinta:#2b2b2b; --suave:#767066; --linea:#e6e2da; --fondo:#faf9f6;
+        --verde:#2e6e46; --rojo:#a03636; --acento:#8a6d3b;}
+  *{box-sizing:border-box;}
+  body{margin:0; padding:24px 16px 60px; background:var(--fondo); color:var(--tinta);
+       font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;}
+  .caja{max-width:1060px; margin:0 auto;}
+  h1{font-size:26px; margin:0 0 4px;}
+  h2{font-size:19px; margin:0 0 2px;}
+  .sub{color:var(--suave); font-size:13.5px; margin:0 0 18px;}
+  .persona{background:#fff; border:1px solid var(--linea); border-radius:12px;
+           padding:18px 20px; margin:0 0 26px;}
+  .titular{font-size:13px; color:var(--suave); margin:0 0 16px;}
+  .cuadro{display:grid; grid-template-columns:1fr auto; gap:6px 16px;
+          font-size:14.5px; font-variant-numeric:tabular-nums; margin:0 0 4px;}
+  .cuadro .val{text-align:right;}
+  .cuadro .tot{border-top:2px solid var(--tinta); padding-top:8px; margin-top:4px;
+               font-weight:700; font-size:17px;}
+  .veredicto{border-radius:10px; padding:12px 14px; margin:14px 0 4px;
+             font-size:15px; font-weight:600;}
+  .veredicto.debe{background:#f7e8e8; border:1px solid #e0bcbc; color:var(--rojo);}
+  .veredicto.cubierto{background:#e8f2ea; border:1px solid #c4dccb; color:var(--verde);}
+  .veredicto small{display:block; font-weight:400; font-size:13px; margin-top:4px;
+                   opacity:.85;}
+  .aparte{background:#f7f5f0; border-radius:10px; padding:10px 14px; margin:14px 0 0;
+          font-size:13.5px; color:var(--suave);}
+  .aparte b{color:var(--tinta);}
+  .aparte ul{margin:6px 0 0; padding-left:18px;}
+  details{margin-top:14px;}
+  summary{cursor:pointer; font-size:13.5px; color:var(--acento); font-weight:600;}
+  .scroll{overflow-x:auto; border:1px solid var(--linea); border-radius:10px;
+          background:#fff; margin-top:10px;}
+  table{border-collapse:collapse; width:100%; font-size:13px;
+        font-variant-numeric:tabular-nums;}
+  th,td{padding:6px 9px; border-bottom:1px solid var(--linea); text-align:right;
+        white-space:nowrap;}
+  th.izq,td.izq{text-align:left; white-space:normal;}
+  thead th{background:#f4f1ea; color:var(--suave); font-weight:600; font-size:11px;
+           text-transform:uppercase; letter-spacing:.03em;}
+  tr:last-child td{border-bottom:none;}
+  .mas{color:var(--rojo);} .menos{color:var(--verde);}
+  .volver{margin:0 0 12px;}
+  .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
+        border-radius:99px; padding:5px 14px; font-size:13px; color:var(--acento);
+        text-decoration:none; font-weight:600;}
+  .volver a:hover{background:#f4f1ea;}
+  a{color:var(--acento);}
+</style>
+</head>
+<body>
+<div class="caja">
+  <p class="volver"><a href="/admin/?repo=1">← Volver al menú</a></p>
+  <h1>Cuenta corriente con Aremko</h1>
+  <p class="sub">Lo que cada uno pagó de su bolsillo por la empresa, contra lo que
+     la empresa ya le transfirió · desde el {{ desde|date:"d-m-Y" }} ·
+     <a href="{% url 'finanzas:tablero' %}">tablero</a> ·
+     <a href="{% url 'finanzas:flujo_caja' %}">flujo de caja</a></p>
+
+  {% for p in personas %}
+  <div class="persona">
+    <h2>{{ p.nombre }}</h2>
+    <p class="titular">{{ p.cuentas }}{% if p.ultima %} · último movimiento cargado
+       {{ p.ultima|date:"d-m-Y" }}{% endif %}</p>
+
+    <div class="cuadro">
+      <div>Gastos de Aremko que pagó {{ p.nombre }}</div>
+      <div class="val">{{ p.gastos }}</div>
+      <div>Traspasos que Aremko le envió</div>
+      <div class="val">− {{ p.recibido }}</div>
+      <div class="tot">Saldo</div>
+      <div class="val tot">{% if p.debe_aremko %}{{ p.saldo_abs }}{% else %}− {{ p.saldo_abs }}{% endif %}</div>
+    </div>
+
+    {% if p.cuadrado %}
+    <div class="veredicto cubierto">Está a cero: lo que puso y lo que recibió cuadran.</div>
+    {% elif p.debe_aremko %}
+    <div class="veredicto debe">Aremko le debe {{ p.saldo_abs }} a {{ p.nombre }}.
+      <small>Plata de su bolsillo que se fue en gastos del negocio y todavía no
+        vuelve.</small></div>
+    {% else %}
+    <div class="veredicto cubierto">Aremko le transfirió {{ p.saldo_abs }} más de lo
+      que gastó en la empresa.
+      <small>Esa diferencia es la que cubre sus retiros. No es una deuda de
+        {{ p.nombre }}: es plata de Aremko que ya salió de la caja.</small></div>
+    {% endif %}
+
+    <div class="aparte">
+      Fuera del saldo, a propósito:
+      <ul>
+        <li>Retiros y gastos personales desde estas cuentas: <b>{{ p.retiros }}</b>.
+          Son costo de Aremko como retiro, no deuda con {{ p.nombre }}.</li>
+        <li>Sin decidir todavía: <b>{{ p.sin_decidir }}</b>
+          ({{ p.n_sin_decidir }} movimiento{{ p.n_sin_decidir|pluralize:"s" }}).
+          Cuando se clasifiquen, el saldo se mueve — si son de Aremko, la deuda sube.</li>
+        <li>Plata propia que entró a estas cuentas: <b>{{ p.propios }}</b>. No es
+          de Aremko y no cuenta para ningún lado.</li>
+      </ul>
+    </div>
+
+    {% if p.detalle %}
+    <details>
+      <summary>Ver las {{ p.detalle|length }} líneas que arman el saldo</summary>
+      <div class="scroll"><table>
+        <thead><tr><th class="izq">Fecha</th><th class="izq">Cuenta</th>
+                   <th class="izq">Glosa</th><th class="izq">Categoría</th>
+                   <th>Puso {{ p.nombre }}</th><th>Le devolvieron</th><th>Saldo</th></tr></thead>
+        <tbody>
+          {% for f in p.detalle %}
+          <tr><td class="izq">{{ f.fecha|date:"d-m-Y" }}</td>
+              <td class="izq">{{ f.cuenta }}</td>
+              <td class="izq">{{ f.glosa }}</td>
+              <td class="izq">{{ f.categoria }}</td>
+              <td class="mas">{{ f.a_favor }}</td>
+              <td class="menos">{{ f.devuelto }}</td>
+              <td>{{ f.corrido }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    </details>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="persona">Todavía no hay cuentas puente cargadas.</div>
+  {% endfor %}
+
+  <p class="sub">Este saldo solo ve lo que está cargado. Un gasto de Aremko pagado
+     desde una cuenta que no seguimos, o una cartola sin subir, no aparece acá.</p>
+</div>
+</body>
+</html>
