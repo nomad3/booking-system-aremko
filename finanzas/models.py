@@ -75,6 +75,13 @@ class CategoriaFinanciera(models.Model):
     grupo = models.CharField(max_length=30, choices=GRUPOS, default='otros',
                              db_index=True)
     orden = models.PositiveSmallIntegerField(default=100)
+    # Cuánto se piensa gastar al mes en este ítem (pedido de Jorge
+    # 2026-08-10): el reporte del mes compara contra esto. En CERO significa
+    # «sin presupuesto definido» y el reporte lo dice con un guion, en vez de
+    # mostrar un exceso de todo lo gastado contra un presupuesto de $0.
+    presupuesto_mensual = models.DecimalField(
+        max_digits=12, decimal_places=0, default=0,
+        help_text='Monto mensual esperado. 0 = sin presupuesto definido.')
 
     class Meta:
         verbose_name = 'Categoría'

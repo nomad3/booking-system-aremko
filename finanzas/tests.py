@@ -2724,3 +2724,129 @@ class AprenderReglaTest(TestCase):
         r = self.client.post(self.url, {'ids': str(m.pk), 'confirmar': '1'})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(ReglaGlosa.objects.count(), 0)
+
+
+class PresupuestoTest(TestCase):
+    """Presupuesto mensual por ítem del plan de cuentas (Jorge 2026-08-10):
+    ver mes a mes cuánto nos acercamos, quedamos o excedimos."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def _presupuestar(self, clave, monto):
+        CategoriaFinanciera.objects.filter(clave=clave).update(
+            presupuesto_mensual=monto)
+
+    def _gasto(self, clave, monto, dia=date(2026, 7, 15)):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=CategoriaFinanciera.objects.get(clave=clave),
+            fuente='captura', referencia=f'p:{clave}:{dia}:{monto}')
+
+    def _fila(self, respuesta, nombre):
+        return [f for f in respuesta.context['filas'] if f['nombre'] == nombre][0]
+
+    def _mes(self, ano=2026, mes=7):
+        return self.client.get(reverse('finanzas:gastos_mes'),
+                               {'ano': ano, 'mes': mes})
+
+    # ── la comparación ─────────────────────────────────────────────────────
+    def test_muestra_lo_que_queda_cuando_va_bajo_presupuesto(self):
+        self._presupuestar('publicidad', 500000)
+        self._gasto('publicidad', 300000)
+        f = self._fila(self._mes(), 'Marketing')
+        self.assertEqual(f['presupuesto']['txt'], '$500.000')
+        self.assertEqual(f['presupuesto']['dif'], '$200.000')
+        self.assertEqual(f['presupuesto']['pct'], '60%')
+        self.assertFalse(f['presupuesto']['excedido'])
+
+    def test_marca_el_exceso_con_el_monto_que_se_paso(self):
+        self._presupuestar('publicidad', 500000)
+        self._gasto('publicidad', 620000)
+        f = self._fila(self._mes(), 'Marketing')
+        self.assertTrue(f['presupuesto']['excedido'])
+        self.assertEqual(f['presupuesto']['dif'], '−$120.000')
+        self.assertEqual(f['presupuesto']['pct'], '124%')
+
+    def test_sin_presupuesto_dice_guion_y_no_inventa_un_exceso(self):
+        """Un ítem sin presupuesto contra $0 daría «excedido en todo lo
+        gastado», que es ruido, no información."""
+        self._gasto('insumos', 90000)
+        f = self._fila(self._mes(), 'Operación e insumos')
+        self.assertEqual(f['presupuesto']['txt'], '—')
+        self.assertTrue(f['presupuesto']['sin'])
+        self.assertFalse(f['presupuesto']['excedido'])
+
+    def test_un_item_presupuestado_sin_gasto_igual_aparece(self):
+        """El mes en que no se pagó la luz no es un mes sin ese ítem: es un
+        mes por debajo del presupuesto, y hay que poder verlo."""
+        self._presupuestar('energia_electrica', 400000)
+        self._gasto('publicidad', 1000)
+        r = self._mes()
+        f = self._fila(r, 'Energía eléctrica')
+        self.assertEqual(f['presupuesto']['txt'], '$400.000')
+        self.assertEqual(f['presupuesto']['dif'], '$400.000')
+        self.assertEqual(f['presupuesto']['pct'], '0%')
+
+    def test_el_grupo_suma_los_presupuestos_de_sus_items(self):
+        self._presupuestar('comisiones', 100000)
+        self._presupuestar('seguros', 60000)
+        self._gasto('comisiones', 30000)
+        r = self._mes()
+        grupo = self._fila(r, 'Administración y financieros')
+        self.assertEqual(grupo['presupuesto']['txt'], '$160.000')
+        self.assertEqual(grupo['presupuesto']['dif'], '$130.000')
+
+    def test_el_total_del_mes_compara_contra_la_suma_de_presupuestos(self):
+        self._presupuestar('publicidad', 500000)
+        self._presupuestar('insumos', 200000)
+        self._gasto('publicidad', 550000)
+        self._gasto('insumos', 100000)
+        r = self._mes()
+        self.assertEqual(r.context['tot_presupuesto']['txt'], '$700.000')
+        self.assertEqual(r.context['tot_presupuesto']['dif'], '$50.000')
+        self.assertFalse(r.context['tot_presupuesto']['excedido'])
+
+    def test_sin_ningun_presupuesto_la_tabla_no_muestra_las_columnas(self):
+        self._gasto('publicidad', 1000)
+        r = self._mes()
+        self.assertFalse(r.context['hay_presupuestos'])
+        self.assertContains(r, 'Todavía no hay presupuestos definidos')
+
+    def test_avisa_que_el_mes_en_curso_va_a_medio_andar(self):
+        """Comparar 10 días contra el presupuesto del mes completo siempre se
+        ve holgado; decirlo vale más que corregirlo con una regla de tres."""
+        hoy = date.today()
+        self._presupuestar('publicidad', 500000)
+        self._gasto('publicidad', 1000, dia=hoy)
+        r = self._mes(ano=hoy.year, mes=hoy.month)
+        self.assertTrue(r.context['en_curso'])
+        self.assertEqual(r.context['dia_hoy'], hoy.day)
+        self.assertContains(r, 'va por el día')
+        # Un mes cerrado no lleva el aviso.
+        self.assertFalse(self._mes(2026, 7).context['en_curso'])
+
+    # ── la vista del año ───────────────────────────────────────────────────
+    def test_en_el_ano_se_pinta_el_mes_que_se_paso(self):
+        self._presupuestar('publicidad', 500000)
+        self._gasto('publicidad', 300000, dia=date(2026, 7, 10))
+        self._gasto('publicidad', 900000, dia=date(2026, 8, 10))
+        r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
+        f = self._fila(r, 'Marketing')
+        # Las columnas parten en julio: la primera cumple, la segunda no.
+        self.assertFalse(f['celdas'][0]['excede'])
+        self.assertTrue(f['celdas'][1]['excede'])
+        self.assertEqual(f['presupuesto']['txt'], '$500.000')
+
+    def test_en_el_mes_las_columnas_son_cuentas_y_no_se_pintan(self):
+        """Comparar lo que salió de UNA cuenta contra el presupuesto del ítem
+        entero daría rojos falsos: la plata puede salir de varias."""
+        self._presupuestar('publicidad', 100000)
+        self._gasto('publicidad', 300000)
+        f = self._fila(self._mes(), 'Marketing')
+        self.assertFalse(any(c['excede'] for c in f['celdas']))
+        self.assertTrue(f['presupuesto']['excedido'])

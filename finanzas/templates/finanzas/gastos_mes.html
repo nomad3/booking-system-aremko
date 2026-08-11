@@ -36,6 +36,15 @@
   .tot td{font-weight:700; border-top:2px solid var(--linea); background:#f4f1ea;}
   .coltotal{font-weight:700;}
   .vacio{color:var(--suave); padding:26px 14px;}
+  .colpres{border-left:2px solid var(--linea); white-space:nowrap;}
+  .sinpres{color:var(--suave);}
+  .excedido{color:#a03636; font-weight:700;}
+  .holgado{color:#2e6e46;}
+  .pct{display:block; font-size:10.5px; font-weight:400; opacity:.7;}
+  .aviso-pres{max-width:1060px; margin:12px auto 0; font-size:13px;
+        color:var(--suave); background:#f7f5f0; border-radius:8px;
+        padding:9px 13px;}
+  .aviso-pres b{color:#a03636;}
   a{color:var(--acento);}
   .volver{margin:0 0 12px;}
   .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
@@ -66,12 +75,22 @@
     </select>
   </form>
 
+  {% if hay_presupuestos and en_curso %}
+  <p class="aviso-pres">⏳ {{ nombre_mes }} va por el día {{ dia_hoy }} de {{ dias_mes }}.
+    El presupuesto es del mes completo, así que hoy casi todo se ve holgado —
+    lo que ya aparece <b>excedido</b> es la señal que importa.</p>
+  {% endif %}
+
   {% if filas %}
   <div class="scroll"><table>
     <thead><tr>
       <th>Plan de cuentas</th>
       {% for c in cuentas %}<th title="{{ c.largo }}">{{ c.corto }}</th>{% endfor %}
       <th class="coltotal">Total</th>
+      {% if hay_presupuestos %}
+      <th class="colpres">Presu&shy;puesto</th>
+      <th class="colpres">Queda / excede</th>
+      {% endif %}
     </tr></thead>
     <tbody>
       {% for f in filas %}
@@ -79,15 +98,33 @@
         <td>{{ f.nombre }}</td>
         {% for c in f.celdas %}<td>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
         <td class="coltotal">{% if f.total.url %}<a href="{{ f.total.url }}">{{ f.total.txt }}</a>{% else %}{{ f.total.txt }}{% endif %}</td>
+        {% if hay_presupuestos %}
+        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{{ f.presupuesto.txt }}</td>
+        <td class="colpres {% if f.presupuesto.excedido %}excedido{% elif not f.presupuesto.sin %}holgado{% endif %}">
+          {{ f.presupuesto.dif }}{% if f.presupuesto.pct %}<span class="pct">{{ f.presupuesto.pct }}</span>{% endif %}</td>
+        {% endif %}
       </tr>
       {% endfor %}
       <tr class="tot">
         <td>Total {{ nombre_mes }} {{ ano }}</td>
         {% for t in tot_columnas %}<td>{{ t }}</td>{% endfor %}
         <td>{{ tot_general }}</td>
+        {% if hay_presupuestos %}
+        <td class="colpres">{{ tot_presupuesto.txt }}</td>
+        <td class="colpres {% if tot_presupuesto.excedido %}excedido{% else %}holgado{% endif %}">
+          {{ tot_presupuesto.dif }}{% if tot_presupuesto.pct %}<span class="pct">{{ tot_presupuesto.pct }}</span>{% endif %}</td>
+        {% endif %}
       </tr>
     </tbody>
   </table></div>
+  {% if not hay_presupuestos %}
+  <p class="aviso-pres">Todavía no hay presupuestos definidos. Se ponen en
+    <a href="/admin/finanzas/categoriafinanciera/">el plan de cuentas</a>, un
+    monto mensual por ítem, y esta tabla empieza a compararlos solita.</p>
+  {% else %}
+  <p class="aviso-pres">Los ítems con «—» no tienen presupuesto definido: no es
+    que sobre plata, es que nadie dijo cuánto se piensa gastar ahí.</p>
+  {% endif %}
   {% else %}
   <div class="scroll"><p class="vacio">Sin gastos registrados en {{ nombre_mes }} {{ ano }}.
     Los datos parten en julio 2026.</p></div>

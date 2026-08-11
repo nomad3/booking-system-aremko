@@ -33,6 +33,13 @@
   .tot td{font-weight:700; border-top:2px solid var(--linea); background:#f4f1ea;}
   .coltotal{font-weight:700;}
   .vacio{color:var(--suave); padding:26px 14px;}
+  .colpres{border-left:2px solid var(--linea); white-space:nowrap;}
+  .sinpres{color:var(--suave);}
+  .excedido{color:#a03636; font-weight:700;}
+  .excedido a{color:#a03636;}
+  .aviso-pres{max-width:1060px; margin:12px auto 0; font-size:13px;
+        color:var(--suave); background:#f7f5f0; border-radius:8px;
+        padding:9px 13px;}
   a{color:var(--acento);}
   .volver{margin:0 0 12px;}
   .volver a{display:inline-block; background:#fff; border:1px solid var(--linea);
@@ -64,22 +71,32 @@
       <th>Plan de cuentas</th>
       {% for c in columnas %}<th title="{{ c.largo }}{% if c.es_actual %} (mes en curso){% endif %}"{% if c.es_actual %} class="actual"{% endif %}>{{ c.nombre }}</th>{% endfor %}
       <th class="coltotal">Total {{ ano }}</th>
+      {% if hay_presupuestos %}<th class="colpres">Presu&shy;puesto<br>mensual</th>{% endif %}
     </tr></thead>
     <tbody>
       {% for f in filas %}
       <tr class="{% if f.es_grupo %}grupo{% else %}cat{% endif %}">
         <td>{{ f.nombre }}</td>
-        {% for c in f.celdas %}<td>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
+        {% for c in f.celdas %}<td{% if c.excede %} class="excedido" title="Se pasó del presupuesto mensual"{% endif %}>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
         <td class="coltotal">{% if f.total.url %}<a href="{{ f.total.url }}">{{ f.total.txt }}</a>{% else %}{{ f.total.txt }}{% endif %}</td>
+        {% if hay_presupuestos %}
+        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{{ f.presupuesto.txt }}</td>
+        {% endif %}
       </tr>
       {% endfor %}
       <tr class="tot">
         <td>Total por mes</td>
         {% for t in tot_columnas %}<td>{{ t }}</td>{% endfor %}
         <td>{{ tot_general }}</td>
+        {% if hay_presupuestos %}<td class="colpres"></td>{% endif %}
       </tr>
     </tbody>
   </table></div>
+  {% if hay_presupuestos %}
+  <p class="aviso-pres">Los meses en <span class="excedido">rojo</span> se pasaron
+    del presupuesto mensual de ese ítem. El mes en curso todavía va corriendo, así
+    que ahí un rojo es una alarma de verdad: ya se pasó sin haber terminado.</p>
+  {% endif %}
   {% else %}
   <div class="scroll"><p class="vacio">Sin gastos registrados en {{ ano }}.
     Los datos parten en julio 2026.</p></div>

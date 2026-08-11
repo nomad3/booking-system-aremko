@@ -10,6 +10,7 @@ Honestidad del tablero: los meses sin gastos cargados muestran "—" y no un
 resultado. Un resultado calculado solo con ingresos sería una mentira cómoda.
 """
 from collections import defaultdict
+import calendar
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import user_passes_test
@@ -324,13 +325,46 @@ def url_movimientos(grupo=None, cat_id=None, ano=None, mes=None,
     return '/admin/finanzas/movimientofinanciero/?' + '&'.join(partes)
 
 
-def _tabla_matriz(datos, columnas, ids=None, enlace=None):
+def _presupuesto_de_fila(presupuestos, grupo, categoria=None):
+    """El presupuesto de una categoría, o la suma del grupo si no se pide una.
+
+    Un grupo sin ningún ítem presupuestado devuelve 0, que el reporte muestra
+    como «—»: no es que sobre plata, es que nadie definió cuánto se piensa
+    gastar ahí.
+    """
+    if categoria is not None:
+        return int(presupuestos.get((grupo, categoria), 0))
+    return sum(int(v) for (g, _), v in presupuestos.items() if g == grupo)
+
+
+def _celda_presupuesto(presupuesto, gastado):
+    """Presupuesto, diferencia y si se excedió — listo para la plantilla."""
+    if not presupuesto:
+        return {'txt': '—', 'dif': '', 'excedido': False, 'sin': True,
+                'pct': ''}
+    resto = presupuesto - gastado
+    return {
+        'txt': _clp(presupuesto),
+        'dif': ('−' + _clp(-resto)) if resto < 0 else _clp(resto),
+        'excedido': resto < 0,
+        'sin': False,
+        'pct': f'{round(gastado * 100 / presupuesto)}%',
+    }
+
+
+def _tabla_matriz(datos, columnas, ids=None, enlace=None, presupuestos=None,
+                  columnas_son_meses=False):
     """Arma las filas del plan de cuentas contra columnas arbitrarias.
 
     datos: {(grupo, categoría): {col: monto}} · columnas: claves ordenadas.
     ids: {(grupo, categoría): id} para enlazar la fila de categoría.
     enlace: f(grupo, cat_id, columna_o_None) → URL. Cada cifra con plata
     queda clicable hacia los movimientos que la componen.
+    presupuestos: {(grupo, categoría): monto mensual} para comparar.
+    columnas_son_meses: solo entonces cada celda se puede pintar contra el
+    presupuesto. En el reporte del mes las columnas son CUENTAS, y comparar
+    lo que salió de una cuenta contra el presupuesto del ítem entero daría
+    rojos falsos.
     Misma agrupación del tablero: subtotal por grupo y debajo sus categorías
     solo si el grupo tiene más de una.
     """
@@ -338,10 +372,12 @@ def _tabla_matriz(datos, columnas, ids=None, enlace=None):
     filas = []
     tot_col = {c: 0 for c in columnas}
     tot_general = 0
+    tot_presupuesto = 0
 
-    def _celda(valor, grupo, cat_id, col):
+    def _celda(valor, grupo, cat_id, col, tope=0):
         return {'txt': _clp(valor) if valor else '',
-                'url': enlace(grupo, cat_id, col) if (enlace and valor) else ''}
+                'url': enlace(grupo, cat_id, col) if (enlace and valor) else '',
+                'excede': bool(columnas_son_meses and tope and valor > tope)}
 
     for g, g_nombre in CategoriaFinanciera.GRUPOS:
         if g == 'ingresos':
@@ -356,23 +392,30 @@ def _tabla_matriz(datos, columnas, ids=None, enlace=None):
             tot_col[c] += v
         total_g = sum(celdas_g)
         tot_general += total_g
+        pres_g = _presupuesto_de_fila(presupuestos, g) if presupuestos else 0
+        tot_presupuesto += pres_g
         filas.append({
             'es_grupo': True, 'nombre': g_nombre,
-            'celdas': [_celda(v, g, None, c)
+            'celdas': [_celda(v, g, None, c, pres_g)
                        for v, c in zip(celdas_g, columnas)],
-            'total': _celda(total_g, g, None, None)})
+            'total': _celda(total_g, g, None, None),
+            'presupuesto': _celda_presupuesto(pres_g, total_g)})
         if len(cats_g) > 1:
             for cat in cats_g:
                 cat_id = ids.get((g, cat))
                 celdas = [datos[(g, cat)].get(c, 0) for c in columnas]
+                pres_c = (_presupuesto_de_fila(presupuestos, g, cat)
+                          if presupuestos else 0)
                 filas.append({
                     'es_grupo': False, 'nombre': cat,
-                    'celdas': [_celda(v, g, cat_id, c)
+                    'celdas': [_celda(v, g, cat_id, c, pres_c)
                                for v, c in zip(celdas, columnas)],
-                    'total': _celda(sum(celdas), g, cat_id, None)})
+                    'total': _celda(sum(celdas), g, cat_id, None),
+                    'presupuesto': _celda_presupuesto(pres_c, sum(celdas))})
     return (filas,
             [_clp(tot_col[c]) if tot_col[c] else '—' for c in columnas],
-            _clp(tot_general))
+            _clp(tot_general),
+            _celda_presupuesto(tot_presupuesto, tot_general))
 
 
 def _param_ano(request, hoy):
@@ -411,13 +454,31 @@ def gastos_mes(request):
         datos[clave][cta] += monto
         tot_cuenta[cta] += monto
 
+    # Presupuestos (Jorge 2026-08-10). Un ítem presupuestado que este mes NO
+    # gastó nada TIENE que aparecer igual: si solo mostráramos lo gastado, el
+    # mes en que no se pagó la luz se vería como un mes sin ese ítem en vez de
+    # como un mes por debajo del presupuesto.
+    presupuestos = {}
+    for c in CategoriaFinanciera.objects.filter(clase='gasto',
+                                                presupuesto_mensual__gt=0):
+        clave = (c.grupo or 'otros', c.nombre)
+        presupuestos[clave] = int(c.presupuesto_mensual)
+        ids.setdefault(clave, c.id)
+        datos[clave]              # crea la fila vacía si no gastó nada
+
     # Solo las cuentas que generaron gastos este mes; la que más gasta primero.
     claves = sorted(tot_cuenta, key=lambda c: -tot_cuenta[c])
-    filas, tot_columnas, tot_general = _tabla_matriz(
+    filas, tot_columnas, tot_general, tot_presupuesto = _tabla_matriz(
         datos, claves, ids,
         lambda g, cid, cta: url_movimientos(
             grupo=g, cat_id=cid, ano=ano, mes=mes,
-            cuenta_id=cuenta_ids.get(cta) if cta else None))
+            cuenta_id=cuenta_ids.get(cta) if cta else None),
+        presupuestos=presupuestos)
+
+    # Un mes a medio andar comparado contra el presupuesto del mes completo se
+    # ve siempre «bien». Decirlo vale más que corregirlo con una regla de tres.
+    en_curso = (ano, mes) == (hoy.year, hoy.month)
+    dias_mes = calendar.monthrange(ano, mes)[1]
 
     return render(request, 'finanzas/gastos_mes.html', {
         'ano': ano, 'mes': mes, 'nombre_mes': MESES_ES[mes],
@@ -428,6 +489,11 @@ def gastos_mes(request):
         'filas': filas,
         'tot_columnas': tot_columnas,
         'tot_general': tot_general,
+        'tot_presupuesto': tot_presupuesto,
+        'hay_presupuestos': bool(presupuestos),
+        'en_curso': en_curso,
+        'dia_hoy': hoy.day if en_curso else dias_mes,
+        'dias_mes': dias_mes,
     })
 
 
@@ -452,9 +518,20 @@ def gastos_ano(request):
         ids[clave] = f['categoria__id']
         datos[clave][f['fecha__month']] += int(f['t'] or 0)
 
-    filas, tot_columnas, tot_general = _tabla_matriz(
+    # El presupuesto es MENSUAL, así que en esta vista es la vara de cada
+    # columna: sirve para ver de un vistazo en qué meses se pasó cada ítem.
+    presupuestos = {}
+    for c in CategoriaFinanciera.objects.filter(clase='gasto',
+                                                presupuesto_mensual__gt=0):
+        clave = (c.grupo or 'otros', c.nombre)
+        presupuestos[clave] = int(c.presupuesto_mensual)
+        ids.setdefault(clave, c.id)
+        datos[clave]
+
+    filas, tot_columnas, tot_general, _pres = _tabla_matriz(
         datos, meses_nums, ids,
-        lambda g, cid, m: url_movimientos(grupo=g, cat_id=cid, ano=ano, mes=m))
+        lambda g, cid, m: url_movimientos(grupo=g, cat_id=cid, ano=ano, mes=m),
+        presupuestos=presupuestos, columnas_son_meses=True)
 
     return render(request, 'finanzas/gastos_ano.html', {
         'ano': ano,
@@ -466,6 +543,7 @@ def gastos_ano(request):
         'filas': filas,
         'tot_columnas': tot_columnas,
         'tot_general': tot_general,
+        'hay_presupuestos': bool(presupuestos),
     })
 
 

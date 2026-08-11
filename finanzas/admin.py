@@ -41,11 +41,20 @@ class CuentaFinancieraAdmin(SoloSuperusuario, admin.ModelAdmin):
 
 @admin.register(CategoriaFinanciera)
 class CategoriaFinancieraAdmin(SoloSuperusuario, admin.ModelAdmin):
-    list_display = ('nombre', 'clave', 'clase', 'orden')
-    list_filter = ('clase',)
-    list_editable = ('orden',)
+    # El presupuesto se escribe ACÁ, en la lista: filtrar por gasto y llenar
+    # la columna de arriba a abajo en una sola pantalla (Jorge 2026-08-10).
+    list_display = ('nombre', 'clave', 'clase', 'grupo', 'presupuesto_fmt',
+                    'presupuesto_mensual', 'orden')
+    list_filter = ('clase', 'grupo')
+    list_editable = ('presupuesto_mensual', 'orden')
     # Requerido por el autocomplete de categoría en MovimientoFinanciero.
     search_fields = ('nombre', 'clave')
+
+    @admin.display(description='Presupuesto', ordering='presupuesto_mensual')
+    def presupuesto_fmt(self, obj):
+        if not obj.presupuesto_mensual:
+            return '— sin definir'
+        return f'${obj.presupuesto_mensual:,.0f}/mes'.replace(',', '.')
 
 
 class TraspasoForm(forms.Form):
