@@ -28,25 +28,17 @@ def _clp(n):
 
 
 def ventas_de_masajes(anio, mes):
-    """Lo vendido en masajes ese mes, por fecha de AGENDAMIENTO.
+    """Lo vendido en masajes ese mes, por fecha del SERVICIO.
 
-    La fecha del servicio y no la del pago: el honorario se genera cuando la
-    masajista trabaja, no cuando el cliente transfiere. Comparar contra la
-    fecha de pago mezclaría meses.
+    Envoltorio del helper que usan los reportes, para que el comando y la web
+    no puedan dar números distintos del mismo mes.
     """
-    from ventas.models import ReservaServicio
+    from datetime import date as _date
 
-    total = 0
-    for rs in (ReservaServicio.objects
-               .filter(fecha_agendamiento__year=anio,
-                       fecha_agendamiento__month=mes,
-                       servicio__categoria__nombre__icontains='masaje')
-               .select_related('servicio')):
-        unitario = rs.precio_unitario_venta
-        if unitario is None:
-            unitario = rs.servicio.precio_base if rs.servicio_id else 0
-        total += int(unitario or 0) * (rs.cantidad_personas or 1)
-    return total
+    from finanzas.views import ventas_por_familia
+
+    del_mes = ventas_por_familia(anio, mes).get(_date(anio, mes, 1), {})
+    return int(del_mes.get('Masajes', 0))
 
 
 class Command(BaseCommand):

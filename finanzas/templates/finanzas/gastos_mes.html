@@ -125,6 +125,14 @@
   {% else %}
   <p class="aviso-pres">Los ítems con «—» no tienen presupuesto definido: no es
     que sobre plata, es que nadie dijo cuánto se piensa gastar ahí.</p>
+  {% if hay_familia %}
+  <p class="aviso-pres">Ojo con los dos relojes: las <b>ventas totales</b> se
+    cuentan por fecha de <b>pago</b>, y la venta de una <b>familia</b> —Masajes,
+    Tinas— por fecha del <b>servicio</b>. Para el 40% de las masajistas ese es
+    el correcto: el honorario nace cuando ella trabaja, no cuando el cliente
+    transfiere. Por eso un masaje de fin de mes pagado al mes siguiente deja
+    diferencia; se lee en el acumulado, no en un mes suelto.</p>
+  {% endif %}
   {% endif %}
   {% else %}
   <div class="scroll"><p class="vacio">Sin gastos registrados en {{ nombre_mes }} {{ ano }}.

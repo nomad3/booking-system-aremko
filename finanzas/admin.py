@@ -44,9 +44,11 @@ class CategoriaFinancieraAdmin(SoloSuperusuario, admin.ModelAdmin):
     # El presupuesto se escribe ACÁ, en la lista: filtrar por gasto y llenar
     # la columna de arriba a abajo en una sola pantalla (Jorge 2026-08-10).
     list_display = ('nombre', 'clave', 'clase', 'grupo', 'presupuesto_fmt',
-                    'presupuesto_mensual', 'presupuesto_pct_ventas', 'orden')
-    list_filter = ('clase', 'grupo')
-    list_editable = ('presupuesto_mensual', 'presupuesto_pct_ventas', 'orden')
+                    'presupuesto_mensual', 'presupuesto_pct_ventas',
+                    'familia_ventas', 'orden')
+    list_filter = ('clase', 'grupo', 'familia_ventas')
+    list_editable = ('presupuesto_mensual', 'presupuesto_pct_ventas',
+                     'familia_ventas', 'orden')
     # Requerido por el autocomplete de categoría en MovimientoFinanciero.
     search_fields = ('nombre', 'clave')
 
@@ -56,7 +58,9 @@ class CategoriaFinancieraAdmin(SoloSuperusuario, admin.ModelAdmin):
         # mostrarlo como si rigiera sería mentir en la propia pantalla donde
         # se edita.
         if obj.presupuesto_pct_ventas:
-            return f'{obj.presupuesto_pct_ventas:.10g}% de las ventas'
+            base = (f'la venta de {obj.familia_ventas}'
+                    if obj.familia_ventas else 'las ventas')
+            return f'{obj.presupuesto_pct_ventas:.10g}% de {base}'
         if not obj.presupuesto_mensual:
             return '— sin definir'
         return f'${obj.presupuesto_mensual:,.0f}/mes'.replace(',', '.')

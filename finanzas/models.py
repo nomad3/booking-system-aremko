@@ -91,6 +91,19 @@ class CategoriaFinanciera(models.Model):
         max_digits=5, decimal_places=2, default=0,
         help_text='% de las ventas del mes. Si es mayor que 0, manda sobre el '
                   'monto fijo. Ej: 20 = 20% de lo vendido ese mes.')
+    # Contra qué venta se mide ese %. El contrato de las masajistas es 40% de
+    # la venta de MASAJES, no del total (Jorge 2026-08-11): con el total, en
+    # verano —cuando las tinas pesan más— el número se desarma.
+    FAMILIAS_VENTA = [
+        ('', 'Todas las ventas'),
+        ('Tinas', 'Solo Tinas'),
+        ('Masajes', 'Solo Masajes'),
+        ('Cabañas', 'Solo Cabañas'),
+        ('Ambientaciones', 'Solo Ambientaciones'),
+    ]
+    familia_ventas = models.CharField(
+        max_length=20, choices=FAMILIAS_VENTA, blank=True, default='',
+        help_text='Contra qué venta se calcula el %. Vacío = ventas totales.')
 
     class Meta:
         verbose_name = 'Categoría'

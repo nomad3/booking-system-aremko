@@ -346,6 +346,53 @@ def ventas_por_mes(anio, mes=None):
     return ventas
 
 
+def ventas_por_familia(anio, mes=None):
+    """{date(año, mes, 1): {'Masajes': X, 'Tinas': Y, …}} de ese período.
+
+    OJO CON EL RELOJ: acá manda la fecha en que el servicio se PRESTA, no la
+    del pago (que es la de `ventas_por_mes`). Para el contrato de las
+    masajistas ese es el reloj correcto — el honorario nace cuando ella
+    trabaja, no cuando el cliente transfiere. Las dos bases conviven en el
+    mismo reporte a propósito, y la página lo declara.
+    """
+    from ventas.models import Cliente, ReservaServicio
+
+    filtros = {'fecha_agendamiento__year': anio}
+    if mes:
+        filtros['fecha_agendamiento__month'] = mes
+    por_mes = defaultdict(lambda: defaultdict(int))
+    for rs in (ReservaServicio.objects.filter(**filtros)
+               .select_related('servicio', 'servicio__categoria')):
+        if not rs.servicio_id:
+            continue
+        cat = (rs.servicio.categoria.nombre
+               if rs.servicio.categoria_id else '')
+        familia = Cliente._mapear_categoria_a_familia(
+            cat, getattr(rs.servicio, 'tipo_servicio', '') or '')
+        # El precio guardado en la línea manda: es lo que se cobró ese día, y
+        # el del catálogo pudo cambiar después.
+        unitario = rs.precio_unitario_venta
+        if unitario is None:
+            unitario = rs.servicio.precio_base
+        d = rs.fecha_agendamiento
+        por_mes[date(d.year, d.month, 1)][familia] += \
+            int(unitario or 0) * (rs.cantidad_personas or 1)
+    return por_mes
+
+
+def base_de_ventas(categoria, totales, por_familia):
+    """Contra qué venta se mide el % de este ítem.
+
+    Sin familia declarada, el total. Con familia, solo lo vendido en ella —
+    el contrato de las masajistas es 40% de la venta de MASAJES, y medirlo
+    contra el total se desarma en verano, cuando las tinas pesan más.
+    """
+    familia = (getattr(categoria, 'familia_ventas', '') or '').strip()
+    if familia:
+        return int((por_familia or {}).get(familia, 0))
+    return int(totales)
+
+
 def presupuesto_efectivo(categoria, vendido):
     """Cuánto puede gastar este ítem en un mes que vendió `vendido`.
 
@@ -372,10 +419,19 @@ def _presupuesto_de_fila(presupuestos, grupo, categoria=None):
 
 
 def _celda_presupuesto(presupuesto, gastado, pct_ventas=None):
-    """Presupuesto, diferencia y si se excedió — listo para la plantilla."""
+    """Presupuesto, diferencia y si se excedió — listo para la plantilla.
+
+    pct_ventas: None, o la tupla (porcentaje, familia) — la familia vacía
+    significa «contra las ventas totales».
+    """
+    familia = ''
+    if isinstance(pct_ventas, (tuple, list)):
+        pct_ventas, familia = (list(pct_ventas) + [''])[:2]
     # float() a propósito: Decimal('20.00') formateado con 'g' conserva los
     # ceros, y en pantalla «20.00% de ventas» se lee peor que «20%».
-    regla = f'{float(pct_ventas):.10g}% de ventas' if pct_ventas else ''
+    regla = (f'{float(pct_ventas):.10g}% de '
+             f'{"venta de " + familia if familia else "ventas"}'
+             ) if pct_ventas else ''
     if not presupuesto:
         # Sin monto no hay contra qué comparar, aunque la regla exista: un mes
         # que no vendió nada tiene un tope de $0, y marcar «excedido en todo lo
@@ -441,12 +497,18 @@ def _tabla_matriz(datos, columnas, ids=None, enlace=None, presupuestos=None,
         # contra el presupuesto DE SU columna, no contra uno solo.
         topes_g = [(_presupuesto_de_fila(presupuesto_por_col.get(c, {}), g)
                     if presupuesto_por_col else pres_g) for c in columnas]
+        # La regla del grupo solo se muestra si TODAS sus categorías comparten
+        # la misma. Con una sola categoría —el caso de Honorarios masajistas—
+        # la fila del grupo ES el ítem, y sin esto la regla no se vería nunca.
+        # Si adentro conviven reglas distintas, no se muestra ninguna.
+        reglas_g = {(pcts or {}).get((g, cat)) for cat in cats_g}
+        regla_g = reglas_g.pop() if len(reglas_g) == 1 else None
         filas.append({
             'es_grupo': True, 'nombre': g_nombre,
             'celdas': [_celda(v, g, None, c, t)
                        for v, c, t in zip(celdas_g, columnas, topes_g)],
             'total': _celda(total_g, g, None, None),
-            'presupuesto': _celda_presupuesto(pres_g, total_g)})
+            'presupuesto': _celda_presupuesto(pres_g, total_g, regla_g)})
         if len(cats_g) > 1:
             for cat in cats_g:
                 cat_id = ids.get((g, cat))
@@ -511,13 +573,16 @@ def gastos_mes(request):
     # mes en que no se pagó la luz se vería como un mes sin ese ítem en vez de
     # como un mes por debajo del presupuesto.
     vendido = ventas_por_mes(ano, mes).get(date(ano, mes, 1), 0)
-    presupuestos, con_pct = {}, {}
+    familias = ventas_por_familia(ano, mes).get(date(ano, mes, 1), {})
+    presupuestos, con_pct, hay_familia = {}, {}, False
     for c in CategoriaFinanciera.objects.filter(clase='gasto').exclude(
             presupuesto_mensual=0, presupuesto_pct_ventas=0):
         clave = (c.grupo or 'otros', c.nombre)
-        presupuestos[clave] = presupuesto_efectivo(c, vendido)
+        presupuestos[clave] = presupuesto_efectivo(
+            c, base_de_ventas(c, vendido, familias))
         if c.presupuesto_pct_ventas:
-            con_pct[clave] = c.presupuesto_pct_ventas
+            con_pct[clave] = (c.presupuesto_pct_ventas, c.familia_ventas)
+            hay_familia = hay_familia or bool(c.familia_ventas)
         ids.setdefault(clave, c.id)
         datos[clave]              # crea la fila vacía si no gastó nada
 
@@ -546,6 +611,7 @@ def gastos_mes(request):
         'tot_general': tot_general,
         'tot_presupuesto': tot_presupuesto,
         'hay_presupuestos': bool(presupuestos),
+        'hay_familia': hay_familia,
         'en_curso': en_curso,
         'dia_hoy': hoy.day if en_curso else dias_mes,
         'dias_mes': dias_mes,
@@ -578,6 +644,7 @@ def gastos_ano(request):
     # Con % de ventas la vara es distinta en cada mes —ese es el punto—, así
     # que se calcula una por columna.
     ventas = ventas_por_mes(ano)
+    familias_ano = ventas_por_familia(ano)
     cats_presupuestadas = list(
         CategoriaFinanciera.objects.filter(clase='gasto').exclude(
             presupuesto_mensual=0, presupuesto_pct_ventas=0))
@@ -586,13 +653,15 @@ def gastos_ano(request):
         clave = (c.grupo or 'otros', c.nombre)
         presupuestos[clave] = int(c.presupuesto_mensual)
         if c.presupuesto_pct_ventas:
-            con_pct[clave] = c.presupuesto_pct_ventas
+            con_pct[clave] = (c.presupuesto_pct_ventas, c.familia_ventas)
         ids.setdefault(clave, c.id)
         datos[clave]
     for m in meses_nums:
         vendido = ventas.get(date(ano, m, 1), 0)
+        del_mes = familias_ano.get(date(ano, m, 1), {})
         por_mes_pres[m] = {
-            (c.grupo or 'otros', c.nombre): presupuesto_efectivo(c, vendido)
+            (c.grupo or 'otros', c.nombre): presupuesto_efectivo(
+                c, base_de_ventas(c, vendido, del_mes))
             for c in cats_presupuestadas}
 
     filas, tot_columnas, tot_general, _pres = _tabla_matriz(

@@ -3358,3 +3358,175 @@ class CalcularPctVentasTest(TestCase):
             fecha_agendamiento=date(2026, 7, 8), hora_inicio='14:00',
             cantidad_personas=2, precio_unitario_venta=60000)
         self.assertEqual(ventas_de_masajes(2026, 7), 0)
+
+
+class PresupuestoPorFamiliaTest(TestCase):
+    """El contrato de las masajistas: 40% de la venta de MASAJES, no del total
+    (Jorge 2026-08-11). Con el total, en verano el número se desarma."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def tearDown(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().tearDown()
+
+    def _reserva(self):
+        from ventas.models import Cliente, VentaReserva
+        cliente, _ = Cliente.objects.get_or_create(
+            telefono='+56900000777', defaults={'nombre': 'Cliente'})
+        reserva, _ = VentaReserva.objects.get_or_create(
+            cliente=cliente, defaults={'fecha_reserva': timezone.now()})
+        return reserva
+
+    def _venta(self, monto, dia=date(2026, 7, 5)):
+        from ventas.models import Pago
+        return Pago.objects.create(
+            venta_reserva=self._reserva(), monto=monto,
+            metodo_pago='transferencia',
+            fecha_pago=timezone.make_aware(
+                datetime(dia.year, dia.month, dia.day, 12)))
+
+    def _servicio(self, familia, precio, dia, personas=1):
+        from ventas.models import CategoriaServicio, ReservaServicio, Servicio
+        cat, _ = CategoriaServicio.objects.get_or_create(nombre=familia)
+        serv, _ = Servicio.objects.get_or_create(
+            nombre=f'Servicio {familia}',
+            defaults={'precio_base': precio, 'duracion': 50, 'categoria': cat})
+        return ReservaServicio.objects.create(
+            venta_reserva=self._reserva(), servicio=serv,
+            fecha_agendamiento=dia, hora_inicio='15:00',
+            cantidad_personas=personas, precio_unitario_venta=precio)
+
+    def _gasto(self, clave, monto, dia=date(2026, 7, 10)):
+        MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=CategoriaFinanciera.objects.get(clave=clave),
+            fuente='captura', referencia=f'pf:{clave}:{dia}:{monto}')
+
+    def _contrato(self, pct=40, familia='Masajes'):
+        CategoriaFinanciera.objects.filter(
+            clave='honorarios_masajistas').update(
+                presupuesto_pct_ventas=pct, familia_ventas=familia)
+        # Otra del mismo grupo para que la tabla abra las categorías.
+        CategoriaFinanciera.objects.filter(clave='remuneraciones').update(
+            presupuesto_mensual=1000)
+
+    def _fila(self, r, nombre):
+        return [f for f in r.context['filas'] if f['nombre'] == nombre][0]
+
+    # ── el cálculo por familia ─────────────────────────────────────────────
+    def test_separa_la_venta_de_cada_familia(self):
+        from .views import ventas_por_familia
+        self._servicio('Masajes', 100000, date(2026, 7, 8))
+        self._servicio('Tinas', 60000, date(2026, 7, 8), personas=2)
+        del_mes = ventas_por_familia(2026, 7)[date(2026, 7, 1)]
+        self.assertEqual(del_mes['Masajes'], 100000)
+        self.assertEqual(del_mes['Tinas'], 120000)
+
+    def test_base_de_ventas_elige_el_total_o_la_familia(self):
+        from .views import base_de_ventas
+        cat = CategoriaFinanciera.objects.get(clave='honorarios_masajistas')
+        totales, fams = 10000000, {'Masajes': 2000000}
+        self.assertEqual(base_de_ventas(cat, totales, fams), totales)
+        cat.familia_ventas = 'Masajes'
+        self.assertEqual(base_de_ventas(cat, totales, fams), 2000000)
+
+    # ── el reporte ─────────────────────────────────────────────────────────
+    def test_el_mes_mide_el_40_contra_la_venta_de_masajes(self):
+        self._contrato()
+        self._venta(10000000)                              # venta total
+        self._servicio('Masajes', 500000, date(2026, 7, 8))
+        self._gasto('honorarios_masajistas', 180000)
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 7})
+        f = self._fila(r, 'Honorarios masajistas')
+        self.assertEqual(f['presupuesto']['txt'], '$200.000')   # 40% de 500.000
+        self.assertEqual(f['presupuesto']['dif'], '$20.000')
+        self.assertIn('40% de venta de Masajes', f['presupuesto']['regla'])
+        self.assertContains(r, '40% de venta de Masajes')
+
+    def test_la_mezcla_no_mueve_la_vara(self):
+        """El punto del contrato: si suben las tinas y los masajes quedan
+        igual, el presupuesto de las masajistas no se mueve."""
+        self._contrato()
+        self._venta(30000000)                               # triple de ventas
+        self._servicio('Masajes', 500000, date(2026, 7, 8))
+        self._servicio('Tinas', 4000000, date(2026, 7, 9))
+        self._gasto('honorarios_masajistas', 180000)
+        f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
+                                       {'ano': 2026, 'mes': 7}),
+                       'Honorarios masajistas')
+        self.assertEqual(f['presupuesto']['txt'], '$200.000')
+
+    def test_avisa_de_los_dos_relojes(self):
+        self._contrato()
+        self._venta(10000000)
+        self._servicio('Masajes', 500000, date(2026, 7, 8))
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 7})
+        self.assertTrue(r.context['hay_familia'])
+        self.assertContains(r, 'dos relojes')
+
+    def test_sin_familia_sigue_midiendo_contra_el_total(self):
+        self._contrato(pct=10, familia='')
+        self._venta(10000000)
+        self._servicio('Masajes', 500000, date(2026, 7, 8))
+        self._gasto('honorarios_masajistas', 180000)
+        f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
+                                       {'ano': 2026, 'mes': 7}),
+                       'Honorarios masajistas')
+        self.assertEqual(f['presupuesto']['txt'], '$1.000.000')
+
+    def test_en_el_ano_cada_mes_usa_su_propia_venta_de_masajes(self):
+        self._contrato()
+        self._venta(10000000, dia=date(2026, 7, 5))
+        self._venta(10000000, dia=date(2026, 8, 5))
+        self._servicio('Masajes', 500000, date(2026, 7, 8))   # tope 200.000
+        self._servicio('Masajes', 200000, date(2026, 8, 8))   # tope 80.000
+        self._gasto('honorarios_masajistas', 150000, dia=date(2026, 7, 10))
+        self._gasto('honorarios_masajistas', 150000, dia=date(2026, 8, 10))
+        r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
+        f = self._fila(r, 'Honorarios masajistas')
+        self.assertFalse(f['celdas'][0]['excede'])    # julio cumple
+        self.assertTrue(f['celdas'][1]['excede'])     # agosto no
+
+    def test_el_comando_y_la_web_dan_el_mismo_numero(self):
+        """Dos fuentes para «venta de masajes» se desincronizarían solas."""
+        from .management.commands.calcular_pct_ventas import ventas_de_masajes
+        from .views import ventas_por_familia
+        self._servicio('Masajes', 500000, date(2026, 7, 8))
+        self.assertEqual(
+            ventas_de_masajes(2026, 7),
+            ventas_por_familia(2026, 7)[date(2026, 7, 1)]['Masajes'])
