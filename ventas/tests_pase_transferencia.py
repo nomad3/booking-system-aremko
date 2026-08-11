@@ -79,3 +79,12 @@ class PaseTransferenciaPrimeroTests(TestCase):
     def test_sin_saldo_no_se_ofrece_pagar(self):
         r = self._pase(saldo=0)
         self.assertNotContains(r, 'Datos de Transferencia')
+
+    def test_no_se_le_escapa_ningun_comentario_al_cliente(self):
+        """El 2026-08-10 el Pase le mostró al cliente un comentario mío sobre
+        comisiones de tarjeta: `{# … #}` de varias líneas no es comentario en
+        Django. Esta página la ve gente que está por pagar."""
+        r = self._pase()
+        for rastro in ('{#', '#}', 'Transferencia primero',
+                       '{% comment', 'endcomment'):
+            self.assertNotContains(r, rastro)
