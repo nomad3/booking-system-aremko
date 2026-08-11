@@ -2919,3 +2919,85 @@ class SaludTarjetasTest(TestCase):
                           'BancoEstado')
         self.assertTrue(fila['atrasada'])
         self.assertFalse(fila.get('es_tarjeta'))
+
+
+class PresupuestarDesdeMesTest(TestCase):
+    """Cargar los presupuestos con un % del gasto real (Jorge 2026-08-11)."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def _gasto(self, clave, monto, dia=date(2026, 7, 10)):
+        MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=CategoriaFinanciera.objects.get(clave=clave),
+            fuente='captura', referencia=f'pp:{clave}:{dia}:{monto}')
+
+    def _correr(self, *args):
+        from io import StringIO
+        salida = StringIO()
+        call_command('presupuestar_desde_mes', *args, stdout=salida)
+        return salida.getvalue()
+
+    def _pres(self, clave):
+        return int(CategoriaFinanciera.objects.get(
+            clave=clave).presupuesto_mensual)
+
+    def test_por_defecto_no_escribe_nada(self):
+        """La lección de revisar_duplicados: lo que escribe se mira primero."""
+        self._gasto('publicidad', 1000000)
+        salida = self._correr()
+        self.assertIn('MODO LECTURA', salida)
+        self.assertEqual(self._pres('publicidad'), 0)
+
+    def test_aplica_el_setenta_por_ciento_redondeado_al_millar(self):
+        self._gasto('publicidad', 1234567)
+        self._correr('--aplicar')
+        self.assertEqual(self._pres('publicidad'), 864000)   # 864.196,9 → 864.000
+
+    def test_el_factor_se_puede_cambiar(self):
+        self._gasto('publicidad', 1000000)
+        self._correr('--aplicar', '--factor', '0.9')
+        self.assertEqual(self._pres('publicidad'), 900000)
+
+    def test_no_pisa_lo_que_jorge_ya_puso_salvo_que_se_lo_pidan(self):
+        CategoriaFinanciera.objects.filter(clave='publicidad').update(
+            presupuesto_mensual=500000)
+        self._gasto('publicidad', 1000000)
+        self._correr('--aplicar')
+        self.assertEqual(self._pres('publicidad'), 500000)
+        self._correr('--aplicar', '--pisar')
+        self.assertEqual(self._pres('publicidad'), 700000)
+
+    def test_no_presupuesta_lo_que_no_se_sabe_ni_las_devoluciones(self):
+        """Ponerle meta a «por clasificar» sería presupuestar la ignorancia; y
+        una devolución no es un costo, es una venta que se deshizo."""
+        self._gasto('por_clasificar', 800000)
+        self._gasto('devoluciones', 200000)
+        salida = self._correr('--aplicar')
+        self.assertEqual(self._pres('por_clasificar'), 0)
+        self.assertEqual(self._pres('devoluciones'), 0)
+        self.assertIn('Sin presupuestar', salida)
+
+    def test_los_retiros_se_presupuestan_pero_con_aviso(self):
+        self._gasto('personales_martin', 300000)
+        salida = self._correr('--aplicar')
+        self.assertEqual(self._pres('personales_martin'), 210000)
+        self.assertIn('RETIROS DE LA FAMILIA', salida)
+        self.assertIn('conversación', salida)
+
+    def test_un_gasto_chico_no_queda_en_cero(self):
+        """$0 se lee como «sin definir» y el ítem se caería del control."""
+        self._gasto('seguros', 500)
+        self._correr('--aplicar')
+        self.assertEqual(self._pres('seguros'), 1000)
+
+    def test_solo_mira_el_mes_pedido(self):
+        self._gasto('publicidad', 1000000, dia=date(2026, 8, 5))
+        salida = self._correr('--aplicar')
+        self.assertIn('No hay gastos cargados', salida)
+        self.assertEqual(self._pres('publicidad'), 0)
+        self._correr('--aplicar', '--mes', '2026-08')
+        self.assertEqual(self._pres('publicidad'), 700000)
