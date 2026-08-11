@@ -77,7 +77,7 @@
     <tbody>
       {% for c in cartolas %}
       <tr>
-        <td>{{ c.nombre }}</td>
+        <td>{{ c.nombre }}{% if c.es_tarjeta %} <span class="nota">· tarjeta</span>{% endif %}</td>
         {% if c.vacia %}
         <td colspan="5" class="nota" style="text-align:left;">Sin ningún movimiento cargado</td>
         {% else %}
@@ -88,11 +88,19 @@
         <td class="{% if c.atrasada %}mal{% else %}bien{% endif %}">
           {% if c.atraso == 0 %}al día{% else %}{{ c.atraso }} días{% endif %}</td>
         {% endif %}
+        {% if c.es_tarjeta %}
+        <td class="nota">no aplica</td>
+        {% else %}
         <td class="{% if c.ancla %}bien{% else %}mal{% endif %}">{% if c.ancla %}sí{% else %}falta{% endif %}</td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
   </table></div>
+  <p class="nota">De las tarjetas solo se mide el atraso: pasan días sin una sola
+     compra, así que buscarles saltos o exigirles que cubran desde el 1 daría
+     alarmas falsas. Se marcan a los {{ dias_alerta_tarjeta }} días — si llegan
+     ahí, conviene entrar al portal y ver si tienen movimiento para subir.</p>
 
   {% for c in cartolas %}{% if c.falta_inicio %}
   <div class="aviso mal">⚠️ <b>{{ c.nombre }}</b> no cubre el comienzo del período:

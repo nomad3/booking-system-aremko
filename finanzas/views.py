@@ -813,6 +813,13 @@ VENTANA_CALCE_DIAS = 5     # decisión de Jorge 2026-08-10
 
 CUENTAS_CON_CARTOLA = ('bancoestado', 'scotiabank', 'scotiabank_alda',
                        'cuentarut_jorge')
+# Las tarjetas también se vigilan (Jorge 2026-08-10): alimentan los gastos y la
+# cuenta corriente, y si Alda deja de mandar los PDF ese gasto desaparece del
+# tablero sin que nadie note la ausencia. Solo se les mide el ATRASO.
+CUENTAS_TARJETA = ('tarjeta_alda_1', 'tarjeta_alda_2')
+# Una tarjeta pasa días sin una sola compra; con el umbral de 3 de las cuentas
+# corrientes estaría siempre en rojo y la alarma dejaría de significar algo.
+DIAS_ALERTA_TARJETA = 10
 HUECO_SOSPECHOSO = 4      # días seguidos sin un solo movimiento
 
 
@@ -971,15 +978,21 @@ def salud_fuentes(request):
     desde = date(2026, 7, 1)
 
     # ── Cartolas: cobertura y huecos ────────────────────────────────────────
+    vigiladas = CUENTAS_CON_CARTOLA + CUENTAS_TARJETA
     cuentas = {c.clave: c for c in
-               CuentaFinanciera.objects.filter(clave__in=CUENTAS_CON_CARTOLA)}
+               CuentaFinanciera.objects.filter(clave__in=vigiladas)}
     anclas = set(SaldoMensual.objects
                  .filter(periodo=date(2026, 7, 1))
                  .values_list('cuenta__clave', flat=True))
     cartolas = []
-    for clave in CUENTAS_CON_CARTOLA:
+    for clave in vigiladas:
         if clave not in cuentas:
             continue
+        # Una tarjeta no es una cuenta corriente: pasa días sin una sola
+        # compra, así que buscarle «saltos» o exigirle que cubra desde el 1
+        # daría alarmas falsas. De ella solo interesa hace cuántos días que
+        # nadie sube el PDF (criterio de Jorge 2026-08-10).
+        es_tarjeta = clave in CUENTAS_TARJETA
         movs = (MovimientoFinanciero.objects
                 .filter(cuenta__clave=clave, fecha__gte=desde)
                 .values_list('fecha', flat=True))
@@ -987,24 +1000,28 @@ def salud_fuentes(request):
         if not fechas:
             cartolas.append({
                 'nombre': NOMBRE_CORTO_CUENTA.get(clave, cuentas[clave].nombre),
-                'vacia': True, 'ancla': clave in anclas})
+                'vacia': True, 'ancla': clave in anclas,
+                'es_tarjeta': es_tarjeta})
             continue
         primera, ultima = min(fechas), max(fechas)
         atraso = (hoy - ultima).days
         cartolas.append({
             'nombre': NOMBRE_CORTO_CUENTA.get(clave, cuentas[clave].nombre),
             'vacia': False,
+            'es_tarjeta': es_tarjeta,
             # El hueco más fácil de no ver: la cartola no empieza donde
             # empieza el período. No es un «salto» (está antes del rango
             # cubierto) y por eso pasaba piola — BancoEstado partía el 14-07.
-            'falta_inicio': (primera - desde).days if primera > desde else 0,
+            'falta_inicio': (0 if es_tarjeta else
+                             ((primera - desde).days if primera > desde else 0)),
             'inicio_esperado': desde,
             'primera': primera, 'ultima': ultima,
             'n_movs': len(movs), 'n_dias': len(fechas),
             'atraso': atraso,
-            'atrasada': atraso >= 3,
+            'atrasada': atraso >= (DIAS_ALERTA_TARJETA if es_tarjeta else 3),
             'ancla': clave in anclas,
-            'tramos': [{'desde': a, 'hasta': b, 'dias': n}
+            'tramos': [] if es_tarjeta else
+                      [{'desde': a, 'hasta': b, 'dias': n}
                        for a, b, n in _tramos_vacios(fechas, primera, ultima)],
         })
 
@@ -1078,6 +1095,7 @@ def salud_fuentes(request):
         'monto_sin_clasificar': _clp(
             sum(int(m.monto) for m in sin_clasificar)),
         'sin_cobros_mp': sin_cobros,
+        'dias_alerta_tarjeta': DIAS_ALERTA_TARJETA,
     })
 
 

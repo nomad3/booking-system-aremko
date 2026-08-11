@@ -2850,3 +2850,66 @@ class PresupuestoTest(TestCase):
         f = self._fila(self._mes(), 'Marketing')
         self.assertFalse(any(c['excede'] for c in f['celdas']))
         self.assertTrue(f['presupuesto']['excedido'])
+
+
+class SaludTarjetasTest(TestCase):
+    """Las tarjetas de Alda también se vigilan (Jorge 2026-08-10): si deja de
+    mandar los PDF, ese gasto desaparece del tablero sin que nadie lo note."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.cat = CategoriaFinanciera.objects.get(clave='por_clasificar')
+
+    def _compra(self, clave, dia, monto=10000):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=CuentaFinanciera.objects.get(clave=clave),
+            clase='gasto', sentido='sale', monto=monto, categoria=self.cat,
+            fuente='captura', referencia=f'tj:{clave}:{dia}:{monto}')
+
+    def _fila(self, respuesta, nombre):
+        return [c for c in respuesta.context['cartolas']
+                if nombre in c['nombre']][0]
+
+    def test_las_tarjetas_aparecen_en_la_tabla(self):
+        self._compra('tarjeta_alda_1', date(2026, 8, 5))
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        nombres = [c['nombre'] for c in r.context['cartolas']]
+        self.assertEqual(len([n for n in nombres if 'Tarjeta' in n]), 2)
+        self.assertTrue(self._fila(r, 'Tarjeta')['es_tarjeta'])
+
+    def test_una_tarjeta_sin_nada_cargado_se_declara_vacia(self):
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        fila = self._fila(r, 'Tarjeta')
+        self.assertTrue(fila['vacia'])
+        self.assertTrue(fila['es_tarjeta'])
+
+    def test_a_la_tarjeta_no_se_le_buscan_saltos_ni_falta_de_inicio(self):
+        """Una tarjeta pasa días sin compras: con el criterio de las cuentas
+        corrientes viviría en rojo y la alarma no significaría nada."""
+        # Empieza tarde (el 20-07) y con un hueco largo en medio.
+        self._compra('tarjeta_alda_1', date(2026, 7, 20))
+        self._compra('tarjeta_alda_1', date(2026, 8, 5))
+        fila = self._fila(self.client.get(reverse('finanzas:salud_fuentes')),
+                          'Tarjeta Alda 1')
+        self.assertEqual(fila['falta_inicio'], 0)
+        self.assertEqual(fila['tramos'], [])
+
+    def test_el_atraso_de_la_tarjeta_se_marca_recien_a_los_diez_dias(self):
+        from .views import DIAS_ALERTA_TARJETA
+        hoy = date.today()
+        self._compra('tarjeta_alda_1', hoy - timedelta(days=4))
+        self._compra('tarjeta_alda_2', hoy - timedelta(days=DIAS_ALERTA_TARJETA))
+        r = self.client.get(reverse('finanzas:salud_fuentes'))
+        self.assertFalse(self._fila(r, 'Tarjeta Alda 1')['atrasada'])
+        self.assertTrue(self._fila(r, 'Tarjeta Alda 2')['atrasada'])
+
+    def test_las_cuentas_corrientes_conservan_su_criterio_de_tres_dias(self):
+        hoy = date.today()
+        self._compra('bancoestado', hoy - timedelta(days=4))
+        fila = self._fila(self.client.get(reverse('finanzas:salud_fuentes')),
+                          'BancoEstado')
+        self.assertTrue(fila['atrasada'])
+        self.assertFalse(fila.get('es_tarjeta'))
