@@ -3151,3 +3151,160 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         self.assertFalse(f['celdas'][0]['excede'])   # julio cumple
         self.assertTrue(f['celdas'][1]['excede'])    # agosto no
         self.assertIn('20% de ventas', f['presupuesto']['regla'])
+
+
+class CalcularPctVentasTest(TestCase):
+    """Elegir el % con datos y no con intuición, más el control del contrato
+    de las masajistas (40% de la venta de MASAJES, dato de Jorge 2026-08-11)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def tearDown(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().tearDown()
+
+    def _reserva(self):
+        from ventas.models import Cliente, VentaReserva
+        cliente, _ = Cliente.objects.get_or_create(
+            telefono='+56900000666', defaults={'nombre': 'Cliente'})
+        reserva, _ = VentaReserva.objects.get_or_create(
+            cliente=cliente, defaults={'fecha_reserva': timezone.now()})
+        return reserva
+
+    def _venta(self, monto, dia=date(2026, 7, 5)):
+        from ventas.models import Pago
+        return Pago.objects.create(
+            venta_reserva=self._reserva(), monto=monto,
+            metodo_pago='transferencia',
+            fecha_pago=timezone.make_aware(datetime(dia.year, dia.month, dia.day, 12)))
+
+    def _masaje(self, precio, dia=date(2026, 7, 8), personas=1):
+        from ventas.models import CategoriaServicio, ReservaServicio, Servicio
+        cat, _ = CategoriaServicio.objects.get_or_create(nombre='Masajes')
+        serv, _ = Servicio.objects.get_or_create(
+            nombre='Masaje relajación',
+            defaults={'precio_base': precio, 'duracion': 50, 'categoria': cat})
+        return ReservaServicio.objects.create(
+            venta_reserva=self._reserva(), servicio=serv,
+            fecha_agendamiento=dia, hora_inicio='15:00',
+            cantidad_personas=personas, precio_unitario_venta=precio)
+
+    def _gasto(self, clave, monto, dia=date(2026, 7, 10)):
+        MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=CategoriaFinanciera.objects.get(clave=clave),
+            fuente='captura', referencia=f'cp:{clave}:{dia}:{monto}')
+
+    def _correr(self, *args):
+        from io import StringIO
+        salida = StringIO()
+        call_command('calcular_pct_ventas', *args, stdout=salida)
+        return salida.getvalue()
+
+    def test_calcula_el_porcentaje_que_representa_cada_gasto(self):
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        salida = self._correr()
+        self.assertIn('20.0%', salida)
+        self.assertIn('[insumos]', salida)
+
+    def test_no_escribe_si_no_se_nombran_los_items(self):
+        """Cuáles son variables lo decide Jorge, no una heurística mía."""
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        self._correr('--aplicar')
+        self.assertEqual(
+            int(CategoriaFinanciera.objects.get(
+                clave='insumos').presupuesto_pct_ventas), 0)
+
+    def test_escribe_solo_los_items_nombrados(self):
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        self._gasto('publicidad', 500000)
+        self._correr('--aplicar', '--items', 'insumos')
+        self.assertEqual(
+            float(CategoriaFinanciera.objects.get(
+                clave='insumos').presupuesto_pct_ventas), 20.0)
+        self.assertEqual(
+            int(CategoriaFinanciera.objects.get(
+                clave='publicidad').presupuesto_pct_ventas), 0)
+
+    def test_avisa_si_el_item_no_tuvo_gasto_ese_mes(self):
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        salida = self._correr('--aplicar', '--items', 'seguros')
+        self.assertIn('no se puede calcular', salida)
+
+    def test_sin_ventas_no_inventa_porcentajes(self):
+        self._gasto('insumos', 2000000)
+        salida = self._correr()
+        self.assertIn('No hay ventas registradas', salida)
+
+    # ── el contrato de las masajistas ──────────────────────────────────────
+    def test_compara_lo_pagado_contra_el_40_de_la_venta_de_masajes(self):
+        self._venta(10000000)
+        self._masaje(100000)
+        self._masaje(100000, dia=date(2026, 7, 9))   # venta masajes: 200.000
+        self._gasto('honorarios_masajistas', 80000)  # 40% exacto
+        salida = self._correr()
+        self.assertIn('$200.000', salida)
+        self.assertIn('Calza exacto', salida)
+
+    def test_marca_cuando_se_pago_de_mas(self):
+        self._venta(10000000)
+        self._masaje(100000)                          # 40% = 40.000
+        self._gasto('honorarios_masajistas', 60000)
+        salida = self._correr()
+        self.assertIn('$20.000 MÁS', salida)
+
+    def test_la_venta_de_masajes_va_por_fecha_del_servicio(self):
+        """El honorario nace cuando la masajista trabaja, no cuando el cliente
+        transfiere: mezclar las fechas cruzaría meses."""
+        from .management.commands.calcular_pct_ventas import ventas_de_masajes
+        self._masaje(100000, dia=date(2026, 7, 8))
+        self._masaje(100000, dia=date(2026, 8, 8))
+        self.assertEqual(ventas_de_masajes(2026, 7), 100000)
+        self.assertEqual(ventas_de_masajes(2026, 8), 100000)
+
+    def test_una_tina_no_cuenta_como_venta_de_masaje(self):
+        from ventas.models import CategoriaServicio, ReservaServicio, Servicio
+
+        from .management.commands.calcular_pct_ventas import ventas_de_masajes
+        cat, _ = CategoriaServicio.objects.get_or_create(nombre='Tinas')
+        serv = Servicio.objects.create(nombre='Tina Puyehue', precio_base=60000,
+                                       duracion=120, categoria=cat)
+        ReservaServicio.objects.create(
+            venta_reserva=self._reserva(), servicio=serv,
+            fecha_agendamiento=date(2026, 7, 8), hora_inicio='14:00',
+            cantidad_personas=2, precio_unitario_venta=60000)
+        self.assertEqual(ventas_de_masajes(2026, 7), 0)
