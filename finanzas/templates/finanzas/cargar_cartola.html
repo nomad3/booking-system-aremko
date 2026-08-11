@@ -183,8 +183,10 @@
       {% endfor %}
     </select></p>
     {% endif %}
-    {# Sin accept: el BSA.dat de Scotia Connect quedaba GRIS en el selector
-       (visto por Jorge 2026-08-09). El tipo real se detecta por los bytes. #}
+    {% comment %}
+      Sin accept: el BSA.dat de Scotia Connect quedaba GRIS en el selector
+      (visto por Jorge 2026-08-09). El tipo real se detecta por los bytes.
+    {% endcomment %}
     <p><input type="file" name="archivo" required></p>
     <button class="boton" type="submit">Revisar el archivo</button>
   </form>

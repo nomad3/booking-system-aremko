@@ -280,9 +280,13 @@
         {% endif %}
 
         {% if not es_cotizacion and saldo > 0 %}
-        {# Transferencia primero: para Aremko no tiene comisión y la tarjeta
-           cuesta ~3,1% (medido junio vs julio 2026). La tarjeta sigue
-           disponible, pero como segunda opción. #}
+        {% comment %}
+          Transferencia primero: para Aremko no tiene comisión y la tarjeta
+          cuesta ~3,1% (medido junio vs julio 2026). La tarjeta sigue
+          disponible, pero como segunda opción.
+          OJO: {# … #} es de UNA línea en Django. En varias se imprime tal cual
+          al cliente — pasó acá el 2026-08-10, en plena página de pago.
+        {% endcomment %}
         <details class="pago-principal">
           <summary>
             <span class="ic i-pay">🏦</span>
