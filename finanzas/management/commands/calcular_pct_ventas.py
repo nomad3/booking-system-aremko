@@ -54,9 +54,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--mes', default='2026-07')
-        parser.add_argument('--items', default='',
-                            help='Claves separadas por coma a las que ESCRIBIR '
-                                 'el %% calculado. Sin esto no se escribe nada.')
+        # nargs='*' y no un string suelto: Jorge corre esto desde el celular y
+        # el teclado mete un espacio después de cada coma, con lo que la shell
+        # parte «insumos, comisiones» en dos argumentos y argparse lo rechaza.
+        # Así da lo mismo si van pegadas, separadas o mezcladas.
+        parser.add_argument('--items', nargs='*', default=[],
+                            help='Claves a las que ESCRIBIR el %% calculado. '
+                                 'Con o sin comas: --items insumos comisiones. '
+                                 'Sin esto no se escribe nada.')
         parser.add_argument('--aplicar', action='store_true')
 
     def handle(self, *args, **opts):
@@ -132,7 +137,10 @@ class Command(BaseCommand):
                 f'  venta de una familia de servicios.')
 
         # ── Escritura, solo lo que se nombre ───────────────────────────────
-        claves = [c.strip() for c in opts['items'].split(',') if c.strip()]
+        # Cada trozo puede venir con comas pegadas («insumos,comisiones») o ser
+        # una clave suelta con la coma colgando («insumos,»).
+        claves = [c.strip() for trozo in opts['items']
+                  for c in str(trozo).split(',') if c.strip()]
         if not claves:
             self.stdout.write(self.style.WARNING(
                 '\nNo se escribió nada. Para fijar un %, nombrá los ítems:\n'

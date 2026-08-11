@@ -3259,6 +3259,27 @@ class CalcularPctVentasTest(TestCase):
             int(CategoriaFinanciera.objects.get(
                 clave='publicidad').presupuesto_pct_ventas), 0)
 
+    def test_tolera_como_el_celular_separa_las_comas(self):
+        """Jorge corre esto desde el teléfono y el teclado mete un espacio
+        después de cada coma: la shell parte «insumos, comisiones» en dos
+        argumentos y el comando lo rechazaba (visto el 2026-08-11)."""
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        self._gasto('comisiones', 300000)
+        self._correr('--aplicar', '--items', 'insumos,', 'comisiones')
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='insumos').presupuesto_pct_ventas), 20.0)
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='comisiones').presupuesto_pct_ventas), 3.0)
+
+    def test_tambien_acepta_las_claves_pegadas_con_coma(self):
+        self._venta(10000000)
+        self._gasto('insumos', 2000000)
+        self._gasto('comisiones', 300000)
+        self._correr('--aplicar', '--items', 'insumos,comisiones')
+        self.assertEqual(float(CategoriaFinanciera.objects.get(
+            clave='comisiones').presupuesto_pct_ventas), 3.0)
+
     def test_avisa_si_el_item_no_tuvo_gasto_ese_mes(self):
         self._venta(10000000)
         self._gasto('insumos', 2000000)
