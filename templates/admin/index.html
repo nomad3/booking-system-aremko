@@ -173,7 +173,11 @@
 
         <!-- REPO: la puerta a los reportes (pedido de Jorge 2026-08-09).
              La tarjeta va sola; al presionarla aparece al lado la tarjeta
-             con los accesos que antes vivían en la cabecera. -->
+             con los accesos que antes vivían en la cabecera.
+             Toda la ficha está detrás del permiso de finanzas: al sacar
+             Artesanías (2026-08-10) lo de adentro quedó 100% financiero, y
+             una tarjeta que se abre vacía es peor que no tenerla. -->
+        {% if user.is_superuser or user|puede_finanzas %}
         <div class="col-lg-4 col-md-6 col-sm-12">
             <div class="card h-100 text-center card-hover" style="cursor:pointer;"
                  onclick="document.getElementById('card-repo-links').classList.toggle('d-none');">
@@ -188,7 +192,6 @@
                 <div class="card-body">
                     <h5 class="card-title">Reportes</h5>
                     <div class="mt-3" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;">
-                        {% if user.is_superuser or user|puede_finanzas %}
                         <a href="{% url 'finanzas:tablero' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;">📈 Tablero financiero</a>
                         <a href="{% url 'finanzas:flujo_caja' %}" class="btn btn-sm btn-outline-info" style="font-size: 11px;">🌊 Flujo de caja</a>
                         <a href="{% url 'finanzas:gastos_mes' %}" class="btn btn-sm btn-outline-secondary" style="font-size: 11px;">🧮 Gastos del mes</a>
@@ -199,12 +202,13 @@
                         <a href="{% url 'finanzas:salud_fuentes' %}" class="btn btn-sm btn-outline-dark" style="font-size: 11px;">🩺 Salud de fuentes</a>
                         <a href="{% url 'finanzas:verificar_transferencias' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;">🏦 Verificar transferencias</a>
                         <a href="{% url 'finanzas:cuenta_corriente' %}" class="btn btn-sm btn-outline-secondary" style="font-size: 11px;">🤝 Cuenta corriente</a>
-                        {% endif %}
-                        <a href="{% url 'artesanias:catalogo' %}" class="btn btn-sm btn-outline-dark" style="font-size: 11px;">🪵 Artesanías</a>
+                        {# Config, no reporte, pero es donde se ponen los presupuestos y se agregan ítems: vive acá para no buscarlo en el menú del admin. #}
+                        <a href="/admin/finanzas/categoriafinanciera/" class="btn btn-sm btn-outline-success" style="font-size: 11px;">🧾 Plan de cuentas</a>
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- Add more section cards if needed -->
         {% endif %}

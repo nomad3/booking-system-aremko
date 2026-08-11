@@ -919,20 +919,26 @@ class ReportesGastosTest(TestCase):
                              302, nombre)
 
     def test_tarjeta_repo_en_el_panel(self):
-        """La tarjeta REPO del panel: Alda ve los enlaces de finanzas
-        adentro; el staff común la ve pero solo con Artesanías."""
+        """La tarjeta REPO es de finanzas y nada más (Jorge 2026-08-10: sacó
+        Artesanías, que le basta con el menú del admin). Quien no tiene acceso
+        a finanzas NO la ve: una ficha que se abre vacía es peor que no
+        tenerla."""
+        # Se busca la FICHA, no la palabra: «REPO» también aparece en dos
+        # comentarios del código que se sirven a todos y darían un falso sí.
+        ficha = 'card-title">REPO'
         self.client.login(username='alda', password='x')
         r = self.client.get('/admin/')
-        self.assertContains(r, 'REPO')
+        self.assertContains(r, ficha)
         self.assertContains(r, 'Gastos del mes')
         self.assertContains(r, 'Tablero financiero')
+        self.assertContains(r, 'Plan de cuentas')
+        self.assertNotContains(r, '🪵 Artesan')
 
         User.objects.create_user('deborah', password='x', is_staff=True)
         self.client.login(username='deborah', password='x')
         r = self.client.get('/admin/')
-        self.assertContains(r, 'REPO')
+        self.assertNotContains(r, ficha)
         self.assertNotContains(r, 'Tablero financiero')
-        self.assertContains(r, 'Artesan')
 
 
 BSA_ALDA = ("\r\n".join([
