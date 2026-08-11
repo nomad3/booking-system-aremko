@@ -11,7 +11,8 @@ from django.shortcuts import redirect, render
 from django.urls import path
 
 from .models import (CategoriaFinanciera, CuentaFinanciera,
-                     MovimientoFinanciero, SaldoMensual)
+                     MovimientoFinanciero, ReglaGlosa, SaldoMensual)
+from .reglas_glosa import patron_sugerido
 
 
 class SoloSuperusuario:
@@ -111,6 +112,30 @@ class MovimientoFinancieroAdmin(SuperusuarioOColaborador, admin.ModelAdmin):
     list_editable = ('categoria',)
     autocomplete_fields = ('categoria',)
     readonly_fields = ('traspaso_par', 'creado_en', 'actualizado_en')
+    actions = ['siempre_esta_categoria']
+
+    @admin.action(description='Siempre esta categoría para esta glosa')
+    def siempre_esta_categoria(self, request, queryset):
+        """Enseña una regla a partir de un movimiento ya clasificado.
+
+        No escribe de inmediato: manda a una pantalla que muestra el patrón
+        propuesto (editable) y cuántos movimientos ya cargados se
+        reclasificarían. Las glosas traen números que cambian mes a mes, así
+        que fijar el patrón a ciegas haría una regla que no calza nunca más.
+        """
+        if not request.user.is_superuser:
+            self.message_user(request, 'La lista «siempre Aremko» la administra '
+                                       'solo el dueño.', level=messages.ERROR)
+            return None
+        sin_categoria = [m for m in queryset if m.categoria_id is None]
+        if sin_categoria:
+            self.message_user(
+                request, 'Primero asigná la categoría en la lista y guardá: la '
+                         'regla se aprende del movimiento ya clasificado.',
+                level=messages.ERROR)
+            return None
+        ids = ','.join(str(m.pk) for m in queryset)
+        return redirect(f'aprender-regla/?ids={ids}')
 
     @admin.display(description='Monto', ordering='monto')
     def monto_fmt(self, obj):
@@ -123,9 +148,71 @@ class MovimientoFinancieroAdmin(SuperusuarioOColaborador, admin.ModelAdmin):
 
     def get_urls(self):
         urls = super().get_urls()
-        extra = [path('traspaso/', self.admin_site.admin_view(self.vista_traspaso),
-                      name='finanzas_registrar_traspaso')]
+        extra = [
+            path('traspaso/', self.admin_site.admin_view(self.vista_traspaso),
+                 name='finanzas_registrar_traspaso'),
+            path('aprender-regla/',
+                 self.admin_site.admin_view(self.vista_aprender_regla),
+                 name='finanzas_aprender_regla'),
+        ]
         return extra + urls
+
+    def vista_aprender_regla(self, request):
+        """Confirmar el patrón antes de fijarlo, y ver qué reclasifica."""
+        if not request.user.is_superuser:
+            return redirect('admin:finanzas_movimientofinanciero_changelist')
+
+        crudos = (request.POST.get('ids') or request.GET.get('ids') or '')
+        ids = [int(x) for x in crudos.split(',') if x.strip().isdigit()]
+        movs = list(MovimientoFinanciero.objects
+                    .filter(pk__in=ids).select_related('categoria', 'cuenta'))
+        if not movs:
+            return redirect('admin:finanzas_movimientofinanciero_changelist')
+
+        propuestas = []
+        for i, m in enumerate(movs):
+            patron = (request.POST.get(f'patron_{i}')
+                      or patron_sugerido(m.descripcion))
+            alcance = MovimientoFinanciero.objects.filter(
+                clase='gasto', categoria__clave='por_clasificar',
+                descripcion__icontains=patron).exclude(pk=m.pk)
+            propuestas.append({
+                'indice': i, 'movimiento': m, 'patron': patron,
+                'ya_existe': ReglaGlosa.objects.filter(patron=patron.upper()
+                                                       ).first(),
+                # Sin esto, «cuántos toca» sería una sorpresa después de
+                # apretar el botón. Es la lección de revisar_duplicados.
+                'reclasifica': alcance.count(),
+            })
+
+        if request.method == 'POST' and request.POST.get('confirmar'):
+            creadas = tocados = 0
+            for p in propuestas:
+                patron = (p['patron'] or '').strip().upper()
+                if not patron:
+                    continue
+                regla, nueva = ReglaGlosa.objects.get_or_create(
+                    patron=patron,
+                    defaults={'categoria': p['movimiento'].categoria,
+                              'creada_por': request.user,
+                              'nota': f'Aprendida de: {p["movimiento"].descripcion[:120]}'})
+                creadas += 1 if nueva else 0
+                tocados += (MovimientoFinanciero.objects
+                            .filter(clase='gasto',
+                                    categoria__clave='por_clasificar',
+                                    descripcion__icontains=patron)
+                            .update(categoria=regla.categoria))
+            self.message_user(
+                request,
+                f'{creadas} regla(s) nueva(s) · {tocados} movimiento(s) que '
+                f'estaban por clasificar quedaron asignados.',
+                level=messages.SUCCESS)
+            return redirect('admin:finanzas_movimientofinanciero_changelist')
+
+        contexto = dict(self.admin_site.each_context(request),
+                        propuestas=propuestas, ids=crudos,
+                        title='Enseñar una regla: siempre esta categoría')
+        return render(request, 'finanzas/aprender_regla.html', contexto)
 
     def vista_traspaso(self, request):
         # El traspaso crea movimientos: solo el dueño. El colaborador que
@@ -161,3 +248,21 @@ class SaldoMensualAdmin(SoloSuperusuario, admin.ModelAdmin):
     @admin.display(description='Saldo de cierre', ordering='saldo_cierre')
     def saldo_fmt(self, obj):
         return f'${obj.saldo_cierre:,.0f}'.replace(',', '.')
+
+
+@admin.register(ReglaGlosa)
+class ReglaGlosaAdmin(SoloSuperusuario, admin.ModelAdmin):
+    """La lista finita de Jorge. SoloSuperusuario a propósito: Alda clasifica
+    movimientos uno a uno, pero la regla que decide para siempre es de él."""
+    list_display = ('patron', 'categoria', 'activa', 'nota', 'creada_por',
+                    'creado_en')
+    list_filter = ('activa', 'categoria__grupo', 'categoria')
+    search_fields = ('patron', 'nota')
+    list_editable = ('activa',)
+    autocomplete_fields = ('categoria',)
+    readonly_fields = ('creada_por', 'creado_en')
+
+    def save_model(self, request, obj, form, change):
+        if not change and obj.creada_por_id is None:
+            obj.creada_por = request.user
+        super().save_model(request, obj, form, change)

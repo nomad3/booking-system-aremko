@@ -1098,6 +1098,9 @@ class MovimientosPegadosTest(TestCase):
     def setUp(self):
         call_command('sembrar_finanzas')
         call_command('aplicar_plan_cuentas', '--aplicar')
+        # Desde el 2026-08-10 las excepciones «siempre Aremko» ya no están en
+        # el código: viven en la lista que administra Jorge.
+        call_command('sembrar_reglas_glosa')
         User.objects.create_superuser('jefe', password='x')
         self.client.login(username='jefe', password='x')
 
@@ -1122,8 +1125,13 @@ class MovimientosPegadosTest(TestCase):
         self.assertEqual(por_desc['Pago Google Ads Google']['cargo'], 180000)
         self.assertEqual(por_desc['Pago Fs Dataforseo']['categoria'],
                          'infraestructura')
+        # La comisión por transacción internacional NO entró a la lista: puede
+        # ser de una compra de Aremko o de una personal de Jorge, y la glosa no
+        # lo dice. Queda para que él decida (regla suya 2026-08-10).
         self.assertEqual(por_desc['Comision Transaccion Internacional']
-                         ['categoria'], 'comisiones')
+                         ['categoria'], 'por_clasificar')
+        # Martín sigue en el código: su cuenta NO la seguimos, así que la plata
+        # que va hacia él sale de nuestra vista y el retiro se registra acá.
         self.assertEqual(por_desc['Tef A Martin Aguilera Toloza 777021']
                          ['categoria'], 'personales_martin')
         aremko = por_desc['Tef De Aremko Hotel Spa']
@@ -2476,3 +2484,218 @@ class CuentaCorrienteTest(TestCase):
         self.assertFalse(jorge['debe_aremko'])
         self.assertEqual(jorge['saldo_abs'], '$450.000')
         self.assertContains(r, 'más de lo')
+
+
+class ReglasGlosaTest(TestCase):
+    """La lista finita «siempre Aremko» (regla de Jorge 2026-08-10): en sus
+    cuentas nada se asigna solo, salvo lo que él haya declarado acá."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        from .reglas_glosa import invalidar_cache
+        invalidar_cache()
+
+    def _regla(self, patron, clave='infraestructura'):
+        from .models import ReglaGlosa
+        return ReglaGlosa.objects.create(
+            patron=patron, categoria=CategoriaFinanciera.objects.get(clave=clave))
+
+    # ── el patrón que se propone ───────────────────────────────────────────
+    def test_el_patron_sugerido_saca_los_numeros_que_cambian(self):
+        from .reglas_glosa import patron_sugerido
+        # El número de póliza cambia mes a mes: si queda en el patrón, la
+        # regla no calza nunca más.
+        self.assertEqual(patron_sugerido('Prima Seguro 2024092601642'),
+                         'PRIMA SEGURO')
+        self.assertEqual(patron_sugerido('Pago Bci Seguros Gener'),
+                         'PAGO BCI SEGUROS')
+        # El prefijo que pone la carga tampoco es parte de la glosa.
+        self.assertEqual(
+            patron_sugerido('Cartola cuentarut jorge: Pago Render Com'),
+            'PAGO RENDER COM')
+
+    def test_el_patron_se_guarda_en_mayusculas(self):
+        r = self._regla('  pago render  ')
+        r.refresh_from_db()
+        self.assertEqual(r.patron, 'PAGO RENDER')
+
+    # ── el motor ───────────────────────────────────────────────────────────
+    def test_lo_que_no_esta_en_la_lista_no_se_asigna(self):
+        from .reglas_glosa import categoria_por_glosa
+        self.assertIsNone(categoria_por_glosa('Compra Jumbo Puerto Varas'))
+        self.assertIsNone(categoria_por_glosa(''))
+
+    def test_gana_el_patron_mas_especifico(self):
+        """Con «BCI» y «BCI SEGUROS» en la lista, un seguro no puede caer en
+        la regla ancha."""
+        from .reglas_glosa import categoria_por_glosa
+        self._regla('BCI', clave='comisiones')
+        self._regla('BCI SEGUROS', clave='seguros')
+        self.assertEqual(categoria_por_glosa('PAGO BCI SEGUROS GENER'),
+                         'seguros')
+
+    def test_una_regla_nueva_rige_de_inmediato(self):
+        """Sin invalidar el caché, Jorge crearía la regla justo antes de subir
+        la cartola donde la necesita y no pasaría nada."""
+        from .reglas_glosa import categoria_por_glosa
+        self.assertIsNone(categoria_por_glosa('PAGO RENDER COM'))
+        self._regla('PAGO RENDER')
+        self.assertEqual(categoria_por_glosa('PAGO RENDER COM'),
+                         'infraestructura')
+
+    def test_una_regla_desactivada_deja_de_regir(self):
+        from .models import ReglaGlosa
+        from .reglas_glosa import categoria_por_glosa
+        r = self._regla('PAGO RENDER')
+        ReglaGlosa.objects.filter(pk=r.pk).update(activa=False)
+        r.refresh_from_db()
+        r.save()          # dispara la señal que bota el caché
+        self.assertIsNone(categoria_por_glosa('PAGO RENDER COM'))
+
+    # ── los tres clasificadores de cuentas mixtas ──────────────────────────
+    def test_la_cuenta_rut_solo_asigna_lo_que_esta_en_la_lista(self):
+        from .services import clasificar_fila_cuentarut
+        self._regla('GOOGLE ADS', clave='publicidad')
+        self.assertEqual(
+            clasificar_fila_cuentarut('Pago Google Ads Google', 180000, 0)[2],
+            'publicidad')
+        self.assertEqual(
+            clasificar_fila_cuentarut('Compra Jumbo Puerto Varas', 84300, 0)[2],
+            'por_clasificar')
+        self.assertEqual(
+            clasificar_fila_cuentarut('Copec Puerto Varas', 40000, 0)[2],
+            'por_clasificar')
+
+    def test_un_cargo_con_el_nombre_de_jorge_ya_no_se_marca_solo_como_retiro(self):
+        """Decisión suya: «es retiro lo que YO clasifico como retiro»."""
+        from .services import clasificar_fila_cuentarut
+        self.assertEqual(
+            clasificar_fila_cuentarut('Tef A Jorge Antonio Aguilera', 50000, 0)[2],
+            'por_clasificar')
+        # Martín es distinto y sigue automático: su cuenta no la seguimos.
+        self.assertEqual(
+            clasificar_fila_cuentarut('Tef A Martin Aguilera Toloza', 20000, 0)[2],
+            'personales_martin')
+
+    def test_la_tarjeta_ya_no_usa_las_reglas_generales(self):
+        """Antes `JUMBO → insumos` metía a Aremko el supermercado de cualquiera."""
+        from .services import clasificar_compra_tarjeta
+        self.assertEqual(clasificar_compra_tarjeta('JUMBO PUERTO VARAS'),
+                         'por_clasificar')
+        self.assertEqual(clasificar_compra_tarjeta('DEBORAH GONZALEZ'),
+                         'por_clasificar')
+        # Pero lo que Jorge declaró sí se asigna, aunque lo pague ella.
+        self._regla('RENDER')
+        self.assertEqual(clasificar_compra_tarjeta('RENDER COM SERVICES'),
+                         'infraestructura')
+
+    def test_la_misma_regla_sirve_en_cualquier_cuenta(self):
+        """Render se paga hoy con la CuentaRUT y mañana con la tarjeta de
+        Alda: una sola regla, sin enseñarle de nuevo (pedido de Jorge)."""
+        from .services import (clasificar_compra_tarjeta, clasificar_fila_alda,
+                               clasificar_fila_cuentarut)
+        self._regla('RENDER')
+        self.assertEqual(clasificar_fila_cuentarut('PAGO RENDER', 30000, 0)[2],
+                         'infraestructura')
+        self.assertEqual(clasificar_fila_alda('PAGO RENDER', 30000, 0)[2],
+                         'infraestructura')
+        self.assertEqual(clasificar_compra_tarjeta('PAGO RENDER'),
+                         'infraestructura')
+
+    def test_la_cuenta_de_alda_sigue_con_su_default_personal(self):
+        from .services import clasificar_fila_alda
+        self.assertEqual(clasificar_fila_alda('SUPERMERCADO X', 10000, 0)[2],
+                         'personales_alda_pc')
+
+    # ── la siembra ─────────────────────────────────────────────────────────
+    def test_la_siembra_trae_lo_que_estaba_en_el_codigo_y_es_idempotente(self):
+        from io import StringIO
+
+        from .models import ReglaGlosa
+        call_command('sembrar_reglas_glosa', stdout=StringIO())
+        n = ReglaGlosa.objects.count()
+        self.assertGreaterEqual(n, 14)
+        self.assertTrue(ReglaGlosa.objects.filter(patron='BCI SEGUROS').exists())
+        call_command('sembrar_reglas_glosa', stdout=StringIO())
+        self.assertEqual(ReglaGlosa.objects.count(), n)
+
+
+class AprenderReglaTest(TestCase):
+    """El botón «Siempre esta categoría para esta glosa»."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        from .reglas_glosa import invalidar_cache
+        invalidar_cache()
+        self.jorge = User.objects.create_superuser('jorge', 'j@j.cl', 'x')
+        self.rut = CuentaFinanciera.objects.get(clave='cuentarut_jorge')
+        self.pc = CategoriaFinanciera.objects.get(clave='por_clasificar')
+        self.seguros = CategoriaFinanciera.objects.get(clave='seguros')
+        self.url = '/admin/finanzas/movimientofinanciero/aprender-regla/'
+
+    def _mov(self, glosa, categoria=None, dia=None, ref=None):
+        return MovimientoFinanciero.objects.create(
+            fecha=dia or date(2026, 8, 10), cuenta=self.rut, clase='gasto',
+            sentido='sale', monto=57185, categoria=categoria or self.pc,
+            fuente='captura', referencia=ref or f'ar:{glosa}:{dia}',
+            descripcion=glosa)
+
+    def test_muestra_el_patron_y_cuantos_movimientos_va_a_tocar(self):
+        self.client.login(username='jorge', password='x')
+        m = self._mov('Pago Bci Seguros Gener', categoria=self.seguros)
+        self._mov('Pago Bci Seguros Gener 998', dia=date(2026, 7, 10),
+                  ref='ar:otro')
+        r = self.client.get(self.url, {'ids': str(m.pk)})
+        self.assertEqual(r.status_code, 200)
+        p = r.context['propuestas'][0]
+        self.assertEqual(p['patron'], 'PAGO BCI SEGUROS')
+        self.assertEqual(p['reclasifica'], 1)
+        self.assertContains(r, 'PAGO BCI SEGUROS')
+
+    def test_confirmar_crea_la_regla_y_reclasifica_solo_lo_pendiente(self):
+        self.client.login(username='jorge', password='x')
+        from .models import ReglaGlosa
+        m = self._mov('Pago Bci Seguros Gener', categoria=self.seguros)
+        pendiente = self._mov('Pago Bci Seguros Gener 998',
+                              dia=date(2026, 7, 10), ref='ar:otro')
+        # Uno que Jorge ya decidió que era otra cosa: no se toca.
+        decidido = self._mov('Pago Bci Seguros viejo',
+                             categoria=CategoriaFinanciera.objects.get(
+                                 clave='personales_jorge'),
+                             dia=date(2026, 6, 10), ref='ar:decidido')
+
+        r = self.client.post(self.url, {'ids': str(m.pk), 'patron_0':
+                                        'PAGO BCI SEGUROS', 'confirmar': '1'})
+        self.assertEqual(r.status_code, 302)
+        regla = ReglaGlosa.objects.get(patron='PAGO BCI SEGUROS')
+        self.assertEqual(regla.categoria, self.seguros)
+        self.assertEqual(regla.creada_por, self.jorge)
+        pendiente.refresh_from_db()
+        decidido.refresh_from_db()
+        self.assertEqual(pendiente.categoria, self.seguros)
+        self.assertEqual(decidido.categoria.clave, 'personales_jorge')
+
+    def test_el_patron_editado_a_mano_es_el_que_manda(self):
+        self.client.login(username='jorge', password='x')
+        from .models import ReglaGlosa
+        m = self._mov('Pago Bci Seguros Gener', categoria=self.seguros)
+        self.client.post(self.url, {'ids': str(m.pk), 'patron_0': 'BCI SEGUROS',
+                                    'confirmar': '1'})
+        self.assertTrue(ReglaGlosa.objects.filter(patron='BCI SEGUROS').exists())
+        self.assertFalse(
+            ReglaGlosa.objects.filter(patron='PAGO BCI SEGUROS').exists())
+
+    def test_alda_no_puede_administrar_la_lista(self):
+        from django.contrib.auth.models import Group
+
+        from .models import ReglaGlosa
+        alda = User.objects.create_user('alda', 'a@a.cl', 'x', is_staff=True)
+        grupo, _ = Group.objects.get_or_create(name='Finanzas colaborador')
+        alda.groups.add(grupo)
+        self.client.login(username='alda', password='x')
+        m = self._mov('Pago Bci Seguros Gener', categoria=self.seguros)
+        r = self.client.post(self.url, {'ids': str(m.pk), 'confirmar': '1'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(ReglaGlosa.objects.count(), 0)

@@ -1,0 +1,69 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<style>
+  .rg-caja{max-width:900px;}
+  .rg-aviso{background:#f5eeda; border:1px solid #e3d5ac; color:#5c4d1f;
+            border-radius:8px; padding:10px 14px; margin:0 0 18px; font-size:13.5px;}
+  .rg-fila{border:1px solid #e6e2da; border-radius:10px; padding:14px 16px;
+           margin:0 0 14px; background:#fff;}
+  .rg-glosa{font-size:12.5px; color:#767066; margin:0 0 10px;}
+  .rg-glosa b{color:#2b2b2b;}
+  .rg-campo{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .rg-campo input[type=text]{font-family:monospace; font-size:14px; padding:6px 8px;
+           min-width:340px; border:1px solid #b8b2a6; border-radius:6px;}
+  .rg-cat{font-weight:700;}
+  .rg-alcance{margin:10px 0 0; font-size:13px;}
+  .rg-alcance.toca{color:#a03636; font-weight:600;}
+  .rg-existe{margin:8px 0 0; font-size:13px; color:#a03636;}
+  .rg-botones{margin-top:20px; display:flex; gap:12px; align-items:center;}
+  .rg-botones .cancelar{color:#767066;}
+</style>
+<div class="rg-caja">
+  <div class="rg-aviso">
+    Esta regla vale para <b>todas las cuentas</b>: si mañana el mismo servicio lo
+    paga otra tarjeta, se clasifica igual. Revisá el patrón antes de fijarlo — las
+    glosas del banco traen números que cambian mes a mes, y un patrón con números
+    no vuelve a calzar nunca.
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    {% for p in propuestas %}
+    <div class="rg-fila">
+      <p class="rg-glosa">Glosa del movimiento:<br><b>{{ p.movimiento.descripcion }}</b><br>
+         {{ p.movimiento.fecha|date:"d-m-Y" }} · {{ p.movimiento.cuenta.nombre }}</p>
+      <div class="rg-campo">
+        <label for="patron_{{ p.indice }}">Guardar como patrón:</label>
+        <input type="text" id="patron_{{ p.indice }}" name="patron_{{ p.indice }}"
+               value="{{ p.patron }}">
+        <span>→ <span class="rg-cat">{{ p.movimiento.categoria.nombre }}</span></span>
+      </div>
+      {% if p.ya_existe %}
+      <p class="rg-existe">Ya existe una regla con ese patrón
+        (→ {{ p.ya_existe.categoria.nombre }}). No se va a duplicar; si querés
+        cambiarle la categoría, editala en Reglas de glosa.</p>
+      {% endif %}
+      <p class="rg-alcance{% if p.reclasifica %} toca{% endif %}">
+        {% if p.reclasifica %}
+          Además va a reclasificar <b>{{ p.reclasifica }}</b> movimiento{{ p.reclasifica|pluralize:"s" }}
+          que hoy están por clasificar y contienen ese texto.
+        {% else %}
+          No toca ningún movimiento ya cargado: solo rige de acá en adelante.
+        {% endif %}
+      </p>
+    </div>
+    {% endfor %}
+
+    <p style="font-size:13px; color:#767066;">Solo se tocan movimientos que están
+      en «Por clasificar». Lo que ya decidiste queda como está.</p>
+
+    <div class="rg-botones">
+      <button type="submit" name="confirmar" value="1" class="default">
+        Guardar la regla y aplicarla</button>
+      <button type="submit" formnovalidate>Recalcular con este patrón</button>
+      <a class="cancelar" href="{% url 'admin:finanzas_movimientofinanciero_changelist' %}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

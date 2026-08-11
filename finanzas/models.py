@@ -191,3 +191,45 @@ class SaldoMensual(models.Model):
 
     def __str__(self):
         return f'{self.cuenta.clave} {self.periodo:%Y-%m}: ${self.saldo_cierre:,.0f}'.replace(',', '.')
+
+
+class ReglaGlosa(models.Model):
+    """La lista finita de glosas que SÍ son gasto de Aremko.
+
+    Regla de Jorge (2026-08-10): en sus cuentas — la CuentaRUT, el Scotiabank
+    de Alda y sus tarjetas — NADA se asigna solo a una cuenta del plan de
+    cuentas. Todo queda por clasificar salvo lo que esté acá, y esta lista la
+    administra él, no el código.
+
+    Vale para TODAS las cuentas a propósito: Render se paga hoy con la
+    CuentaRUT y mañana con la tarjeta de Alda, y no hay que enseñarle de nuevo.
+    Quien la pagó igual queda registrado en el movimiento, que es lo que arma
+    la cuenta corriente.
+    """
+    patron = models.CharField(
+        max_length=120, unique=True,
+        help_text='Texto que debe aparecer en la glosa. Se guarda en '
+                  'MAYÚSCULAS y se compara sin distinguir mayúsculas.')
+    categoria = models.ForeignKey(CategoriaFinanciera, on_delete=models.PROTECT,
+                                  related_name='reglas_glosa')
+    nota = models.CharField(max_length=200, blank=True, default='',
+                            help_text='Por qué es de Aremko. Para acordarse en seis meses.')
+    activa = models.BooleanField(default=True)
+    creada_por = models.ForeignKey('auth.User', null=True, blank=True,
+                                   on_delete=models.SET_NULL,
+                                   related_name='reglas_glosa')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Regla de glosa'
+        verbose_name_plural = 'Reglas de glosa (siempre Aremko)'
+        ordering = ['patron']
+
+    def save(self, *args, **kwargs):
+        # El patrón se guarda normalizado: comparar en minúsculas contra un
+        # banco que escribe TODO EN MAYÚSCULAS no calzaría nunca.
+        self.patron = (self.patron or '').strip().upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.patron} → {self.categoria.nombre}'

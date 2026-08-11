@@ -902,11 +902,18 @@ def clasificar_fila_alda(descripcion, cargo, abono):
     - Cargo → gasto, con el default PERSONAL: lo de la empresa se reclasifica
       a mano (los comercios REDCOMPRA son ambiguos por naturaleza).
     """
+    from .reglas_glosa import categoria_por_glosa
+
     d = (descripcion or '').upper()
     if abono > 0:
         if RUT_AREMKO_SIN_DV in d or 'AREMKO' in d:
             return 'traspaso', 'entra', '', True
         return 'personal', 'entra', '', False
+    # La lista de Jorge manda sobre todo lo demás: si él declaró que esa
+    # glosa es de Aremko, lo es aunque la haya pagado ella.
+    de_aremko = categoria_por_glosa(d)
+    if de_aremko:
+        return 'gasto', 'sale', de_aremko, False
     if 'PAGO TARJ' in d:
         return 'gasto', 'sale', 'tarjeta_alda', False
     # Scotiabank llama «EMISION DE VIGENTE» a la emisión de un vale vista.
@@ -1032,28 +1039,23 @@ def clasificar_fila_cuentarut(descripcion, cargo, abono):
     regla clara queda POR CLASIFICAR (grupo otros) — ni se infla el gasto de
     la empresa ni se esconde como personal.
     """
+    from .reglas_glosa import categoria_por_glosa
+
     d = (descripcion or '').upper()
     if abono > 0:
         if RUT_AREMKO_SIN_DV in d or 'AREMKO' in d:
             return 'traspaso', 'entra', '', True
         return 'personal', 'entra', '', False
-    if 'GOOGLE ADS' in d or 'META PLATFORMS' in d or 'FACEBK' in d:
-        return 'gasto', 'sale', 'publicidad', False
-    if any(p in d for p in ('TWILIO', 'SENDGRID', 'DATAFORSEO', 'ECERT',
-                            'OPENAI', 'ANTHROPIC', 'RENDER', 'CLOUDINARY',
-                            'OPENROUTER', 'VERCEL')):
-        return 'gasto', 'sale', 'infraestructura', False
-    if 'COMISION' in d:
-        return 'gasto', 'sale', 'comisiones', False
-    # Seguro del auto: lo paga Jorge todos los meses desde su CuentaRUT y
-    # Aremko se lo devuelve (decisión de Jorge 2026-08-10). El gasto se anota
-    # ACÁ, donde se pagó; la devolución es un traspaso y no vuelve a sumar.
-    if 'BCI SEGUROS' in d:
-        return 'gasto', 'sale', 'seguros', False
+    # Martín es distinto de Jorge por una razón estructural, no personal: su
+    # cuenta NO la seguimos. La plata que va hacia él sale de nuestra vista y
+    # no hay cartola donde ver en qué se gastó, así que el retiro se registra
+    # acá mismo. Un cargo con el nombre del PROPIO Jorge, en cambio, queda por
+    # clasificar: él decide si fue retiro o no (decisión suya 2026-08-10).
     if 'MARTIN AGUILERA' in d:
         return 'gasto', 'sale', 'personales_martin', False
-    if 'JORGE ANTONIO AGUILERA' in d or 'JORGE AGUILERA' in d:
-        return 'gasto', 'sale', 'personales_jorge', False
+    de_aremko = categoria_por_glosa(d)
+    if de_aremko:
+        return 'gasto', 'sale', de_aremko, False
     return 'gasto', 'sale', 'por_clasificar', False
 
 
@@ -1283,17 +1285,22 @@ _RE_RUIDO_TARJETA = re.compile(
 def clasificar_compra_tarjeta(descripcion):
     """Categoría de una compra de la tarjeta.
 
-    Es una tarjeta MIXTA (Aremko y personal), así que el default es POR
-    CLASIFICAR y no «personal»: el punto del ejercicio es que ellos decidan
-    cuáles son de Aremko, no que el sistema lo adivine.
+    Es una tarjeta MIXTA (Aremko y personal). Solo se asigna a Aremko lo que
+    esté en la lista de Jorge; el resto queda POR CLASIFICAR. Antes consultaba
+    las reglas generales del plan de cuentas, y eso metía a Aremko cualquier
+    compra en un comercio que también aparece en su vida personal (regla de
+    Jorge 2026-08-10).
     """
-    from .reglas import clasificar_por_reglas
+    from .reglas_glosa import categoria_por_glosa
 
     d = (descripcion or '').upper()
+    de_aremko = categoria_por_glosa(d)
+    if de_aremko:
+        return de_aremko
     if any(p in d for p in ('COMISION', 'INTERES', 'SERVICIO DE ACTIVIDAD',
                             'SEGURO', 'DESGRAVAMEN')):
         return 'banco_alda'
-    return clasificar_por_reglas(descripcion) or 'por_clasificar'
+    return 'por_clasificar'
 
 
 def parsear_lineas_tarjeta(texto, cuenta_clave):
