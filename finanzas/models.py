@@ -82,6 +82,15 @@ class CategoriaFinanciera(models.Model):
     presupuesto_mensual = models.DecimalField(
         max_digits=12, decimal_places=0, default=0,
         help_text='Monto mensual esperado. 0 = sin presupuesto definido.')
+    # Casi la mitad del gasto de Aremko se mueve con las ventas —insumos,
+    # masajistas, comisiones, impuestos—, y un monto fijo ahí miente en las dos
+    # direcciones: en temporada baja se cumple sin esfuerzo mientras entra
+    # menos plata (Jorge 2026-08-11, después de ver que julio fue vacaciones de
+    # invierno). Con un % puesto, ESE manda sobre el monto fijo.
+    presupuesto_pct_ventas = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text='% de las ventas del mes. Si es mayor que 0, manda sobre el '
+                  'monto fijo. Ej: 20 = 20% de lo vendido ese mes.')
 
     class Meta:
         verbose_name = 'Categoría'

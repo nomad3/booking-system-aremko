@@ -80,7 +80,10 @@
         {% for c in f.celdas %}<td{% if c.excede %} class="excedido" title="Se pasó del presupuesto mensual"{% endif %}>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
         <td class="coltotal">{% if f.total.url %}<a href="{{ f.total.url }}">{{ f.total.txt }}</a>{% else %}{{ f.total.txt }}{% endif %}</td>
         {% if hay_presupuestos %}
-        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{{ f.presupuesto.txt }}</td>
+        {# En la fila de grupo no va monto: si adentro conviven ítems con % y
+           con monto fijo, un solo número ahí sería falso. La comparación del
+           grupo vive en Gastos del mes; acá el control son las celdas rojas. #}
+        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{% if f.es_grupo %}{% elif f.presupuesto.regla %}{{ f.presupuesto.regla }}{% else %}{{ f.presupuesto.txt }}{% endif %}</td>
         {% endif %}
       </tr>
       {% endfor %}

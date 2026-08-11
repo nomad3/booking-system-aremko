@@ -325,6 +325,40 @@ def url_movimientos(grupo=None, cat_id=None, ano=None, mes=None,
     return '/admin/finanzas/movimientofinanciero/?' + '&'.join(partes)
 
 
+def ventas_por_mes(anio, mes=None):
+    """{date(año, mes, 1): vendido} con la MISMA definición del tablero.
+
+    Importa que coincida: si esta página dijera «ventas» y el tablero otra
+    cosa, el presupuesto como % estaría midiendo contra un número que Jorge no
+    reconoce. Las giftcards y los descuentos quedan fuera igual que allá — un
+    canje de giftcard no es plata nueva que entra este mes.
+    """
+    filtros = {'fecha_pago__year': anio}
+    if mes:
+        filtros['fecha_pago__month'] = mes
+    ventas = defaultdict(int)
+    for f in (Pago.objects.filter(**filtros)
+              .exclude(metodo_pago__in=METODOS_EXCLUIDOS)
+              .values('fecha_pago__year', 'fecha_pago__month')
+              .annotate(t=Sum('monto'))):
+        ventas[date(f['fecha_pago__year'], f['fecha_pago__month'], 1)] += \
+            int(f['t'] or 0)
+    return ventas
+
+
+def presupuesto_efectivo(categoria, vendido):
+    """Cuánto puede gastar este ítem en un mes que vendió `vendido`.
+
+    El % manda sobre el monto fijo: casi la mitad del gasto de Aremko se mueve
+    con las ventas, y ahí un monto fijo se cumple solo en temporada baja —
+    justo cuando entra menos plata (Jorge 2026-08-11).
+    """
+    pct = float(getattr(categoria, 'presupuesto_pct_ventas', 0) or 0)
+    if pct > 0:
+        return int(round(vendido * pct / 100.0))
+    return int(categoria.presupuesto_mensual or 0)
+
+
 def _presupuesto_de_fila(presupuestos, grupo, categoria=None):
     """El presupuesto de una categoría, o la suma del grupo si no se pide una.
 
@@ -337,11 +371,18 @@ def _presupuesto_de_fila(presupuestos, grupo, categoria=None):
     return sum(int(v) for (g, _), v in presupuestos.items() if g == grupo)
 
 
-def _celda_presupuesto(presupuesto, gastado):
+def _celda_presupuesto(presupuesto, gastado, pct_ventas=None):
     """Presupuesto, diferencia y si se excedió — listo para la plantilla."""
+    # float() a propósito: Decimal('20.00') formateado con 'g' conserva los
+    # ceros, y en pantalla «20.00% de ventas» se lee peor que «20%».
+    regla = f'{float(pct_ventas):.10g}% de ventas' if pct_ventas else ''
     if not presupuesto:
+        # Sin monto no hay contra qué comparar, aunque la regla exista: un mes
+        # que no vendió nada tiene un tope de $0, y marcar «excedido en todo lo
+        # gastado» sería ruido. La regla igual se declara, para que se entienda
+        # que el «—» no es falta de presupuesto sino falta de ventas.
         return {'txt': '—', 'dif': '', 'excedido': False, 'sin': True,
-                'pct': ''}
+                'pct': '', 'regla': regla}
     resto = presupuesto - gastado
     return {
         'txt': _clp(presupuesto),
@@ -349,11 +390,13 @@ def _celda_presupuesto(presupuesto, gastado):
         'excedido': resto < 0,
         'sin': False,
         'pct': f'{round(gastado * 100 / presupuesto)}%',
+        # Con qué regla salió ese monto, para que no parezca escrito a mano.
+        'regla': regla,
     }
 
 
 def _tabla_matriz(datos, columnas, ids=None, enlace=None, presupuestos=None,
-                  columnas_son_meses=False):
+                  columnas_son_meses=False, pcts=None, presupuesto_por_col=None):
     """Arma las filas del plan de cuentas contra columnas arbitrarias.
 
     datos: {(grupo, categoría): {col: monto}} · columnas: claves ordenadas.
@@ -394,10 +437,14 @@ def _tabla_matriz(datos, columnas, ids=None, enlace=None, presupuestos=None,
         tot_general += total_g
         pres_g = _presupuesto_de_fila(presupuestos, g) if presupuestos else 0
         tot_presupuesto += pres_g
+        # Con % de ventas el tope cambia mes a mes, así que cada celda se pinta
+        # contra el presupuesto DE SU columna, no contra uno solo.
+        topes_g = [(_presupuesto_de_fila(presupuesto_por_col.get(c, {}), g)
+                    if presupuesto_por_col else pres_g) for c in columnas]
         filas.append({
             'es_grupo': True, 'nombre': g_nombre,
-            'celdas': [_celda(v, g, None, c, pres_g)
-                       for v, c in zip(celdas_g, columnas)],
+            'celdas': [_celda(v, g, None, c, t)
+                       for v, c, t in zip(celdas_g, columnas, topes_g)],
             'total': _celda(total_g, g, None, None),
             'presupuesto': _celda_presupuesto(pres_g, total_g)})
         if len(cats_g) > 1:
@@ -406,12 +453,17 @@ def _tabla_matriz(datos, columnas, ids=None, enlace=None, presupuestos=None,
                 celdas = [datos[(g, cat)].get(c, 0) for c in columnas]
                 pres_c = (_presupuesto_de_fila(presupuestos, g, cat)
                           if presupuestos else 0)
+                topes_c = [(_presupuesto_de_fila(presupuesto_por_col.get(c, {}),
+                                                 g, cat)
+                            if presupuesto_por_col else pres_c)
+                           for c in columnas]
                 filas.append({
                     'es_grupo': False, 'nombre': cat,
-                    'celdas': [_celda(v, g, cat_id, c, pres_c)
-                               for v, c in zip(celdas, columnas)],
+                    'celdas': [_celda(v, g, cat_id, c, t)
+                               for v, c, t in zip(celdas, columnas, topes_c)],
                     'total': _celda(sum(celdas), g, cat_id, None),
-                    'presupuesto': _celda_presupuesto(pres_c, sum(celdas))})
+                    'presupuesto': _celda_presupuesto(
+                        pres_c, sum(celdas), (pcts or {}).get((g, cat)))})
     return (filas,
             [_clp(tot_col[c]) if tot_col[c] else '—' for c in columnas],
             _clp(tot_general),
@@ -458,11 +510,14 @@ def gastos_mes(request):
     # gastó nada TIENE que aparecer igual: si solo mostráramos lo gastado, el
     # mes en que no se pagó la luz se vería como un mes sin ese ítem en vez de
     # como un mes por debajo del presupuesto.
-    presupuestos = {}
-    for c in CategoriaFinanciera.objects.filter(clase='gasto',
-                                                presupuesto_mensual__gt=0):
+    vendido = ventas_por_mes(ano, mes).get(date(ano, mes, 1), 0)
+    presupuestos, con_pct = {}, {}
+    for c in CategoriaFinanciera.objects.filter(clase='gasto').exclude(
+            presupuesto_mensual=0, presupuesto_pct_ventas=0):
         clave = (c.grupo or 'otros', c.nombre)
-        presupuestos[clave] = int(c.presupuesto_mensual)
+        presupuestos[clave] = presupuesto_efectivo(c, vendido)
+        if c.presupuesto_pct_ventas:
+            con_pct[clave] = c.presupuesto_pct_ventas
         ids.setdefault(clave, c.id)
         datos[clave]              # crea la fila vacía si no gastó nada
 
@@ -473,7 +528,7 @@ def gastos_mes(request):
         lambda g, cid, cta: url_movimientos(
             grupo=g, cat_id=cid, ano=ano, mes=mes,
             cuenta_id=cuenta_ids.get(cta) if cta else None),
-        presupuestos=presupuestos)
+        presupuestos=presupuestos, pcts=con_pct)
 
     # Un mes a medio andar comparado contra el presupuesto del mes completo se
     # ve siempre «bien». Decirlo vale más que corregirlo con una regla de tres.
@@ -520,18 +575,31 @@ def gastos_ano(request):
 
     # El presupuesto es MENSUAL, así que en esta vista es la vara de cada
     # columna: sirve para ver de un vistazo en qué meses se pasó cada ítem.
-    presupuestos = {}
-    for c in CategoriaFinanciera.objects.filter(clase='gasto',
-                                                presupuesto_mensual__gt=0):
+    # Con % de ventas la vara es distinta en cada mes —ese es el punto—, así
+    # que se calcula una por columna.
+    ventas = ventas_por_mes(ano)
+    cats_presupuestadas = list(
+        CategoriaFinanciera.objects.filter(clase='gasto').exclude(
+            presupuesto_mensual=0, presupuesto_pct_ventas=0))
+    presupuestos, con_pct, por_mes_pres = {}, {}, {}
+    for c in cats_presupuestadas:
         clave = (c.grupo or 'otros', c.nombre)
         presupuestos[clave] = int(c.presupuesto_mensual)
+        if c.presupuesto_pct_ventas:
+            con_pct[clave] = c.presupuesto_pct_ventas
         ids.setdefault(clave, c.id)
         datos[clave]
+    for m in meses_nums:
+        vendido = ventas.get(date(ano, m, 1), 0)
+        por_mes_pres[m] = {
+            (c.grupo or 'otros', c.nombre): presupuesto_efectivo(c, vendido)
+            for c in cats_presupuestadas}
 
     filas, tot_columnas, tot_general, _pres = _tabla_matriz(
         datos, meses_nums, ids,
         lambda g, cid, m: url_movimientos(grupo=g, cat_id=cid, ano=ano, mes=m),
-        presupuestos=presupuestos, columnas_son_meses=True)
+        presupuestos=presupuestos, columnas_son_meses=True, pcts=con_pct,
+        presupuesto_por_col=por_mes_pres)
 
     return render(request, 'finanzas/gastos_ano.html', {
         'ano': ano,

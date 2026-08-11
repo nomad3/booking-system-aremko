@@ -44,14 +44,19 @@ class CategoriaFinancieraAdmin(SoloSuperusuario, admin.ModelAdmin):
     # El presupuesto se escribe ACÁ, en la lista: filtrar por gasto y llenar
     # la columna de arriba a abajo en una sola pantalla (Jorge 2026-08-10).
     list_display = ('nombre', 'clave', 'clase', 'grupo', 'presupuesto_fmt',
-                    'presupuesto_mensual', 'orden')
+                    'presupuesto_mensual', 'presupuesto_pct_ventas', 'orden')
     list_filter = ('clase', 'grupo')
-    list_editable = ('presupuesto_mensual', 'orden')
+    list_editable = ('presupuesto_mensual', 'presupuesto_pct_ventas', 'orden')
     # Requerido por el autocomplete de categoría en MovimientoFinanciero.
     search_fields = ('nombre', 'clave')
 
     @admin.display(description='Presupuesto', ordering='presupuesto_mensual')
     def presupuesto_fmt(self, obj):
+        # El % manda: si está puesto, el monto fijo de al lado no se usa, y
+        # mostrarlo como si rigiera sería mentir en la propia pantalla donde
+        # se edita.
+        if obj.presupuesto_pct_ventas:
+            return f'{obj.presupuesto_pct_ventas:.10g}% de las ventas'
         if not obj.presupuesto_mensual:
             return '— sin definir'
         return f'${obj.presupuesto_mensual:,.0f}/mes'.replace(',', '.')

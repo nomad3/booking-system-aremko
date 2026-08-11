@@ -99,7 +99,8 @@
         {% for c in f.celdas %}<td>{% if c.url %}<a href="{{ c.url }}">{{ c.txt }}</a>{% else %}{{ c.txt }}{% endif %}</td>{% endfor %}
         <td class="coltotal">{% if f.total.url %}<a href="{{ f.total.url }}">{{ f.total.txt }}</a>{% else %}{{ f.total.txt }}{% endif %}</td>
         {% if hay_presupuestos %}
-        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{{ f.presupuesto.txt }}</td>
+        <td class="colpres{% if f.presupuesto.sin %} sinpres{% endif %}">{{ f.presupuesto.txt }}
+          {% if f.presupuesto.regla %}<span class="pct">{{ f.presupuesto.regla }}</span>{% endif %}</td>
         <td class="colpres {% if f.presupuesto.excedido %}excedido{% elif not f.presupuesto.sin %}holgado{% endif %}">
           {{ f.presupuesto.dif }}{% if f.presupuesto.pct %}<span class="pct">{{ f.presupuesto.pct }}</span>{% endif %}</td>
         {% endif %}

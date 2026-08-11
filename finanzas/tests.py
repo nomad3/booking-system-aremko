@@ -3001,3 +3001,153 @@ class PresupuestarDesdeMesTest(TestCase):
         self.assertEqual(self._pres('publicidad'), 0)
         self._correr('--aplicar', '--mes', '2026-08')
         self.assertEqual(self._pres('publicidad'), 700000)
+
+
+class PresupuestoPorcentajeVentasTest(TestCase):
+    """Casi la mitad del gasto se mueve con las ventas (Jorge 2026-08-11):
+    para esos ítems la vara es un % de lo vendido, no un monto fijo."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        self._limpiar_thread_local()
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        User.objects.create_superuser('duenio', 'x@x.cl', 'x')
+        self.client.login(username='duenio', password='x')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+
+    def tearDown(self):
+        self._limpiar_thread_local()
+        super().tearDown()
+
+    @staticmethod
+    def _limpiar_thread_local():
+        from ventas import middleware
+        middleware._thread_locals.user = None
+
+    def _venta(self, dia, monto, metodo='transferencia'):
+        from ventas.models import Cliente, Pago, VentaReserva
+        cliente, _ = Cliente.objects.get_or_create(
+            telefono='+56900000555', defaults={'nombre': 'Cliente'})
+        reserva, _ = VentaReserva.objects.get_or_create(
+            cliente=cliente, defaults={'fecha_reserva': timezone.now()})
+        cuando = timezone.make_aware(datetime(dia.year, dia.month, dia.day, 12))
+        return Pago.objects.create(venta_reserva=reserva, monto=monto,
+                                   metodo_pago=metodo, fecha_pago=cuando)
+
+    def _gasto(self, clave, monto, dia):
+        MovimientoFinanciero.objects.create(
+            fecha=dia, cuenta=self.be, clase='gasto', sentido='sale',
+            monto=monto, categoria=CategoriaFinanciera.objects.get(clave=clave),
+            fuente='captura', referencia=f'pv:{clave}:{dia}:{monto}')
+
+    def _pct(self, clave, pct, fijo=0):
+        CategoriaFinanciera.objects.filter(clave=clave).update(
+            presupuesto_pct_ventas=pct, presupuesto_mensual=fijo)
+        # La tabla solo abre las categorías de un grupo cuando hay más de una;
+        # con una sola se ve el subtotal del grupo. Se presupuesta otra del
+        # mismo grupo para que la fila de Insumos exista — y de paso queda
+        # probado que en un grupo pueden convivir % y monto fijo.
+        CategoriaFinanciera.objects.filter(clave='mantencion').update(
+            presupuesto_mensual=50000)
+
+    def _fila(self, r, nombre):
+        return [f for f in r.context['filas'] if f['nombre'] == nombre][0]
+
+    # ── las ventas del mes ─────────────────────────────────────────────────
+    def test_las_ventas_excluyen_giftcard_y_descuento_igual_que_el_tablero(self):
+        """Si esta página dijera «ventas» y el tablero otra cosa, el % estaría
+        midiendo contra un número que Jorge no reconoce."""
+        from ventas.models import Pago
+
+        from .views import ventas_por_mes
+        self._venta(date(2026, 7, 5), 1000000)
+        # El modelo exige una giftcard real para ese método, así que el pago se
+        # crea normal y se le cambia el método por queryset.
+        canje = self._venta(date(2026, 7, 6), 300000)
+        Pago.objects.filter(pk=canje.pk).update(metodo_pago='giftcard')
+        self._venta(date(2026, 7, 7), 50000, metodo='descuento')
+        self.assertEqual(ventas_por_mes(2026, 7)[date(2026, 7, 1)], 1000000)
+
+    # ── el motor ───────────────────────────────────────────────────────────
+    def test_el_porcentaje_manda_sobre_el_monto_fijo(self):
+        from .views import presupuesto_efectivo
+        cat = CategoriaFinanciera.objects.get(clave='insumos')
+        cat.presupuesto_mensual, cat.presupuesto_pct_ventas = 999999, 20
+        self.assertEqual(presupuesto_efectivo(cat, 5000000), 1000000)
+        cat.presupuesto_pct_ventas = 0
+        self.assertEqual(presupuesto_efectivo(cat, 5000000), 999999)
+
+    # ── el reporte del mes ─────────────────────────────────────────────────
+    def test_el_mes_compara_contra_el_porcentaje_de_lo_vendido(self):
+        self._pct('insumos', 20, fijo=100)      # el fijo queda ignorado
+        self._venta(date(2026, 7, 5), 5000000)
+        self._gasto('insumos', 900000, date(2026, 7, 10))
+        r = self.client.get(reverse('finanzas:gastos_mes'),
+                            {'ano': 2026, 'mes': 7})
+        f = self._fila(r, 'Alimentos e insumos')
+        self.assertEqual(f['presupuesto']['txt'], '$1.000.000')
+        self.assertEqual(f['presupuesto']['dif'], '$100.000')
+        self.assertFalse(f['presupuesto']['excedido'])
+        self.assertIn('20% de ventas', f['presupuesto']['regla'])
+        self.assertContains(r, '20% de ventas')
+
+    def test_un_mes_flojo_baja_la_vara_y_el_exceso_aparece(self):
+        """El punto de todo esto: con monto fijo, un mes de pocas ventas se
+        cumple sin esfuerzo mientras entra menos plata."""
+        self._pct('insumos', 20)
+        self._venta(date(2026, 7, 5), 1000000)     # mes flojo
+        self._gasto('insumos', 300000, date(2026, 7, 10))
+        f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
+                                       {'ano': 2026, 'mes': 7}),
+                       'Alimentos e insumos')
+        self.assertEqual(f['presupuesto']['txt'], '$200.000')
+        self.assertTrue(f['presupuesto']['excedido'])
+        self.assertEqual(f['presupuesto']['dif'], '−$100.000')
+
+    def test_sin_ventas_en_el_mes_el_porcentaje_no_inventa_presupuesto(self):
+        self._pct('insumos', 20)
+        self._gasto('insumos', 300000, date(2026, 7, 10))
+        f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
+                                       {'ano': 2026, 'mes': 7}),
+                       'Alimentos e insumos')
+        self.assertTrue(f['presupuesto']['sin'])
+        self.assertEqual(f['presupuesto']['txt'], '—')
+
+    # ── el reporte del año ─────────────────────────────────────────────────
+    def test_en_el_ano_cada_mes_se_mide_contra_sus_propias_ventas(self):
+        """Julio vendió el triple que agosto: el mismo gasto puede estar bien
+        en uno y excedido en el otro. Con una vara única esto no se vería."""
+        self._pct('insumos', 20)
+        self._venta(date(2026, 7, 5), 3000000)     # tope julio: 600.000
+        self._venta(date(2026, 8, 5), 1000000)     # tope agosto: 200.000
+        self._gasto('insumos', 500000, date(2026, 7, 10))
+        self._gasto('insumos', 500000, date(2026, 8, 10))
+        r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
+        f = self._fila(r, 'Alimentos e insumos')
+        self.assertFalse(f['celdas'][0]['excede'])   # julio cumple
+        self.assertTrue(f['celdas'][1]['excede'])    # agosto no
+        self.assertIn('20% de ventas', f['presupuesto']['regla'])
