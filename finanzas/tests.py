@@ -2544,6 +2544,31 @@ class ReglasGlosaTest(TestCase):
         self.assertEqual(categoria_por_glosa('PAGO RENDER COM'),
                          'infraestructura')
 
+    def test_si_la_tabla_no_existe_todo_queda_por_clasificar(self):
+        """Deploy antes de la migración: cargar una cartola no puede reventar.
+
+        Sin lista, todo va a «por clasificar» — el lado seguro. Pasó de verdad
+        el 2026-08-10, entre el deploy y el `migrate` en Render.
+        """
+        from unittest.mock import patch
+
+        from django.db import ProgrammingError
+
+        from . import reglas_glosa
+        from .services import clasificar_fila_cuentarut
+
+        self._regla('PAGO RENDER')
+        reglas_glosa.invalidar_cache()
+        with patch.object(reglas_glosa, '_leer_reglas',
+                          side_effect=ProgrammingError('relation does not exist')):
+            self.assertIsNone(reglas_glosa.categoria_por_glosa('PAGO RENDER'))
+            self.assertEqual(
+                clasificar_fila_cuentarut('PAGO RENDER COM', 30000, 0)[2],
+                'por_clasificar')
+        # Y el fallo NO queda cacheado: apenas la tabla existe, la regla rige.
+        self.assertEqual(reglas_glosa.categoria_por_glosa('PAGO RENDER'),
+                         'infraestructura')
+
     def test_una_regla_desactivada_deja_de_regir(self):
         from .models import ReglaGlosa
         from .reglas_glosa import categoria_por_glosa

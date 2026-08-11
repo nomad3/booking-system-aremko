@@ -14,17 +14,34 @@ def invalidar_cache():
     _CACHE['reglas'] = None
 
 
+def _leer_reglas():
+    from .models import ReglaGlosa
+    return list(ReglaGlosa.objects
+                .filter(activa=True)
+                .values_list('patron', 'categoria__clave'))
+
+
 def reglas_activas():
     """[(patrón, clave de categoría)] de más largo a más corto.
 
     El orden importa: si alguien guarda «BCI» y también «BCI SEGUROS», gana el
     específico. Con el orden al revés, la regla ancha se comería a la fina.
+
+    Si la tabla todavía no existe —código desplegado antes de correr la
+    migración— se devuelve la lista vacía en vez de reventar: sin reglas todo
+    queda POR CLASIFICAR, que es el lado seguro. El 2026-08-10 ese hueco dejó
+    la carga de cartolas rota entre el deploy y la migración.
     """
     if _CACHE['reglas'] is None:
-        from .models import ReglaGlosa
-        filas = list(ReglaGlosa.objects
-                     .filter(activa=True)
-                     .values_list('patron', 'categoria__clave'))
+        from django.db import DatabaseError, transaction
+        try:
+            # El savepoint importa: en Postgres una consulta fallida aborta la
+            # transacción entera, y esto corre DENTRO del atomic que escribe
+            # los movimientos. Sin él, la cartola completa se caería.
+            with transaction.atomic():
+                filas = _leer_reglas()
+        except DatabaseError:
+            return []          # sin cachear: al migrar, rige de inmediato
         _CACHE['reglas'] = sorted(filas, key=lambda r: -len(r[0]))
     return _CACHE['reglas']
 
