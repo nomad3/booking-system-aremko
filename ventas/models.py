@@ -1496,7 +1496,13 @@ class ReservaServicio(models.Model):
     def clean(self):
         # Basic validation example: Ensure assigned provider is valid for the service type
         super().clean()
-        if self.servicio and self.proveedor_asignado:
+        # Se preguntan los _id y no los objetos: en una FK obligatoria sin
+        # valor, `self.servicio` NO devuelve None — lanza
+        # RelatedObjectDoesNotExist. En el admin, una fila del inline a medio
+        # llenar (con fecha u hora pero sin servicio elegido) entraba acá y
+        # devolvía un 500 en vez del «este campo es obligatorio» de siempre.
+        # Le pasó a Jorge el 2026-08-11 editando la reserva 6552.
+        if self.servicio_id and self.proveedor_asignado_id:
             if self.servicio.tipo_servicio == 'masaje':
                 if not self.servicio.proveedores.filter(pk=self.proveedor_asignado.pk).exists():
                     raise ValidationError({
