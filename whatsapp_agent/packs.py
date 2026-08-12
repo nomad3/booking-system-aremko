@@ -960,7 +960,7 @@ _FICHAS_EXPERIENCIA = {
     'refugio': {
         'nombre': 'Refugio Aremko',
         'url': 'https://www.aremko.cl/refugio/',
-        'resumen': 'cabaña 2 noches + tina + masaje + desayuno, desde $270.000',
+        'resumen': 'cabaña 2 noches + tina + masaje + desayuno, $290.000',
     },
     'pausa': {
         'nombre': 'Pausa junto al río',

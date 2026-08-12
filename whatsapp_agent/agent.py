@@ -1106,6 +1106,49 @@ def _cliente_eligio_producto(mensaje, historial, producto_id, candidatos=None):
     return False, ', '.join(empatados) if empatados else 'varias opciones similares'
 
 
+_PREGUNTAS_DE_REGALO = (
+    'a nombre de quien', 'a nombre de quién', 'nombre de quien', 'nombre de quién',
+    'quien la recibe', 'quién la recibe', 'quien lo recibe', 'quién lo recibe',
+    'para quien es', 'para quién es', 'dedicatoria', 'mensaje para',
+    'mensaje personalizado', 'algun mensaje', 'algún mensaje',
+)
+
+
+def _ya_pregunto_por_el_regalo(historial):
+    """H-093: ¿Aremko preguntó de verdad por el destinatario o la dedicatoria?
+
+    `sin_datos_regalo` nació como escape para el cliente que NO quiere
+    personalizar la carta. Pero es un booleano que pone el modelo, así que la
+    regla («solo si ya preguntaste») vivía en palabras — y Luna no sostiene
+    guiones: Deborah (2026-08-12) reportó cotizaciones generadas sin haber
+    pedido nunca los datos del destinatario, y en los logs el gate no rechazó
+    ni una sola vez. Un flag que el modelo se autoriza a sí mismo no es un
+    gate. Acá se comprueba contra lo que Luna realmente escribió.
+
+    Mismo patrón que `_cliente_eligio_producto` (H-084): la tool no le cree al
+    modelo, mira la conversación.
+    """
+    for linea in (historial or '').splitlines():
+        if not linea.startswith('[Aremko]:'):
+            continue
+        texto = _normalizar_txt(linea)
+        if any(_normalizar_txt(p) in texto for p in _PREGUNTAS_DE_REGALO):
+            return True
+    return False
+
+
+def _sin_datos_regalo_verificado(args, historial):
+    """El flag que declara el modelo, contrastado con la conversación (H-093)."""
+    if not bool((args or {}).get('sin_datos_regalo')):
+        return False
+    if _ya_pregunto_por_el_regalo(historial):
+        return True
+    logger.info('[preparar_giftcard] H-093: sin_datos_regalo=true pero Luna nunca '
+                'preguntó por destinatario/dedicatoria → flag ignorado, se le pide '
+                'que pregunte')
+    return False
+
+
 def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
     """H-080: agrega una ambientación (servicio) con las guardias deterministas:
     cantidad SIEMPRE 1 (su precio es por unidad; el motor multiplica base × cantidad)
@@ -2536,7 +2579,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                                   'telefono': telefono,
                                   'documento_identidad': documento},
                     giftcards_data=[gc_item],
-                    sin_datos_regalo=bool(args.get('sin_datos_regalo')),
+                    # H-093: el flag solo vale si la conversación muestra que
+                    # Luna PREGUNTÓ. Que ella lo declare no alcanza.
+                    sin_datos_regalo=_sin_datos_regalo_verificado(args, historial),
                     # Reintentos del LLM en el MISMO turno no duplican la
                     # propuesta; un pedido nuevo (otro turno) sí crea otra.
                     idempotency_key=f'gc-{external_id}-{args.get("experiencia_id")}'

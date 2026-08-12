@@ -7517,7 +7517,9 @@ class RefugioConfig(SingletonModel):
 
     # Oferta
     precio_clp = models.PositiveIntegerField(
-        default=270000,
+        # Espejo de REFUGIO_PRECIO_PLANO en whatsapp_agent/packs.py, que es el
+        # que se cobra de verdad. Si cambia uno, el test H-093 grita.
+        default=290000,
         verbose_name="Precio (CLP)",
         help_text="Precio total del paquete Refugio en pesos chilenos.",
     )
@@ -7638,7 +7640,7 @@ class RefugioConfig(SingletonModel):
         default=(
             "Tres días para volver a tu centro. Cabaña en naturaleza, "
             "masaje en pareja, tinas calientes. La segunda noche, cortesía "
-            "Aremko. $270.000 por 2 personas."
+            "Aremko. $290.000 por 2 personas."
         ),
         verbose_name="SEO Meta Description",
     )
@@ -7664,6 +7666,16 @@ class RefugioConfig(SingletonModel):
         if not self.paquete_incluye:
             return []
         return [linea.strip() for linea in self.paquete_incluye.splitlines() if linea.strip()]
+
+    @property
+    def precio_fmt(self):
+        """«290.000» — formato chileno, sin depender del locale activo.
+
+        `intcomma` con la locale 'es' usa espacio duro como separador de miles,
+        así que la landing mostraba «$290 000» (y ese espacio además rompía los
+        links de WhatsApp donde se intercala el precio).
+        """
+        return f'{self.precio_clp:,}'.replace(',', '.')
 
     class Meta:
         verbose_name = "Configuración Landing Refugio"

@@ -343,7 +343,7 @@
         <h1>{{ config.hero_title }}</h1>
         <p class="lead">{{ config.hero_subtitle }}</p>
         <div class="refugio-hero-ctas">
-            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24{{ config.precio_fmt }}).%20%5BRefugio%5D"
                target="_blank" rel="noopener"
                class="btn-whatsapp-refugio" data-event="refugio_whatsapp_click">
                 <i class="fab fa-whatsapp"></i> Reservar por WhatsApp
@@ -377,7 +377,7 @@
                 <div class="refugio-precio-card">
                     <p class="mb-0 text-muted">Inversión total</p>
                     <div class="precio">
-                        <span class="moneda">$</span>{{ config.precio_clp|intcomma }}
+                        <span class="moneda">$</span>{{ config.precio_fmt }}
                     </div>
                     <p class="unidad mb-1">por 2 personas, experiencia completa</p>
                     {% if config.garantia_texto %}
@@ -631,7 +631,7 @@
                         </button>
                         <p class="text-muted small mt-2 mb-0">
                             O reserva directo por
-                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24{{ config.precio_fmt }}).%20%5BRefugio%5D"
                                target="_blank" rel="noopener" data-event="refugio_whatsapp_click">WhatsApp</a>
                         </p>
                     </div>
@@ -645,7 +645,7 @@
 
 {# ── Barra sticky de WhatsApp (solo móvil) ─────────────────────── #}
 <div class="refugio-sticky-cta">
-    <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24270.000).%20%5BRefugio%5D"
+    <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24{{ config.precio_fmt }}).%20%5BRefugio%5D"
        target="_blank" rel="noopener" data-event="refugio_whatsapp_click">
         <i class="fab fa-whatsapp"></i> Reservar por WhatsApp
     </a>
@@ -718,7 +718,7 @@
                         // Cuenta 539-975-0827 (ecolonco1@gmail.com). Conversion creada 2026-05-29.
                         gtag('event', 'conversion', {
                             'send_to': 'AW-18196625156/2z2aCNrR4rUcEITu6eRD',
-                            'value': 270000,
+                            'value': {{ config.precio_clp }},
                             'currency': 'CLP',
                         });
                     }
