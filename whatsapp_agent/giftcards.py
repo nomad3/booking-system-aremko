@@ -132,6 +132,23 @@ def _lo_dijo_el_cliente(texto, historial, mensaje='', minimo=0.6):
 # Vive acá y no en el prompt porque el prompt ya lo pedía y no alcanzó: Luna no
 # sostiene guiones. La herramienta devuelve UNA pregunta por vez y se niega a
 # cotizar hasta tenerlas todas.
+def _confirmado_en_la_conversacion(valor, historial, mensaje=''):
+    """¿El cliente ya vio este dato (y pudo corregirlo) en algún mensaje?
+
+    Vale tanto si lo escribió él como si Aremko se lo mostró para confirmar.
+    Lo que NO vale es que salga de la ficha y nunca aparezca en el chat: el
+    correo de la ficha puede estar viejo y la carta se perdería en silencio.
+    """
+    import unicodedata
+
+    plano = unicodedata.normalize('NFKD', (valor or '')).encode('ascii', 'ignore').decode().lower()
+    if not plano.strip():
+        return False
+    todo = unicodedata.normalize('NFKD', (historial or '') + ' ' + (mensaje or ''))
+    todo = todo.encode('ascii', 'ignore').decode().lower()
+    return plano in todo
+
+
 def _ya_preguntamos_esto(historial, pregunta):
     """¿La última cosa que dijo Aremko fue justo esta pregunta?
 
@@ -366,14 +383,29 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                           detalle='Esa frase no la escribió el cliente. ', historial=historial)
 
         # 3. ¿A qué correo se la mandamos? (la carta viaja por email)
+        #
+        # Tener el dato en la ficha NO alcanza (Jorge, 2026-08-12, viendo una
+        # cotización que se armó sin preguntarle nada de esto): la gift card
+        # viaja por ese correo, y si en la ficha quedó uno viejo, la carta se
+        # pierde y nadie se entera. Con dato en ficha se CONFIRMA en voz alta;
+        # sin dato, se pregunta. En los dos casos el cliente lo ve y lo puede
+        # corregir antes de que exista la cotización.
         if not email or '@' not in email:
             return _falta('falta_email',
                           '¿A qué correo te enviamos la gift card? 📩', historial=historial)
+        if not _confirmado_en_la_conversacion(email, historial, mensaje):
+            return _falta('falta_confirmar_email',
+                          f'Te enviamos la gift card a {email} — ¿está bien, o '
+                          f'prefieres otro correo? 📩', historial=historial)
 
         # 4. ¿A nombre de quién va la compra?
         if not nombre or len(nombre) < 3:
             return _falta('falta_nombre_comprador',
                           '¿Y cuál es tu nombre, para dejar la compra a tu nombre?', historial=historial)
+        if not _confirmado_en_la_conversacion(nombre, historial, mensaje):
+            return _falta('falta_confirmar_nombre',
+                          f'La compra queda a nombre de {nombre}, ¿está bien así?',
+                          historial=historial)
 
 
         if idempotency_key:

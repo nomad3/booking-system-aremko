@@ -107,7 +107,9 @@ class SecuenciaDePreguntasTest(TestCase):
         self.assertIn('correo', r['siguiente_pregunta'].lower())
 
     def test_4_con_el_correo_pregunta_el_nombre_del_comprador(self):
-        r = _preparar(historial='[Cliente]: para Alda\n[Cliente]: que la quiero mucho\n',
+        r = _preparar(historial=('[Cliente]: para Alda\n'
+                                 '[Cliente]: que la quiero mucho\n'
+                                 '[Cliente]: jorge@aremko.cl\n'),
                       gc={'destinatario_nombre': 'Alda',
                           'mensaje': 'que la quiero mucho'},
                       cliente={'email': 'jorge@aremko.cl'})
@@ -115,7 +117,11 @@ class SecuenciaDePreguntasTest(TestCase):
         self.assertIn('nombre', r['siguiente_pregunta'].lower())
 
     def test_5_con_los_cuatro_datos_recien_cotiza(self):
-        r = _preparar(historial='[Cliente]: para Alda\n[Cliente]: que la quiero mucho\n',
+        """Cliente nuevo: escribe él sus datos, así que son 4 preguntas y ya."""
+        r = _preparar(historial=('[Cliente]: para Alda\n'
+                                 '[Cliente]: que la quiero mucho\n'
+                                 '[Cliente]: jorge@aremko.cl\n'
+                                 '[Cliente]: Jorge Aguilera\n'),
                       gc={'destinatario_nombre': 'Alda',
                           'mensaje': 'que la quiero mucho'},
                       cliente={'email': 'jorge@aremko.cl', 'nombre': 'Jorge Aguilera'})
@@ -163,7 +169,10 @@ class NoSePuedeEsquivarTest(TestCase):
         self.assertEqual(r['error'], 'falta_destinatario')
 
     def test_quien_no_quiere_frase_llega_a_la_cotizacion(self):
-        r = _preparar(historial='[Cliente]: para Alda\n[Cliente]: no, sin mensaje\n',
+        r = _preparar(historial=('[Cliente]: para Alda\n'
+                                 '[Cliente]: no, sin mensaje\n'
+                                 '[Cliente]: jorge@aremko.cl\n'
+                                 '[Cliente]: Jorge Aguilera\n'),
                       sin_datos_regalo=True,
                       gc={'destinatario_nombre': 'Alda'},
                       cliente={'email': 'jorge@aremko.cl', 'nombre': 'Jorge Aguilera'})
@@ -377,3 +386,65 @@ class NuncaDosVecesLaMismaPreguntaTest(TestCase):
                       gc={'destinatario_nombre': 'Alda'})
         self.assertEqual(r['error'], 'falta_dedicatoria')
         self.assertIn('siguiente_pregunta', r)
+
+
+class ElCorreoYElNombreSeConfirmanTest(TestCase):
+    """H-098 (2026-08-12, 15:41): la secuencia avanzó bien hasta la frase y ahí
+    saltó directo a la cotización. Jorge: «no ha pedido el nombre de la persona
+    que regala ni su mail para que le llegue la giftcards».
+
+    Estaban en su ficha, y yo los había dado por completados. Mal: la gift card
+    viaja por ese correo. Si en la ficha quedó uno viejo, la carta se pierde y
+    nadie se entera —ni el que compró, ni el que iba a recibir el regalo."""
+
+    def setUp(self):
+        _experiencia()
+
+    LISTO = {'gc': {'destinatario_nombre': 'Martin Aguilera',
+                    'mensaje': 'Hijo, te quiero mucho'}}
+    HIST = ('[Cliente]: Martin Aguilera\n'
+            '[Cliente]: Hijo, te quiero mucho\n')
+
+    def test_con_ficha_completa_igual_confirma_el_correo(self):
+        r = _preparar(historial=self.HIST,
+                      cliente={'nombre': 'Jorge Aguilera', 'email': 'jorge@aremko.cl'},
+                      **self.LISTO)
+        self.assertEqual(r['error'], 'falta_confirmar_email')
+        self.assertIn('jorge@aremko.cl', r['siguiente_pregunta'])
+        self.assertIn('prefieres otro correo', r['siguiente_pregunta'])
+        self.assertFalse(PropuestaReserva.objects.exists())
+
+    def test_despues_del_correo_confirma_el_nombre(self):
+        hist = self.HIST + '[Aremko]: Te enviamos la gift card a jorge@aremko.cl — ¿está bien?\n'
+        r = _preparar(historial=hist, mensaje='sí',
+                      cliente={'nombre': 'Jorge Aguilera', 'email': 'jorge@aremko.cl'},
+                      **self.LISTO)
+        self.assertEqual(r['error'], 'falta_confirmar_nombre')
+        self.assertIn('Jorge Aguilera', r['siguiente_pregunta'])
+
+    def test_con_los_dos_confirmados_recien_cotiza(self):
+        hist = (self.HIST +
+                '[Aremko]: Te enviamos la gift card a jorge@aremko.cl — ¿está bien?\n'
+                '[Cliente]: sí\n'
+                '[Aremko]: La compra queda a nombre de Jorge Aguilera, ¿está bien así?\n')
+        r = _preparar(historial=hist, mensaje='sí',
+                      cliente={'nombre': 'Jorge Aguilera', 'email': 'jorge@aremko.cl'},
+                      **self.LISTO)
+        self.assertTrue(r['success'], r)
+        self.assertEqual(r['total'], 80000)
+
+    def test_el_correo_que_escribe_el_cliente_no_se_repregunta(self):
+        """Si lo tipeó él, ya lo vio: no hay nada que confirmar."""
+        hist = self.HIST + '[Cliente]: mandala a otro@correo.cl\n'
+        r = _preparar(historial=hist,
+                      cliente={'nombre': 'Jorge Aguilera', 'email': 'otro@correo.cl'},
+                      **self.LISTO)
+        self.assertEqual(r['error'], 'falta_confirmar_nombre',
+                         'El correo que escribió el cliente no se vuelve a preguntar')
+
+    def test_un_correo_que_nunca_aparecio_en_el_chat_no_pasa(self):
+        """El caso que motivó todo: el dato sale de la ficha y nadie lo ve."""
+        r = _preparar(historial=self.HIST,
+                      cliente={'nombre': 'Jorge Aguilera', 'email': 'viejo@antiguo.cl'},
+                      **self.LISTO)
+        self.assertEqual(r['error'], 'falta_confirmar_email')

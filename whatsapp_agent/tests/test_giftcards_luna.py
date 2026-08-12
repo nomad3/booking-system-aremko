@@ -27,8 +27,14 @@ CLIENTE = {'nombre': 'María Prueba', 'email': 'maria@prueba.cl',
 HISTORIAL = ('[Cliente]: quiero regalar dos masajes\n'
              '[Aremko]: ¿A nombre de quién van?\n'
              '[Cliente]: para Los papás de María\n'
-             '[Aremko]: ¿Querés dejarles una frase?\n'
-             '[Cliente]: pongan que los quiero mucho\n')
+             '[Aremko]: ¿Quieres dejarles una frase?\n'
+             '[Cliente]: pongan que los quiero mucho\n'
+             # H-098: el correo y el nombre del comprador también se confirman
+             # en voz alta aunque estén en la ficha.
+             '[Aremko]: Te enviamos la gift card a maria@prueba.cl — ¿está bien?\n'
+             '[Cliente]: sí\n'
+             '[Aremko]: La compra queda a nombre de María Prueba, ¿está bien así?\n'
+             '[Cliente]: sí\n')
 
 
 def _experiencia(id_exp='masaje_relajacion', nombre='Masaje de Relajación',
@@ -223,7 +229,7 @@ class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE),
-            historial='[Cliente]: para Los papás\n', sin_datos_regalo=True,
+            historial=HISTORIAL, sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': 'masaje_relajacion',
                              'cantidad': 2,
                              'destinatario_nombre': 'Los papás'}])
@@ -248,7 +254,7 @@ class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            historial='[Cliente]: para Los papás\n',
+            historial=HISTORIAL,
             giftcards_data=[{'experiencia_id': 'masaje_relajacion',
                              'destinatario_nombre': 'Los papás'}])
         a = self._aprobar(prep['propuesta_id'])
@@ -457,7 +463,7 @@ class CotizacionConGiftcardsTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            historial='[Cliente]: para Martín\n',
+            historial=HISTORIAL + '[Cliente]: para Martín\n',
             giftcards_data=[{'experiencia_id': 'pausa_dos',
                              'destinatario_nombre': 'Martín'}])
         self.assertTrue(prep['success'])
@@ -526,7 +532,7 @@ class PreguntasDeRegaloObligatoriasTest(TestCase):
     def test_con_destinatario_pasa(self):
         r = self._preparar({'experiencia_id': 'masaje_relajacion',
                             'destinatario_nombre': 'Martín'},
-                           historial='[Cliente]: para Martín\n',
+                           historial=HISTORIAL + '[Cliente]: para Martín\n',
                            sin_datos_regalo=True)
         self.assertTrue(r['success'], r)
 
@@ -546,7 +552,7 @@ class PreguntasDeRegaloObligatoriasTest(TestCase):
             self._preparar(sin_datos_regalo=True)['error'], 'falta_destinatario')
         r = self._preparar({'experiencia_id': 'masaje_relajacion',
                             'destinatario_nombre': 'Martín'},
-                           historial='[Cliente]: para Martín\n',
+                           historial=HISTORIAL + '[Cliente]: para Martín\n',
                            sin_datos_regalo=True)
         self.assertTrue(r['success'], r)
 

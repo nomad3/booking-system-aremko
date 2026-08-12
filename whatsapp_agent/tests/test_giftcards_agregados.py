@@ -84,7 +84,11 @@ class RegalaConAgregadosTest(_SinSenalesDeVenta, TestCase):
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE),
             historial=('[Cliente]: para Alda\n'
-                       '[Cliente]: que la quiero mucho\n'),
+                       '[Cliente]: que la quiero mucho\n'
+                       '[Aremko]: ¿Te la enviamos a maria@prueba.cl?\n'
+                       '[Cliente]: sí\n'
+                       '[Aremko]: ¿La compra a nombre de María Prueba?\n'
+                       '[Cliente]: sí\n'),
             giftcards_data=[{'experiencia_id': 'masaje_pareja',
                              'cantidad': cantidad_cartas,
                              'destinatario_nombre': 'Alda',
