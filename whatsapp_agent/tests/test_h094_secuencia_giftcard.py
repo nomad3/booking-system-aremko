@@ -236,3 +236,84 @@ class NadaInternoLlegaAlClienteTest(TestCase):
         self.assertEqual(escalation.pregunta_pendiente([]), '')
         self.assertEqual(escalation.pregunta_pendiente(
             [{'name': 'ver_carrito', 'result': {'success': True}}]), '')
+
+
+class ResponderNoRepiteLaPreguntaTest(TestCase):
+    """H-096 (2026-08-12, 15:17): Luna preguntó el nombre, Jorge contestó
+    «Martin aguilera», y volvió a preguntar exactamente lo mismo.
+
+    El mensaje de ESTE turno no viaja dentro del historial —el agente lo pasa
+    aparte, igual que en `_cliente_eligio_producto`—, así que la respuesta
+    recién dada no contaba como algo dicho por el cliente."""
+
+    def setUp(self):
+        _experiencia()
+
+    def test_el_nombre_recien_dicho_cuenta(self):
+        self.assertTrue(_lo_dijo_el_cliente(
+            'Martin Aguilera',
+            historial='[Aremko]: ¿A nombre de quién va la gift card?\n',
+            mensaje='Martin aguilera'))
+
+    def test_sin_el_mensaje_del_turno_se_repetiria_la_pregunta(self):
+        """La prueba de que el bug era ese y no otro."""
+        self.assertFalse(_lo_dijo_el_cliente(
+            'Martin Aguilera',
+            historial='[Aremko]: ¿A nombre de quién va la gift card?\n'))
+
+    def test_contestar_el_nombre_avanza_a_la_frase(self):
+        r = _preparar(historial='[Aremko]: ¿A nombre de quién va?\n',
+                      mensaje='Martin aguilera',
+                      gc={'destinatario_nombre': 'Martin Aguilera'})
+        self.assertEqual(r['error'], 'falta_dedicatoria',
+                         'Contestar el nombre tiene que AVANZAR, no repetir')
+
+    def test_la_frase_recien_escrita_tambien_cuenta(self):
+        r = _preparar(historial='[Cliente]: para Martin\n',
+                      mensaje='que lo quiero mucho',
+                      gc={'destinatario_nombre': 'Martin',
+                          'mensaje': 'que lo quiero mucho'})
+        self.assertEqual(r['error'], 'falta_email')
+
+
+class HablaComoChilenaTest(TestCase):
+    """Jorge: «Me habla con el modismo argentino Contame su nombre»."""
+
+    def setUp(self):
+        _experiencia()
+
+    def test_ninguna_pregunta_usa_voseo(self):
+        vistos = []
+        for kw in ({}, {'gc': {'destinatario_nombre': 'Alda'},
+                        'historial': '[Cliente]: para Alda\n'}):
+            hist = kw.pop('historial', '[Cliente]: quiero regalar\n')
+            r = _preparar(historial=hist, **kw)
+            vistos.append(r['siguiente_pregunta'])
+        for pregunta in vistos:
+            for arg in ('contame', 'querés', 'escribila', 'podés', 'tenés',
+                        'decime', 'avisame'):
+                self.assertNotIn(arg, pregunta.lower(),
+                                 f'Modismo argentino en: {pregunta!r}')
+
+    def test_usa_las_formas_chilenas(self):
+        r = _preparar(historial='[Cliente]: quiero regalar\n')
+        self.assertIn('cuéntame', r['siguiente_pregunta'].lower())
+
+
+class PrecioDeRegaloUnicoTest(TestCase):
+    """Jorge (15:16): «me ofrece Noche de aguas calientes por 160.000 (el valor
+    normal) y luego me dice que la misma experiencia cuesta 130.000 (el valor
+    de la giftcard)». Dos precios para lo mismo en 30 segundos."""
+
+    def _fuente(self):
+        import whatsapp_agent.prompt as prompt_mod
+        return open(prompt_mod.__file__, encoding='utf-8').read()
+
+    def test_el_prompt_prohibe_mezclar_los_dos_precios(self):
+        fuente = self._fuente()
+        self.assertIn('los precios de la sección 2 dejan de existir', fuente)
+        self.assertIn('llamá\n`catalogo_giftcards` ANTES de decir un solo precio', fuente)
+
+    def test_el_prompt_aclara_que_la_giftcard_puede_valer_menos(self):
+        """Que sea más barata es la oferta, no un error a corregir."""
+        self.assertIn('puede valer\nMENOS que la reserva', self._fuente())

@@ -73,7 +73,7 @@ def _lineas_del_cliente(historial):
     return salida
 
 
-def _lo_dijo_el_cliente(texto, historial, minimo=0.6):
+def _lo_dijo_el_cliente(texto, historial, mensaje='', minimo=0.6):
     """¿Ese texto salió del cliente, o lo inventó Luna?
 
     H-094 (2026-08-12): el gate anterior solo se cerraba si venían VACÍOS el
@@ -87,8 +87,14 @@ def _lo_dijo_el_cliente(texto, historial, minimo=0.6):
     """
     import unicodedata
 
-    dicho = ' '.join(_lineas_del_cliente(historial))
-    if not dicho:
+    # El mensaje de ESTE turno todavía no está en el historial (así se lo pasa
+    # el agente: `mensaje` va aparte). Sin sumarlo, el cliente respondía
+    # «Martin Aguilera» y la herramienta volvía a preguntar lo mismo —Jorge lo
+    # vio en vivo el 2026-08-12 a las 15:17, la pregunta repetida dos veces.
+    plano_msg = unicodedata.normalize('NFKD', mensaje or '')
+    plano_msg = plano_msg.encode('ascii', 'ignore').decode().lower()
+    dicho = ' '.join(_lineas_del_cliente(historial) + [plano_msg])
+    if not dicho.strip():
         return False
     palabras = _palabras_clave(texto)
     if not palabras:
@@ -245,7 +251,7 @@ def _resolver_experiencia(texto):
 
 def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                       idempotency_key=None, sin_datos_regalo=False,
-                      historial=''):
+                      historial='', mensaje=''):
     """Crea la propuesta de venta de gift cards (mismo cajón que las reservas).
 
     giftcards_data: [{experiencia_id, monto (solo si la experiencia es de
@@ -291,25 +297,25 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
         # 1. ¿A nombre de quién va?
         if not destinatario:
             return _falta('falta_destinatario',
-                          '¿A nombre de quién va la gift card? Contame su nombre 🌿')
-        if not _lo_dijo_el_cliente(destinatario, historial):
+                          '¿A nombre de quién va la gift card? Cuéntame su nombre 🌿')
+        if not _lo_dijo_el_cliente(destinatario, historial, mensaje):
             logger.info('[preparar_giftcard] H-094: destinatario %r no aparece en lo '
                         'que escribió el cliente → se pide de nuevo', destinatario[:40])
             return _falta('destinatario_no_lo_dijo_el_cliente',
-                          '¿A nombre de quién va la gift card? Contame su nombre 🌿',
+                          '¿A nombre de quién va la gift card? Cuéntame su nombre 🌿',
                           detalle='Ese nombre no lo dijo el cliente. ')
 
         # 2. ¿Quiere dejarle una frase escrita?
         if not dedicatoria and not sin_datos_regalo:
             return _falta('falta_dedicatoria',
-                          '¿Querés incluirle una frase? Escribila como quieras '
-                          'que aparezca en la carta ✨')
-        if dedicatoria and not _lo_dijo_el_cliente(dedicatoria, historial):
+                          '¿Quieres incluirle una frase? Escríbela tal como '
+                          'quieres que aparezca en la carta ✨')
+        if dedicatoria and not _lo_dijo_el_cliente(dedicatoria, historial, mensaje):
             logger.info('[preparar_giftcard] H-094: dedicatoria inventada por el '
                         'modelo → se pide de nuevo')
             return _falta('dedicatoria_no_la_dijo_el_cliente',
-                          '¿Querés incluirle una frase? Escribila como quieras '
-                          'que aparezca en la carta ✨',
+                          '¿Quieres incluirle una frase? Escríbela tal como '
+                          'quieres que aparezca en la carta ✨',
                           detalle='Esa frase no la escribió el cliente. ')
 
         # 3. ¿A qué correo se la mandamos? (la carta viaja por email)

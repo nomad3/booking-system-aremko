@@ -2582,8 +2582,10 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                     # Luna PREGUNTÓ. Que ella lo declare no alcanza.
                     sin_datos_regalo=_sin_datos_regalo_verificado(args, historial),
                     # Para comprobar que el destinatario y la dedicatoria
-                    # salieron del cliente y no del modelo (H-094).
-                    historial=historial,
+                    # salieron del cliente y no del modelo (H-094). El mensaje
+                    # de ESTE turno va aparte del historial: sin él, la
+                    # respuesta recién dada no contaba y se repetía la pregunta.
+                    historial=historial, mensaje=mensaje,
                     # Reintentos del LLM en el MISMO turno no duplican la
                     # propuesta; un pedido nuevo (otro turno) sí crea otra.
                     idempotency_key=f'gc-{external_id}-{args.get("experiencia_id")}'
