@@ -3861,6 +3861,17 @@ class GiftCardExperiencia(models.Model):
         db_index=True,
         help_text="Si está inactivo, no aparece en el wizard"
     )
+    # La vitrina se curaba con una lista de ids escrita en giftcard_views.py
+    # («DECISIÓN RADICAL» del 2026-07-05). Cuando Jorge activó los masajes el
+    # 2026-08-12 no aparecieron en la web: la curaduría vivía en el código y
+    # no se enteró. Ahora la decide él desde el admin.
+    destacada_web = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Destacada en la web",
+        help_text="Aparece en la vitrina de /giftcards/. Sin ninguna marcada, "
+                  "la vitrina muestra todas las activas."
+    )
     orden = models.IntegerField(
         default=0,
         help_text="Orden de aparición en la lista (menor = primero)"
@@ -3914,7 +3925,10 @@ class GiftCardExperiencia(models.Model):
             # Galería para el carrusel de la vitrina (1-3 fotos, sin huecos)
             'imagenes': [f.url for f in (self.imagen, self.imagen_2, self.imagen_3) if f],
             'monto_fijo': float(self.monto_fijo) if self.monto_fijo else None,
-            'montos_sugeridos': self.montos_sugeridos or []
+            'montos_sugeridos': self.montos_sugeridos or [],
+            # La vitrina de /giftcards/ filtra por esto (antes: lista de ids
+            # escrita en giftcard_views.py).
+            'destacada_web': self.destacada_web,
         }
 
 

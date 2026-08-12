@@ -2993,12 +2993,17 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         'categoria',
         'precio_display',
         'activo',
+        # La vitrina de /giftcards/ se cura ACÁ desde el 2026-08-12 (antes era
+        # una lista de ids escrita en giftcard_views.py, y activar algo en el
+        # admin no lo hacía aparecer en la web).
+        'destacada_web',
         'orden',
         'modificado'
     )
     list_filter = (
         'categoria',
         'activo',
+        'destacada_web',
         'creado',
         'modificado'
     )
@@ -3009,7 +3014,7 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
         'descripcion_giftcard'
     )
     ordering = ('categoria', 'orden', 'nombre')
-    list_editable = ('activo', 'orden')
+    list_editable = ('activo', 'destacada_web', 'orden')
 
     fieldsets = (
         ('Identificación', {
@@ -3033,7 +3038,7 @@ class GiftCardExperienciaAdmin(admin.ModelAdmin):
             )
         }),
         ('Configuración', {
-            'fields': ('activo', 'orden')
+            'fields': ('activo', 'destacada_web', 'orden')
         }),
         ('Metadatos', {
             'fields': ('creado', 'modificado'),

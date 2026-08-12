@@ -4,10 +4,12 @@ NOTA: la suite local no puede correr mientras exista el drift AR-033/AR-034 (cre
 test DB revienta al re-aplicar migraciones). Estos tests documentan el contrato y
 quedan listos para cuando eso se resuelva / para CI.
 """
+from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
 
 from django.test import TestCase
+from django.utils import timezone
 
 from carrito_reservas.models import CarritoReserva
 from whatsapp_agent import rollback
@@ -65,6 +67,9 @@ class RollbackPropuestaTests(TestCase):
             propuesta_id=f'test-{PropuestaReserva.objects.count() + 1}',
             canal=CANAL, external_id=PHONE, estado='pendiente',
             payload={'servicios': [], 'productos': []}, servicios=[],
+            # cliente_data y expires_at son NOT NULL sin default: el create
+            # revienta sin ellos (la app siempre los llena en reserva_service).
+            cliente_data={}, expires_at=timezone.now() + timedelta(hours=2),
             total=Decimal('0'), resumen_texto='')
         base.update(kwargs)
         return PropuestaReserva.objects.create(**base)
