@@ -904,6 +904,26 @@ def cargar_movimientos(request):
             }
             ctx['texto'] = ''
 
+    elif request.method == 'POST' and request.FILES.getlist('capturas'):
+        # Captura del celular → texto para pegar. NO escribe movimientos: llena
+        # el mismo cuadro y de ahí sigue el circuito de dos golpes de siempre.
+        # Un modelo leyendo montos puede errarle a un dígito, y el lugar más
+        # fácil para cazar eso es el texto, antes de que sea un movimiento.
+        from .vision import leer_capturas, validar_capturas
+
+        capturas = request.FILES.getlist('capturas')
+        ok, error = validar_capturas(capturas)
+        if not ok:
+            ctx['error'] = error
+        else:
+            texto, dudosas, error = leer_capturas(capturas)
+            ctx['error'] = error
+            if texto:
+                ctx['texto'] = ((ctx['texto'] + '\n' + texto).strip()
+                                if ctx['texto'].strip() else texto)
+                ctx['leidas'] = len(texto.splitlines())
+            ctx['dudosas'] = dudosas
+
     elif request.method == 'POST' and request.POST.get('texto', '').strip():
         cuenta_clave = ctx['cuenta_sel']
         if cuenta_clave not in CUENTAS_PUENTE:

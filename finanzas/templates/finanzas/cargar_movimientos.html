@@ -115,6 +115,28 @@
      El monto va <b>tal como se ve en la app</b>: con signo menos si es cargo,
      sin signo si entró plata. Fecha DD-MM-AAAA.<br>
      Ejemplo: <code>14-07-2026 ; Pago Google Ads Google ; -180.000</code></p>
+  {% if leidas %}
+  <p class="ok">Leí <b>{{ leidas }}</b> movimiento{{ leidas|pluralize:"s" }} de la captura.
+     Revisalos abajo antes de seguir — sobre todo los montos.</p>
+  {% endif %}
+  {% if dudosas %}
+  <p class="aviso"><b>No leí con seguridad {{ dudosas|length }} línea{{ dudosas|length|pluralize:"s" }}</b>
+     y las dejé fuera a propósito. Agregalas a mano si corresponden:
+     {% for d in dudosas %}<br>· {{ d }}{% endfor %}</p>
+  {% endif %}
+
+  {% comment %}
+  La captura NO escribe movimientos: llena el cuadro de abajo. Un modelo
+  leyendo montos puede errarle a un dígito, y el texto es el lugar donde eso
+  se caza fácil — después ya sería un movimiento en la contabilidad.
+  {% endcomment %}
+  <form method="post" enctype="multipart/form-data" style="margin-bottom:14px;">{% csrf_token %}
+    <p class="sub" style="margin-bottom:6px;"><b>¿Tenés la captura del celular?</b>
+       Subila y te lleno el cuadro. Podés subir varias de una (hasta 8).</p>
+    <p><input type="file" name="capturas" accept="image/*" multiple></p>
+    <button class="boton" type="submit">Leer la captura</button>
+  </form>
+
   <form method="post">{% csrf_token %}
     <p><select name="cuenta">
       {% for c in cuentas %}
