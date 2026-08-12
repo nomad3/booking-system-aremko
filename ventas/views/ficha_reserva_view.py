@@ -270,16 +270,39 @@ def ficha_reserva_cliente(request, token):
     except Exception:  # noqa: BLE001 — nunca tumbar la ficha por esto
         bebida_personalizable = False
 
+    # Gift cards de esta compra (venta vía Luna, 2026-08-12). Se muestran con
+    # su experiencia y destinatario; el código NO se muestra acá — la carta
+    # con el código viaja por email recién cuando el pago se confirma, y
+    # publicarlo antes en una página sin login sería regalarlo sin cobrar.
+    cartas = list(venta.giftcards.all())
+    nombres_exp = {}
+    if cartas:
+        from ..models import GiftCardExperiencia
+        nombres_exp = dict(
+            GiftCardExperiencia.objects
+            .filter(id_experiencia__in=[c.servicio_asociado for c in cartas
+                                        if c.servicio_asociado])
+            .values_list('id_experiencia', 'nombre'))
+    giftcards_venta = [{
+        'nombre': nombres_exp.get(gc.servicio_asociado)
+                  or (gc.servicio_asociado or '').replace('_', ' ').title()
+                  or 'de regalo',
+        'destinatario': gc.destinatario_nombre or '',
+        'monto_str': _clp(gc.monto_inicial),
+    } for gc in cartas]
+    solo_giftcards = bool(giftcards_venta) and not tipos_venta
+
     # QR de llegada + reordenamiento del Pase según el momento del huésped.
     # Antes de llegar manda "cómo llego y cuánto debo"; una vez adentro manda
     # "wifi y pedir algo". Que la pantalla cambie sola tras el escaneo es
     # además lo que le demuestra al cliente que el QR sirvió para algo.
+    # En una compra SOLO de gift cards no hay llegada: el QR no significa nada.
     from ..llegadas import hora_local, ya_llego
     llego_en = ya_llego(venta.id)
     context_qr = {
         'llego': bool(llego_en),
         'hora_llegada': hora_local(llego_en),
-        'qr_svg': '' if llego_en else qr_svg(url_llegada(token)),
+        'qr_svg': '' if (llego_en or solo_giftcards) else qr_svg(url_llegada(token)),
     }
 
     context = {
@@ -289,8 +312,11 @@ def ficha_reserva_cliente(request, token):
         'estado_label': estado_label,
         'estado_cls': estado_cls,
         **context_qr,
-        'experiencia_nombre': _experiencia_nombre(tipos_venta),
+        'experiencia_nombre': ('Gift Cards' if solo_giftcards
+                               else _experiencia_nombre(tipos_venta)),
         'lineas': _lineas_servicios(venta),
+        'giftcards': giftcards_venta,
+        'solo_giftcards': solo_giftcards,
         'total_str': _clp(venta.total),
         'pagado_str': _clp(venta.pagado),
         'saldo': int(venta.saldo_pendiente or 0),

@@ -1,0 +1,290 @@
+# -*- coding: utf-8 -*-
+"""Luna vende gift cards (pedido de Jorge 2026-08-12).
+
+El caso que se caía: «quiero regalar dos masajes para mis papás» — Luna no
+tenía camino. Estos tests cubren el camino completo: catálogo vivo → propuesta
+(gate de Deborah) → aprobación crea la venta con sus cartas → el Pase las
+muestra sin código y sin QR.
+"""
+from datetime import date
+
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from ventas.models import (Cliente, GiftCard, GiftCardExperiencia,
+                           VentaReserva)
+from whatsapp_agent.giftcards import (catalogo_giftcards,
+                                      materializar_giftcards,
+                                      preparar_giftcard)
+from whatsapp_agent.models import PropuestaReserva
+
+CLIENTE = {'nombre': 'María Prueba', 'email': 'maria@prueba.cl',
+           'telefono': '+56911111111', 'documento_identidad': '12345678-5'}
+
+
+def _experiencia(id_exp='masaje_relajacion', nombre='Masaje de Relajación',
+                 monto_fijo=50000, activo=True, **extra):
+    return GiftCardExperiencia.objects.create(
+        id_experiencia=id_exp, categoria='masajes', nombre=nombre,
+        descripcion='Masaje 50 minutos', descripcion_giftcard='Detalle',
+        imagen='giftcards/x.jpg', monto_fijo=monto_fijo, activo=activo,
+        **extra)
+
+
+class _SinSenalesDeVenta:
+    """Mismo patrón que finanzas.tests: las señales CRM/Meta sobre VentaReserva
+    y Pago no son el sujeto de estos tests y arrastran estado ajeno."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._mover_senales(desconectar=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._mover_senales(desconectar=False)
+        super().tearDownClass()
+
+    @staticmethod
+    def _mover_senales(desconectar):
+        from django.db.models.signals import post_save
+
+        from control_gestion.signals import react_to_reserva_change
+        from ventas.models import Pago, VentaReserva
+        from ventas.signals.main_signals import actualizar_tramo_y_premios_on_pago
+
+        mover = post_save.disconnect if desconectar else post_save.connect
+        for receptor in (actualizar_tramo_y_premios_on_pago,
+                         react_to_reserva_change):
+            for emisor in (VentaReserva, Pago):
+                mover(receptor, sender=emisor)
+
+    def setUp(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().setUp()
+
+    def tearDown(self):
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().tearDown()
+
+
+class CatalogoGiftcardsTest(TestCase):
+    def test_lee_de_la_bd_en_vivo_y_solo_activas(self):
+        """Jorge agrega «Masaje para dos» en el admin y Luna la ofrece en el
+        mensaje siguiente, sin deploy. Las inactivas no existen para Luna."""
+        _experiencia()
+        _experiencia(id_exp='vieja', nombre='Ya no va', activo=False)
+        r = catalogo_giftcards()
+        ids = [e['id'] for e in r['experiencias']]
+        self.assertIn('masaje_relajacion', ids)
+        self.assertNotIn('vieja', ids)
+
+        _experiencia(id_exp='masaje_para_dos', nombre='Masaje para dos',
+                     monto_fijo=95000)
+        ids = [e['id'] for e in catalogo_giftcards()['experiencias']]
+        self.assertIn('masaje_para_dos', ids)
+
+    def test_tarjeta_de_valor_expone_montos_sugeridos(self):
+        _experiencia(id_exp='valor', nombre='Tarjeta de Valor', monto_fijo=None,
+                     montos_sugeridos=[30000, 50000])
+        exp = catalogo_giftcards()['experiencias'][0]
+        self.assertIsNone(exp['precio'])
+        self.assertEqual(exp['montos_sugeridos'], [30000, 50000])
+
+
+class PrepararGiftcardTest(TestCase):
+    def setUp(self):
+        self.exp = _experiencia()
+
+    def _preparar(self, giftcards=None, cliente=None, **kw):
+        return preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=cliente or dict(CLIENTE),
+            giftcards_data=giftcards or [
+                {'experiencia_id': 'masaje_relajacion', 'cantidad': 2,
+                 'destinatario_nombre': 'Los papás de María'}], **kw)
+
+    def test_dos_masajes_para_los_papas(self):
+        """El caso exacto de Jorge: 2 masajes = propuesta por $100.000."""
+        r = self._preparar()
+        self.assertTrue(r['success'])
+        self.assertEqual(r['total'], 100000)
+        self.assertEqual(r['giftcards_count'], 2)
+        prop = PropuestaReserva.objects.get(propuesta_id=r['propuesta_id'])
+        self.assertEqual(prop.estado, 'pendiente')
+        self.assertEqual(prop.payload['servicios'], [])
+        self.assertEqual(prop.payload['giftcards'][0]['precio'], 50000)
+        self.assertIn('Los papás', r['resumen_texto'])
+
+    def test_sin_email_no_hay_venta(self):
+        """Sin email no hay carta que entregar: se corta antes de proponer."""
+        cliente = dict(CLIENTE, email='')
+        r = self._preparar(cliente=cliente)
+        self.assertFalse(r['success'])
+        self.assertIn('email', r['mensaje'].lower())
+
+    def test_el_precio_lo_pone_el_catalogo_no_el_llm(self):
+        """Aunque el LLM mandara un precio, se ignora: defense in depth."""
+        r = self._preparar(giftcards=[{'experiencia_id': 'masaje_relajacion',
+                                       'cantidad': 1, 'precio': 1}])
+        self.assertTrue(r['success'])
+        self.assertEqual(r['total'], 50000)
+
+    def test_experiencia_inactiva_o_inexistente_se_rechaza(self):
+        GiftCardExperiencia.objects.filter(pk=self.exp.pk).update(activo=False)
+        r = self._preparar()
+        self.assertFalse(r['success'])
+        self.assertEqual(r['error'], 'experiencia_no_existe')
+
+    def test_tarjeta_de_valor_exige_monto_dentro_de_rango(self):
+        _experiencia(id_exp='valor', nombre='Tarjeta de Valor',
+                     monto_fijo=None, montos_sugeridos=[30000])
+        sin_monto = self._preparar(giftcards=[{'experiencia_id': 'valor'}])
+        self.assertFalse(sin_monto['success'])
+        chico = self._preparar(giftcards=[{'experiencia_id': 'valor',
+                                           'monto': 500}])
+        self.assertFalse(chico['success'])
+        ok = self._preparar(giftcards=[{'experiencia_id': 'valor',
+                                        'monto': 40000}])
+        self.assertTrue(ok['success'])
+        self.assertEqual(ok['total'], 40000)
+
+    def test_un_pedido_gigante_pasa_por_humano(self):
+        r = self._preparar(giftcards=[{'experiencia_id': 'masaje_relajacion',
+                                       'cantidad': 40}])
+        self.assertFalse(r['success'])
+        self.assertEqual(r['error'], 'demasiadas_giftcards')
+
+    def test_reintento_del_llm_no_duplica_la_propuesta(self):
+        a = self._preparar(idempotency_key='gc-test-1')
+        b = self._preparar(idempotency_key='gc-test-1')
+        self.assertEqual(a['propuesta_id'], b['propuesta_id'])
+        self.assertTrue(b.get('duplicada'))
+        self.assertEqual(PropuestaReserva.objects.count(), 1)
+
+
+class MaterializarGiftcardsTest(_SinSenalesDeVenta, TestCase):
+    def test_cada_unidad_es_una_carta_y_el_total_cuadra(self):
+        cliente = Cliente.objects.create(nombre='María', telefono='+56911111111')
+        venta = VentaReserva.objects.create(cliente=cliente, total=0,
+                                            fecha_reserva=timezone.now())
+        payload = {'cliente': dict(CLIENTE), 'giftcards': [
+            {'experiencia_id': 'masaje_relajacion', 'precio': 50000,
+             'cantidad': 2, 'destinatario_nombre': 'Los papás',
+             'mensaje': 'Con cariño'}]}
+        creadas, monto = materializar_giftcards(venta, payload, cliente)
+        self.assertEqual((creadas, monto), (2, 100000))
+        cartas = list(venta.giftcards.all())
+        self.assertEqual(len(cartas), 2)
+        for c in cartas:
+            self.assertEqual(int(c.monto_inicial), 50000)
+            self.assertEqual(c.estado, 'por_cobrar')
+            self.assertEqual(c.comprador_email, 'maria@prueba.cl')
+            self.assertEqual(c.destinatario_nombre, 'Los papás')
+            self.assertEqual((c.fecha_vencimiento - date.today()).days, 365)
+        # La señal recalculó el total de la venta con las cartas.
+        venta.refresh_from_db()
+        self.assertEqual(int(venta.total), 100000)
+
+
+@override_settings(LUNA_API_KEY='clave-test')
+class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
+    """El gate de Deborah: aprobar la propuesta crea la venta con sus cartas."""
+
+    def setUp(self):
+        super().setUp()
+        _experiencia()
+
+    def _aprobar(self, propuesta_id):
+        return self.client.post(
+            '/api/luna/reservas/create/', {'propuesta_id': propuesta_id},
+            content_type='application/json', HTTP_X_API_KEY='clave-test')
+
+    def test_aprobar_crea_venta_con_cartas_y_total(self):
+        prep = preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': 'masaje_relajacion',
+                             'cantidad': 2,
+                             'destinatario_nombre': 'Los papás'}])
+        self.assertTrue(prep['success'])
+        r = self._aprobar(prep['propuesta_id'])
+        self.assertEqual(r.status_code, 201, r.content)
+        datos = r.json()
+        self.assertTrue(datos['success'])
+        venta = VentaReserva.objects.get(id=datos['reserva']['id'])
+        self.assertEqual(venta.giftcards.count(), 2)
+        self.assertEqual(int(venta.total), 100000)
+        self.assertEqual(int(venta.saldo_pendiente), 100000)
+        self.assertEqual(venta.reservaservicios.count(), 0)
+        # La propuesta quedó consumida.
+        prop = PropuestaReserva.objects.get(propuesta_id=prep['propuesta_id'])
+        self.assertEqual(prop.estado, 'creada')
+
+    def test_doble_aprobacion_no_duplica_cartas(self):
+        """El contrato real del endpoint: una propuesta consumida no se puede
+        volver a aprobar (el doble click casi simultáneo lo cubren el caché y
+        el lock). Lo que importa acá: NUNCA aparece una segunda carta."""
+        prep = preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': 'masaje_relajacion'}])
+        a = self._aprobar(prep['propuesta_id'])
+        b = self._aprobar(prep['propuesta_id'])
+        self.assertEqual(a.status_code, 201)
+        venta_id = a.json()['reserva']['id']
+        cuerpo_b = b.json()
+        self.assertTrue(
+            cuerpo_b.get('duplicada')
+            or (cuerpo_b.get('reserva') or {}).get('duplicada')
+            or cuerpo_b.get('error') == 'propuesta_not_found',
+            cuerpo_b)
+        self.assertEqual(
+            VentaReserva.objects.get(id=venta_id).giftcards.count(), 1)
+        self.assertEqual(GiftCard.objects.count(), 1)
+
+
+class PaseConGiftcardsTest(_SinSenalesDeVenta, TestCase):
+    """El Pase de una compra solo-giftcard: cartas visibles, sin código, sin QR."""
+
+    def test_el_pase_muestra_las_cartas_y_no_el_qr(self):
+        from ventas.views.ficha_reserva_view import token_para_reserva
+        _experiencia()
+        cliente = Cliente.objects.create(nombre='María', telefono='+56911111111')
+        venta = VentaReserva.objects.create(cliente=cliente, total=0,
+                                            fecha_reserva=timezone.now())
+        GiftCard.objects.create(
+            monto_inicial=50000, monto_disponible=50000,
+            fecha_vencimiento=date(2027, 8, 12), estado='por_cobrar',
+            cliente_comprador=cliente, venta_reserva=venta,
+            destinatario_nombre='Los papás',
+            servicio_asociado='masaje_relajacion')
+        venta.calcular_total()
+
+        r = self.client.get(f'/ventas/reserva/{token_para_reserva(venta.id)}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Gift Card Masaje de Relajación')
+        self.assertContains(r, 'para Los papás')
+        self.assertContains(r, 'llega por email')
+        # Sin QR de llegada: una gift card no tiene llegada que registrar.
+        self.assertNotContains(r, 'Tu código de ingreso')
+        # El código de la carta NO se publica en una página sin login.
+        carta = venta.giftcards.first()
+        self.assertNotContains(r, carta.codigo)
+
+
+class PromptGiftcardsTest(TestCase):
+    def test_el_prompt_trae_la_seccion_de_regalo(self):
+        import whatsapp_agent.prompt as prompt_mod
+        fuente = open(prompt_mod.__file__, encoding='utf-8').read()
+        self.assertIn('GIFT CARDS', fuente)
+        self.assertIn('catalogo_giftcards', fuente)
+        self.assertIn('vale 1 año', fuente)
+
+    def test_las_tools_estan_declaradas_y_despachadas(self):
+        import whatsapp_agent.agent as agent_mod
+        fuente = open(agent_mod.__file__, encoding='utf-8').read()
+        self.assertIn("'catalogo_giftcards'", fuente)
+        self.assertIn("'preparar_giftcard'", fuente)

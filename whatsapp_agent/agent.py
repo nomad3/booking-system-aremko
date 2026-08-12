@@ -583,6 +583,50 @@ _TOOLS = [{
             'required': ['reserva_id', 'nombre_producto'],
         },
     },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'catalogo_giftcards',
+        'description': (
+            'Lista las GIFT CARDS disponibles para regalar, con nombre y precio, leídas del '
+            'catálogo vigente. Llamala apenas detectes intención de REGALO: "quiero regalar", '
+            '"una gift card", "algo para mi mamá/pareja/amiga", "un vale de regalo". Una gift '
+            'card NO lleva fecha ni hora: vale 1 año y quien la recibe agenda cuando quiera — '
+            'decílo, porque resuelve la duda típica ("no sé cuándo pueden ir"). Después de '
+            'verla, ofrecé UNA opción a la vez, la que mejor calce con lo que pidió.'
+        ),
+        'parameters': {'type': 'object', 'properties': {}, 'required': []},
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'preparar_giftcard',
+        'description': (
+            'GATE DE DEBORAH: crea la propuesta de compra de gift cards. NO vende directo — '
+            'el equipo aprueba y al cliente le llega la cotización con los datos de '
+            'transferencia. Llamala SOLO cuando ya tengas: (1) qué experiencia del catálogo '
+            '(id exacto de catalogo_giftcards), (2) cuántas, (3) nombre y email del comprador '
+            '— el email es OBLIGATORIO: las gift cards se envían por email una vez pagadas. '
+            'Datos opcionales que suman: nombre de quien la recibe y un mensaje/dedicatoria. '
+            'Cada unidad es una gift card propia (2 masajes = 2 cartas, canjeables por '
+            'separado). Cuando success=true respondé con el campo `mensaje` TAL CUAL; NO '
+            'digas que la compra ya quedó lista — es una propuesta pendiente.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'experiencia_id': {'type': 'string', 'description': 'ID exacto de la experiencia según catalogo_giftcards. REQUERIDO.'},
+                'cantidad': {'type': 'integer', 'description': 'Cuántas gift cards de esa experiencia (default 1)'},
+                'monto': {'type': 'integer', 'description': 'SOLO para tarjetas de valor libre (sin precio fijo): monto en CLP que elige el cliente'},
+                'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (opcional, sale en la carta)'},
+                'mensaje': {'type': 'string', 'description': 'Dedicatoria breve para la carta (opcional)'},
+                'nombre': {'type': 'string', 'description': 'Nombre del COMPRADOR (si no está en su ficha)'},
+                'email': {'type': 'string', 'description': 'Email del COMPRADOR — ahí llegan las gift cards. Obligatorio si no está en su ficha.'},
+                'documento_identidad': {'type': 'string', 'description': 'RUT del comprador (requerido si es cliente nuevo)'},
+            },
+            'required': ['experiencia_id'],
+        },
+    },
 }]
 
 
@@ -824,7 +868,8 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
         name, res = tc.get('name'), tc.get('result')
         if not escalation.tool_result_ok(res):
             continue
-        if name in ('confirmar_reserva_carrito', 'confirmar_ritual', 'confirmar_refugio'):
+        if name in ('confirmar_reserva_carrito', 'confirmar_ritual',
+                    'confirmar_refugio', 'preparar_giftcard'):
             confirmo = True
         elif name in ('agregar_servicio_carrito', 'agregar_producto_carrito', 'quitar_item_carrito'):
             agrego = True
@@ -2437,6 +2482,75 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 logger.exception('Agente WA: tool agregar_producto_a_reserva_existente falló: %s', exc)
                 return {'success': False, 'error': 'internal_error',
                         'mensaje': f'No se pudo preparar la adición: {str(exc)[:100]}'}
+        if name == 'catalogo_giftcards':
+            # Venta de gift cards (Jorge 2026-08-12). Se lee de la BD en cada
+            # llamada: una experiencia nueva en el admin queda ofrecible en el
+            # mensaje siguiente, sin deploy.
+            from .giftcards import catalogo_giftcards as _catalogo_gc
+            try:
+                return _catalogo_gc()
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool catalogo_giftcards falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': 'No pude leer el catálogo de gift cards.'}
+        if name == 'preparar_giftcard':
+            # GATE DE DEBORAH: misma puerta que las reservas — propuesta al
+            # cajón, aprobación humana, y recién ahí venta + Pase.
+            from .giftcards import preparar_giftcard as _preparar_gc
+            try:
+                args = args or {}
+                external_id = phone if phone else '+56912345678'
+                ficha = datos_cliente or {}
+                nombre = (args.get('nombre') or ficha.get('nombre') or '').strip()
+                email = (args.get('email') or ficha.get('email') or '').strip()
+                documento = (args.get('documento_identidad')
+                             or ficha.get('documento_identidad') or '').strip()
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
+                faltan = [k for k, v in (('nombre', nombre), ('email', email)) if not v]
+                if faltan:
+                    return {'success': False, 'error': 'faltan_datos', 'faltan': faltan,
+                            'mensaje': ('Faltan datos del comprador: '
+                                        + ', '.join(faltan)
+                                        + '. El email es donde llegan las gift cards.')}
+                gc_item = {
+                    'experiencia_id': args.get('experiencia_id'),
+                    'cantidad': args.get('cantidad', 1),
+                    'monto': args.get('monto'),
+                    'destinatario_nombre': args.get('destinatario_nombre', ''),
+                    'mensaje': args.get('mensaje', ''),
+                }
+                resultado = _preparar_gc(
+                    canal=canal, external_id=external_id,
+                    cliente_data={'nombre': nombre, 'email': email,
+                                  'telefono': telefono,
+                                  'documento_identidad': documento},
+                    giftcards_data=[gc_item],
+                    # Reintentos del LLM en el MISMO turno no duplican la
+                    # propuesta; un pedido nuevo (otro turno) sí crea otra.
+                    idempotency_key=f'gc-{external_id}-{args.get("experiencia_id")}'
+                                    f'-{args.get("cantidad", 1)}',
+                )
+                if not resultado.get('success'):
+                    return resultado
+                total = resultado.get('total', 0)
+                return {
+                    'success': True,
+                    'propuesta_id': resultado.get('propuesta_id'),
+                    'total': total,
+                    'mensaje': (
+                        f'¡Qué lindo regalo! 🎁 Te preparo la compra (total ${total:,}) '
+                        'y te la enviamos en un momento con los datos de transferencia. '
+                        'Apenas se confirme el pago, la gift card te llega por email '
+                        'lista para regalar — vale 1 año y quien la recibe agenda '
+                        'cuando quiera. 🌿'
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool preparar_giftcard falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'No se pudo preparar la gift card: {str(exc)[:100]}'}
         return {'error': f'herramienta desconocida: {name}'}
 
     try:

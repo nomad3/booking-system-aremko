@@ -151,6 +151,9 @@ def _corregir_dia_semana(t):
 TOOLS_MUTAN_CARRITO = (
     'confirmar_reserva_carrito', 'confirmar_ritual', 'confirmar_refugio',
     'agregar_servicio_carrito', 'agregar_producto_carrito',
+    # También crea una propuesta real: un texto que suene a fracaso encima de
+    # una gift card ya propuesta es la misma contradicción que con el carrito.
+    'preparar_giftcard',
 )
 _PATRON_CONTRADICCION = re.compile(
     r'hubo un problema|no se pudo|no logr[ée]|no logramos|no fue posible|'

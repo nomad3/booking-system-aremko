@@ -703,6 +703,7 @@ def crear_reserva(request):
             cliente_data = payload.get('cliente', {})
             servicios_data = payload.get('servicios', [])
             productos_data = payload.get('productos', [])  # tablas, jugos, etc.
+            giftcards_data = payload.get('giftcards', [])  # venta de gift cards vía Luna
             metodo_pago = payload.get('metodo_pago', 'pendiente')
             notas = f'[Propuesta {propuesta_id[:8]}] Aprobada por Deborah'
             idempotency_key = propuesta.idempotency_key or f'propuesta_{propuesta_id}'
@@ -712,6 +713,7 @@ def crear_reserva(request):
             cliente_data = request.data.get('cliente', {})
             servicios_data = request.data.get('servicios', [])
             productos_data = request.data.get('productos', [])
+            giftcards_data = request.data.get('giftcards', [])
             metodo_pago = request.data.get('metodo_pago', 'pendiente')
             notas = request.data.get('notas', '')
 
@@ -730,11 +732,13 @@ def crear_reserva(request):
                 'mensaje': 'Datos de cliente son requeridos'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        if not servicios_data:
+        # Una venta SOLO de gift cards es válida: no lleva servicios ni fecha
+        # (la carta vale 365 días y el destinatario agenda después).
+        if not servicios_data and not giftcards_data:
             return Response({
                 'success': False,
                 'error': 'validation_error',
-                'mensaje': 'Debe incluir al menos un servicio'
+                'mensaje': 'Debe incluir al menos un servicio o una gift card'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Verificar idempotencia (evitar duplicados)
@@ -761,16 +765,17 @@ def crear_reserva(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Validar disponibilidad de servicios (reutilizar lógica de validar_disponibilidad)
-        # Crear request interno para validación
-        validacion_response = validar_disponibilidad_interna(servicios_data)
+        # Solo si hay servicios: una gift card no ocupa slot ni tiene fecha.
+        if servicios_data:
+            validacion_response = validar_disponibilidad_interna(servicios_data)
 
-        if not validacion_response['success']:
-            return Response({
-                'success': False,
-                'error': 'availability_error',
-                'errores': validacion_response.get('errores', []),
-                'mensaje': 'Uno o más servicios no están disponibles'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            if not validacion_response['success']:
+                return Response({
+                    'success': False,
+                    'error': 'availability_error',
+                    'errores': validacion_response.get('errores', []),
+                    'mensaje': 'Uno o más servicios no están disponibles'
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         # Iniciar transacción atómica
         with transaction.atomic():
@@ -954,6 +959,18 @@ def crear_reserva(request):
                     logger.info('[Luna API] comanda %s sin líneas de cocina '
                                 '(solo descuentos) → se elimina', comanda.id)
                     comanda.delete()
+
+            # 3c. Gift cards (venta vía Luna): cada unidad es una carta por_cobrar
+            # con vencimiento a 365 días. Su monto se suma al total estimado ACÁ
+            # porque el paso 5 fija el total a mano: la señal de GiftCard llama a
+            # calcular_total() durante la creación, pero lo que persiste es el
+            # total del paso 5 — sin esta suma, las cartas quedarían fuera.
+            if giftcards_data:
+                from whatsapp_agent.giftcards import materializar_giftcards
+                _n_gc, monto_gc = materializar_giftcards(
+                    venta_reserva, {'cliente': cliente_data,
+                                    'giftcards': giftcards_data}, cliente)
+                total_estimado += monto_gc
 
             # 4. Aplicar descuentos. Fuente ÚNICA: PackDescuentoService.descuento_para_servicios,
             # que arma el carrito como espera el motor (masajes divididos por persona). Antes este

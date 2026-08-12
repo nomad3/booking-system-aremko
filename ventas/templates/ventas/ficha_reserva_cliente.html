@@ -194,11 +194,22 @@
                 <span>{{ l.nombre }}{% if l.fecha %} <span class="sub">· {{ l.fecha|date:"d/m" }}{% if l.hora %} {{ l.hora }}{% endif %}</span>{% elif l.es_producto %} <span class="sub">· x{{ l.cantidad }}</span>{% endif %}</span>
                 <span>{{ l.monto_str }}</span>
               </div>
-            {% empty %}
+            {% empty %}{% if not giftcards %}
               <div class="row">Sin servicios cargados aún.</div>
+            {% endif %}{% endfor %}
+            {% for g in giftcards %}
+              <div class="row">
+                <span>🎁 Gift Card {{ g.nombre }}{% if g.destinatario %} <span class="sub">· para {{ g.destinatario }}</span>{% endif %}</span>
+                <span>{{ g.monto_str }}</span>
+              </div>
             {% endfor %}
             <div class="totes"><span>Total</span><span>{{ total_str }}</span></div>
             {% if saldo > 0 %}<div class="saldo-row"><span>Saldo a pagar</span><span>{{ saldo_str }}</span></div>{% endif %}
+            {% if giftcards %}
+              <div class="row"><span class="sub">Apenas confirmemos tu pago, cada gift card
+                llega por email con su código, lista para regalar. Vale 1 año y quien la
+                recibe agenda cuando quiera. 🌿</span></div>
+            {% endif %}
           </div>
         </details>
 
