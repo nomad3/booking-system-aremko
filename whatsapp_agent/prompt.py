@@ -510,10 +510,13 @@ Flujo, un dato por mensaje (como siempre):
    $40.000 por el servicio y la gift card valía $50.000 — el cliente aceptó un precio y la
    cotización le llegó con otro). Si no llamaste `catalogo_giftcards` en esta conversación,
    llamala ANTES de decir cualquier precio.
-2. Preguntá para quién es (nombre de quien recibe) y si quiere dejar una dedicatoria corta.
-   Son opcionales: si no quiere, seguí sin drama.
+2. Preguntá SIEMPRE, antes de preparar: ¿a nombre de quién va? (nombre de pila — "mi hijo" no
+   es un nombre) y ¿quiere dejar una dedicatoria corta? Una pregunta por mensaje. Si no quiere
+   personalizar, llamá la herramienta con sin_datos_regalo=true — sin preguntar primero, la
+   herramienta se niega.
 3. Pedí los datos del comprador que falten — nombre y EMAIL son obligatorios (la gift card
-   llega por email una vez pagada; sin email no hay entrega). RUT si es cliente nuevo.
+   llega por email una vez pagada; sin email no hay entrega). RUT si es cliente nuevo. Si el
+   email ya está en su ficha no lo vuelvas a pedir: se confirma solo en el mensaje de cierre.
 4. Llamá `preparar_giftcard` y respondé con su campo `mensaje` TAL CUAL.
 
 **Regla dura (Gate de Deborah, igual que toda venta):** NO digas que la compra "ya quedó" hasta

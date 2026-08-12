@@ -99,6 +99,9 @@ class PrepararGiftcardTest(TestCase):
         self.exp = _experiencia()
 
     def _preparar(self, giftcards=None, cliente=None, **kw):
+        # El gate de preguntas de regalo tiene su clase de tests propia:
+        # acá se prueba OTRA cosa, así que se declara que ya se preguntó.
+        kw.setdefault('sin_datos_regalo', True)
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=cliente or dict(CLIENTE),
@@ -229,7 +232,7 @@ class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
         el lock). Lo que importa acá: NUNCA aparece una segunda carta."""
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': 'masaje_relajacion'}])
         a = self._aprobar(prep['propuesta_id'])
         b = self._aprobar(prep['propuesta_id'])
@@ -302,7 +305,7 @@ class ResolverExperienciaTest(TestCase):
     def _preparar(self, exp_id):
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
 
     def test_el_caso_exacto_que_escalo(self):
@@ -344,7 +347,7 @@ class ResolverPorPalabrasTest(TestCase):
     def _preparar(self, exp_id):
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
 
     def test_puntuacion_y_tildes_distintas_igual_calzan(self):
@@ -392,7 +395,7 @@ class PrecioDeLaFuenteCorrectaTest(TestCase):
         _experiencia(monto_fijo=50000)
         r = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': 'masaje_relajacion',
                              'cantidad': 2}])
         self.assertTrue(r['success'])
@@ -462,3 +465,50 @@ class CotizacionConGiftcardsTest(_SinSenalesDeVenta, TestCase):
         self.assertEqual(int(venta.total), 110000)
         # Y la ficha destino ya sabe mostrarlas (GC-C).
         self.assertIn('/ventas/reserva/', r.url)
+
+
+class PreguntasDeRegaloObligatoriasTest(TestCase):
+    """Quinto intento real (2026-08-12, 01:46): Luna saltó directo al cierre
+    y la carta salió «para su hijo», sin nombre ni dedicatoria, y el email se
+    usó en silencio. Luna no sostiene guiones: la pregunta obligatoria vive
+    en la herramienta."""
+
+    def setUp(self):
+        _experiencia()
+
+    def _preparar(self, gc=None, **kw):
+        return preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[gc or {'experiencia_id': 'masaje_relajacion'}],
+            **kw)
+
+    def test_sin_destinatario_ni_dedicatoria_se_niega(self):
+        r = self._preparar()
+        self.assertFalse(r['success'])
+        self.assertEqual(r['error'], 'faltan_preguntas_de_regalo')
+        self.assertIn('a nombre de quién', r['mensaje'])
+        self.assertEqual(PropuestaReserva.objects.count(), 0)
+
+    def test_con_destinatario_pasa(self):
+        r = self._preparar({'experiencia_id': 'masaje_relajacion',
+                            'destinatario_nombre': 'Martín'})
+        self.assertTrue(r['success'], r)
+
+    def test_solo_dedicatoria_tambien_pasa(self):
+        r = self._preparar({'experiencia_id': 'masaje_relajacion',
+                            'mensaje': 'Con cariño, papá'})
+        self.assertTrue(r['success'], r)
+
+    def test_declinar_explicito_pasa(self):
+        """El cliente no quiso personalizar: el flag lo declara y sigue."""
+        r = self._preparar(sin_datos_regalo=True)
+        self.assertTrue(r['success'], r)
+
+    def test_el_cierre_confirma_el_email_en_voz_alta(self):
+        """El email de la ficha se usa, pero nunca más en silencio: el
+        mensaje al cliente lo dice y ofrece corregirlo."""
+        import whatsapp_agent.agent as agent_mod
+        fuente = open(agent_mod.__file__, encoding='utf-8').read()
+        self.assertIn('las gift cards llegan a {email}', fuente)
+        self.assertIn('Si prefieres otro correo', fuente)

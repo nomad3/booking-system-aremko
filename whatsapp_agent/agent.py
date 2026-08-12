@@ -618,8 +618,9 @@ _TOOLS = [{
                 'experiencia_id': {'type': 'string', 'description': 'ID de la experiencia según catalogo_giftcards, o su NOMBRE tal como lo viste (la herramienta lo resuelve). REQUERIDO. Si devuelve error con experiencias_disponibles, elegí el id correcto de esa lista y reintentá en este mismo turno.'},
                 'cantidad': {'type': 'integer', 'description': 'Cuántas gift cards de esa experiencia (default 1)'},
                 'monto': {'type': 'integer', 'description': 'SOLO para tarjetas de valor libre (sin precio fijo): monto en CLP que elige el cliente'},
-                'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (opcional, sale en la carta)'},
-                'mensaje': {'type': 'string', 'description': 'Dedicatoria breve para la carta (opcional)'},
+                'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (sale en la carta). PREGUNTALO SIEMPRE antes de preparar — «para mi hijo» no es un nombre: pedí el nombre de pila.'},
+                'mensaje': {'type': 'string', 'description': 'Dedicatoria breve para la carta. PREGUNTÁ si quiere dejar una antes de preparar.'},
+                'sin_datos_regalo': {'type': 'boolean', 'description': 'true SOLO si ya le preguntaste al cliente por el nombre del destinatario y la dedicatoria y NO quiso darlos. Sin destinatario/mensaje y sin este flag, la herramienta se niega.'},
                 'nombre': {'type': 'string', 'description': 'Nombre del COMPRADOR (si no está en su ficha)'},
                 'email': {'type': 'string', 'description': 'Email del COMPRADOR — ahí llegan las gift cards. Obligatorio si no está en su ficha.'},
                 'documento_identidad': {'type': 'string', 'description': 'RUT del comprador (requerido si es cliente nuevo)'},
@@ -2527,6 +2528,7 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                                   'telefono': telefono,
                                   'documento_identidad': documento},
                     giftcards_data=[gc_item],
+                    sin_datos_regalo=bool(args.get('sin_datos_regalo')),
                     # Reintentos del LLM en el MISMO turno no duplican la
                     # propuesta; un pedido nuevo (otro turno) sí crea otra.
                     idempotency_key=f'gc-{external_id}-{args.get("experiencia_id")}'
@@ -2549,9 +2551,13 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                         f'¡Qué lindo regalo! 🎁 Te preparo la compra:\n'
                         f'{detalle}Total ${total:,}. Te la enviamos en un momento '
                         'con los datos de transferencia. Apenas se confirme el '
-                        'pago, la gift card te llega por email lista para '
-                        'regalar — vale 1 año y quien la recibe agenda cuando '
-                        'quiera. 🌿'
+                        # El email en voz alta a propósito (quinto intento real:
+                        # se usó el de la ficha en silencio y Jorge no supo a
+                        # dónde llegarían las cartas). Si está desactualizado,
+                        # el cliente lo corrige acá mismo.
+                        f'pago, las gift cards llegan a {email} listas para '
+                        'regalar — valen 1 año y quien las recibe agenda cuando '
+                        'quiera. Si prefieres otro correo, avísame. 🌿'
                     ),
                 }
             except Exception as exc:  # noqa: BLE001

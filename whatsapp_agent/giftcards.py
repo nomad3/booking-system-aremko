@@ -127,11 +127,18 @@ def _resolver_experiencia(texto):
 
 
 def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
-                      idempotency_key=None):
+                      idempotency_key=None, sin_datos_regalo=False):
     """Crea la propuesta de venta de gift cards (mismo cajón que las reservas).
 
     giftcards_data: [{experiencia_id, monto (solo si la experiencia es de
     valor libre), cantidad, destinatario_nombre, mensaje}]
+
+    sin_datos_regalo: el cliente NO quiso personalizar (se le preguntó y
+    declinó). Sin este flag y sin destinatario ni dedicatoria, la propuesta
+    se BLOQUEA: en el quinto intento real (2026-08-12, 01:46) Luna saltó
+    directo al cierre y la carta salió «para su hijo», sin nombre ni mensaje.
+    Luna no sostiene guiones — la pregunta obligatoria vive acá, no en el
+    prompt.
 
     Cada UNIDAD es una GiftCard propia (dos masajes = dos cartas, cada una
     canjeable por separado). El precio SIEMPRE se lee del catálogo — el LLM
@@ -140,6 +147,18 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
     from ventas.models import GiftCardExperiencia
 
     try:
+        personalizada = any((gc.get('destinatario_nombre') or '').strip()
+                            or (gc.get('mensaje') or '').strip()
+                            for gc in (giftcards_data or []))
+        if not personalizada and not sin_datos_regalo:
+            return {
+                'success': False, 'error': 'faltan_preguntas_de_regalo',
+                'mensaje': ('Antes de preparar la compra preguntale al cliente '
+                            '(una por mensaje): ¿a nombre de quién va la gift '
+                            'card? ¿quiere dejar una dedicatoria corta? Si no '
+                            'quiere personalizarla, volvé a llamar esta '
+                            'herramienta con sin_datos_regalo=true.'),
+            }
         nombre = (cliente_data.get('nombre') or '').strip()
         email = (cliente_data.get('email') or '').strip()
         if not nombre or len(nombre) < 3:
