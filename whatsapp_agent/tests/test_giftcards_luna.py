@@ -334,3 +334,48 @@ class ResolverExperienciaTest(TestCase):
         self.assertFalse(r['success'])
         self.assertTrue(r['experiencias_disponibles'])
         self.assertIn('volvé a llamar', r['mensaje'])
+
+
+class ResolverPorPalabrasTest(TestCase):
+    """Segundo intento real (2026-08-12, 01:09): el nombre reconstruido y el
+    del catálogo diferían en puntuación/tildes y el icontains literal no
+    calzó. El calce va por palabras normalizadas."""
+
+    def _preparar(self, exp_id):
+        return preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
+
+    def test_puntuacion_y_tildes_distintas_igual_calzan(self):
+        """El catálogo dice «· 50 min» y el modelo mandó «(50 min)»."""
+        _experiencia(id_exp='masaje_relax',
+                     nombre='Masaje de relajación o descontracturante · 50 min',
+                     monto_fijo=40000)
+        r = self._preparar('Masaje Relajacion o Descontracturante (50 min)')
+        self.assertTrue(r['success'], r)
+        self.assertEqual(r['total'], 80000)
+
+    def test_el_orden_de_las_palabras_no_importa(self):
+        _experiencia(id_exp='tina_dos', nombre='Tina para dos · junto al río',
+                     monto_fijo=50000)
+        r = self._preparar('tina junto al rio para dos')
+        self.assertTrue(r['success'], r)
+
+    def test_palabras_de_mas_no_calzan_con_cualquiera(self):
+        """«masaje con piedras calientes» no debe caer en el masaje normal:
+        pedir algo que no existe se responde con el catálogo, no adivinando."""
+        _experiencia(id_exp='masaje_relax', nombre='Masaje de relajación',
+                     monto_fijo=40000)
+        r = self._preparar('masaje con piedras calientes')
+        self.assertFalse(r['success'])
+        self.assertTrue(r['experiencias_disponibles'])
+
+    def test_el_error_le_ordena_al_modelo_no_mostrar_la_lista(self):
+        """Lo segundo que enseñó el intento: el modelo le pasó la lista
+        interna al cliente que YA había aceptado. El mensaje ahora lo
+        prohíbe y le ordena reintentar solo."""
+        _experiencia()
+        r = self._preparar('no_existe_nada_asi')
+        self.assertIn('NO le muestres esta lista', r['mensaje'])
+        self.assertIn('volvé a llamar', r['mensaje'])

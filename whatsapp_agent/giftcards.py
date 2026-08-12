@@ -59,50 +59,69 @@ def catalogo_giftcards():
     }
 
 
+# Palabras que no distinguen una experiencia de otra. «para/dos/junto/río» NO
+# están: «Masaje para dos» y «Tina para dos junto al río» se separan por ellas.
+_PALABRAS_VACIAS = {'de', 'la', 'el', 'los', 'las', 'un', 'una', 'o', 'y',
+                    'a', 'en', 'con', 'del', 'min', 'mins', 'minutos', 'hrs',
+                    'giftcard', 'gift', 'card'}
+
+
+def _palabras_clave(texto):
+    """Palabras significativas, sin tildes ni puntuación ni números.
+
+    «Masaje Relajación o Descontracturante (50 min)» →
+    {'masaje', 'relajacion', 'descontracturante'} — lo mismo dé cómo venga
+    escrito: mayúsculas, tildes, paréntesis, puntos medios u orden.
+    """
+    import re
+    import unicodedata
+
+    plano = unicodedata.normalize('NFKD', texto or '')
+    plano = plano.encode('ascii', 'ignore').decode().lower()
+    return {p for p in re.findall(r'[a-z]+', plano)
+            if len(p) >= 3 and p not in _PALABRAS_VACIAS}
+
+
 def _resolver_experiencia(texto):
     """(experiencia, None) o (None, error_dict) a partir de id O nombre.
 
-    Primera prueba real (Jorge, 2026-08-12): Luna ofreció bien la experiencia,
-    pero al confirmar el cliente —un turno después— ya no tenía el resultado
-    del catálogo en contexto y reconstruyó el id desde el nombre visible. No
-    calzó, y una venta ya ganada escaló a humano. El modelo no sostiene datos
-    exactos entre turnos: la tolerancia va acá, no en pedirle memoria.
+    Dos intentos reales de Jorge (2026-08-12) enseñaron esto:
+    1. El resultado del catálogo no sobrevive entre turnos: al confirmar, el
+       modelo reconstruye el nombre de memoria.
+    2. Ese nombre reconstruido difiere del catálogo en puntuación, tildes o
+       cola («(50 min)» vs «· 50 min»), así que un icontains literal tampoco
+       alcanza.
 
-    Orden: id exacto → nombre exacto → nombre contenido (si es único). El
-    error devuelve el catálogo vigente para que el modelo se corrija EN EL
-    MISMO turno, sin volver a llamar a la otra tool.
+    El calce va por PALABRAS normalizadas: si todas las palabras clave del
+    texto están en el nombre de UNA sola experiencia activa, es esa. Si
+    ninguna o varias, NO se adivina: el error devuelve el catálogo con ids
+    para que el modelo se corrija en el mismo turno.
     """
     from ventas.models import GiftCardExperiencia
 
-    activas = GiftCardExperiencia.objects.filter(activo=True)
+    activas = list(GiftCardExperiencia.objects.filter(activo=True))
     texto = (texto or '').strip()
     if texto:
-        exp = activas.filter(id_experiencia=texto).first()
-        if exp:
-            return exp, None
-        exp = activas.filter(nombre__iexact=texto).first()
-        if exp:
-            return exp, None
-        # Nombre "a ojo": sirve si identifica UNA sola. Se prueba el texto
-        # completo y, si no, su primera parte sin paréntesis ni cola —
-        # «Masaje Relajación o Descontracturante (50 min)» debe calzar aunque
-        # el modelo recorte o agregue la duración.
-        candidatos = list(activas.filter(nombre__icontains=texto)[:2])
-        if not candidatos:
-            corto = texto.split('(')[0].strip()[:30]
-            if len(corto) >= 4:
-                candidatos = list(activas.filter(nombre__icontains=corto)[:2])
-        if len(candidatos) == 1:
-            return candidatos[0], None
+        for e in activas:
+            if e.id_experiencia == texto:
+                return e, None
+        claves = _palabras_clave(texto)
+        if claves:
+            candidatos = [e for e in activas
+                          if claves <= _palabras_clave(e.nombre)
+                          or claves == _palabras_clave(e.id_experiencia)]
+            if len(candidatos) == 1:
+                return candidatos[0], None
 
     disponibles = [{'id': e.id_experiencia, 'nombre': e.nombre,
                     'precio': int(e.monto_fijo) if e.monto_fijo else None}
-                   for e in activas.order_by('categoria', 'orden')]
+                   for e in sorted(activas, key=lambda e: (e.categoria, e.orden))]
     return None, {
         'success': False, 'error': 'experiencia_no_existe',
-        'mensaje': (f'No pude identificar la gift card «{texto}». Elegí una '
-                    'del catálogo adjunto (usá su id) y volvé a llamar esta '
-                    'misma herramienta.'),
+        'mensaje': (f'No pude identificar la gift card «{texto}». Elegí el id '
+                    'correcto de experiencias_disponibles y volvé a llamar '
+                    'esta MISMA herramienta ahora — NO le muestres esta lista '
+                    'al cliente ni le pidas que elija de nuevo.'),
         'experiencias_disponibles': disponibles,
     }
 
