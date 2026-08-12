@@ -373,13 +373,13 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
         if not dedicatoria and not sin_datos_regalo:
             return _falta('falta_dedicatoria',
                           '¿Quieres incluirle una frase? Escríbela tal como '
-                          'quieres que aparezca en la carta ✨', historial=historial)
+                          'quieres que aparezca en la gift card ✨', historial=historial)
         if dedicatoria and not _lo_dijo_el_cliente(dedicatoria, historial, mensaje):
             logger.info('[preparar_giftcard] H-094: dedicatoria inventada por el '
                         'modelo → se pide de nuevo')
             return _falta('dedicatoria_no_la_dijo_el_cliente',
                           '¿Quieres incluirle una frase? Escríbela tal como '
-                          'quieres que aparezca en la carta ✨',
+                          'quieres que aparezca en la gift card ✨',
                           detalle='Esa frase no la escribió el cliente. ', historial=historial)
 
         # 3. ¿A qué correo se la mandamos? (la carta viaja por email)

@@ -8,6 +8,7 @@ la MISMA línea; en varias líneas es texto.
 """
 import os
 import re
+from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase
@@ -53,3 +54,37 @@ class ComentariosDePlantillaTest(SimpleTestCase):
         bueno = '{# comentario de una línea #}'
         m = re.search(r'\{#', bueno)
         self.assertIn('#}', bueno[m.end():])
+
+
+class GiftCardsNuncaSeLlamanCartaTest(SimpleTestCase):
+    """Jorge (2026-08-12): «en un párrafo habla de carta. Debe hablar siempre
+    de Gift Cards».
+
+    El producto se llama Gift Card en la web, en el admin y en el email. Que
+    en un mensaje se llame «carta» hace dudar de si es otra cosa. Adentro del
+    código «carta» sigue valiendo como sinónimo —lee bien en los comentarios—;
+    lo que no puede pasar es que salga a la pantalla del cliente.
+    """
+
+    # Textos que el cliente lee, o que Luna lee y tiende a repetir.
+    FUENTES = (
+        'whatsapp_agent/giftcards.py',
+        'whatsapp_agent/prompt.py',
+    )
+    # `carta` seguida de algo que la delata como el producto.
+    PATRON = re.compile(
+        r"['\"][^'\"]*\b(?:la|una|esa|tu|cada|dos|las)\s+cartas?\b[^'\"]*['\"]",
+        re.IGNORECASE)
+
+    def test_ningun_texto_visible_dice_carta(self):
+        raiz = Path(__file__).resolve().parent.parent
+        problemas = []
+        for relativa in self.FUENTES:
+            ruta = raiz / relativa
+            for n, linea in enumerate(ruta.read_text(encoding='utf-8').splitlines(), 1):
+                sin_comentario = linea.split('#')[0]
+                if self.PATRON.search(sin_comentario):
+                    problemas.append(f'{relativa}:{n}: {linea.strip()[:90]}')
+        self.assertFalse(
+            problemas,
+            'Texto visible que dice «carta» en vez de «gift card»:\n' + '\n'.join(problemas))

@@ -608,7 +608,7 @@ _TOOLS = [{
             '(id exacto de catalogo_giftcards), (2) cuántas, (3) nombre y email del comprador '
             '— el email es OBLIGATORIO: las gift cards se envían por email una vez pagadas. '
             'Datos opcionales que suman: nombre de quien la recibe y un mensaje/dedicatoria. '
-            'Cada unidad es una gift card propia (2 masajes = 2 cartas, canjeables por '
+            'Cada unidad es una gift card propia (2 masajes = 2 gift cards, canjeables por '
             'separado). Cuando success=true respondé con el campo `mensaje` TAL CUAL; NO '
             'digas que la compra ya quedó lista — es una propuesta pendiente.'
         ),
@@ -618,8 +618,8 @@ _TOOLS = [{
                 'experiencia_id': {'type': 'string', 'description': 'ID de la experiencia según catalogo_giftcards, o su NOMBRE tal como lo viste (la herramienta lo resuelve). REQUERIDO. Si devuelve error con experiencias_disponibles, elegí el id correcto de esa lista y reintentá en este mismo turno.'},
                 'cantidad': {'type': 'integer', 'description': 'Cuántas gift cards de esa experiencia (default 1)'},
                 'monto': {'type': 'integer', 'description': 'SOLO para tarjetas de valor libre (sin precio fijo): monto en CLP que elige el cliente'},
-                'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (sale en la carta). PREGUNTALO SIEMPRE antes de preparar — «para mi hijo» no es un nombre: pedí el nombre de pila.'},
-                'mensaje': {'type': 'string', 'description': 'Dedicatoria breve para la carta. PREGUNTÁ si quiere dejar una antes de preparar.'},
+                'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (sale en la gift card). PREGUNTALO SIEMPRE antes de preparar — «para mi hijo» no es un nombre: pedí el nombre de pila.'},
+                'mensaje': {'type': 'string', 'description': 'Dedicatoria breve para la gift card. PREGUNTÁ si quiere dejar una antes de preparar.'},
                 'sin_datos_regalo': {'type': 'boolean', 'description': 'true SOLO si ya le preguntaste al cliente por el nombre del destinatario y la dedicatoria y NO quiso darlos. Sin destinatario/mensaje y sin este flag, la herramienta se niega.'},
                 'nombre': {'type': 'string', 'description': 'Nombre del COMPRADOR (si no está en su ficha)'},
                 'email': {'type': 'string', 'description': 'Email del COMPRADOR — ahí llegan las gift cards. Obligatorio si no está en su ficha.'},

@@ -215,10 +215,12 @@ class ReglaEnElPromptTest(TestCase):
         import whatsapp_agent.prompt as prompt_mod
         return open(prompt_mod.__file__, encoding='utf-8').read()
 
-    def test_el_prompt_dice_que_mis_papas_es_una_sola_carta(self):
+    def test_el_prompt_dice_que_mis_papas_es_una_sola_giftcard(self):
         fuente = self._fuente()
         self.assertIn('mis papás', fuente)
-        self.assertIn('NO son dos cartas', fuente)
+        # El producto se llama gift card en todos lados, también acá (Jorge,
+        # 2026-08-12: «Debe hablar siempre de Gift Cards»).
+        self.assertIn('NO son dos gift cards', fuente)
 
     def test_el_prompt_dice_que_con_varias_cartas_no_hay_agregados(self):
         fuente = self._fuente()
