@@ -162,6 +162,40 @@ _PATRON_CONTRADICCION = re.compile(
 )
 
 
+# H-095 (2026-08-12, 14:45): al cliente le llegó, palabra por palabra, la
+# instrucción que la herramienta le daba a Luna: «ALTO. Todavía no se puede
+# cotizar. Mandá al cliente EXACTAMENTE esta pregunta...». El prompt le pide
+# copiar el campo `mensaje` tal cual cuando la venta sale bien, y ella lo
+# generalizó al caso de error.
+#
+# La causa se arregló en origen (ese campo ahora trae solo la pregunta), pero
+# esto es la red: ningún texto que suene a instrucción interna sale al cliente,
+# venga del campo que venga.
+_PATRON_INSTRUCCION_INTERNA = re.compile(
+    r'\bALTO\.|esta herramienta|no vuelvas a llamar|el campo `?mensaje|'
+    r'tool_call|sin_datos_regalo|success\s*=|\bpropuesta_id\b|'
+    r'mandá al cliente|manda al cliente',
+    re.IGNORECASE,
+)
+
+
+def parece_instruccion_interna(texto):
+    """True si el borrador es plomería que el cliente no debe leer."""
+    return bool(_PATRON_INSTRUCCION_INTERNA.search(texto or ''))
+
+
+def pregunta_pendiente(tool_calls_executed):
+    """La `siguiente_pregunta` que dejó una tool en este turno, si la hay.
+
+    Sirve para reemplazar un borrador filtrado por lo que de verdad
+    correspondía preguntar, en vez de escalar y trabar la venta."""
+    for tc in reversed(tool_calls_executed or []):
+        res = tc.get('result')
+        if isinstance(res, dict) and res.get('siguiente_pregunta'):
+            return res['siguiente_pregunta']
+    return ''
+
+
 def tool_result_ok(res):
     """True si el resultado de una tool fue exitoso (sin error, success no-False)."""
     return isinstance(res, dict) and not res.get('error') and res.get('success', True) is not False

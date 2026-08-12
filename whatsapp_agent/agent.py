@@ -2665,6 +2665,23 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
 
+    # H-095: el borrador puede ser plomería interna. Pasó de verdad (14:45): al
+    # cliente le llegó «ALTO. Todavía no se puede cotizar. Mandá al cliente
+    # EXACTAMENTE esta pregunta...». Si la tool dejó una pregunta pendiente, se
+    # manda ESA —la venta sigue—; si no hay con qué reemplazar, escala.
+    if escalation.parece_instruccion_interna(texto):
+        pregunta = escalation.pregunta_pendiente(resultado.tool_calls_executed)
+        if pregunta:
+            logger.warning('[Agente WA] H-095: borrador con instrucción interna → se '
+                           'reemplaza por la pregunta pendiente. Texto: %s', texto[:160])
+            texto = pregunta
+        else:
+            logger.warning('[Agente WA] H-095: borrador con instrucción interna y sin '
+                           'pregunta con qué reemplazarlo → escalar. Texto: %s', texto[:160])
+            return _borrador_escala(
+                'el borrador traía instrucciones internas, no un mensaje para el cliente',
+                modelo=modelo, tokens=tokens)
+
     # H-045: el texto no está vacío, pero puede contradecir una tool que sí tuvo éxito en este
     # mismo turno (ver comentario junto a escalation.hay_contradiccion_exito_vs_texto). No se
     # manda así.

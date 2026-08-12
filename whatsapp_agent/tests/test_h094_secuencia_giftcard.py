@@ -126,7 +126,9 @@ class SecuenciaDePreguntasTest(TestCase):
     def test_cada_paso_manda_UNA_sola_pregunta(self):
         r = _preparar(historial='[Cliente]: quiero regalar un masaje\n')
         self.assertEqual(r['siguiente_pregunta'].count('?'), 1)
-        self.assertIn('NO vuelvas a llamar esta herramienta', r['mensaje'])
+        # Lo que Luna tiene que hacer va en `instruccion`; `mensaje` es lo que
+        # lee el cliente (H-095).
+        self.assertIn('esperá la respuesta del cliente', r['instruccion'])
 
 
 class NoSePuedeEsquivarTest(TestCase):
@@ -185,3 +187,52 @@ class ElCasoDeJorgeTest(TestCase):
                          'Con «masaje» y nada más NO puede salir una cotización')
         self.assertEqual(r['error'], 'falta_destinatario')
         self.assertEqual(PropuestaReserva.objects.count(), 0)
+
+
+class NadaInternoLlegaAlClienteTest(TestCase):
+    """H-095: el 2026-08-12 a las 14:45, al cliente le llegó palabra por palabra
+    «ALTO. Todavía no se puede cotizar. Mandá al cliente EXACTAMENTE esta
+    pregunta y nada más...». El prompt le pide a Luna copiar el campo `mensaje`
+    tal cual cuando la venta sale bien, y ella lo generalizó al error."""
+
+    def setUp(self):
+        _experiencia()
+
+    def test_el_campo_que_se_copia_trae_SOLO_la_pregunta(self):
+        r = _preparar(historial='[Cliente]: quiero regalar un masaje\n')
+        # Si Luna copia `mensaje` tal cual, el cliente lee algo correcto.
+        self.assertEqual(r['mensaje'], r['siguiente_pregunta'])
+        for plomeria in ('ALTO', 'herramienta', 'Mandá al cliente', 'success'):
+            self.assertNotIn(plomeria, r['mensaje'])
+
+    def test_lo_interno_viaja_aparte(self):
+        r = _preparar(historial='[Cliente]: quiero regalar un masaje\n')
+        self.assertIn('No completes el dato vos', r['instruccion'])
+
+    def test_la_guarda_reconoce_un_borrador_interno(self):
+        from whatsapp_agent import escalation
+        self.assertTrue(escalation.parece_instruccion_interna(
+            'ALTO. Todavía no se puede cotizar. Mandá al cliente EXACTAMENTE '
+            'esta pregunta y nada más: «¿A nombre de quién va?»'))
+        self.assertTrue(escalation.parece_instruccion_interna(
+            'NO vuelvas a llamar esta herramienta hasta que responda'))
+
+    def test_la_guarda_no_molesta_a_un_mensaje_normal(self):
+        from whatsapp_agent import escalation
+        for bueno in ('¿A nombre de quién va la gift card? Contame su nombre 🌿',
+                      '¡Listo! Te preparé la cotización para que la revises. 🌿',
+                      'La Tina para dos junto al río vale $50.000. ¿Te sirve?'):
+            self.assertFalse(escalation.parece_instruccion_interna(bueno), bueno)
+
+    def test_el_borrador_filtrado_se_reemplaza_por_la_pregunta(self):
+        from whatsapp_agent import escalation
+        pendiente = escalation.pregunta_pendiente([
+            {'name': 'preparar_giftcard',
+             'result': {'success': False, 'siguiente_pregunta': '¿A nombre de quién va?'}}])
+        self.assertEqual(pendiente, '¿A nombre de quién va?')
+
+    def test_sin_pregunta_pendiente_no_hay_reemplazo(self):
+        from whatsapp_agent import escalation
+        self.assertEqual(escalation.pregunta_pendiente([]), '')
+        self.assertEqual(escalation.pregunta_pendiente(
+            [{'name': 'ver_carrito', 'result': {'success': True}}]), '')

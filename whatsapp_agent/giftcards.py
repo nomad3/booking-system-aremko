@@ -110,15 +110,26 @@ def _lo_dijo_el_cliente(texto, historial, minimo=0.6):
 # sostiene guiones. La herramienta devuelve UNA pregunta por vez y se niega a
 # cotizar hasta tenerlas todas.
 def _falta(error, pregunta, detalle=''):
+    """Falta un dato: se devuelve LA PREGUNTA, no un reto.
+
+    `mensaje` es el campo que Luna copia al cliente (así se lo pide el prompt
+    para el caso exitoso, y lo generaliza). El 2026-08-12 a las 14:45 esto se
+    vio en vivo: el campo traía la instrucción interna y al cliente le llegó
+    «ALTO. Todavía no se puede cotizar. Mandá al cliente EXACTAMENTE...».
+    Vergonzoso y culpa del diseño, no del modelo.
+
+    Ahora `mensaje` ES la pregunta: si Luna lo copia tal cual, el cliente lee
+    justo lo que corresponde. Lo interno vive en `instruccion`, aparte.
+    """
     return {
         'success': False,
         'error': error,
+        'mensaje': pregunta,
         'siguiente_pregunta': pregunta,
-        'mensaje': (f'ALTO. Todavía no se puede cotizar. {detalle}'
-                    f'Mandá al cliente EXACTAMENTE esta pregunta y nada más: '
-                    f'«{pregunta}» — una sola pregunta por mensaje. NO vuelvas '
-                    f'a llamar esta herramienta hasta que el cliente RESPONDA; '
-                    f'no completes vos el dato ni lo supongas.'),
+        'instruccion': (f'{detalle}Falta un dato para cotizar. Mandá el campo '
+                        f'`mensaje` tal cual, una sola pregunta, y esperá la '
+                        f'respuesta del cliente antes de volver a llamar esta '
+                        f'herramienta. No completes el dato vos.'),
     }
 
 
