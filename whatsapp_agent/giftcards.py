@@ -33,6 +33,33 @@ MONTO_MINIMO_VALOR = 20000       # tarjeta de valor libre: piso razonable
 MONTO_MAXIMO_VALOR = 1000000
 
 
+def cartas_en_payload(payload):
+    """Cuántas CARTAS (unidades, no líneas) hay en una propuesta de gift cards."""
+    return sum(max(1, int(item.get('cantidad') or 1))
+               for item in (payload or {}).get('giftcards') or [])
+
+
+def texto_incluye(productos_data):
+    """«Incluye: 2 Jugo Natural de Frambuesa · 1 Tabla de Quesos», o '' si no hay.
+
+    Jorge (2026-08-12): cuando alguien regala una experiencia y suma jugos o una
+    tabla, eso es parte del REGALO — tiene que decirlo la carta que recibe la
+    persona, no quedar como un producto suelto de la venta que nadie entrega.
+    """
+    from ventas.models import Producto
+
+    if not productos_data:
+        return ''
+    partes = []
+    for item in productos_data:
+        try:
+            producto = Producto.objects.get(id=item.get('producto_id'))
+        except (Producto.DoesNotExist, ValueError, TypeError):
+            continue  # un producto borrado no puede tumbar la venta
+        partes.append(f"{max(1, int(item.get('cantidad') or 1))} {producto.nombre}")
+    return 'Incluye: ' + ' · '.join(partes) if partes else ''
+
+
 def catalogo_giftcards():
     """Experiencias regalables activas, compacto para el LLM.
 
@@ -284,6 +311,11 @@ def materializar_giftcards(venta, payload, cliente_comprador):
     creadas, monto_total = 0, 0
     hoy = timezone.now().date()
     cliente_data = payload.get('cliente') or {}
+    # Los agregados (jugos, tabla) van DENTRO de la carta y solo cuando hay UNA:
+    # con varias no habría a cuál asignarlos, y Jorge decidió que esas ventas
+    # queden simples (la regla se aplica antes, al agregar el producto).
+    incluye = (texto_incluye(payload.get('productos'))
+               if cartas_en_payload(payload) == 1 else '')
     for item in payload.get('giftcards') or []:
         for _ in range(max(1, int(item.get('cantidad') or 1))):
             GiftCard.objects.create(
@@ -300,6 +332,7 @@ def materializar_giftcards(venta, payload, cliente_comprador):
                 destinatario_nombre=item.get('destinatario_nombre', ''),
                 mensaje_personalizado=item.get('mensaje', ''),
                 servicio_asociado=item.get('experiencia_id', ''),
+                detalle_especial=incluye,
             )
             creadas += 1
             monto_total += int(item['precio'])

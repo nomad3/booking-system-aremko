@@ -1565,7 +1565,12 @@ class GiftCardAdmin(admin.ModelAdmin):
     """GiftCards. Incluye «Ajustar saldo», reservada al dueño (ver más abajo)."""
 
     actions = ['ajustar_saldo']
-    list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial', 'monto_disponible', 'fecha_emision', 'fecha_vencimiento', 'estado')
+    list_display = ('codigo', 'cliente_comprador', 'cliente_destinatario', 'monto_inicial',
+                    'monto_disponible',
+                    # Lo que sumaron al regalo (jugos, tabla). Deborah lo necesita a la
+                    # vista: hoy el canje es a mano y si no lo ve, no se entrega.
+                    'detalle_especial',
+                    'fecha_emision', 'fecha_vencimiento', 'estado')
     search_fields = ('codigo', 'cliente_comprador__nombre', 'cliente_destinatario__nombre')
     list_filter = ('estado', 'fecha_emision', 'fecha_vencimiento')
     readonly_fields = ('codigo', 'monto_disponible')

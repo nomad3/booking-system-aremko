@@ -595,6 +595,18 @@
                         <div class="detail-value">{{ experiencia.nombre }}</div>
                     </div>
                     {% endif %}
+                    {% comment %}
+                    Lo que sumaron a ESTE regalo (jugos, una tabla). Va acá y no en la
+                    descripción del catálogo, que es la misma para todas las cartas de
+                    la experiencia. Sin esta línea, quien recibe el regalo nunca se
+                    entera de que tiene dos jugos esperándolo (Jorge, 2026-08-12).
+                    {% endcomment %}
+                    {% if giftcard.detalle_especial %}
+                    <div class="detail-item full-width">
+                        <div class="detail-label">Además</div>
+                        <div class="detail-value">{{ giftcard.detalle_especial }}</div>
+                    </div>
+                    {% endif %}
                     <div class="detail-item">
                         <div class="detail-label">Emitido</div>
                         <div class="detail-value">{{ giftcard.fecha_emision|date:"d/m/Y" }}</div>

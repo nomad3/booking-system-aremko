@@ -289,6 +289,9 @@ def ficha_reserva_cliente(request, token):
                   or 'de regalo',
         'destinatario': gc.destinatario_nombre or '',
         'monto_str': _clp(gc.monto_inicial),
+        # Lo que sumaron al regalo («Incluye: 2 Jugo de Frambuesa»): va con la
+        # carta, no como línea suelta de la venta.
+        'incluye': gc.detalle_especial or '',
     } for gc in cartas]
     solo_giftcards = bool(giftcards_venta) and not tipos_venta
 

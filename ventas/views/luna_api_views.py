@@ -912,7 +912,14 @@ def crear_reserva(request):
             # ReservaProducto SIN fecha_entrega (NULL). El inventario se descuenta recién en
             # esa fecha vía comanda.entregar_inventario() (cron `procesar_entregas_comandas_vencidas`
             # o entrega manual). Así una reserva de hoy para dentro de 30 días descuenta en 30 días.
-            if productos_data:
+            # Venta SOLO de gift cards: los jugos/tablas viajan DENTRO de la carta y se
+            # preparan el día que la persona la canjee — que puede ser en 11 meses. No
+            # hay fecha a la cual mandarle una comanda, así que no se crea ninguna; la
+            # línea de facturación (ReservaProducto) sí, porque el cliente los pagó.
+            # Además, `servicios_data` vacío hacía reventar el sorted()[0] de más abajo
+            # con IndexError: la venta entera moría al aprobarla.
+            solo_giftcards = bool(giftcards_data) and not servicios_data
+            if productos_data and not solo_giftcards:
                 # Fecha objetivo = primer servicio (por fecha, luego hora).
                 serv_orden = sorted(
                     servicios_data, key=lambda s: (s['fecha'], s.get('hora') or '00:00'))
@@ -960,6 +967,23 @@ def crear_reserva(request):
                                 '(solo descuentos) → se elimina', comanda.id)
                     comanda.delete()
 
+            elif productos_data and solo_giftcards:
+                # Regalo con agregados: se factura ahora, se prepara al canjear. El
+                # texto «Incluye: …» lo escribe materializar_giftcards en la carta.
+                for prod_data in productos_data:
+                    try:
+                        producto = Producto.objects.get(id=prod_data['producto_id'])
+                    except Producto.DoesNotExist:
+                        continue
+                    cant = int(prod_data.get('cantidad', 1) or 1)
+                    ReservaProducto.objects.create(
+                        venta_reserva=venta_reserva, producto=producto, cantidad=cant,
+                        precio_unitario_venta=producto.precio_base)
+                    total_estimado += producto.precio_base * cant
+                logger.info('[Luna API] %s producto(s) dentro de la gift card de la '
+                            'venta %s: se entregan al canjear, sin comanda',
+                            len(productos_data), venta_reserva.id)
+
             # 3c. Gift cards (venta vía Luna): cada unidad es una carta por_cobrar
             # con vencimiento a 365 días. Su monto se suma al total estimado ACÁ
             # porque el paso 5 fija el total a mano: la señal de GiftCard llama a
@@ -969,7 +993,10 @@ def crear_reserva(request):
                 from whatsapp_agent.giftcards import materializar_giftcards
                 _n_gc, monto_gc = materializar_giftcards(
                     venta_reserva, {'cliente': cliente_data,
-                                    'giftcards': giftcards_data}, cliente)
+                                    'giftcards': giftcards_data,
+                                    # Los agregados van en el texto de la carta.
+                                    'productos': productos_data if solo_giftcards else []},
+                    cliente)
                 total_estimado += monto_gc
 
             # 4. Aplicar descuentos. Fuente ÚNICA: PackDescuentoService.descuento_para_servicios,

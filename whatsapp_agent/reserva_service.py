@@ -253,6 +253,18 @@ def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
     if propuesta is None or not propuesta.esta_vigente():
         return None  # no hay propuesta → el caller usa el carrito normal
 
+    # Jorge (2026-08-12): en una venta de VARIAS gift cards no se agregan productos —
+    # no habría a cuál de las cartas asignarlos y el regalo se enreda. Con UNA sola
+    # carta sí: el agregado viaja DENTRO de ella («Incluye: 2 Jugo de Frambuesa»).
+    from .giftcards import cartas_en_payload
+    n_cartas = cartas_en_payload(propuesta.payload)
+    if n_cartas > 1:
+        return {'success': False, 'error': 'giftcards_no_admiten_agregados',
+                'mensaje': ('Son varias gift cards: esas ventas van simples, sin '
+                            'agregados. Decíselo al cliente en UNA frase amable y '
+                            'ofrecé que los jugos/tablas los pida cuando reserve '
+                            'la visita.')}
+
     try:
         producto = Producto.objects.get(id=producto_id)
     except Producto.DoesNotExist:

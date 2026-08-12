@@ -199,7 +199,7 @@
             {% endif %}{% endfor %}
             {% for g in giftcards %}
               <div class="row">
-                <span>🎁 Gift Card {{ g.nombre }}{% if g.destinatario %} <span class="sub">· para {{ g.destinatario }}</span>{% endif %}</span>
+                <span>🎁 Gift Card {{ g.nombre }}{% if g.destinatario %} <span class="sub">· para {{ g.destinatario }}</span>{% endif %}{% if g.incluye %}<br><span class="sub">{{ g.incluye }}</span>{% endif %}</span>
                 <span>{{ g.monto_str }}</span>
               </div>
             {% endfor %}
