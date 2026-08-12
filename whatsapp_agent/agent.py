@@ -1543,6 +1543,14 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
     # H-028 FIX: Crear closure de executor que capture el phone real para preparar_reserva
     def _tool_executor_con_contexto(name, args):
         """Ejecuta las tools del agente. Captura el phone del cliente para PropuestaReserva."""
+        # H-092 (2026-08-12): varias ramas hacen `external_id = phone if phone else ...`
+        # DENTRO de su propio `if`. Eso lo vuelve local de TODA la función, así que las
+        # ramas que solo lo LEEN (verificar_cliente, buscar_reservas_cliente) reventaban
+        # con UnboundLocalError. Caso real: un cliente con cotización de gift card pidió
+        # sumar un jugo; Luna llamó buscar_reservas_cliente, la tool murió y ella derivó a
+        # una persona en vez de sumarlo. Definirlo acá arriba cierra la clase entera de
+        # bug; las ramas que necesitan otro default lo siguen pisando abajo.
+        external_id = phone if phone else 'desconocido'
         if name == 'consultar_disponibilidad':
             from .availability import disponibilidad
             try:
