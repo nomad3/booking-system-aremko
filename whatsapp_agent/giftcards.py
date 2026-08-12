@@ -60,6 +60,68 @@ def texto_incluye(productos_data):
     return 'Incluye: ' + ' · '.join(partes) if partes else ''
 
 
+def _lineas_del_cliente(historial):
+    """Solo lo que escribió el CLIENTE, normalizado."""
+    import unicodedata
+    salida = []
+    for linea in (historial or '').splitlines():
+        if not linea.startswith('[Cliente]:'):
+            continue
+        crudo = linea[len('[Cliente]:'):]
+        plano = unicodedata.normalize('NFKD', crudo).encode('ascii', 'ignore').decode()
+        salida.append(plano.lower())
+    return salida
+
+
+def _lo_dijo_el_cliente(texto, historial, minimo=0.6):
+    """¿Ese texto salió del cliente, o lo inventó Luna?
+
+    H-094 (2026-08-12): el gate anterior solo se cerraba si venían VACÍOS el
+    destinatario y la dedicatoria. Luna lo esquivó en el mismo segundo —
+    reintentó con un nombre inventado y la cotización salió igual (log de las
+    18:20:17). Un dato que el modelo puede fabricar no es un dato del cliente.
+
+    Se pide que al menos `minimo` de las palabras significativas aparezcan en
+    lo que el cliente escribió: tolera que Luna corrija una tilde o el orden,
+    pero no que invente «Para mi mamá con cariño» de la nada.
+    """
+    import unicodedata
+
+    dicho = ' '.join(_lineas_del_cliente(historial))
+    if not dicho:
+        return False
+    palabras = _palabras_clave(texto)
+    if not palabras:
+        # Nombre demasiado corto para el filtro de palabras («Ana», «Jo»):
+        # se busca tal cual, sin tildes.
+        plano = unicodedata.normalize('NFKD', texto or '')
+        plano = plano.encode('ascii', 'ignore').decode().lower().strip()
+        return bool(plano) and plano in dicho
+    encontradas = sum(1 for p in palabras if p in dicho)
+    return encontradas / len(palabras) >= minimo
+
+
+# El orden de las preguntas lo fijó Jorge (2026-08-12): «Nombre del
+# destinatario, después si quiere incluir una frase, correo suyo donde llegará
+# la giftcard, nombre suyo. Así pregunta por pregunta se completan estos datos
+# y luego se prepara la cotización».
+#
+# Vive acá y no en el prompt porque el prompt ya lo pedía y no alcanzó: Luna no
+# sostiene guiones. La herramienta devuelve UNA pregunta por vez y se niega a
+# cotizar hasta tenerlas todas.
+def _falta(error, pregunta, detalle=''):
+    return {
+        'success': False,
+        'error': error,
+        'siguiente_pregunta': pregunta,
+        'mensaje': (f'ALTO. Todavía no se puede cotizar. {detalle}'
+                    f'Mandá al cliente EXACTAMENTE esta pregunta y nada más: '
+                    f'«{pregunta}» — una sola pregunta por mensaje. NO vuelvas '
+                    f'a llamar esta herramienta hasta que el cliente RESPONDA; '
+                    f'no completes vos el dato ni lo supongas.'),
+    }
+
+
 def catalogo_giftcards():
     """Experiencias regalables activas, compacto para el LLM.
 
@@ -171,50 +233,84 @@ def _resolver_experiencia(texto):
 
 
 def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
-                      idempotency_key=None, sin_datos_regalo=False):
+                      idempotency_key=None, sin_datos_regalo=False,
+                      historial=''):
     """Crea la propuesta de venta de gift cards (mismo cajón que las reservas).
 
     giftcards_data: [{experiencia_id, monto (solo si la experiencia es de
     valor libre), cantidad, destinatario_nombre, mensaje}]
 
-    sin_datos_regalo: el cliente NO quiso personalizar (se le preguntó y
-    declinó). Sin este flag y sin destinatario ni dedicatoria, la propuesta
-    se BLOQUEA: en el quinto intento real (2026-08-12, 01:46) Luna saltó
-    directo al cierre y la carta salió «para su hijo», sin nombre ni mensaje.
-    Luna no sostiene guiones — la pregunta obligatoria vive acá, no en el
-    prompt.
+    LA SECUENCIA DE PREGUNTAS LA MANDA ESTA HERRAMIENTA, no el prompt (Jorge,
+    2026-08-12): destinatario → dedicatoria → email del comprador → nombre del
+    comprador, UNA por mensaje. Mientras falte alguna, devuelve
+    `siguiente_pregunta` y se niega a cotizar.
 
-    Cada UNIDAD es una GiftCard propia (dos masajes = dos cartas, cada una
-    canjeable por separado). El precio SIEMPRE se lee del catálogo — el LLM
-    no fija precios (defense in depth: lo mismo que recalcular_propuesta).
+    Historia de por qué está acá y no en palabras:
+      · 01:46 — Luna saltó al cierre y la carta salió «para su hijo».
+        Se agregó el bloqueo por campos vacíos + el flag `sin_datos_regalo`.
+      · 18:20 — el flag se verificó contra el historial (H-093)... y Luna
+        reintentó EN EL MISMO SEGUNDO con un nombre inventado. Como los campos
+        ya no venían vacíos, la puerta no se cerró y la cotización salió.
+      · Ahora los datos además tienen que haber salido de la boca del cliente.
+
+    Cada UNIDAD es una GiftCard propia. El precio SIEMPRE se lee del catálogo —
+    el LLM no fija precios (defense in depth: igual que recalcular_propuesta).
     """
     from ventas.models import GiftCardExperiencia
 
     try:
-        personalizada = any((gc.get('destinatario_nombre') or '').strip()
-                            or (gc.get('mensaje') or '').strip()
-                            for gc in (giftcards_data or []))
-        if not personalizada and not sin_datos_regalo:
-            return {
-                'success': False, 'error': 'faltan_preguntas_de_regalo',
-                'mensaje': ('Antes de preparar la compra preguntale al cliente '
-                            '(una por mensaje): ¿a nombre de quién va la gift '
-                            'card? ¿quiere dejar una dedicatoria corta? Si no '
-                            'quiere personalizarla, volvé a llamar esta '
-                            'herramienta con sin_datos_regalo=true.'),
-            }
-        nombre = (cliente_data.get('nombre') or '').strip()
-        email = (cliente_data.get('email') or '').strip()
-        if not nombre or len(nombre) < 3:
-            return {'success': False, 'error': 'validation_error',
-                    'mensaje': 'Nombre del comprador requerido (mín 3 caracteres)'}
-        # Sin email no hay carta que entregar: acá es obligatorio de verdad.
-        if not email or '@' not in email:
-            return {'success': False, 'error': 'validation_error',
-                    'mensaje': 'Email válido requerido: la gift card se envía por email'}
         if not giftcards_data:
             return {'success': False, 'error': 'validation_error',
                     'mensaje': 'Debe incluir al menos una gift card'}
+
+        # Primero: ¿qué se está regalando? Si el id no resuelve, el error trae el
+        # catálogo y el modelo se corrige solo — enterarse de eso DESPUÉS de
+        # cuatro preguntas al cliente sería absurdo.
+        for gc in giftcards_data:
+            _exp, error = _resolver_experiencia((gc.get('experiencia_id') or '').strip())
+            if _exp is None:
+                return error
+
+        primera = giftcards_data[0] or {}
+        destinatario = (primera.get('destinatario_nombre') or '').strip()
+        dedicatoria = (primera.get('mensaje') or '').strip()
+        nombre = (cliente_data.get('nombre') or '').strip()
+        email = (cliente_data.get('email') or '').strip()
+
+        # 1. ¿A nombre de quién va?
+        if not destinatario:
+            return _falta('falta_destinatario',
+                          '¿A nombre de quién va la gift card? Contame su nombre 🌿')
+        if not _lo_dijo_el_cliente(destinatario, historial):
+            logger.info('[preparar_giftcard] H-094: destinatario %r no aparece en lo '
+                        'que escribió el cliente → se pide de nuevo', destinatario[:40])
+            return _falta('destinatario_no_lo_dijo_el_cliente',
+                          '¿A nombre de quién va la gift card? Contame su nombre 🌿',
+                          detalle='Ese nombre no lo dijo el cliente. ')
+
+        # 2. ¿Quiere dejarle una frase escrita?
+        if not dedicatoria and not sin_datos_regalo:
+            return _falta('falta_dedicatoria',
+                          '¿Querés incluirle una frase? Escribila como quieras '
+                          'que aparezca en la carta ✨')
+        if dedicatoria and not _lo_dijo_el_cliente(dedicatoria, historial):
+            logger.info('[preparar_giftcard] H-094: dedicatoria inventada por el '
+                        'modelo → se pide de nuevo')
+            return _falta('dedicatoria_no_la_dijo_el_cliente',
+                          '¿Querés incluirle una frase? Escribila como quieras '
+                          'que aparezca en la carta ✨',
+                          detalle='Esa frase no la escribió el cliente. ')
+
+        # 3. ¿A qué correo se la mandamos? (la carta viaja por email)
+        if not email or '@' not in email:
+            return _falta('falta_email',
+                          '¿A qué correo te enviamos la gift card? 📩')
+
+        # 4. ¿A nombre de quién va la compra?
+        if not nombre or len(nombre) < 3:
+            return _falta('falta_nombre_comprador',
+                          '¿Y cuál es tu nombre, para dejar la compra a tu nombre?')
+
 
         if idempotency_key:
             previa = PropuestaReserva.objects.filter(

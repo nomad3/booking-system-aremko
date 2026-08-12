@@ -83,6 +83,8 @@ class RegalaConAgregadosTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE),
+            historial=('[Cliente]: para Alda\n'
+                       '[Cliente]: que la quiero mucho\n'),
             giftcards_data=[{'experiencia_id': 'masaje_pareja',
                              'cantidad': cantidad_cartas,
                              'destinatario_nombre': 'Alda',

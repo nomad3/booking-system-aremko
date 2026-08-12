@@ -2560,12 +2560,11 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 telefono = (args.get('telefono') or '').strip()
                 if not telefono and canal == 'whatsapp':
                     telefono = external_id
-                faltan = [k for k, v in (('nombre', nombre), ('email', email)) if not v]
-                if faltan:
-                    return {'success': False, 'error': 'faltan_datos', 'faltan': faltan,
-                            'mensaje': ('Faltan datos del comprador: '
-                                        + ', '.join(faltan)
-                                        + '. El email es donde llegan las gift cards.')}
+                # El orden de las preguntas lo decide la herramienta (H-094), no
+                # acá: primero el regalo (destinatario, dedicatoria) y recién
+                # después los datos del comprador. Antes se cortaba por
+                # nombre/email ANTES de preguntar por el regalo, que es al revés
+                # de lo que pidió Jorge.
                 gc_item = {
                     'experiencia_id': args.get('experiencia_id'),
                     'cantidad': args.get('cantidad', 1),
@@ -2582,6 +2581,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                     # H-093: el flag solo vale si la conversación muestra que
                     # Luna PREGUNTÓ. Que ella lo declare no alcanza.
                     sin_datos_regalo=_sin_datos_regalo_verificado(args, historial),
+                    # Para comprobar que el destinatario y la dedicatoria
+                    # salieron del cliente y no del modelo (H-094).
+                    historial=historial,
                     # Reintentos del LLM en el MISMO turno no duplican la
                     # propuesta; un pedido nuevo (otro turno) sí crea otra.
                     idempotency_key=f'gc-{external_id}-{args.get("experiencia_id")}'

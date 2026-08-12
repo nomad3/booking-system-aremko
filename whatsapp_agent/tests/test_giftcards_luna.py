@@ -21,6 +21,15 @@ from whatsapp_agent.models import PropuestaReserva
 CLIENTE = {'nombre': 'María Prueba', 'email': 'maria@prueba.cl',
            'telefono': '+56911111111', 'documento_identidad': '12345678-5'}
 
+# Desde H-094 la herramienta exige que el destinatario y la dedicatoria hayan
+# salido de la boca del CLIENTE, así que los tests que prueban otra cosa
+# (precios, calce de nombres, dedup) traen este historial de fondo.
+HISTORIAL = ('[Cliente]: quiero regalar dos masajes\n'
+             '[Aremko]: ¿A nombre de quién van?\n'
+             '[Cliente]: para Los papás de María\n'
+             '[Aremko]: ¿Querés dejarles una frase?\n'
+             '[Cliente]: pongan que los quiero mucho\n')
+
 
 def _experiencia(id_exp='masaje_relajacion', nombre='Masaje de Relajación',
                  monto_fijo=50000, activo=True, **extra):
@@ -99,15 +108,18 @@ class PrepararGiftcardTest(TestCase):
         self.exp = _experiencia()
 
     def _preparar(self, giftcards=None, cliente=None, **kw):
-        # El gate de preguntas de regalo tiene su clase de tests propia:
-        # acá se prueba OTRA cosa, así que se declara que ya se preguntó.
+        # La secuencia de preguntas del regalo tiene su clase de tests propia
+        # (y test_h094_secuencia_giftcard): acá se prueba OTRA cosa —precios,
+        # topes, idempotencia—, así que el destinatario y la dedicatoria se dan
+        # por preguntados y se inyectan en cada carta.
         kw.setdefault('sin_datos_regalo', True)
+        cartas = giftcards or [{'experiencia_id': 'masaje_relajacion', 'cantidad': 2}]
+        for carta in cartas:
+            carta.setdefault('destinatario_nombre', 'Los papás de María')
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=cliente or dict(CLIENTE),
-            giftcards_data=giftcards or [
-                {'experiencia_id': 'masaje_relajacion', 'cantidad': 2,
-                 'destinatario_nombre': 'Los papás de María'}], **kw)
+            cliente_data=cliente or dict(CLIENTE), historial=HISTORIAL,
+            giftcards_data=cartas, **kw)
 
     def test_dos_masajes_para_los_papas(self):
         """El caso exacto de Jorge: 2 masajes = propuesta por $100.000."""
@@ -126,7 +138,9 @@ class PrepararGiftcardTest(TestCase):
         cliente = dict(CLIENTE, email='')
         r = self._preparar(cliente=cliente)
         self.assertFalse(r['success'])
-        self.assertIn('email', r['mensaje'].lower())
+        # H-094: además de negarse, dice qué preguntar.
+        self.assertEqual(r['error'], 'falta_email')
+        self.assertIn('correo', r['siguiente_pregunta'].lower())
 
     def test_el_precio_lo_pone_el_catalogo_no_el_llm(self):
         """Aunque el LLM mandara un precio, se ignora: defense in depth."""
@@ -209,6 +223,7 @@ class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE),
+            historial='[Cliente]: para Los papás\n', sin_datos_regalo=True,
             giftcards_data=[{'experiencia_id': 'masaje_relajacion',
                              'cantidad': 2,
                              'destinatario_nombre': 'Los papás'}])
@@ -233,7 +248,9 @@ class AprobarGiftcardTest(_SinSenalesDeVenta, TestCase):
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            giftcards_data=[{'experiencia_id': 'masaje_relajacion'}])
+            historial='[Cliente]: para Los papás\n',
+            giftcards_data=[{'experiencia_id': 'masaje_relajacion',
+                             'destinatario_nombre': 'Los papás'}])
         a = self._aprobar(prep['propuesta_id'])
         b = self._aprobar(prep['propuesta_id'])
         self.assertEqual(a.status_code, 201)
@@ -314,7 +331,9 @@ class ResolverExperienciaTest(TestCase):
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
+            historial=HISTORIAL,
+            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2,
+                             'destinatario_nombre': 'Los papás de María'}])
 
     def test_el_caso_exacto_que_escalo(self):
         """El modelo mandó el nombre tal como lo mostró, no el id."""
@@ -356,7 +375,9 @@ class ResolverPorPalabrasTest(TestCase):
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
+            historial=HISTORIAL,
+            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2,
+                             'destinatario_nombre': 'Los papás de María'}])
 
     def test_puntuacion_y_tildes_distintas_igual_calzan(self):
         """El catálogo dice «· 50 min» y el modelo mandó «(50 min)»."""
@@ -404,8 +425,9 @@ class PrecioDeLaFuenteCorrectaTest(TestCase):
         r = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
             cliente_data=dict(CLIENTE), sin_datos_regalo=True,
-            giftcards_data=[{'experiencia_id': 'masaje_relajacion',
-                             'cantidad': 2}])
+            historial=HISTORIAL,
+            giftcards_data=[{'experiencia_id': 'masaje_relajacion', 'cantidad': 2,
+                             'destinatario_nombre': 'Los papás de María'}])
         self.assertTrue(r['success'])
         self.assertIn('$100,000', r['resumen_texto'].replace('.', ','))
         self.assertEqual(r['total'], 100000)
@@ -434,7 +456,8 @@ class CotizacionConGiftcardsTest(_SinSenalesDeVenta, TestCase):
                      monto_fijo=110000)
         prep = preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), sin_datos_regalo=True,
+            historial='[Cliente]: para Martín\n',
             giftcards_data=[{'experiencia_id': 'pausa_dos',
                              'destinatario_nombre': 'Martín'}])
         self.assertTrue(prep['success'])
@@ -484,33 +507,47 @@ class PreguntasDeRegaloObligatoriasTest(TestCase):
     def setUp(self):
         _experiencia()
 
-    def _preparar(self, gc=None, **kw):
+    def _preparar(self, gc=None, historial='', **kw):
         return preparar_giftcard(
             canal='whatsapp', external_id='+56911111111',
-            cliente_data=dict(CLIENTE),
+            cliente_data=dict(CLIENTE), historial=historial,
             giftcards_data=[gc or {'experiencia_id': 'masaje_relajacion'}],
             **kw)
 
     def test_sin_destinatario_ni_dedicatoria_se_niega(self):
         r = self._preparar()
         self.assertFalse(r['success'])
-        self.assertEqual(r['error'], 'faltan_preguntas_de_regalo')
-        self.assertIn('a nombre de quién', r['mensaje'])
+        # H-094 cambió el nombre del error: ahora la herramienta no solo se
+        # niega, dice CUÁL es la siguiente pregunta.
+        self.assertEqual(r['error'], 'falta_destinatario')
+        self.assertIn('nombre', r['siguiente_pregunta'].lower())
         self.assertEqual(PropuestaReserva.objects.count(), 0)
 
     def test_con_destinatario_pasa(self):
         r = self._preparar({'experiencia_id': 'masaje_relajacion',
-                            'destinatario_nombre': 'Martín'})
+                            'destinatario_nombre': 'Martín'},
+                           historial='[Cliente]: para Martín\n',
+                           sin_datos_regalo=True)
         self.assertTrue(r['success'], r)
 
-    def test_solo_dedicatoria_tambien_pasa(self):
+    def test_solo_dedicatoria_YA_NO_alcanza(self):
+        """H-094: el destinatario dejó de ser opcional. Una carta sin nombre de
+        quien la recibe es justo lo que salió mal a las 01:46."""
         r = self._preparar({'experiencia_id': 'masaje_relajacion',
-                            'mensaje': 'Con cariño, papá'})
-        self.assertTrue(r['success'], r)
+                            'mensaje': 'Con cariño, papá'},
+                           historial='[Cliente]: con cariño, papá\n')
+        self.assertFalse(r['success'])
+        self.assertEqual(r['error'], 'falta_destinatario')
 
-    def test_declinar_explicito_pasa(self):
-        """El cliente no quiso personalizar: el flag lo declara y sigue."""
-        r = self._preparar(sin_datos_regalo=True)
+    def test_declinar_la_frase_pasa_pero_el_nombre_sigue_haciendo_falta(self):
+        """`sin_datos_regalo` siempre fue para la DEDICATORIA, nunca un permiso
+        para saltarse a quién va dirigido el regalo."""
+        self.assertEqual(
+            self._preparar(sin_datos_regalo=True)['error'], 'falta_destinatario')
+        r = self._preparar({'experiencia_id': 'masaje_relajacion',
+                            'destinatario_nombre': 'Martín'},
+                           historial='[Cliente]: para Martín\n',
+                           sin_datos_regalo=True)
         self.assertTrue(r['success'], r)
 
     def test_el_cierre_confirma_el_email_en_voz_alta(self):
