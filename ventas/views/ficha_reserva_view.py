@@ -634,10 +634,14 @@ def _lineas_productos_payload(productos_data):
 
 
 def _cotizacion_lineas_total(propuesta):
-    """Líneas + total de la cotización (servicios + productos). Si los servicios NO traen ya una
-    línea de descuento (caso pack de ciudad), aplica el descuento del pack para que el total = el
-    de la reserva final. El Ritual/Refugio ya traen su línea de descuento en el payload → no se
-    duplica. Los productos suman al total (igual que en propuesta.total)."""
+    """(líneas, total_str, giftcards) de la cotización.
+
+    Servicios + productos como siempre; las GIFT CARDS del payload (venta vía
+    Luna) se devuelven aparte para el bloque 🎁 y SUMAN al total. Sin esto, la
+    cotización de una compra solo-giftcard decía «Sin servicios cargados aún —
+    Total $0» con un botón de aprobar (visto por Jorge 2026-08-12, 01:37): el
+    cliente aceptó $110.000 y la página le mostraba cero.
+    """
     payload = propuesta.payload or {}
     servicios_data = payload.get('servicios', [])
     lineas = _lineas_desde_payload(servicios_data)
@@ -650,7 +654,19 @@ def _cotizacion_lineas_total(propuesta):
                 'monto_str': _clp(-descuento), 'subtotal_num': -descuento, 'es_descuento': True,
             })
     total = sum(l.get('subtotal_num', 0) for l in lineas)
-    return lineas, _clp(total)
+
+    giftcards = []
+    for item in payload.get('giftcards') or []:
+        cantidad = max(1, int(item.get('cantidad') or 1))
+        monto = int(item.get('precio') or 0) * cantidad
+        nombre = item.get('experiencia_nombre') or 'de regalo'
+        giftcards.append({
+            'nombre': f'{cantidad}x {nombre}' if cantidad > 1 else nombre,
+            'destinatario': item.get('destinatario_nombre') or '',
+            'monto_str': _clp(monto),
+        })
+        total += monto
+    return lineas, _clp(total), giftcards
 
 
 def cotizacion_cliente(request, token):
@@ -665,13 +681,17 @@ def cotizacion_cliente(request, token):
 
     payload = propuesta.payload or {}
     cliente_data = payload.get('cliente', {}) or {}
-    lineas, total_str = _cotizacion_lineas_total(propuesta)
+    lineas, total_str, giftcards_cot = _cotizacion_lineas_total(propuesta)
+    solo_gc = bool(giftcards_cot) and not payload.get('servicios')
     context = {
         'es_cotizacion': True,
         'cliente_nombre': (cliente_data.get('nombre') or '').split(' ')[0],
-        'experiencia_nombre': _experiencia_nombre(_tipos_desde_payload(payload.get('servicios', []))),
+        'experiencia_nombre': ('Gift Cards' if solo_gc else _experiencia_nombre(
+            _tipos_desde_payload(payload.get('servicios', [])))),
         'lineas': lineas,
         'total_str': total_str,
+        'giftcards': giftcards_cot,
+        'solo_giftcards': solo_gc,
         'vigente': propuesta.esta_vigente(),
         'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
     }
@@ -717,11 +737,12 @@ def aprobar_cotizacion(request, token):
 
     logger.error('[cotización] Aprobar falló para propuesta %s: %s',
                  propuesta.propuesta_id[:8], data.get('mensaje'))
-    lineas, total_str = _cotizacion_lineas_total(propuesta)
+    lineas, total_str, giftcards_cot = _cotizacion_lineas_total(propuesta)
     return render(request, 'ventas/ficha_reserva_cliente.html', {
         'es_cotizacion': True,
         'error_aprobar': data.get('mensaje') or 'No se pudo crear la reserva. Te contactamos a la brevedad.',
         'lineas': lineas,
         'total_str': total_str,
+        'giftcards': giftcards_cot,
         'aprobar_url': aprobar_url,
     }, status=400)

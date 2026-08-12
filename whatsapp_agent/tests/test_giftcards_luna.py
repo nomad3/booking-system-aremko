@@ -411,3 +411,54 @@ class PrecioDeLaFuenteCorrectaTest(TestCase):
         import whatsapp_agent.agent as agent_mod
         fuente = open(agent_mod.__file__, encoding='utf-8').read()
         self.assertIn("resultado.get('resumen_texto')", fuente)
+
+
+class CotizacionConGiftcardsTest(_SinSenalesDeVenta, TestCase):
+    """Cuarto intento real (2026-08-12, 01:37): la conversación cerró perfecto
+    y la página de la cotización decía «Sin servicios cargados aún — Total $0»
+    con el botón de aprobar. La página no sabía de gift cards."""
+
+    def _cotizar(self):
+        _experiencia(id_exp='pausa_dos', nombre='Pausa junto al río · para dos',
+                     monto_fijo=110000)
+        prep = preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': 'pausa_dos',
+                             'destinatario_nombre': 'Martín'}])
+        self.assertTrue(prep['success'])
+        return prep
+
+    def test_la_cotizacion_muestra_las_cartas_y_el_total_real(self):
+        from ventas.views.ficha_reserva_view import token_para_cotizacion
+        prep = self._cotizar()
+        r = self.client.get(
+            f'/ventas/propuesta/{token_para_cotizacion(prep["propuesta_id"])}/')
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Pausa junto al río')
+        self.assertContains(r, 'para Martín')
+        self.assertContains(r, '$110.000')
+        self.assertContains(r, 'llega por email')
+        self.assertNotContains(r, 'Sin servicios cargados')
+        self.assertNotContains(r, 'Total</span><span>$0<')
+        # El copy del botón habla de gift cards, no de generar una reserva.
+        self.assertContains(r, 'las gift cards llegan a tu email')
+
+    def test_aprobar_desde_la_pagina_crea_la_venta_con_cartas(self):
+        """El botón del cliente termina el circuito completo."""
+        from django.contrib.auth.models import User as _User
+
+        from ventas.views.ficha_reserva_view import token_para_cotizacion
+        _User.objects.create_superuser('sistema', 's@s.cl', 'x')
+        prep = self._cotizar()
+        token = token_para_cotizacion(prep['propuesta_id'])
+        with override_settings(LUNA_API_KEY='clave-test'):
+            r = self.client.post(f'/ventas/propuesta/{token}/aprobar/')
+        self.assertEqual(r.status_code, 302, getattr(r, 'content', b'')[:200])
+        prop = PropuestaReserva.objects.get(propuesta_id=prep['propuesta_id'])
+        self.assertEqual(prop.estado, 'creada')
+        venta = VentaReserva.objects.get(id=prop.reserva_id)
+        self.assertEqual(venta.giftcards.count(), 1)
+        self.assertEqual(int(venta.total), 110000)
+        # Y la ficha destino ya sabe mostrarlas (GC-C).
+        self.assertIn('/ventas/reserva/', r.url)

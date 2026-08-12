@@ -129,7 +129,7 @@
           <div class="topline">
             <div class="resv">Tu cotización</div>
           </div>
-          <div class="saldo">{% if cliente_nombre %}{{ cliente_nombre }}, esta{% else %}Esta{% endif %} es la propuesta para tu visita a Aremko.</div>
+          <div class="saldo">{% if cliente_nombre %}{{ cliente_nombre }}, esta{% else %}Esta{% endif %} es la propuesta para tu {% if solo_giftcards %}regalo de Aremko{% else %}visita a Aremko{% endif %}.</div>
         {% else %}
           <div class="topline">
             <div class="resv">Reserva {{ numero }}</div>
@@ -382,7 +382,7 @@
             {% csrf_token %}
             <button type="submit" class="btn" style="background:#3D6B4A">Aprobar cotización</button>
           </form>
-          <div class="com-note">Al aprobar, generamos tu reserva al instante.</div>
+          <div class="com-note">{% if solo_giftcards %}Al aprobar, te enviamos los datos de transferencia; con el pago confirmado, las gift cards llegan a tu email.{% else %}Al aprobar, generamos tu reserva al instante.{% endif %}</div>
         {% endif %}
 
         {% if not es_cotizacion %}
