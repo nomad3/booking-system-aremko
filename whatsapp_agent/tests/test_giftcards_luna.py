@@ -286,6 +286,14 @@ class PromptGiftcardsTest(TestCase):
         self.assertIn('catalogo_giftcards', fuente)
         self.assertIn('vale 1 año', fuente)
 
+    def test_el_prompt_prohibe_regalar_lo_no_publicado(self):
+        """Política de Jorge (2026-08-12): Luna ofrece SOLO las gift cards
+        publicadas; los masajes se regalan dentro de las experiencias."""
+        import whatsapp_agent.prompt as prompt_mod
+        fuente = open(prompt_mod.__file__, encoding='utf-8').read()
+        self.assertIn('Solo existe lo que devuelve', fuente)
+        self.assertIn('DENTRO de las experiencias', fuente)
+
     def test_las_tools_estan_declaradas_y_despachadas(self):
         import whatsapp_agent.agent as agent_mod
         fuente = open(agent_mod.__file__, encoding='utf-8').read()
