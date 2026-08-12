@@ -73,6 +73,21 @@ def _lineas_del_cliente(historial):
     return salida
 
 
+def _parecidas(palabra, dichas):
+    """¿Alguna de las palabras del cliente es ESA, aun con un dedazo?
+
+    «Aguilkera» (como lo tipeó Jorge) tiene que calzar con «Aguilera» (como lo
+    corrigió Luna). Sin esta tolerancia, cualquier typo del cliente dejaba la
+    venta en un loop: la herramienta pedía el nombre, el cliente lo daba, Luna
+    lo corregía, la herramienta lo daba por inventado y volvía a pedirlo.
+    """
+    import difflib
+    if palabra in dichas:
+        return True
+    return any(difflib.SequenceMatcher(None, palabra, d).ratio() >= 0.8
+               for d in dichas if abs(len(d) - len(palabra)) <= 3)
+
+
 def _lo_dijo_el_cliente(texto, historial, mensaje='', minimo=0.6):
     """¿Ese texto salió del cliente, o lo inventó Luna?
 
@@ -103,7 +118,9 @@ def _lo_dijo_el_cliente(texto, historial, mensaje='', minimo=0.6):
         plano = unicodedata.normalize('NFKD', texto or '')
         plano = plano.encode('ascii', 'ignore').decode().lower().strip()
         return bool(plano) and plano in dicho
-    encontradas = sum(1 for p in palabras if p in dicho)
+    import re
+    dichas = set(re.findall(r'[a-z]+', dicho))
+    encontradas = sum(1 for p in palabras if p in dicho or _parecidas(p, dichas))
     return encontradas / len(palabras) >= minimo
 
 
@@ -115,7 +132,27 @@ def _lo_dijo_el_cliente(texto, historial, mensaje='', minimo=0.6):
 # Vive acá y no en el prompt porque el prompt ya lo pedía y no alcanzó: Luna no
 # sostiene guiones. La herramienta devuelve UNA pregunta por vez y se niega a
 # cotizar hasta tenerlas todas.
-def _falta(error, pregunta, detalle=''):
+def _ya_preguntamos_esto(historial, pregunta):
+    """¿La última cosa que dijo Aremko fue justo esta pregunta?
+
+    Red anti-loop: si ya la hicimos y el dato SIGUE sin poder validarse, algo
+    no está funcionando —un apodo, una respuesta que no es un nombre, un
+    dedazo que ni la tolerancia salva— y repetirla por tercera vez es lo peor
+    que puede pasarle a una venta. Mejor que la tome una persona.
+    """
+    ultima = ''
+    for linea in (historial or '').splitlines():
+        if linea.startswith('[Aremko]:'):
+            ultima = linea
+    if not ultima:
+        return False
+    # Se compara por el núcleo de la pregunta, no por el texto entero: Luna
+    # puede reformularla un poco al mandarla.
+    nucleo = pregunta.split('?')[0][-40:].lower()
+    return bool(nucleo) and nucleo in ultima.lower()
+
+
+def _falta(error, pregunta, detalle='', historial=''):
     """Falta un dato: se devuelve LA PREGUNTA, no un reto.
 
     `mensaje` es el campo que Luna copia al cliente (así se lo pide el prompt
@@ -127,6 +164,16 @@ def _falta(error, pregunta, detalle=''):
     Ahora `mensaje` ES la pregunta: si Luna lo copia tal cual, el cliente lee
     justo lo que corresponde. Lo interno vive en `instruccion`, aparte.
     """
+    if _ya_preguntamos_esto(historial, pregunta):
+        logger.warning('[preparar_giftcard] H-097: la pregunta «%s» ya se hizo y el dato '
+                       'sigue sin validar → a una persona, no se repite', pregunta[:50])
+        return {
+            'success': False,
+            'error': 'pregunta_en_loop',
+            'escalar_por_loop': True,
+            'mensaje': ('Esta pregunta ya se hizo y la respuesta no se pudo usar. '
+                        'NO la repitas: que siga una persona.'),
+        }
     return {
         'success': False,
         'error': error,
@@ -297,36 +344,36 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
         # 1. ¿A nombre de quién va?
         if not destinatario:
             return _falta('falta_destinatario',
-                          '¿A nombre de quién va la gift card? Cuéntame su nombre 🌿')
+                          '¿A nombre de quién va la gift card? Cuéntame su nombre 🌿', historial=historial)
         if not _lo_dijo_el_cliente(destinatario, historial, mensaje):
             logger.info('[preparar_giftcard] H-094: destinatario %r no aparece en lo '
                         'que escribió el cliente → se pide de nuevo', destinatario[:40])
             return _falta('destinatario_no_lo_dijo_el_cliente',
                           '¿A nombre de quién va la gift card? Cuéntame su nombre 🌿',
-                          detalle='Ese nombre no lo dijo el cliente. ')
+                          detalle='Ese nombre no lo dijo el cliente. ', historial=historial)
 
         # 2. ¿Quiere dejarle una frase escrita?
         if not dedicatoria and not sin_datos_regalo:
             return _falta('falta_dedicatoria',
                           '¿Quieres incluirle una frase? Escríbela tal como '
-                          'quieres que aparezca en la carta ✨')
+                          'quieres que aparezca en la carta ✨', historial=historial)
         if dedicatoria and not _lo_dijo_el_cliente(dedicatoria, historial, mensaje):
             logger.info('[preparar_giftcard] H-094: dedicatoria inventada por el '
                         'modelo → se pide de nuevo')
             return _falta('dedicatoria_no_la_dijo_el_cliente',
                           '¿Quieres incluirle una frase? Escríbela tal como '
                           'quieres que aparezca en la carta ✨',
-                          detalle='Esa frase no la escribió el cliente. ')
+                          detalle='Esa frase no la escribió el cliente. ', historial=historial)
 
         # 3. ¿A qué correo se la mandamos? (la carta viaja por email)
         if not email or '@' not in email:
             return _falta('falta_email',
-                          '¿A qué correo te enviamos la gift card? 📩')
+                          '¿A qué correo te enviamos la gift card? 📩', historial=historial)
 
         # 4. ¿A nombre de quién va la compra?
         if not nombre or len(nombre) < 3:
             return _falta('falta_nombre_comprador',
-                          '¿Y cuál es tu nombre, para dejar la compra a tu nombre?')
+                          '¿Y cuál es tu nombre, para dejar la compra a tu nombre?', historial=historial)
 
 
         if idempotency_key:

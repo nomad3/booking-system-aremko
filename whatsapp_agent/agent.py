@@ -2667,6 +2667,17 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
 
+    # H-097: una tool avisó que su pregunta ya se hizo y la respuesta no sirvió.
+    # Repetirla por tercera vez es la peor cara del bot; la toma una persona.
+    for _tc in (resultado.tool_calls_executed or []):
+        _res = _tc.get('result')
+        if isinstance(_res, dict) and _res.get('escalar_por_loop'):
+            logger.warning('[Agente WA] H-097: %s pidió no repetir la pregunta → escalar',
+                           _tc.get('name'))
+            return _borrador_escala(
+                'la misma pregunta ya se hizo y la respuesta del cliente no se pudo usar',
+                modelo=modelo, tokens=tokens)
+
     # H-095: el borrador puede ser plomería interna. Pasó de verdad (14:45): al
     # cliente le llegó «ALTO. Todavía no se puede cotizar. Mandá al cliente
     # EXACTAMENTE esta pregunta...». Si la tool dejó una pregunta pendiente, se

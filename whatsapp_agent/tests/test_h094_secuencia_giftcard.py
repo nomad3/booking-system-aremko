@@ -317,3 +317,63 @@ class PrecioDeRegaloUnicoTest(TestCase):
     def test_el_prompt_aclara_que_la_giftcard_puede_valer_menos(self):
         """Que sea más barata es la oferta, no un error a corregir."""
         self.assertIn('puede valer\nMENOS que la reserva', self._fuente())
+
+
+class UnDedazoNoTrabaLaVentaTest(TestCase):
+    """H-097 (2026-08-12, 15:27): Jorge tipeó «Martin Aguilkera», Luna corrigió
+    el typo a «Martin Aguilera», y la guarda —que exigía coincidencia casi
+    exacta— lo dio por inventado y volvió a preguntar. La protección contra
+    nombres inventados se había vuelto un callejón sin salida: peor que el
+    problema que evitaba, porque una carta mal dirigida se corrige y una venta
+    en loop se pierde."""
+
+    def setUp(self):
+        _experiencia()
+
+    def test_el_typo_del_cliente_calza_con_el_nombre_corregido(self):
+        self.assertTrue(_lo_dijo_el_cliente(
+            'Martin Aguilera', historial='', mensaje='Martin Aguilkera'))
+
+    def test_sigue_rechazando_un_nombre_de_verdad_inventado(self):
+        """La tolerancia es para dedazos, no para cualquier cosa."""
+        self.assertFalse(_lo_dijo_el_cliente(
+            'Carolina Pérez', historial='', mensaje='Martin Aguilkera'))
+        self.assertFalse(_lo_dijo_el_cliente(
+            'Su esposa', historial='[Cliente]: quiero regalar un masaje\n'))
+
+    def test_con_el_typo_la_venta_avanza(self):
+        r = _preparar(historial='[Aremko]: ¿A nombre de quién va?\n',
+                      mensaje='Martin Aguilkera',
+                      gc={'destinatario_nombre': 'Martin Aguilera'})
+        self.assertEqual(r['error'], 'falta_dedicatoria',
+                         'Un dedazo no puede dejar la venta en loop')
+
+
+class NuncaDosVecesLaMismaPreguntaTest(TestCase):
+    """La red de fondo: si la pregunta ya se hizo y el dato sigue sin validar,
+    la conversación pasa a una persona en vez de repetirse."""
+
+    def setUp(self):
+        _experiencia()
+
+    def test_repetir_la_pregunta_escala_en_vez_de_insistir(self):
+        historial = ('[Cliente]: quiero regalar algo\n'
+                     '[Aremko]: ¿A nombre de quién va la gift card? Cuéntame su nombre 🌿\n')
+        r = _preparar(historial=historial, mensaje='no sé, la que sea')
+        self.assertEqual(r['error'], 'pregunta_en_loop')
+        self.assertTrue(r['escalar_por_loop'])
+        self.assertNotIn('siguiente_pregunta', r)
+
+    def test_la_primera_vez_si_pregunta(self):
+        r = _preparar(historial='[Aremko]: ¡Hola! ¿En qué te ayudo?\n',
+                      mensaje='quiero regalar algo')
+        self.assertEqual(r['error'], 'falta_destinatario')
+        self.assertIn('siguiente_pregunta', r)
+
+    def test_una_pregunta_distinta_no_cuenta_como_repeticion(self):
+        """Avanzar de una pregunta a la siguiente es lo normal, no un loop."""
+        historial = '[Aremko]: ¿A nombre de quién va la gift card? Cuéntame su nombre 🌿\n'
+        r = _preparar(historial=historial, mensaje='Alda',
+                      gc={'destinatario_nombre': 'Alda'})
+        self.assertEqual(r['error'], 'falta_dedicatoria')
+        self.assertIn('siguiente_pregunta', r)
