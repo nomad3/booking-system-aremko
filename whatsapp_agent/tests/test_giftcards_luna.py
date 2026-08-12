@@ -379,3 +379,35 @@ class ResolverPorPalabrasTest(TestCase):
         r = self._preparar('no_existe_nada_asi')
         self.assertIn('NO le muestres esta lista', r['mensaje'])
         self.assertIn('volvé a llamar', r['mensaje'])
+
+
+class PrecioDeLaFuenteCorrectaTest(TestCase):
+    """Tercer intento real (2026-08-12, 01:23): Luna citó el precio del
+    SERVICIO ($40.000) y la gift card valía $50.000 — el cliente aceptó un
+    precio y la cotización salió con otro."""
+
+    def test_el_resumen_con_precios_reales_viaja_en_la_propuesta(self):
+        """La corrección visible: el resumen de la propuesta lleva el precio
+        del catálogo de gift cards, línea por línea."""
+        _experiencia(monto_fijo=50000)
+        r = preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': 'masaje_relajacion',
+                             'cantidad': 2}])
+        self.assertTrue(r['success'])
+        self.assertIn('$100,000', r['resumen_texto'].replace('.', ','))
+        self.assertEqual(r['total'], 100000)
+
+    def test_el_prompt_prohibe_cotizar_con_el_precio_del_servicio(self):
+        import whatsapp_agent.prompt as prompt_mod
+        fuente = open(prompt_mod.__file__, encoding='utf-8').read()
+        self.assertIn('NUNCA del catálogo de', fuente)
+        self.assertIn('ANTES de decir cualquier precio', fuente)
+
+    def test_el_mensaje_de_cierre_incluye_el_detalle_con_precios(self):
+        """El dispatch arma el mensaje al cliente con el resumen real: si el
+        modelo citó mal antes, acá aparece la corrección."""
+        import whatsapp_agent.agent as agent_mod
+        fuente = open(agent_mod.__file__, encoding='utf-8').read()
+        self.assertIn("resultado.get('resumen_texto')", fuente)

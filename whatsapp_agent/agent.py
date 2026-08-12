@@ -2535,16 +2535,23 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if not resultado.get('success'):
                     return resultado
                 total = resultado.get('total', 0)
+                # El detalle con el precio REAL va en el mensaje al cliente a
+                # propósito: si el modelo citó antes un precio de otra fuente
+                # (pasó: el del servicio en vez del de la gift card), esta es
+                # la corrección visible antes de que llegue la cotización.
+                detalle = (resultado.get('resumen_texto') or '').strip()
+                detalle = f'{detalle}\n' if detalle else ''
                 return {
                     'success': True,
                     'propuesta_id': resultado.get('propuesta_id'),
                     'total': total,
                     'mensaje': (
-                        f'¡Qué lindo regalo! 🎁 Te preparo la compra (total ${total:,}) '
-                        'y te la enviamos en un momento con los datos de transferencia. '
-                        'Apenas se confirme el pago, la gift card te llega por email '
-                        'lista para regalar — vale 1 año y quien la recibe agenda '
-                        'cuando quiera. 🌿'
+                        f'¡Qué lindo regalo! 🎁 Te preparo la compra:\n'
+                        f'{detalle}Total ${total:,}. Te la enviamos en un momento '
+                        'con los datos de transferencia. Apenas se confirme el '
+                        'pago, la gift card te llega por email lista para '
+                        'regalar — vale 1 año y quien la recibe agenda cuando '
+                        'quiera. 🌿'
                     ),
                 }
             except Exception as exc:  # noqa: BLE001
