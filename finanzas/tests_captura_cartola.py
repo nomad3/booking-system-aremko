@@ -145,3 +145,62 @@ class SubirCapturaEnLaVistaTest(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(MovimientoFinanciero.objects.count(), 0,
                          'La propuesta no escribe: eso lo hace la confirmación')
+
+
+class CapturaEnLaPaginaDeCartolasTest(TestCase):
+    """Jorge sube la captura en «Cargar cartola bancaria» —la página con el
+    nombre obvio— y le decía «no reconozco el archivo». El lector estaba en la
+    otra página. Ahora la de cartolas la acepta, la lee y lo manda a revisar.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_superuser(
+            'jorge_cartola', 'j2@test.cl', 'clave-larga-de-prueba')
+        self.client.force_login(self.user)
+        self.url = reverse('finanzas:cargar_cartola')
+
+    @mock.patch('finanzas.vision.leer_capturas')
+    def test_una_captura_en_cartolas_lleva_a_revisar_con_el_texto_puesto(self, m_leer):
+        m_leer.return_value = ('04-08-2026 ; Pago Twilio Sendgrid ; -22316', [], '')
+        r = self.client.post(self.url, {'archivo': _imagen()})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r['Location'], reverse('finanzas:cargar_movimientos'))
+
+        # Y al llegar, el texto ya está en el cuadro.
+        destino = self.client.get(r['Location'])
+        self.assertContains(destino, 'Pago Twilio Sendgrid')
+        self.assertContains(destino, 'Leí')
+        self.assertEqual(MovimientoFinanciero.objects.count(), 0)
+
+    @mock.patch('finanzas.vision.leer_capturas')
+    def test_el_texto_no_se_repite_al_recargar(self, m_leer):
+        """Se saca de la sesión al mostrarlo: un F5 no lo trae de nuevo."""
+        m_leer.return_value = ('04-08-2026 ; Pago Render.com ; -119443', [], '')
+        self.client.post(self.url, {'archivo': _imagen()})
+        primera = self.client.get(reverse('finanzas:cargar_movimientos'))
+        self.assertContains(primera, 'Pago Render.com')
+        segunda = self.client.get(reverse('finanzas:cargar_movimientos'))
+        self.assertNotContains(segunda, 'Pago Render.com')
+
+    @mock.patch('finanzas.vision.leer_capturas')
+    def test_si_no_se_puede_leer_se_queda_en_cartolas_con_el_motivo(self, m_leer):
+        m_leer.return_value = ('', [], 'No encontré movimientos en la captura.')
+        r = self.client.post(self.url, {'archivo': _imagen()})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'No encontré movimientos')
+
+    def test_los_formatos_de_siempre_siguen_su_camino(self):
+        """La captura es una rama nueva, no toca las otras cuatro."""
+        from finanzas.views import _es_imagen
+        self.assertFalse(_es_imagen(b'PK\x03\x04'))          # xlsx
+        self.assertFalse(_es_imagen(b'\xd0\xcf\x11\xe0'))    # xls
+        self.assertFalse(_es_imagen(b'%PDF-1.4'))            # pdf
+        self.assertFalse(_es_imagen(b';TIPO;FECHA'))         # BSA.dat
+
+    def test_reconoce_los_formatos_de_captura(self):
+        from finanzas.views import _es_imagen
+        self.assertTrue(_es_imagen(b'\x89PNG\r\n\x1a\n'))              # PNG
+        self.assertTrue(_es_imagen(b'\xff\xd8\xff\xe0' + b'0' * 8))    # JPEG
+        self.assertTrue(_es_imagen(b'RIFF' + b'0000' + b'WEBP'))       # WEBP
+        self.assertTrue(_es_imagen(b'0000ftypheic'))                   # HEIC

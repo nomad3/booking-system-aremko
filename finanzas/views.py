@@ -16,7 +16,7 @@ from datetime import date, timedelta
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import Count, Max, Sum
 from django.db.models.functions import TruncDate
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
 from ventas.models import Pago
@@ -692,6 +692,18 @@ NOMBRE_CUENTA_CARTOLA = {'bancoestado': 'BancoEstado Chequera Electrónica',
                          'tarjeta_alda_2': 'Tarjeta Alda 2 (Scotiabank)'}
 
 
+def _es_imagen(magia):
+    """¿Los primeros bytes son de una imagen? PNG, JPEG, WEBP o HEIC.
+
+    Las capturas de iPhone son PNG; las fotos, HEIC. Se detecta por contenido
+    igual que el resto de los formatos: el nombre del archivo miente seguido.
+    """
+    return (magia.startswith(b'\x89PNG')
+            or magia.startswith(b'\xff\xd8\xff')          # JPEG
+            or (magia[:4] == b'RIFF' and magia[8:12] == b'WEBP')
+            or magia[4:8] == b'ftyp')                        # HEIC/HEIF
+
+
 @user_passes_test(puede_ver_finanzas)
 def cargar_cartola(request):
     """Carga de cartolas bancarias (P-22 F4 paso 3): BancoEstado (.xlsx) y
@@ -754,9 +766,22 @@ def cargar_cartola(request):
 
     elif request.method == 'POST' and request.FILES.get('archivo'):
         archivo = request.FILES['archivo']
-        magia = archivo.read(4)
+        magia = archivo.read(12)
         archivo.seek(0)
         try:
+            if _es_imagen(magia):
+                # Jorge sube la captura ACÁ, que es la página con el nombre
+                # obvio (2026-08-12). El lector vive en «pegar movimientos»
+                # porque ahí está el circuito de revisión; se lee la imagen y
+                # se lo manda para allá con el texto puesto, en vez de
+                # devolverle un «no reconozco el archivo».
+                from .vision import leer_capturas
+                texto, dudosas, error_v = leer_capturas([archivo])
+                if error_v:
+                    raise ValueError(error_v)
+                request.session['captura_texto'] = texto
+                request.session['captura_dudosas'] = dudosas
+                return redirect('finanzas:cargar_movimientos')
             if magia.startswith(b'PK'):            # zip → xlsx BancoEstado
                 cuenta_clave = 'bancoestado'
                 datos = parsear_cartola_bancoestado(archivo)
@@ -784,8 +809,9 @@ def cargar_cartola(request):
             else:
                 raise ValueError('No reconozco el archivo: se esperan el .xlsx '
                                  'de BancoEstado, el .xls de Scotiabank, el '
-                                 'BSA.dat de la cuenta de Alda o el PDF de '
-                                 'una de sus tarjetas.')
+                                 'BSA.dat de la cuenta de Alda, el PDF de una '
+                                 'de sus tarjetas — o una captura de pantalla '
+                                 '(PNG/JPG) de la app del banco.')
         except ValueError as e:
             ctx['error'] = str(e)
         except Exception:
@@ -886,6 +912,14 @@ def cargar_movimientos(request):
     ctx = {'cuentas': cuentas,
            'cuenta_sel': request.POST.get('cuenta') or 'cuentarut_jorge',
            'texto': request.POST.get('texto', '')}
+
+    # Llegó desde «Cargar cartola» con una captura ya leída: se recoge el texto
+    # y se muestra acá, que es donde vive la revisión. Se saca de la sesión
+    # (pop) para que un F5 no lo repita.
+    if request.method == 'GET' and request.session.get('captura_texto'):
+        ctx['texto'] = request.session.pop('captura_texto')
+        ctx['dudosas'] = request.session.pop('captura_dudosas', [])
+        ctx['leidas'] = len(ctx['texto'].splitlines())
 
     if request.method == 'POST' and request.POST.get('confirmar'):
         try:
