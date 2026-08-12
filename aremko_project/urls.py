@@ -33,6 +33,7 @@ from ventas.sitemaps import (
 )
 from aremko_blog.sitemaps import AremkoBlogIndexSitemap, AremkoBlogPostSitemap
 from django.views.generic import TemplateView
+from django.views.generic.base import RedirectView
 
 sitemaps = {
     'homepage': HomepageSitemap,
@@ -175,8 +176,21 @@ urlpatterns = [
     path('ventas/', include('ventas.urls')), # Rely on app_name in ventas.urls
     # Include Control de Gestión URLs
     path('control_gestion/', include('control_gestion.urls')),
+    # /accounts/login/ devolvía 500 desde hace semanas (45 golpes solo el
+    # 2026-08-12, un bot cada 10 segundos): `django.contrib.auth.urls` busca la
+    # plantilla `registration/login.html`, y este proyecto no la tiene. El resto
+    # de las rutas de auth SÍ andan porque el admin trae sus plantillas
+    # (password_reset, password_change); login.html es la que no incluye.
+    #
+    # No hay dos logins que mantener: el equipo entra por /admin/. Así que esta
+    # ruta lleva ahí, conservando el `?next=` para que el usuario aterrice donde
+    # quería. Va ANTES del include para ganarle, y mantiene name='login' para no
+    # romper `{% url 'login' %}` ni el redirect de @login_required.
+    path('accounts/login/',
+         RedirectView.as_view(url='/admin/login/', query_string=True, permanent=False),
+         name='login'),
     # Include Django auth urls
-    path('accounts/', include('django.contrib.auth.urls')), # Provides login, logout, etc.
+    path('accounts/', include('django.contrib.auth.urls')), # Provides logout, password reset, etc.
 
     # API endpoints
     path('api/', include('api.urls')),
