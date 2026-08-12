@@ -288,3 +288,49 @@ class PromptGiftcardsTest(TestCase):
         fuente = open(agent_mod.__file__, encoding='utf-8').read()
         self.assertIn("'catalogo_giftcards'", fuente)
         self.assertIn("'preparar_giftcard'", fuente)
+
+
+class ResolverExperienciaTest(TestCase):
+    """Primera prueba real (2026-08-12): Luna reconstruyó el id desde el
+    nombre visible y la venta escaló. La tool ahora resuelve por nombre."""
+
+    def setUp(self):
+        _experiencia(id_exp='masaje_relajacion',
+                     nombre='Masaje Relajación o Descontracturante (50 min)',
+                     monto_fijo=40000)
+
+    def _preparar(self, exp_id):
+        return preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE),
+            giftcards_data=[{'experiencia_id': exp_id, 'cantidad': 2}])
+
+    def test_el_caso_exacto_que_escalo(self):
+        """El modelo mandó el nombre tal como lo mostró, no el id."""
+        r = self._preparar('Masaje Relajación o Descontracturante (50 min)')
+        self.assertTrue(r['success'], r)
+        self.assertEqual(r['total'], 80000)
+
+    def test_tambien_resuelve_el_nombre_recortado(self):
+        r = self._preparar('Masaje Relajación')
+        self.assertTrue(r['success'], r)
+
+    def test_el_id_exacto_sigue_funcionando(self):
+        self.assertTrue(self._preparar('masaje_relajacion')['success'])
+
+    def test_ambiguo_no_adivina_y_entrega_el_catalogo(self):
+        _experiencia(id_exp='masaje_para_dos', nombre='Masaje para dos',
+                     monto_fijo=95000)
+        r = self._preparar('Masaje')
+        self.assertFalse(r['success'])
+        ids = [e['id'] for e in r['experiencias_disponibles']]
+        self.assertIn('masaje_relajacion', ids)
+        self.assertIn('masaje_para_dos', ids)
+
+    def test_inexistente_entrega_el_catalogo_para_autocorregirse(self):
+        """El error trae el catálogo: el modelo se corrige EN el mismo turno,
+        sin tener que acordarse de llamar la otra tool."""
+        r = self._preparar('algo_que_no_existe')
+        self.assertFalse(r['success'])
+        self.assertTrue(r['experiencias_disponibles'])
+        self.assertIn('volvé a llamar', r['mensaje'])

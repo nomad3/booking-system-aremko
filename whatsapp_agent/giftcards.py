@@ -59,6 +59,54 @@ def catalogo_giftcards():
     }
 
 
+def _resolver_experiencia(texto):
+    """(experiencia, None) o (None, error_dict) a partir de id O nombre.
+
+    Primera prueba real (Jorge, 2026-08-12): Luna ofreció bien la experiencia,
+    pero al confirmar el cliente —un turno después— ya no tenía el resultado
+    del catálogo en contexto y reconstruyó el id desde el nombre visible. No
+    calzó, y una venta ya ganada escaló a humano. El modelo no sostiene datos
+    exactos entre turnos: la tolerancia va acá, no en pedirle memoria.
+
+    Orden: id exacto → nombre exacto → nombre contenido (si es único). El
+    error devuelve el catálogo vigente para que el modelo se corrija EN EL
+    MISMO turno, sin volver a llamar a la otra tool.
+    """
+    from ventas.models import GiftCardExperiencia
+
+    activas = GiftCardExperiencia.objects.filter(activo=True)
+    texto = (texto or '').strip()
+    if texto:
+        exp = activas.filter(id_experiencia=texto).first()
+        if exp:
+            return exp, None
+        exp = activas.filter(nombre__iexact=texto).first()
+        if exp:
+            return exp, None
+        # Nombre "a ojo": sirve si identifica UNA sola. Se prueba el texto
+        # completo y, si no, su primera parte sin paréntesis ni cola —
+        # «Masaje Relajación o Descontracturante (50 min)» debe calzar aunque
+        # el modelo recorte o agregue la duración.
+        candidatos = list(activas.filter(nombre__icontains=texto)[:2])
+        if not candidatos:
+            corto = texto.split('(')[0].strip()[:30]
+            if len(corto) >= 4:
+                candidatos = list(activas.filter(nombre__icontains=corto)[:2])
+        if len(candidatos) == 1:
+            return candidatos[0], None
+
+    disponibles = [{'id': e.id_experiencia, 'nombre': e.nombre,
+                    'precio': int(e.monto_fijo) if e.monto_fijo else None}
+                   for e in activas.order_by('categoria', 'orden')]
+    return None, {
+        'success': False, 'error': 'experiencia_no_existe',
+        'mensaje': (f'No pude identificar la gift card «{texto}». Elegí una '
+                    'del catálogo adjunto (usá su id) y volvé a llamar esta '
+                    'misma herramienta.'),
+        'experiencias_disponibles': disponibles,
+    }
+
+
 def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                       idempotency_key=None):
     """Crea la propuesta de venta de gift cards (mismo cajón que las reservas).
@@ -99,12 +147,9 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
         lineas, items, total, n_cartas = [], [], 0, 0
         for gc in giftcards_data:
             exp_id = (gc.get('experiencia_id') or '').strip()
-            exp = GiftCardExperiencia.objects.filter(
-                id_experiencia=exp_id, activo=True).first()
+            exp, error = _resolver_experiencia(exp_id)
             if exp is None:
-                return {'success': False, 'error': 'experiencia_no_existe',
-                        'mensaje': f'No hay una gift card «{exp_id}» activa. '
-                                   'Consultá el catálogo de nuevo.'}
+                return error
             cantidad = max(1, int(gc.get('cantidad') or 1))
 
             if exp.tiene_monto_fijo():

@@ -615,7 +615,7 @@ _TOOLS = [{
         'parameters': {
             'type': 'object',
             'properties': {
-                'experiencia_id': {'type': 'string', 'description': 'ID exacto de la experiencia según catalogo_giftcards. REQUERIDO.'},
+                'experiencia_id': {'type': 'string', 'description': 'ID de la experiencia según catalogo_giftcards, o su NOMBRE tal como lo viste (la herramienta lo resuelve). REQUERIDO. Si devuelve error con experiencias_disponibles, elegí el id correcto de esa lista y reintentá en este mismo turno.'},
                 'cantidad': {'type': 'integer', 'description': 'Cuántas gift cards de esa experiencia (default 1)'},
                 'monto': {'type': 'integer', 'description': 'SOLO para tarjetas de valor libre (sin precio fijo): monto en CLP que elige el cliente'},
                 'destinatario_nombre': {'type': 'string', 'description': 'Nombre de quien recibe el regalo (opcional, sale en la carta)'},
