@@ -67,19 +67,28 @@ _PALABRAS_VACIAS = {'de', 'la', 'el', 'los', 'las', 'un', 'una', 'o', 'y',
 
 
 def _palabras_clave(texto):
-    """Palabras significativas, sin tildes ni puntuación ni números.
+    """Palabras significativas, sin tildes, puntuación, números ni plurales.
 
     «Masaje Relajación o Descontracturante (50 min)» →
     {'masaje', 'relajacion', 'descontracturante'} — lo mismo dé cómo venga
     escrito: mayúsculas, tildes, paréntesis, puntos medios u orden.
+
+    El plural se recorta a los DOS lados por igual, así que da lo mismo si
+    coinciden en singular o no: «dos masajes» (la frase real de Jorge) tiene
+    que calzar con «Masaje para Dos». «dos» queda intacto — solo se recorta
+    con más de 3 letras.
     """
     import re
     import unicodedata
 
     plano = unicodedata.normalize('NFKD', texto or '')
     plano = plano.encode('ascii', 'ignore').decode().lower()
-    return {p for p in re.findall(r'[a-z]+', plano)
-            if len(p) >= 3 and p not in _PALABRAS_VACIAS}
+    palabras = set()
+    for p in re.findall(r'[a-z]+', plano):
+        if len(p) < 3 or p in _PALABRAS_VACIAS:
+            continue
+        palabras.add(p[:-1] if len(p) > 3 and p.endswith('s') else p)
+    return palabras
 
 
 def _resolver_experiencia(texto):
@@ -110,6 +119,14 @@ def _resolver_experiencia(texto):
             candidatos = [e for e in activas
                           if claves <= _palabras_clave(e.nombre)
                           or claves == _palabras_clave(e.id_experiencia)]
+            # Calce EXACTO primero: «Velada Sorpresa · Dulce» es subconjunto
+            # de «… Dulce + hidromasaje», así que pedir la base siempre daba
+            # ambigüedad y las 4 veladas simples eran irresolubles por nombre.
+            # Si una candidata usa exactamente las mismas palabras, es esa.
+            exactas = [e for e in candidatos
+                       if _palabras_clave(e.nombre) == claves]
+            if len(exactas) == 1:
+                return exactas[0], None
             if len(candidatos) == 1:
                 return candidatos[0], None
 

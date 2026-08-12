@@ -520,3 +520,62 @@ class PreguntasDeRegaloObligatoriasTest(TestCase):
         fuente = open(agent_mod.__file__, encoding='utf-8').read()
         self.assertIn('las gift cards llegan a {email}', fuente)
         self.assertIn('Si prefieres otro correo', fuente)
+
+
+class CatalogoRealDeAremkoTest(TestCase):
+    """Simulado contra el catálogo REAL de Jorge (2026-08-12) y traído acá:
+    dos agujeros que no se veían con nombres de laboratorio."""
+
+    def setUp(self):
+        # Los nombres son los de producción, tal cual.
+        _experiencia(id_exp='Masaje para 1 persona',
+                     nombre='Masaje de Relajacion o Descontracturante 1 persona',
+                     monto_fijo=40000)
+        _experiencia(id_exp='masaje_pareja', nombre='Masaje para Dos',
+                     monto_fijo=80000)
+        _experiencia(id_exp='tina_para_dos',
+                     nombre='Tina para dos · junto al río', monto_fijo=50000)
+        _experiencia(id_exp='velada_dulce', nombre='Velada Sorpresa · Dulce',
+                     monto_fijo=98000)
+        _experiencia(id_exp='velada_dulce_hidro',
+                     nombre='Velada Sorpresa · Dulce + hidromasaje',
+                     monto_fijo=108000)
+
+    def _resolver(self, texto):
+        from whatsapp_agent.giftcards import _resolver_experiencia
+        exp, _err = _resolver_experiencia(texto)
+        return exp
+
+    def test_dos_masajes_calza_aunque_venga_en_plural(self):
+        """La frase literal de Jorge. Antes: «masajes» ≠ «Masaje» → error."""
+        exp = self._resolver('dos masajes')
+        self.assertIsNotNone(exp)
+        self.assertEqual(exp.id_experiencia, 'masaje_pareja')
+
+    def test_la_velada_base_ya_no_es_irresoluble(self):
+        """«Velada Sorpresa · Dulce» es subconjunto exacto de «… +
+        hidromasaje»: pedir la base daba ambigüedad para siempre. Ahora el
+        calce EXACTO gana."""
+        exp = self._resolver('Velada Sorpresa Dulce')
+        self.assertIsNotNone(exp)
+        self.assertEqual(exp.id_experiencia, 'velada_dulce')
+
+    def test_la_version_con_hidromasaje_sigue_resolviendo(self):
+        exp = self._resolver('Velada Sorpresa · Dulce + hidromasaje')
+        self.assertEqual(exp.id_experiencia, 'velada_dulce_hidro')
+
+    def test_masaje_a_secas_sigue_pidiendo_precision(self):
+        """Con dos masajes activos, «masaje» es genuinamente ambiguo: no
+        adivinar es lo correcto."""
+        self.assertIsNone(self._resolver('masaje'))
+
+    def test_el_individual_no_se_confunde_con_el_de_pareja(self):
+        exp = self._resolver('Masaje Relajación o Descontracturante (50 min)')
+        self.assertEqual(exp.id_experiencia, 'Masaje para 1 persona')
+        self.assertEqual(int(exp.monto_fijo), 40000)
+
+    def test_el_prompt_distingue_una_carta_para_dos_de_dos_cartas(self):
+        import whatsapp_agent.prompt as prompt_mod
+        fuente = open(prompt_mod.__file__, encoding='utf-8').read()
+        self.assertIn('Masaje para dos personas', fuente)
+        self.assertIn('no se puede partir', fuente)
