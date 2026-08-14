@@ -396,13 +396,25 @@ def _descuento_pack_cabana(cabana, tina, f, cabana_hora, tina_hora, personas):
         return 0
 
 
-def disponibilidad_pack_cabana_tina(fecha, personas=2):
+def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
     """Propone itinerarios Cabaña + Tina (1 noche, 2 personas) para `fecha`.
 
     Lista las cabañas libres esa noche (todas para 2) y les acopla UNA tina en el horario
     MÁS TARDE disponible >= 16:00 (regla fundamental). Cada opción trae precio real y precio
     con descuento de pack (dom-jue). El desayuno ($20.000 para dos, día siguiente ~10:00) va
     INCLUIDO en el `precio_total` del paquete y se menciona como incluido. 1 noche por ahora.
+
+    Con `todas=True` agrega `alternativas`: CADA cabaña con CADA tina disponible, no solo
+    con la más tarde. Jorge (2026-08-14), viendo que para el 22 salían dos opciones y las
+    dos con la misma tina: «¿por qué no ofrece entre las opciones tina de hidromasaje que
+    hay disponible también para ese día en horarios cercanos?». La causa eran DOS topes
+    apilados: `elegir_tina_mas_tarde` se quedaba con UNA tina —la Tronador de 22:00 le
+    ganaba por media hora a la Hidromasaje de 21:30— y esa misma se repetía en todas las
+    cabañas, más un corte a 2 opciones.
+
+    `opciones` NO cambia: la usan la landing de /noche-de-aguas-calientes/, la tool de
+    disponibilidad de Luna y el ruteo de packs. Lo nuevo viaja aparte, igual que hizo la
+    Pausa en H-059.
     """
     from .availability import disponibilidad, _parse_fecha
 
@@ -460,6 +472,40 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
     # Limitar a máximo 2 opciones para evitar que Luna ofrezca demasiadas alternativas
     opciones = opciones[:2]
 
+    # `alternativas`: cada cabaña con cada tina. Una entrada por par, usando el horario
+    # MÁS TARDE de esa tina — varios slots de la misma tina serían ruido, no opciones.
+    # Orden: hora desc (la regla de Jorge sigue mandando, ahora como criterio de ORDEN y
+    # no como filtro), luego precio y nombre para que sea determinístico.
+    alternativas = []
+    if todas:
+        for c in cabanas:
+            cab_total = c['precio_total']
+            cabana_hora = (c.get('slots_libres') or ['16:00'])[0]
+            for t in tinas:
+                slots = [s for s in (t.get('slots_libres') or [])
+                         if (hhmm_a_min(s) or -1) >= TINA_PISO_CABANA_MIN]
+                if not slots:
+                    continue
+                hora_t = max(slots, key=lambda x: hhmm_a_min(x))
+                t_total = t['precio_total']
+                precio_total = cab_total + t_total
+                desc = _descuento_pack_cabana(c, t, f, cabana_hora, hora_t, personas)
+                alternativas.append({
+                    'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
+                               'hora_check_out': '11:00 del día siguiente',
+                               'precio_total': cab_total},
+                    'desayuno': _desayuno_de_cabana(c['nombre']),
+                    'desayuno_incluido': True,
+                    'tina': {'nombre': t['nombre'], 'hora': hora_t,
+                             'precio_total': t_total},
+                    'precio_total': precio_total,
+                    'descuento_pack': desc,
+                    'precio_con_descuento': max(0, precio_total - desc),
+                    'hay_descuento': desc > 0,
+                })
+        alternativas.sort(key=lambda o: (-(hhmm_a_min(o['tina']['hora']) or 0),
+                                         o['precio_total'], o['cabana']['nombre']))
+
     nota = ''
     if tina is None:
         nota = ('no hay tina disponible desde las 16:00 esa noche; ofrecer solo la cabaña '
@@ -473,8 +519,11 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2):
     # de dejarlo (antes: avisaba "precio normal, el descuento aplica domingo a jueves").
     nota_upsell = ''
 
-    return {'fecha': f.isoformat(), 'personas': personas, 'tina_mas_tarde': tina_hora,
-            'opciones': opciones, 'nota': nota, 'nota_upsell': nota_upsell}
+    salida = {'fecha': f.isoformat(), 'personas': personas, 'tina_mas_tarde': tina_hora,
+              'opciones': opciones, 'nota': nota, 'nota_upsell': nota_upsell}
+    if todas:
+        salida['alternativas'] = alternativas
+    return salida
 
 
 # ── Ritual del Río (H-031 Fase 1): cabaña + tina + masaje + desayuno, 1 unidad ──

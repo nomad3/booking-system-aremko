@@ -52,6 +52,10 @@ NOMBRES = {
 
 # Tope de alternativas por respuesta (evita abrumar la bandeja con decenas de botones).
 MAX_ALTERNATIVAS = 12
+# Noche de Aguas Calientes combina cabañas × tinas, así que crece rápido. Tope de
+# Jorge (2026-08-14): 6. En el cajón se muestran de a una y él o Deborah eligen
+# cuál enviar, así que el tope es para que la lista sea manejable, no para esconder.
+MAX_ALTERNATIVAS_NOCHE = 6
 
 
 def _alt(titulo, precio_total, precio_con_descuento, hay_descuento, texto_sugerido, itinerario):
@@ -123,11 +127,15 @@ def _masaje_solo(fecha, personas):
 # ---------------------------------------------------------------------------
 
 def _noche_aguas_calientes(fecha, personas):
-    res = packs.disponibilidad_pack_cabana_tina(fecha, personas=personas)
+    # `todas=True`: cada cabaña con cada tina, no una sola tina repetida (Jorge,
+    # 2026-08-14). Vienen ordenadas de la tina más tarde a la más temprana —esa
+    # sigue siendo la preferida— y se topean en 6: en el cajón se muestran de a
+    # una y Deborah elige cuál mandarle al cliente.
+    res = packs.disponibilidad_pack_cabana_tina(fecha, personas=personas, todas=True)
     if res.get('error'):
         return {'error': res['error']}
     alts = []
-    for op in res.get('opciones', []):
+    for op in (res.get('alternativas') or res.get('opciones', [])):
         cab = op['cabana']
         tina = op.get('tina')
         itin = [{'servicio': cab['nombre'], 'hora': cab['hora_check_in']}]
@@ -144,7 +152,7 @@ def _noche_aguas_calientes(fecha, personas):
             titulo=titulo, precio_total=precio, precio_con_descuento=precio_desc,
             hay_descuento=bool(op.get('hay_descuento')), texto_sugerido=texto,
             itinerario=itin))
-    return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
+    return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS_NOCHE]}
 
 
 # ---------------------------------------------------------------------------
