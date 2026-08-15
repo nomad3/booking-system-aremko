@@ -631,6 +631,34 @@ _TOOLS = [{
 }]
 
 
+_NOMBRES_DE_TOOLS = {t['function']['name'] for t in _TOOLS}
+
+
+def _nombre_de_tool(name):
+    """El nombre REAL de la herramienta que el modelo quiso llamar (H-100).
+
+    Caso real (2026-08-15, Jorge probando): con el destinatario, la dedicatoria
+    y el correo ya confirmados, Luna pidió `prepare_giftcard` — el nombre en
+    inglés, que no existe. La venta entera se derivó a una persona por una
+    letra, en el último paso y con todos los datos listos.
+
+    Se acepta el nombre inventado SOLO si se parece a UNA sola herramienta real:
+    con dos candidatas no se adivina y se deriva como siempre. Los nombres
+    genuinamente distintos (`check_availability`) no calzan con nada y siguen
+    derivando — esto perdona un dedazo, no traduce del inglés.
+    """
+    if not name or name in _NOMBRES_DE_TOOLS:
+        return name
+    import difflib
+    cercanos = [t for t in _NOMBRES_DE_TOOLS
+                if difflib.SequenceMatcher(None, name, t).ratio() >= 0.85]
+    if len(cercanos) == 1:
+        logger.warning('Agente WA: la tool «%s» no existe; se ejecuta «%s»',
+                       name, cercanos[0])
+        return cercanos[0]
+    return name
+
+
 def _fecha_hoy_texto():
     """'2026-06-14 (domingo)' en hora de Chile, para que el LLM resuelva 'el sábado'."""
     from django.utils import timezone
@@ -794,10 +822,32 @@ def _estado_estructurado(canal, external_id):
                 .filter(canal=canal, external_id=external_id, estado='pendiente')
                 .order_by('-created_at').first())
         if prop is not None and prop.esta_vigente():
+            # H-101: decirle que la cotización existe no alcanzaba — hay que
+            # decirle CÓMO sumarle algo. Con una cotización de gift card en
+            # curso, Jorge pidió «quiero agregar una tabla de quesos» y Luna
+            # escaló *«no se encontró la reserva para agregar el producto»* sin
+            # llamar a UNA sola herramienta (2026-08-15, 15:20). La indicación
+            # que nombra las tools vivía dentro de `buscar_reservas_cliente`
+            # (H-090), así que solo llegaba si el modelo la llamaba. Acá va en
+            # el estado, que se inyecta en TODOS los turnos.
+            como_sumar = (
+                'Para sumarle algo usá `agregar_producto_carrito` o '
+                '`agregar_servicio_carrito` — NO `agregar_producto_a_reserva_existente`, '
+                'porque todavía NO hay reserva creada. NUNCA escales ni digas que no '
+                'encontraste la reserva: la cotización ES donde se agrega.')
+            if (prop.payload or {}).get('giftcards'):
+                # Ver [[whatsapp_agent/giftcards.py]]: el agregado viaja DENTRO
+                # de la carta («Incluye: 1 Tabla de Quesos»), que es justamente
+                # lo que el modelo no hizo cuando inventó una carta de $80.000.
+                como_sumar += (
+                    ' Es una cotización de GIFT CARD: si el cliente suma un producto '
+                    '(una tabla, jugos), va DENTRO del regalo y la carta lo dirá. '
+                    'NO busques otra gift card cuyo precio sume ese total.')
             bloques.append(
                 f'COTIZACIÓN YA ENVIADA Y VIGENTE (total ${int(prop.total or 0):,}): el cliente ya la '
                 'tiene para aprobar. Si pide un cambio, ajustá sobre ESA; NO armes otra cotización '
-                'desde cero. NO digas que está "confirmada"/"reservada" hasta que la apruebe.')
+                'desde cero. NO digas que está "confirmada"/"reservada" hasta que la apruebe. '
+                + como_sumar)
     except Exception:  # noqa: BLE001
         logger.exception('[estado] no se pudo leer la propuesta de %s/%s', canal, external_id)
     if not bloques:
@@ -1594,6 +1644,10 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         # una persona en vez de sumarlo. Definirlo acá arriba cierra la clase entera de
         # bug; las ramas que necesitan otro default lo siguen pisando abajo.
         external_id = phone if phone else 'desconocido'
+        # H-100: el modelo a veces pide la tool con el nombre en inglés. Se
+        # corrige acá arriba, antes del despacho, para que valga en TODAS las
+        # ramas y no solo en la que se cayó.
+        name = _nombre_de_tool(name)
         if name == 'consultar_disponibilidad':
             from .availability import disponibilidad
             try:
