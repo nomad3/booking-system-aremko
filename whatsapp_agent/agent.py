@@ -2133,6 +2133,39 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
 
                 carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
                 if carrito is None or not carrito.items:
+                    # H-103: con la cotización ya enviada, el carrito vacío NO es
+                    # un problema — la venta vive en la PROPUESTA y el cliente la
+                    # aprueba desde el link. Jorge (2026-08-15 15:57) respondió
+                    # «si» a «te la enviamos para que la revises», Luna leyó eso
+                    # como «confirmá la reserva», encontró el carrito vacío y
+                    # derivó a una persona con la venta lista y correcta.
+                    #
+                    # Mismo aprendizaje que H-090: devolver el vacío a secas es
+                    # esconderle la salida al modelo.
+                    from .grounding import formatear_precio
+                    from .models import PropuestaReserva
+                    prop = (PropuestaReserva.objects
+                            .filter(canal=canal, external_id=external_id, estado='pendiente')
+                            .order_by('-created_at').first())
+                    if prop is not None and prop.esta_vigente():
+                        logger.info('[confirmar_reserva_carrito] carrito vacío pero la '
+                                    'propuesta %s está vigente → no es un error',
+                                    prop.propuesta_id[:8])
+                        return {
+                            'success': True,
+                            'ya_cotizado': True,
+                            'propuesta_id': prop.propuesta_id,
+                            'total': int(prop.total or 0),
+                            # `mensaje` es lo que Luna copia al cliente: acá va
+                            # texto apto para él, nunca la instrucción interna.
+                            'mensaje': (f'Tu cotización por {formatear_precio(prop.total)} ya está '
+                                        'lista y te la enviamos. Al aprobarla te llegan los datos '
+                                        'de transferencia 🌿'),
+                            'instruccion': (
+                                'La cotización YA está creada y enviada; no hay carrito porque '
+                                'esta venta vive en la propuesta. NO armes otra, NO uses las '
+                                'tools del carrito y NO escales.'),
+                        }
                     return {
                         'success': False,
                         'error': 'carrito_vacio',
