@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-08-06_
+_Última revisión: 2026-08-15_
 
 ## Web y marketing
 
@@ -180,6 +180,29 @@ _Última revisión: 2026-08-06_
     ($75.000 para 3 personas) en el admin.
 15. **P-15 · WhatsApp Cloud API / Meta** — Destrabar App Review (decidir App propio
     vs BSP) y rotar el APP_SECRET de la bandeja de Instagram.
+24. **P-24 · La BD de test no se puede crear (ningún test corre)** — `manage.py test`
+    muere aplicando migraciones: `column "tramos_validos" of relation "ventas_premio"
+    already exists`. Como la BD de test se crea desde cero, **hoy no corre un solo
+    test del repo**: el 2026-08-15 quedaron 26 tests escritos sin ejecutar (check-out
+    de la agenda, hora del pedido, y los siete arreglos de gift cards H-099…H-105).
+    Reparar drift-safe (`SeparateDatabaseAndState` + `ADD COLUMN IF NOT EXISTS`, ver
+    `ventas/migrations/0134`): prod ya tiene la columna, el arreglo debe ser no-op
+    contra prod. **OJO:** `makemigrations ventas --check` también reporta drift
+    preexistente (índices como `producto_comanda_idx` de la 0082 que el modelo no
+    declara) — NO generarlas a ciegas: borrarían índices vivos.
+25. **P-25 · El editor «Corregir cotización» no sabe de gift cards** — En la bandeja
+    (repo `aremko-cli`) no se puede corregir una cotización de gift card: exige ≥1
+    servicio en las tres capas (`CotizacionCajon.tsx`, `luna.go`, `editar_propuesta`
+    en Django). **Relajar solo la validación ROMPE la venta**: `recalcular_propuesta`
+    recalcula el total con servicios+productos y dejaría las cartas guardadas pero
+    invisibles (una cotización de $100.000 quedaría en $20.000). Primero enseñarle a
+    `editar_propuesta` a conservar y sumar las gift cards, después destrabar las tres
+    capas. Toca 2 repos y 3 deploys (Django, Vercel, backend Go a mano). Mientras
+    tanto el camino es pedírselo a Luna por chat, que sí sabe (H-105).
+26. **P-26 · El cron de vaciado de tinas falla cada media hora** — `gen_vaciado_tinas`
+    tira `value too long for type character varying(16)` procesando el servicio 13913
+    (visto 2026-08-15 a las 18:30 y 19:00 UTC): un campo se pasa de largo y esa tarea
+    de vaciado no se genera. Nadie se entera porque el cron sigue corriendo.
 
 ## Asistente de Publicaciones (community manager)
 
