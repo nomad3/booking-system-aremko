@@ -9,7 +9,7 @@ from .forms import PagoInlineForm, PagoInlineFormSet, VentaReservaAdminForm
 from django.forms import DateTimeInput
 from datetime import date, datetime, timedelta  # Importa date, datetime, y timedelta
 from django.utils import timezone
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -147,6 +147,21 @@ class ReservaServicioInline(admin.TabularInline):
 
         return formfield
 
+def productos_vendibles(ids_visibles=None):
+    """Productos que el personal puede elegir al vender: los del menú de comanda
+    del cliente más los de venta en mesón, y solo con inventario disponible.
+
+    `ids_visibles` son productos que igual deben aparecer aunque hoy no califiquen
+    (los ya guardados en la reserva/comanda que se está editando). Sin eso, abrir
+    una reserva antigua con un producto descatalogado o sin stock reventaría al
+    guardar con "Escoja una opción válida".
+    """
+    filtro = (Q(comanda_cliente=True) | Q(venta_meson=True)) & Q(cantidad_disponible__gt=0)
+    if ids_visibles:
+        filtro |= Q(id__in=list(ids_visibles))
+    return Producto.objects.filter(filtro).order_by('nombre')
+
+
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
@@ -178,9 +193,21 @@ class ReservaProductoInline(admin.TabularInline):
         }.get(det.comanda.estado, det.comanda.get_estado_display())
     estado_comanda.short_description = 'Estado'
 
+    def get_formset(self, request, obj=None, **kwargs):
+        """Guarda la VentaReserva que se está editando para que
+        formfield_for_foreignkey pueda dejar visibles sus productos actuales."""
+        request._venta_reserva_en_edicion = obj
+        return super().get_formset(request, obj, **kwargs)
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "producto":
-            kwargs["queryset"] = Producto.objects.order_by('nombre')  # Ordena alfabéticamente por nombre
+            venta = getattr(request, '_venta_reserva_en_edicion', None)
+            ids_actuales = (
+                ReservaProducto.objects
+                .filter(venta_reserva=venta)
+                .values_list('producto_id', flat=True)
+            ) if venta and venta.pk else None
+            kwargs["queryset"] = productos_vendibles(ids_actuales)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
@@ -1714,12 +1741,14 @@ class CategoriaProductoAdmin(admin.ModelAdmin):
 
 class ProductoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'categoria', 'precio_base', 'publicado_web', 'comanda_cliente',
-                    'orden', 'orden_comanda', 'cantidad_disponible', 'vista_previa_imagen')
+                    'venta_meson', 'alerta_selector', 'orden', 'orden_comanda',
+                    'cantidad_disponible', 'vista_previa_imagen')
     search_fields = ('nombre', 'categoria__nombre', 'descripcion_web')
-    list_filter = ('publicado_web', 'comanda_cliente', 'categoria', 'proveedor')
-    list_editable = ('publicado_web', 'comanda_cliente', 'orden', 'orden_comanda')
+    list_filter = ('publicado_web', 'comanda_cliente', 'venta_meson', 'categoria', 'proveedor')
+    list_editable = ('publicado_web', 'comanda_cliente', 'venta_meson', 'orden', 'orden_comanda')
     autocomplete_fields = ['proveedor', 'categoria']
     ordering = ('orden', 'nombre')
+    actions = ['marcar_venta_meson', 'desmarcar_venta_meson']
 
     fieldsets = (
         ('Información Básica', {
@@ -1739,7 +1768,57 @@ class ProductoAdmin(admin.ModelAdmin):
                           'El "Orden en Menú" determina en qué posición aparece (menor = primero).',
             'classes': ('collapse',)
         }),
+        ('🏪 Venta en Mesón (solo personal)', {
+            'fields': ('venta_meson',),
+            'description': 'Para lo que se vende cara a cara —espumantes, vinos— y NO debe quedar '
+                          'a la vista de cualquiera en el link público de comanda. '
+                          'Marcado acá, el producto aparece en el selector de Reserva Productos y '
+                          'en la comanda interna, siempre que tenga inventario mayor que cero.',
+        }),
     )
+
+    @admin.display(description='Selector')
+    def alerta_selector(self, obj):
+        """Explica en el listado por qué un producto marcado no aparece al vender:
+        el selector exige inventario disponible."""
+        habilitado = obj.comanda_cliente or obj.venta_meson
+        if not habilitado:
+            return format_html('<span style="color:#999;">—</span>')
+        if obj.cantidad_disponible > 0:
+            return format_html('<span style="color:#2e7d32;">✓ visible</span>')
+        return format_html(
+            '<span style="color:#c62828;" title="Marcado, pero sin inventario: no aparece en el '
+            'selector de productos">⚠️ sin stock</span>'
+        )
+
+    @admin.action(description='🏪 Marcar como Venta en Mesón')
+    def marcar_venta_meson(self, request, queryset):
+        actualizados = queryset.update(venta_meson=True)
+        sin_stock = queryset.filter(cantidad_disponible__lte=0).count()
+        self.message_user(request, f'{actualizados} producto(s) marcados para venta en mesón.')
+        if sin_stock:
+            self.message_user(
+                request,
+                f'{sin_stock} de ellos no aparecerán en el selector hasta que tengan inventario mayor que cero.',
+                level=messages.WARNING,
+            )
+
+    @admin.action(description='Quitar de Venta en Mesón')
+    def desmarcar_venta_meson(self, request, queryset):
+        actualizados = queryset.update(venta_meson=False)
+        self.message_user(request, f'{actualizados} producto(s) quitados de venta en mesón.')
+
+    def get_search_results(self, request, queryset, search_term):
+        """El autocomplete de productos dentro de una Comanda usa este método.
+        Ahí el personal solo debe ver lo vendible; en Compras a proveedor
+        (DetalleCompra) se sigue buscando sobre el catálogo completo."""
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        if (request.GET.get('model_name') == 'detallecomanda'
+                and request.GET.get('field_name') == 'producto'):
+            queryset = queryset.filter(
+                (Q(comanda_cliente=True) | Q(venta_meson=True)) & Q(cantidad_disponible__gt=0)
+            )
+        return queryset, may_have_duplicates
 
     def vista_previa_imagen(self, obj):
         """Mostrar miniatura de la imagen en el listado"""

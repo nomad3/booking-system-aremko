@@ -169,6 +169,16 @@ class Producto(models.Model):
         help_text="Orden de visualización en el menú de comandas para clientes (menor número = primero)"
     )
 
+    # Venta atendida por el personal (mesón). Separado de comanda_cliente porque
+    # hay productos —espumante, vino— que se venden cara a cara pero NO deben
+    # quedar a la vista de cualquiera en el link público de comanda.
+    venta_meson = models.BooleanField(
+        default=False,
+        verbose_name="Venta en Mesón",
+        help_text="Si está marcado, el personal puede agregar este producto a una reserva o comanda "
+                  "desde el admin, sin que aparezca en el menú público del cliente"
+    )
+
     class Meta:
         ordering = ['orden', 'nombre']
         verbose_name = "Producto"
