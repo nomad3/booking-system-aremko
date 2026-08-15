@@ -117,3 +117,68 @@ class CartaConfirmadaPorElClienteTests(TestCase):
         r = self._preparar('masaje_pareja')
 
         self.assertIn('agregá el producto aparte', r['instruccion'])
+
+
+class NoRepreguntarLoYaCotizadoTests(TestCase):
+    """H-102 — con la cotización lista, la herramienta no reinicia el guion.
+
+    Jorge, 2026-08-15 15:38: cotización de tina enviada, tabla de quesos ya
+    sumada ($70.000), y Luna volvió a llamar la herramienta sin el destinatario.
+    El control de duplicados estaba DESPUÉS de las cuatro preguntas, así que el
+    guion arrancó de cero: «¿A nombre de quién va la gift card?» — con el dato
+    en pantalla dos mensajes más arriba.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        _experiencia('tina_para_dos', 'Tina para dos · junto al río', 50000)
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from whatsapp_agent.models import PropuestaReserva
+
+        self.key = 'gc-+56911111111-tina_para_dos-1'
+        self.previa = PropuestaReserva.objects.create(
+            propuesta_id='prop-vigente-1', idempotency_key=self.key,
+            canal='whatsapp', external_id='+56911111111',
+            payload={'giftcards': [{'experiencia_id': 'tina_para_dos', 'precio': 50000,
+                                    'cantidad': 1, 'destinatario_nombre': 'Martin'}],
+                     'servicios': [], 'productos': [{'producto_id': 1, 'cantidad': 1}]},
+            cliente_data={}, servicios=[], total=70000,   # 50.000 + la tabla
+            expires_at=timezone.now() + timedelta(hours=12))
+
+    def _preparar_sin_destinatario(self):
+        return preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE), idempotency_key=self.key,
+            historial='[Cliente]: quiero regalar una tina para dos\n', mensaje='sí',
+            giftcards_data=[{'experiencia_id': 'tina_para_dos', 'cantidad': 1}])
+
+    def test_devuelve_la_cotizacion_vigente_en_vez_de_preguntar_de_nuevo(self):
+        r = self._preparar_sin_destinatario()
+
+        self.assertTrue(r['success'])
+        self.assertTrue(r['duplicada'])
+        self.assertNotIn('A nombre de quién', str(r.get('mensaje', '')))
+
+    def test_el_total_incluye_lo_que_se_sumo_despues(self):
+        """La tabla se agregó a la propuesta: son $70.000, no los $50.000 de la
+        carta sola."""
+        r = self._preparar_sin_destinatario()
+
+        self.assertEqual(r['total'], 70000)
+
+    def test_una_venta_nueva_sigue_pidiendo_el_destinatario(self):
+        """El guion de H-094 queda intacto donde corresponde: sin cotización
+        previa, sin destinatario no se cotiza."""
+        r = preparar_giftcard(
+            canal='whatsapp', external_id='+56911111111',
+            cliente_data=dict(CLIENTE), idempotency_key='gc-otra-distinta-1',
+            historial='[Cliente]: quiero regalar una tina para dos\n', mensaje='sí',
+            giftcards_data=[{'experiencia_id': 'tina_para_dos', 'cantidad': 1}])
+
+        self.assertFalse(r['success'])
+        self.assertEqual(r['error'], 'falta_destinatario')

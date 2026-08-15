@@ -439,6 +439,25 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
             if _exp is None:
                 return error
 
+        # Segundo: ¿esto ya está cotizado? Va ANTES de las preguntas a propósito
+        # (H-102). Jorge, 2026-08-15: con la cotización lista y la tabla de
+        # quesos ya sumada, Luna volvió a llamar esta herramienta sin el
+        # destinatario y el guion arrancó de cero — «¿A nombre de quién va la
+        # gift card?» por segunda vez, con el dato en pantalla dos mensajes más
+        # arriba. Preguntar algo que ya está guardado no es prudencia, es un
+        # loop: la propuesta vigente YA tiene esas respuestas.
+        if idempotency_key:
+            previa = PropuestaReserva.objects.filter(
+                idempotency_key=idempotency_key).first()
+            if previa and previa.esta_vigente():
+                logger.info('[Luna] Propuesta giftcard duplicada (idempotente): %s',
+                            idempotency_key[:24])
+                return {'success': True, 'propuesta_id': previa.propuesta_id,
+                        'resumen_texto': previa.resumen_texto,
+                        # El total sale de la propuesta, así que incluye lo que
+                        # se le sumó después (la tabla): $70.000, no $50.000.
+                        'total': int(previa.total), 'duplicada': True}
+
         primera = giftcards_data[0] or {}
         destinatario = (primera.get('destinatario_nombre') or '').strip()
         dedicatoria = (primera.get('mensaje') or '').strip()
@@ -494,16 +513,6 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                           f'La compra queda a nombre de {nombre}, ¿está bien así?',
                           historial=historial)
 
-
-        if idempotency_key:
-            previa = PropuestaReserva.objects.filter(
-                idempotency_key=idempotency_key).first()
-            if previa and previa.esta_vigente():
-                logger.info('[Luna] Propuesta giftcard duplicada (idempotente): %s',
-                            idempotency_key[:24])
-                return {'success': True, 'propuesta_id': previa.propuesta_id,
-                        'resumen_texto': previa.resumen_texto,
-                        'total': int(previa.total), 'duplicada': True}
 
         lineas, items, total, n_cartas = [], [], 0, 0
         for gc in giftcards_data:

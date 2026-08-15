@@ -16,6 +16,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
 
+from whatsapp_agent.grounding import formatear_precio
 from whatsapp_agent.models import PropuestaReserva
 from ventas.models import Servicio, VentaReserva
 
@@ -303,8 +304,12 @@ def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
         'actualizo_propuesta': True,
         'propuesta_id': propuesta.propuesta_id,
         'total': int(propuesta.total),
+        # El separador de miles se formatea con `formatear_precio`: este texto
+        # va tal cual al WhatsApp del cliente, y `f'{x:,}'` le mandaba «$70,000»
+        # (Jorge lo vio en su propia prueba, 2026-08-15).
         'mensaje': (f'¡Listo! Sumé {producto.nombre} a tu cotización. '
-                    f'Nuevo total ${int(propuesta.total):,}. Te la enviamos para que la revises. 🌿'),
+                    f'Nuevo total {formatear_precio(propuesta.total)}. '
+                    'Te la enviamos para que la revises. 🌿'),
     }
 
 
@@ -366,7 +371,8 @@ def agregar_servicio_a_propuesta(canal, external_id, servicio_id, fecha, hora, c
         'propuesta_id': propuesta.propuesta_id,
         'total': total,
         'mensaje': (f'¡Listo! Sumé {nombre_srv} a tu cotización. '
-                    f'Nuevo total ${total:,}. Te la enviamos para que la revises. 🌿'),
+                    f'Nuevo total {formatear_precio(total)}. '
+                    'Te la enviamos para que la revises. 🌿'),
     }
 
 
