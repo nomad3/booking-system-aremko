@@ -42,6 +42,11 @@ class MedioPago(models.Model):
         default=False, db_index=True,
         help_text="ON: cada pago con este medio genera boleta electrónica. "
                   "OFF: el recaudador informa al SII (voucher = boleta) o no es plata real.")
+    visible_al_cobrar = models.BooleanField(
+        default=True, verbose_name='Visible al cobrar',
+        help_text="ON: aparece en el selector de método de pago del admin. "
+                  "OFF: se esconde del selector SIN borrar nada — los pagos "
+                  "históricos con este medio siguen intactos y se siguen viendo.")
     nota = models.CharField(max_length=255, blank=True, default='')
     actualizado_at = models.DateTimeField(auto_now=True)
 

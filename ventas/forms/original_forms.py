@@ -94,6 +94,15 @@ class PagoInlineForm(forms.ModelForm):
         model = Pago
         fields = ['fecha_pago', 'monto', 'metodo_pago', 'giftcard']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        campo = self.fields.get('metodo_pago')
+        if campo is not None:
+            # Import lazy: facturacion es una app aislada y opcional respecto de ventas.
+            from facturacion.medios import filtrar_choices_pago
+            actual = self.instance.metodo_pago if self.instance and self.instance.pk else None
+            campo.choices = filtrar_choices_pago(campo.choices, actual)
+
     def clean(self):
         cleaned_data = super().clean()
         metodo_pago = cleaned_data.get('metodo_pago')

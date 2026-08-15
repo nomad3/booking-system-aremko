@@ -2140,6 +2140,16 @@ class PagoAdmin(admin.ModelAdmin):
     list_display = ('venta_reserva', 'monto', 'metodo_pago', 'fecha_pago')
     actions = ['emitir_boleta_electronica']
 
+    def get_form(self, request, obj=None, **kwargs):
+        """Ofrece solo los medios de pago vigentes, más el que este pago ya
+        tenga guardado (ver facturacion/medios.py)."""
+        form = super().get_form(request, obj, **kwargs)
+        campo = form.base_fields.get('metodo_pago')
+        if campo is not None:
+            from facturacion.medios import filtrar_choices_pago
+            campo.choices = filtrar_choices_pago(campo.choices, obj.metodo_pago if obj else None)
+        return form
+
     @admin.action(description='Emitir boleta electrónica (P-16)')
     def emitir_boleta_electronica(self, request, queryset):
         # Import lazy: la app facturacion es aislada y opcional respecto de ventas.

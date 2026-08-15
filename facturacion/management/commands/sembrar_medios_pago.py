@@ -35,6 +35,15 @@ GENERAN_BOLETA = {
     'mercadopagoaremko',  # transferencia directa a la Cuenta Vista MP → SÍ boletea
 }
 
+# Medios que Jorge dejó de usar (2026-08-15): no se ofrecen al cobrar, pero el
+# historial se conserva. Solo aplica a los que se CREAN acá; si el medio ya
+# existe, manda lo que esté marcado en el admin.
+OCULTOS_AL_COBRAR = {
+    'transferencia', 'webpay', 'descuento',
+    'machjorge', 'machalda', 'bicegoalda', 'bcialda', 'andesalda',
+    'mercadopagoaremko', 'scotiabankalda', 'copecjorge', 'copecalda',
+}
+
 NOTAS = {
     'mercadopago_link': 'Link de pago MP: lo informa MP al SII (voucher = boleta).',
     'mercadopago': 'Revisar caso a caso: si es transferencia a la Cuenta Vista, boletea.',
@@ -67,6 +76,7 @@ class Command(BaseCommand):
                 defaults={
                     'nombre': nombre,
                     'genera_boleta': codigo in GENERAN_BOLETA,
+                    'visible_al_cobrar': codigo not in OCULTOS_AL_COBRAR,
                     'nota': NOTAS.get(codigo, ''),
                 },
             )

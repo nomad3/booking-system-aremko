@@ -8,9 +8,9 @@ from .services.emisor import emitir_boleta_para_pago
 
 @admin.register(MedioPago)
 class MedioPagoAdmin(admin.ModelAdmin):
-    list_display = ('codigo', 'nombre', 'genera_boleta', 'nota', 'actualizado_at')
-    list_editable = ('genera_boleta',)
-    list_filter = ('genera_boleta',)
+    list_display = ('codigo', 'nombre', 'visible_al_cobrar', 'genera_boleta', 'nota', 'actualizado_at')
+    list_editable = ('visible_al_cobrar', 'genera_boleta')
+    list_filter = ('visible_al_cobrar', 'genera_boleta')
     search_fields = ('codigo', 'nombre')
     ordering = ('-genera_boleta', 'codigo')
 
