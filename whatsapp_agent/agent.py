@@ -351,14 +351,19 @@ _TOOLS = [{
         'name': 'quitar_item_carrito',
         'description': (
             'Quita un item del carrito por su índice. '
-            'H-029 FASE 2. Recalcula totales automáticamente.'
+            'H-029 FASE 2. Recalcula totales automáticamente. '
+            'Si la venta YA está cotizada (hay cotización vigente), esta misma tool saca el '
+            'PRODUCTO de la cotización: pasá `nombre` con lo que dijo el cliente '
+            '(ej. "la tabla mixta") — ahí el índice no aplica.'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
                 'indice': {'type': 'integer', 'description': 'Índice del item a quitar (0-based)'},
+                'nombre': {'type': 'string',
+                           'description': 'Producto a quitar de la cotización, como lo nombró el cliente'},
             },
-            'required': ['indice'],
+            'required': [],
         },
     },
 }, {
@@ -1104,6 +1109,33 @@ def _token_en_texto(palabra, texto_norm):
     return any(re.search(r'\b' + re.escape(v) + r'\b', texto_norm) for v in variantes)
 
 
+_NEGADORES = ('no ', 'sin ', 'tampoco ', 'nada de ', 'menos ', 'ni ')
+
+
+def _sin_negaciones(texto_norm):
+    """PURA. Deja solo lo que el cliente pidió, sin los tramos que negó (H-104).
+
+    Jorge, 2026-08-15: le agregaron la Tabla Mixta cuando pidió una de jamones y
+    corrigió con «Quiero la tabla de jamones de 20.000 pesos, NO la tabla
+    mixta». Esa frase —la más clara de toda la conversación— hacía que «mixta»
+    sumara un punto A FAVOR de la mixta, porque el puntaje contaba la palabra sin
+    mirar si venía negada. El resultado: se bloqueó justo la corrección.
+
+    Devuelve '' si el cliente solo dijo lo que NO quiere: ahí no hay nada que
+    elegir y corresponde preguntarle, no adivinar.
+    """
+    partes = re.split(r'[,;.!¡?¿\n]+|\by\b|\bpero\b', texto_norm or '')
+    limpias = []
+    for parte in partes:
+        parte = parte.strip()
+        if not parte or parte == 'no':
+            continue
+        if any(parte.startswith(neg) for neg in _NEGADORES):
+            continue
+        limpias.append(parte)
+    return ' '.join(limpias)
+
+
 def _elegir_producto_por_contexto(contexto_norm, candidatos):
     """PURA. candidatos: [(id, nombre)]. Puntúa cada producto por cuántas palabras
     significativas de su nombre aparecen en el contexto (y qué fracción de su nombre
@@ -1142,7 +1174,11 @@ def _cliente_eligio_producto(mensaje, historial, producto_id, candidatos=None):
             Producto.objects.filter(publicado_web=True, cantidad_disponible__gt=0)
             .values_list('id', 'nombre'))
 
-    elegido, empatados = _elegir_producto_por_contexto(_normalizar_txt(mensaje or ''), candidatos)
+    # Solo lo que PIDIÓ: «no la tabla mixta» no puede puntuar a favor de la
+    # mixta (H-104). La limpieza se aplica al mensaje del cliente y no a la
+    # oferta de Aremko de más abajo, que es donde él niega.
+    elegido, empatados = _elegir_producto_por_contexto(
+        _sin_negaciones(_normalizar_txt(mensaje or '')), candidatos)
     if elegido is None and not empatados:
         ultima = ''
         for linea in reversed((historial or '').splitlines()):
@@ -2097,11 +2133,23 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         if name == 'quitar_item_carrito':
             # H-029 FASE 2: quitar item del carrito
             from carrito_reservas.services import CarritoService
+            from .reserva_service import quitar_producto_de_propuesta
             try:
                 args = args or {}
+                externo = phone if phone else 'desconocido'
+                # H-105: si la venta ya está cotizada, lo que hay que sacar vive
+                # en la PROPUESTA y no en el carrito (que está vacío). Antes esto
+                # respondía `indice_invalido` y la venta se derivaba a una persona
+                # por no poder deshacer un agregado.
+                desde_propuesta = quitar_producto_de_propuesta(
+                    canal=canal, external_id=externo,
+                    nombre=(args.get('nombre') or '').strip(),
+                    indice=args.get('indice'))
+                if desde_propuesta is not None:
+                    return desde_propuesta
                 resultado = CarritoService.quitar_item(
                     canal=canal,
-                    external_id=phone if phone else 'desconocido',
+                    external_id=externo,
                     indice=args.get('indice', 0)
                 )
                 return resultado

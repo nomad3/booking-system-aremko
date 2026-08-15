@@ -313,6 +313,102 @@ def agregar_producto_a_propuesta(canal, external_id, producto_id, cantidad=1):
     }
 
 
+def _calza_nombre(pedido, nombre_producto):
+    """¿«la tabla mixta» apunta a «Tabla Mixta de Quesos y Jamones»?
+
+    Compara solo contra los productos que YA están en la cotización (uno o dos),
+    así que basta con que las palabras largas del pedido estén en el nombre.
+    """
+    import re
+    import unicodedata
+
+    def plano(s):
+        s = unicodedata.normalize('NFD', (s or '').lower())
+        return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+
+    nombre_n = plano(nombre_producto)
+    palabras = [w for w in re.split(r'\W+', plano(pedido)) if len(w) >= 4]
+    return bool(palabras) and all(w in nombre_n for w in palabras)
+
+
+def quitar_producto_de_propuesta(canal, external_id, nombre='', indice=None):
+    """Saca un producto de la cotización vigente (H-105).
+
+    El espejo de `agregar_producto_a_propuesta`, que faltaba: se podía sumar una
+    tabla a la cotización pero no sacarla. Jorge (2026-08-15) pidió cambiar la
+    Tabla Mixta por la de Jamón y Luna se estrelló con `indice_invalido` —
+    `quitar_item_carrito` opera sobre el CARRITO, que en estas ventas está
+    vacío porque todo vive en la propuesta. La venta quedó derivada a una
+    persona por no poder deshacer un agregado.
+
+    Devuelve None si NO hay propuesta vigente (el caller usa el carrito normal).
+    """
+    from ventas.models import Producto
+
+    propuesta = (PropuestaReserva.objects
+                 .filter(canal=canal, external_id=external_id, estado='pendiente')
+                 .order_by('-created_at').first())
+    if propuesta is None or not propuesta.esta_vigente():
+        return None
+
+    payload = dict(propuesta.payload or {})
+    productos = list(payload.get('productos') or [])
+    if not productos:
+        # Nada que sacar acá (quitar SERVICIOS de una propuesta es otra
+        # historia: recalcula packs). Se devuelve None para no cambiarle el
+        # comportamiento al carrito, que es quien atendía esto hasta ahora.
+        return None
+
+    # Nombres reales, para poder nombrarlos al cliente y para el calce.
+    info = {p.id: (p.nombre, int(p.precio_base)) for p in Producto.objects.filter(
+        id__in=[x.get('producto_id') for x in productos])}
+
+    elegido = None
+    if nombre:
+        candidatos = [x for x in productos
+                      if _calza_nombre(nombre, info.get(x.get('producto_id'), ('', 0))[0])]
+        if len(candidatos) > 1:
+            nombres = ', '.join(info.get(c.get('producto_id'), ('?', 0))[0] for c in candidatos)
+            return {'success': False, 'error': 'producto_ambiguo',
+                    'mensaje': f'¿Cuál quitamos: {nombres}?'}
+        elegido = candidatos[0] if candidatos else None
+    if elegido is None and indice is not None:
+        try:
+            elegido = productos[int(indice)]
+        except (ValueError, TypeError, IndexError):
+            elegido = None
+    if elegido is None:
+        nombres = ', '.join(info.get(x.get('producto_id'), ('?', 0))[0] for x in productos)
+        return {'success': False, 'error': 'producto_no_encontrado',
+                'mensaje': f'En la cotización hay: {nombres}. ¿Cuál quitamos?'}
+
+    pid = elegido.get('producto_id')
+    nombre_prod, precio = info.get(pid, ('el producto', 0))
+    cantidad = max(1, int(elegido.get('cantidad') or 1))
+
+    productos = [x for x in productos if x is not elegido]
+    payload['productos'] = productos
+    propuesta.payload = payload
+    propuesta.total = max(0, int(propuesta.total or 0) - precio * cantidad)
+    # La línea del resumen se va con el producto; si no, la cotización diría un
+    # detalle que ya no existe.
+    propuesta.resumen_texto = '\n'.join(
+        linea for linea in (propuesta.resumen_texto or '').splitlines()
+        if nombre_prod not in linea).strip()
+    propuesta.save(update_fields=['payload', 'total', 'resumen_texto'])
+
+    logger.info('[Luna] Producto %s quitado de la propuesta vigente %s (nuevo total $%s)',
+                nombre_prod, propuesta.propuesta_id[:8], propuesta.total)
+    return {
+        'success': True,
+        'actualizo_propuesta': True,
+        'propuesta_id': propuesta.propuesta_id,
+        'total': int(propuesta.total),
+        'mensaje': (f'¡Listo! Saqué {nombre_prod} de tu cotización. '
+                    f'Nuevo total {formatear_precio(propuesta.total)}. 🌿'),
+    }
+
+
 def agregar_servicio_a_propuesta(canal, external_id, servicio_id, fecha, hora, cantidad_personas):
     """Si YA existe una propuesta vigente, suma el SERVICIO a ESA propuesta en vez de abrir un
     carrito separado que la dejaría desincronizada (caso real H-043: el masaje agregado tras armar
