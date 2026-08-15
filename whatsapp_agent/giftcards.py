@@ -313,6 +313,93 @@ def _resolver_experiencia(texto):
     }
 
 
+def _palabras_distintivas(exp, activas):
+    """Las palabras del nombre que MENOS se repiten en el catálogo.
+
+    Son las que de verdad eligen esta carta y no otra: «dos» está en siete
+    experiencias y «velada» en ocho, así que decirlas no elige nada; «tina»,
+    «pausa» o «dulce» sí.
+
+    Se toman las más raras en vez de un umbral fijo porque el catálogo cambia
+    de tamaño —Jorge agrega experiencias desde el admin— y un umbral calibrado
+    para quince se afloja con cuatro.
+
+    Efecto lateral buscado: con dos cartas de masaje en el catálogo, «masaje»
+    deja de ser distintiva y decir solo «un masaje» pide confirmación. Es
+    correcto: esa palabra no alcanza para saber cuál de las dos quiere.
+    """
+    from collections import Counter
+
+    cuenta = Counter(p for e in activas for p in _palabras_clave(e.nombre))
+    claves = _palabras_clave(exp.nombre)
+    if not claves:
+        return set()
+    minimo = min(cuenta.get(p, 0) for p in claves)
+    return {p for p in claves if cuenta.get(p, 0) == minimo}
+
+
+def _el_cliente_nombro_la_carta(exp, historial, mensaje=''):
+    """¿La carta salió del cliente, o la eligió el modelo por él? (H-099)
+
+    Caso real (2026-08-15, Bárbara): querían «tina para dos + tabla de quesos»
+    = $80.000. Luna cotizó «Masaje para Dos», la ÚNICA carta del catálogo que
+    vale exactamente $80.000. El id era válido, así que ningún control saltó: el
+    pedido no cabía en una sola carta y el modelo buscó una que cuadrara con el
+    monto en vez de decir que no podía.
+
+    Mismo principio que el destinatario y la dedicatoria (H-094): un dato que el
+    modelo puede fabricar no es un dato del cliente. Se exige que al menos una
+    palabra DISTINTIVA del nombre haya salido de su boca —«tina», «masaje»,
+    «dulce»—, ignorando las que comparte medio catálogo.
+
+    Ojo: se mira solo lo que escribió el CLIENTE. Que Luna haya nombrado la
+    carta antes no cuenta — es justamente lo que hay que verificar.
+    """
+    import unicodedata
+
+    from ventas.models import GiftCardExperiencia
+
+    activas = list(GiftCardExperiencia.objects.filter(activo=True))
+    distintivas = _palabras_distintivas(exp, activas)
+    if not distintivas:
+        # Un nombre sin nada propio no se le puede exigir al cliente: no hay
+        # palabra que pudiera haber dicho para elegirlo.
+        return True
+
+    plano_msg = unicodedata.normalize('NFKD', mensaje or '')
+    plano_msg = plano_msg.encode('ascii', 'ignore').decode().lower()
+    dicho = ' '.join(_lineas_del_cliente(historial) + [plano_msg])
+    if not dicho.strip():
+        return False
+    dichas = _palabras_clave(dicho)
+    return any(p in dichas or _parecidas(p, dichas) for p in distintivas)
+
+
+# Un «sí» no se puede fabricar desde el prompt: lo escribe el cliente.
+_AFIRMACIONES = {
+    'si', 'sii', 'siii', 'sip', 'claro', 'dale', 'oka', 'okey', 'correcto',
+    'exacto', 'esa', 'ese', 'eso', 'perfecto', 'confirmo', 'confirmado',
+    'obvio', 'listo', 'buenisimo', 'genial', 'quiero',
+}
+
+
+def _dijo_que_si(mensaje):
+    """¿El cliente respondió afirmativamente en este turno?
+
+    Se usa solo después de haberle mostrado la carta y su precio: una carta que
+    él no nombró necesita su sí explícito, no la interpretación del modelo.
+    """
+    import re
+    import unicodedata
+
+    plano = unicodedata.normalize('NFKD', mensaje or '')
+    plano = plano.encode('ascii', 'ignore').decode().lower()
+    palabras = set(re.findall(r'[a-z]+', plano))
+    if 'no' in palabras:   # «no, esa no» trae «esa»: la negación manda
+        return False
+    return bool(palabras & _AFIRMACIONES) or 'ok' in palabras
+
+
 def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                       idempotency_key=None, sin_datos_regalo=False,
                       historial='', mensaje=''):
@@ -439,6 +526,27 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                     return {'success': False, 'error': 'monto_invalido',
                             'mensaje': (f'Para «{exp.nombre}» falta el monto: entre '
                                         f'${MONTO_MINIMO_VALOR:,} y ${MONTO_MAXIMO_VALOR:,}')}
+
+            # H-099: la carta que se vende también tiene que haber salido del
+            # cliente. Es el dato que define QUÉ se regala y a qué precio, y era
+            # el único del regalo sin este control.
+            if not _el_cliente_nombro_la_carta(exp, historial, mensaje):
+                monto_clp = f'{monto:,}'.replace(',', '.')   # $80.000, no $80,000
+                confirmacion = (f'¿Confirmas que es la Gift Card {exp.nombre} '
+                                f'(${monto_clp})?')
+                # Si ya se la mostramos con su precio y respondió que sí, es
+                # suyo el sí — el modelo no puede inventarlo por él.
+                if not (_ya_preguntamos_esto(historial, confirmacion)
+                        and _dijo_que_si(mensaje)):
+                    return _falta(
+                        'falta_confirmar_experiencia', confirmacion,
+                        detalle=('El cliente nunca nombró esta gift card. '
+                                 'Si lo que pide lleva algo más que la carta '
+                                 '(una tabla, jugos), NO busques otra carta que '
+                                 'sume ese valor: cotizá la carta que él pidió y '
+                                 'agregá el producto aparte, que viaja dentro '
+                                 'del regalo. '),
+                        historial=historial)
 
             n_cartas += cantidad
             total += monto * cantidad
