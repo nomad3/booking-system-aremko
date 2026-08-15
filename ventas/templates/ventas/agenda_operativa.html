@@ -592,6 +592,16 @@
         font-size: 13.5px; font-weight: 600;
     }
     .checkout-btn.checkout-btn-cobrar { background: #e53935; color: #fff; }
+    .checkout-cierre { margin-top: 2px; }
+    .checkout-btn-cerrar {
+        border: none; cursor: pointer; font-family: inherit;
+        background: #00695c; color: #fff;
+    }
+    .checkout-btn-cerrar:disabled { opacity: .6; cursor: default; }
+    .checkout-cerrado {
+        display: inline-block; margin-top: 8px; font-size: 13.5px;
+        font-weight: 700; color: #2e7d32;
+    }
     .checkout-vacio {
         background: rgba(255,255,255,.15); border-radius: 8px; padding: 18px;
         text-align: center; font-size: 15px;
@@ -969,6 +979,18 @@
                    class="checkout-btn {% if c.debe %}checkout-btn-cobrar{% endif %}">
                     {% if c.debe %}💰 Cobrar{% else %}Ver{% endif %} · Reserva #{{ c.reserva_id }}
                 </a>
+                {# Cerrar la estadía sin pasar por el admin. El id deja que el
+                   botón se transforme en confirmación sin recargar la agenda. #}
+                <div class="checkout-cierre" id="cierre-{{ c.reserva_id }}">
+                    {% if c.cerrada %}
+                    <span class="checkout-cerrado">✓ Check-out hecho</span>
+                    {% else %}
+                    <button type="button" class="checkout-btn checkout-btn-cerrar"
+                            onclick="hacerCheckout({{ c.reserva_id }}, {{ c.saldo }})">
+                        🔑 Hacer check-out
+                    </button>
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% empty %}
@@ -1488,6 +1510,44 @@ function marcarLlegada(reservaId) {
     .catch(function(e) {
         console.error('Error marcando llegada:', e);
         alert('No se pudo marcar la llegada. Revisa la conexión.');
+    });
+}
+
+// Cierra la estadía desde la agenda, sin abrir el admin.
+// Si quedó saldo, el navegador pregunta antes: cerrar una salida con plata
+// pendiente es legítimo (el cobro puede acordarse aparte), pero nunca debe
+// pasar de largo sin que nadie lo note.
+function hacerCheckout(reservaId, saldo) {
+    if (saldo > 0) {
+        var monto = '$' + Number(saldo).toLocaleString('es-CL');
+        if (!confirm('Esta reserva queda debiendo ' + monto + '.\n\n¿Cerrar el check-out igual?')) {
+            return;
+        }
+    }
+    var caja = document.getElementById('cierre-' + reservaId);
+    var boton = caja ? caja.querySelector('button') : null;
+    if (boton) { boton.disabled = true; boton.textContent = 'Cerrando…'; }
+
+    fetch('/ventas/agenda-operativa/api/marcar-checkout/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({reserva_id: reservaId})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) {
+            alert(data.error || 'No se pudo cerrar el check-out');
+            if (boton) { boton.disabled = false; boton.textContent = '🔑 Hacer check-out'; }
+            return;
+        }
+        if (caja) {
+            caja.innerHTML = '<span class="checkout-cerrado">✓ Check-out ' + data.hora + '</span>';
+        }
+    })
+    .catch(function(e) {
+        console.error('Error cerrando el check-out:', e);
+        alert('No se pudo cerrar el check-out. Revisa la conexión.');
+        if (boton) { boton.disabled = false; boton.textContent = '🔑 Hacer check-out'; }
     });
 }
 

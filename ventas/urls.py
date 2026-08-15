@@ -52,6 +52,7 @@ urlpatterns = [
     path('agenda-operativa/api/comandas-pendientes/', agenda_operativa_view.comandas_pendientes_api, name='comandas_pendientes_api'),
     path('agenda-operativa/api/comanda-cambiar-estado/', agenda_operativa_view.comanda_cambiar_estado_api, name='comanda_cambiar_estado_api'),
     path('agenda-operativa/api/marcar-llegada/', agenda_operativa_view.marcar_llegada_api, name='marcar_llegada_api'),
+    path('agenda-operativa/api/marcar-checkout/', agenda_operativa_view.marcar_checkout_api, name='marcar_checkout_api'),
     path('agenda-operativa/api/producto-marcar-entregado/', agenda_operativa_view.producto_marcar_entregado_api, name='producto_marcar_entregado_api'),
     path('caja-diaria/', reporting_views.caja_diaria_view, name='caja_diaria'),  # Nueva vista de caja diaria
     path('caja-diaria-recepcionistas/', reporting_views.caja_diaria_recepcionistas_view, name='caja_diaria_recepcionistas'), # Added path if needed

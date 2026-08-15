@@ -201,6 +201,10 @@ def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
             'saldo_fmt': _clp(saldo),
             'estado_pago': v.estado_pago,
             'debe': saldo > 0,
+            # Para que el botón de check-out sepa si esta salida ya se cerró
+            # (si no, al recargar la agenda el botón reaparecería como si nada).
+            'estado_reserva': v.estado_reserva,
+            'cerrada': v.estado_reserva == 'checkout',
         })
 
     # Deudores primero (mayor saldo arriba), después las pagadas por hora natural.
@@ -1039,6 +1043,43 @@ def marcar_llegada_api(request):
                             status=500)
     # `recien=False` (ya estaba marcada) NO es un error: la respuesta es exitosa
     # igual, con la hora real de llegada.
+    venta.refresh_from_db(fields=['estado_reserva'])
+    return JsonResponse({'success': True, 'recien': recien,
+                         'hora': hora_local(cuando),
+                         'estado_reserva': venta.estado_reserva})
+
+
+@staff_required
+@require_http_methods(["POST"])
+def marcar_checkout_api(request):
+    """Cierra la estadía desde la agenda: deja la reserva en 'Check-out'.
+
+    El caso real es el mostrador: el huésped entrega la llave y se va. Hasta
+    ahora había que abrir la reserva en el admin y cambiar el estado a mano, y
+    lo que cuesta dos pantallas se hace "después" — o no se hace.
+
+    Cerrar con saldo pendiente SÍ está permitido (a veces el cobro se acuerda
+    aparte), pero la confirmación la pide el navegador y el saldo queda escrito
+    en el movimiento.
+
+    Body JSON: { reserva_id: int }
+    """
+    from ..llegadas import hora_local, registrar_salida
+
+    try:
+        data = json.loads(request.body)
+        venta = VentaReserva.objects.select_related('cliente').get(
+            id=data.get('reserva_id'))
+    except (ValueError, TypeError, VentaReserva.DoesNotExist):
+        return JsonResponse({'success': False, 'error': 'Reserva no encontrada'},
+                            status=404)
+
+    cuando, recien = registrar_salida(venta, usuario=request.user)
+    if cuando is None:
+        return JsonResponse({'success': False, 'error': 'No se pudo registrar el check-out'},
+                            status=500)
+    # `recien=False` (ya estaba cerrada) no es un error: se responde igual de
+    # bien, con la hora real en que se cerró.
     venta.refresh_from_db(fields=['estado_reserva'])
     return JsonResponse({'success': True, 'recien': recien,
                          'hora': hora_local(cuando),

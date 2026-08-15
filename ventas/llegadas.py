@@ -133,3 +133,88 @@ def hora_local(cuando):
     if not cuando:
         return ''
     return timezone.localtime(cuando).strftime('%H:%M')
+
+
+# ---------------------------------------------------------------------------
+# La otra punta de la estadía: el check-out
+#
+# Vive acá y no en un módulo aparte porque es el mismo par de gestos que la
+# llegada —mover `estado_reserva` y dejar rastro en MovimientoCliente— y
+# separarlos garantizaba que uno evolucionara sin el otro.
+# ---------------------------------------------------------------------------
+
+TIPO_SALIDA = 'checkout'
+
+
+def marcar_checkout(venta):
+    """Cierra la estadía: deja la reserva en 'checkout'. Devuelve si cambió.
+
+    Acepta venir desde 'pendiente' además de 'checkin': que nadie haya marcado
+    la llegada no significa que el huésped no estuviera, y obligar a marcar una
+    llegada de mentira para poder cerrar la salida es peor dato que ninguno.
+    """
+    if not venta or getattr(venta, 'estado_reserva', None) not in ('pendiente', 'checkin'):
+        return False
+    try:
+        venta.estado_reserva = 'checkout'
+        venta.save(update_fields=['estado_reserva'])
+        return True
+    except Exception:  # noqa: BLE001 — la salida ya quedó registrada igual
+        logger.exception('[checkout] no se pudo cerrar la reserva %s', venta.pk)
+        return False
+
+
+def salida_de(venta_id):
+    """Cuándo se hizo el check-out de esta reserva (datetime o None)."""
+    from .models import MovimientoCliente
+    return (MovimientoCliente.objects
+            .filter(tipo_movimiento=TIPO_SALIDA, venta_reserva_id=venta_id)
+            .order_by('fecha_movimiento')
+            .values_list('fecha_movimiento', flat=True)
+            .first())
+
+
+def registrar_salida(venta, usuario=None):
+    """Registra el check-out desde la agenda y cierra la reserva.
+
+    IDEMPOTENTE, igual que la llegada: apretar dos veces no duplica el
+    movimiento ni pisa la hora en que realmente se fue.
+
+    Devuelve (cuando, recien_cerrada).
+    """
+    from .models import MovimientoCliente
+
+    if not venta or not getattr(venta, 'pk', None):
+        return None, False
+
+    previa = salida_de(venta.pk)
+    if previa:
+        # Doble clic o dos personas cerrando a la vez: no es un error. De paso
+        # repara la reserva que quedó con el estado atrasado.
+        marcar_checkout(venta)
+        return previa, False
+
+    if not getattr(venta, 'cliente_id', None):
+        logger.warning('[checkout] reserva %s sin cliente — no se registra', venta.pk)
+        return None, False
+
+    saldo = int(getattr(venta, 'saldo_pendiente', 0) or 0)
+    # El saldo va en el comentario a propósito: si alguien cerró una salida con
+    # plata pendiente, tiene que poder leerse después sin cruzar dos informes.
+    detalle = f' Quedó debiendo ${saldo:,.0f}.'.replace(',', '.') if saldo > 0 else ''
+    try:
+        mov = MovimientoCliente.objects.create(
+            cliente_id=venta.cliente_id,
+            venta_reserva=venta,
+            tipo_movimiento=TIPO_SALIDA,
+            usuario=usuario if getattr(usuario, 'is_authenticated', False) else None,
+            comentarios=f'Check-out registrado desde la agenda.{detalle}',
+        )
+    except Exception:  # noqa: BLE001 — cerrar una salida no puede tumbar recepción
+        logger.exception('[checkout] no se pudo registrar (reserva %s)', venta.pk)
+        return None, False
+
+    cerrada = marcar_checkout(venta)
+    logger.info('[checkout] reserva=%s usuario=%s saldo=%s cerrada=%s',
+                venta.pk, getattr(usuario, 'username', '-'), saldo, cerrada)
+    return mov.fecha_movimiento, True
