@@ -311,6 +311,22 @@ def comanda_cliente_finalizar(request, token):
 
             comanda.estado = 'pendiente'
             comanda.token_acceso = None  # Liberar token
+
+            # El pedido nace ACÁ, no cuando se abrió el link.
+            #
+            # `fecha_solicitud` es auto_now_add: se estampa al crear la FILA, y
+            # la fila del cliente nace como borrador vacío —al abrir el menú, o
+            # al confirmar el pedido anterior (más abajo)—. Ese borrador puede
+            # tener días. Sin esto, cocina veía "7165 min" (5 días) en un jugo
+            # que la clienta acababa de pedir desde la tina, y el badge rojo de
+            # urgencia dejaba de significar nada porque salía siempre.
+            #
+            # En un UPDATE, auto_now_add NO pisa el valor asignado: solo actúa
+            # en el INSERT. Por eso basta con escribirlo antes del save().
+            ahora = timezone.now()
+            comanda.fecha_solicitud = ahora
+            comanda.hora_solicitud = timezone.localtime(ahora).time()
+
             # El día en que cocina debe verla queda FIJADO acá. Antes se dejaba
             # en NULL y la agenda tenía que deducirlo desde los servicios de la
             # reserva; si la reserva no tenía servicios (caso real 6479), el
