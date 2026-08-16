@@ -96,6 +96,39 @@ class GiftcardBuilderTests(TestCase):
             self.assertNotIn('carta', texto)
 
 
+class DescripcionCompletaTests(TestCase):
+    """El corte de 120 del catálogo de Luna NO puede llegar al cliente.
+
+    En la primera prueba real (2026-08-16) un WhatsApp salió con «...bosque
+    nativ.» — la descripción cortada a mitad de palabra por el [:120] pensado
+    para el prompt de Luna. El cliente recibe el texto completo; Luna sigue
+    recibiendo el recortado (su prompt no tiene por qué engordar).
+    """
+
+    # 155 caracteres: el [:120] la cortaría en «bosque nativ»
+    DESCRIPCION = ('Tina privada de hidromasaje para 2 personas por dos horas '
+                   'a orillas del Río Pescado, en medio de un antiguo bosque '
+                   'nativo con vista a las estrellas')
+
+    def setUp(self):
+        _experiencia('tina_dos', 'Tina hidromasaje 2 personas',
+                     categoria='tinas', monto_fijo=60000,
+                     descripcion=self.DESCRIPCION)
+
+    def test_el_cliente_recibe_la_descripcion_entera(self):
+        alt = construir_alternativas('giftcard', None, 2)['alternativas'][0]
+        self.assertIn('bosque nativo con vista a las estrellas',
+                      alt['texto_sugerido'])
+        self.assertNotIn('nativ.', alt['texto_sugerido'])
+
+    def test_luna_sigue_recibiendo_el_recorte_de_120(self):
+        from whatsapp_agent.giftcards import catalogo_giftcards
+        exp = catalogo_giftcards()['experiencias'][0]
+        self.assertEqual(len(exp['descripcion']), 120)
+        exp_completa = catalogo_giftcards(texto_completo=True)['experiencias'][0]
+        self.assertEqual(exp_completa['descripcion'], self.DESCRIPCION)
+
+
 @override_settings(LUNA_API_KEY='clave-de-test')
 class GiftcardEndpointTests(TestCase):
     """GET /api/luna/experiencias/alternativas/ — la regla de la fecha."""

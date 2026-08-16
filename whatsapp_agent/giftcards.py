@@ -203,23 +203,30 @@ def _falta(error, pregunta, detalle='', historial=''):
     }
 
 
-def catalogo_giftcards():
+def catalogo_giftcards(texto_completo=False):
     """Experiencias regalables activas, compacto para el LLM.
 
     Devuelve {'success': True, 'experiencias': [...], 'nota': str}.
+
+    `texto_completo=True` entrega la descripción SIN el recorte de 120
+    caracteres. El recorte existe para no engordar el prompt de Luna —ella
+    redacta con sus palabras y el corte nunca se ve—, pero H-108 pega la
+    descripción TAL CUAL al cliente, y en la primera prueba real (2026-08-16)
+    salió «...bosque nativ.» cortado a mitad de palabra en un WhatsApp real.
     """
     from ventas.models import GiftCardExperiencia
 
     experiencias = []
     for e in (GiftCardExperiencia.objects.filter(activo=True)
               .order_by('categoria', 'orden', 'nombre')):
+        descripcion = e.descripcion or ''
         experiencias.append({
             'id': e.id_experiencia,
             'nombre': e.nombre,
             'categoria': e.get_categoria_display(),
             'precio': int(e.monto_fijo) if e.monto_fijo else None,
             'montos_sugeridos': [int(m) for m in (e.montos_sugeridos or [])],
-            'descripcion': (e.descripcion or '')[:120],
+            'descripcion': descripcion if texto_completo else descripcion[:120],
         })
     return {
         'success': True,

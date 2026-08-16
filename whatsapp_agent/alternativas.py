@@ -284,7 +284,9 @@ def _giftcard(fecha, personas):
     from .giftcards import catalogo_giftcards
 
     alts = []
-    for e in catalogo_giftcards().get('experiencias', []):
+    # texto_completo: la descripción va TAL CUAL al cliente; el recorte de 120
+    # del catálogo de Luna cortaba palabras al medio («bosque nativ.»).
+    for e in catalogo_giftcards(texto_completo=True).get('experiencias', []):
         descripcion = (e.get('descripcion') or '').strip().rstrip('.')
         detalle = f" — {descripcion}" if descripcion else ''
         if e.get('precio'):
