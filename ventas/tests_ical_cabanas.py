@@ -233,6 +233,38 @@ class UrlDelCalendarioTest(_SinSenalesDeVenta, TestCase):
         otra = CalendarioCabana.objects.create(servicio=_cabana('Cabaña Tepa'))
         self.assertNotEqual(self.cal.token, otra.token)
 
+    def test_no_se_publica_la_ocupacion_vieja(self):
+        """En la primera prueba real (Torre) el .ics traía 211 eventos y 208
+        eran de fechas pasadas: 40 KB en cada lectura de Booking, y el
+        histórico de ocupación de la cabaña regalado a un tercero. Las OTAs
+        ignoran el pasado; no hay razón para mandárselo."""
+        cliente = Cliente.objects.create(nombre='Viejo', telefono='+56922222222')
+        v = VentaReserva.objects.create(cliente=cliente, total=0)
+        ReservaServicio.objects.create(
+            venta_reserva=v, servicio=self.torre,
+            fecha_agendamiento=date(2024, 3, 10), hora_inicio='16:00',
+            cantidad_personas=2)
+        cuerpo = self.client.get(
+            f'/ventas/ical/{self.cal.token}/cabana-torre.ics').content.decode()
+        self.assertNotIn('20240310', cuerpo)
+
+    def test_el_huesped_que_sigue_alojado_no_se_corta(self):
+        """Llegó antes de la ventana pero todavía no se va: sus noches
+        pendientes TIENEN que seguir bloqueadas."""
+        from django.utils import timezone as tz
+        hoy = tz.localdate()
+        cliente = Cliente.objects.create(nombre='Sigue', telefono='+56933333333')
+        v = VentaReserva.objects.create(cliente=cliente, total=0)
+        for delta in (-2, -1, 0, 1):
+            ReservaServicio.objects.create(
+                venta_reserva=v, servicio=self.torre,
+                fecha_agendamiento=hoy + timedelta(days=delta),
+                hora_inicio='16:00', cantidad_personas=2)
+        cuerpo = self.client.get(
+            f'/ventas/ical/{self.cal.token}/cabana-torre.ics').content.decode()
+        self.assertIn((hoy + timedelta(days=2)).strftime('%Y%m%d'), cuerpo,
+                      'la salida del que sigue alojado tiene que aparecer')
+
     def test_regenerar_el_token_invalida_la_url_vieja(self):
         viejo = self.cal.token
         nuevo = self.cal.regenerar_token()
