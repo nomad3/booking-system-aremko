@@ -2062,10 +2062,17 @@ def experiencias_alternativas(request):
     GET /api/luna/experiencias/alternativas/?tipo=<tipo>&fecha=YYYY-MM-DD&personas=N
 
       tipo (obligatorio): pausa | tina_sola | masaje_solo | noche_aguas_calientes
-                          | ritual | refugio
-      fecha (obligatorio, YYYY-MM-DD; también acepta expresiones NL)
+                          | ritual | refugio | giftcard
+      fecha (obligatorio para los tipos con agenda, YYYY-MM-DD; también acepta
+             expresiones NL). `giftcard` NO lleva fecha (H-108): una gift card
+             vale 1 año y el destinatario agenda después — si viene, se ignora.
       personas (opcional, default 2, entero ≥ 1). Para masaje: N personas = N masajes.
-                Ritual/Refugio/Noche son siempre para 2 (se ignora personas).
+                Ritual/Refugio/Noche son siempre para 2 (se ignora personas);
+                giftcard también la ignora (el precio es el de la tarjeta).
+
+    Para tipo=giftcard la respuesta trae `fecha: null` e `itinerario: []` en
+    cada alternativa (no hay horas que agendar); una alternativa por
+    experiencia publicada del catálogo, mismo orden que la vitrina web.
 
     Respuesta 200 (shape unificado, mismo espíritu que Pausa):
     {
@@ -2078,18 +2085,24 @@ def experiencias_alternativas(request):
          "itinerario": [{"servicio": "Tina ...", "hora": "18:00"}]}
       ]
     }
-    `alternativas` vacía (200, no error) si ese día no hay nada. 400 si falta tipo/fecha,
-    tipo inválido o de Fase 2, o parámetros mal formados.
+    `alternativas` vacía (200, no error) si ese día no hay nada. 400 si falta el
+    tipo, falta la fecha en un tipo con agenda, el tipo es inválido o los
+    parámetros vienen mal formados.
     """
     tipo = request.GET.get('tipo')
     fecha = request.GET.get('fecha')
     personas_raw = request.GET.get('personas', '2')
 
-    if not tipo:
+    from whatsapp_agent import alternativas as alt_mod
+
+    tipo_norm = (tipo or '').strip().lower()
+    if not tipo_norm:
         return Response(
-            {'error': 'tipo es obligatorio (pausa|tina_sola|masaje_solo|noche_aguas_calientes)'},
+            {'error': f"tipo es obligatorio ({'|'.join(alt_mod.TIPOS_VALIDOS)})"},
             status=status.HTTP_400_BAD_REQUEST)
-    if not fecha:
+    # giftcard no lleva fecha (H-108): el builder la ignora. Los demás tipos
+    # siguen exigiéndola — sin fecha no hay agenda que consultar.
+    if not fecha and tipo_norm not in alt_mod.TIPOS_SIN_FECHA:
         return Response(
             {'error': 'fecha es obligatoria (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -2101,10 +2114,8 @@ def experiencias_alternativas(request):
         return Response(
             {'error': 'personas debe ser >= 1'}, status=status.HTTP_400_BAD_REQUEST)
 
-    from whatsapp_agent import alternativas as alt_mod
-
     try:
-        resultado = alt_mod.construir_alternativas(tipo, fecha, personas)
+        resultado = alt_mod.construir_alternativas(tipo_norm, fecha, personas)
     except Exception as e:  # noqa: BLE001 — no romper el endpoint por un error inesperado
         logger.error(f'[Luna API] Error en experiencias_alternativas: {str(e)}', exc_info=True)
         return Response({'error': f'error interno: {str(e)[:200]}'},

@@ -39,7 +39,9 @@ from . import packs
 # referencia histórica; TODOS pasan por _BUILDERS.
 TIPOS_FASE1 = ('pausa', 'tina_sola', 'masaje_solo', 'noche_aguas_calientes')
 TIPOS_FASE2 = ('ritual', 'refugio')
-TIPOS_VALIDOS = TIPOS_FASE1 + TIPOS_FASE2
+# Fase 3 (H-108): tipos SIN agenda — el endpoint no les exige `fecha`.
+TIPOS_SIN_FECHA = ('giftcard',)
+TIPOS_VALIDOS = TIPOS_FASE1 + TIPOS_FASE2 + TIPOS_SIN_FECHA
 
 NOMBRES = {
     'pausa': 'Pausa junto al río',
@@ -48,6 +50,7 @@ NOMBRES = {
     'noche_aguas_calientes': 'Noche de Aguas Calientes',
     'ritual': 'Ritual del Río',
     'refugio': 'Refugio Aremko',
+    'giftcard': 'Gift Card',
 }
 
 # Tope de alternativas por respuesta (evita abrumar la bandeja con decenas de botones).
@@ -257,6 +260,56 @@ def _refugio(fecha, personas):
     return {'fecha': base['fecha'], 'alternativas': alts}
 
 
+# ---------------------------------------------------------------------------
+# giftcard (H-108): el catálogo publicado, sin fecha ni horario
+# ---------------------------------------------------------------------------
+
+def _giftcard(fecha, personas):
+    """Una alternativa por experiencia publicada del catálogo.
+
+    `fecha` y `personas` se ignoran a propósito: una gift card no ocupa slot
+    —vale 1 año y quien la recibe agenda después—, así que acá no hay
+    disponibilidad que consultar. Ese es además el argumento de venta, y por
+    eso va dentro de cada `texto_sugerido`.
+
+    La fuente es catalogo_giftcards() — la MISMA que vende Luna (H-105) y que
+    pinta la vitrina web: activar una experiencia en el admin la hace aparecer
+    en la bandeja sin deploy. Sin tope, a diferencia de los otros builders: el
+    catálogo lo cura Jorge en el admin y hoy no llega a diez; cortarlo acá
+    sería esconderle tarjetas a Deborah sin aviso.
+
+    Una experiencia sin monto fijo ni montos sugeridos se OMITE: un botón sin
+    precio no ofrece nada vendible.
+    """
+    from .giftcards import catalogo_giftcards
+
+    alts = []
+    for e in catalogo_giftcards().get('experiencias', []):
+        descripcion = (e.get('descripcion') or '').strip().rstrip('.')
+        detalle = f" — {descripcion}" if descripcion else ''
+        if e.get('precio'):
+            precio = int(e['precio'])
+            titulo = e['nombre']
+            precio_frase = f"Valor {formatear_precio(precio)}"
+        elif e.get('montos_sugeridos'):
+            sugeridos = [int(m) for m in e['montos_sugeridos']]
+            precio = min(sugeridos)
+            titulo = f"{e['nombre']} · monto a elección"
+            precio_frase = ('Monto a tu elección (sugeridos: '
+                            + ' / '.join(formatear_precio(m) for m in sugeridos)
+                            + ')')
+        else:
+            continue
+        texto = (f"Gift Card «{e['nombre']}»{detalle}. {precio_frase}. "
+                 f"Vale por 1 año y quien la recibe elige cuándo usarla.")
+        alts.append(_alt(
+            titulo=titulo, precio_total=precio, precio_con_descuento=precio,
+            hay_descuento=False, texto_sugerido=texto,
+            # Sin horas que agendar: la bandeja debe tolerar itinerario vacío.
+            itinerario=[]))
+    return {'fecha': None, 'alternativas': alts}
+
+
 _BUILDERS = {
     'pausa': _pausa,
     'tina_sola': _tina_sola,
@@ -264,6 +317,7 @@ _BUILDERS = {
     'noche_aguas_calientes': _noche_aguas_calientes,
     'ritual': _ritual,
     'refugio': _refugio,
+    'giftcard': _giftcard,
 }
 
 
