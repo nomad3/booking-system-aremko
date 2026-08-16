@@ -203,18 +203,22 @@ _Última revisión: 2026-08-15 (wrapup nocturno — se agregaron P-27 y P-28)_
     tira `value too long for type character varying(16)` procesando el servicio 13913
     (visto 2026-08-15 a las 18:30 y 19:00 UTC): un campo se pasa de largo y esa tarea
     de vaciado no se genera. Nadie se entera porque el cron sigue corriendo.
-27. **P-27 · Sincronización iCal con OTAs — Fase 2 y las otras 4 cabañas** — La Fase 1
-    quedó cerrada y verificada el 2026-08-15 solo para la **Cabaña Torre**: Booking leyó
-    el `.ics` de Aremko y bloqueó las noches correctas (RES-6561 el 21-22 de agosto, con
-    el 23 libre — el `DTEND` exclusivo se interpretó bien). Falta: **(a)** el cron de la
-    Fase 2 que lee `CalendarioCabana.url_booking` / `url_airbnb` y bloquea acá lo vendido
-    allá — la regla de diseño es **espejar, no acumular**, ver
-    `[[feedback_ical_no_reexportar_bloqueos]]`; **(b)** confirmar si la habitación
-    «Habitación Doble» de la propiedad Booking 15112726 es efectivamente la Torre o
-    agrupa varias cabañas, **antes** de conectar las otras cuatro; **(c)** revisar por qué
-    Booking muestra «Cerrado» el 18, 23 y 25 de agosto — no salió de Aremko (nuestro
-    `.ics` publicó 4 reservas y cero bloqueos), el 18 y 25 son martes pero el 23 es
-    domingo y no calza con nada. Ver `[[project_aremko_ical_ota_sync]]`.
+27. **P-27 · Sincronización iCal con OTAs — pendientes del panel y las otras 4 cabañas** —
+    Las DOS fases están operativas para la **Cabaña Torre** (2026-08-16): Fase 1
+    verificada (Booking leyó el `.ics` y bloqueó el 21-22 con el 23 libre) y Fase 2 en
+    marcha — Cron Job `sincronizar-calendarios-ota` en Render (`*/15 * * * *`, clon de la
+    config de «revisar pagos»; primera corrida en verde). El cron espeja, no acumula
+    (`ventas/ota_sync.py`); el exportador excluye los bloqueos `[OTA]` para no hacer eco.
+    Falta: **(a)** confirmar si «Habitación Doble» de la propiedad Booking 15112726 es
+    efectivamente la Torre o agrupa varias cabañas, **antes** de conectar las otras
+    cuatro; **(b)** revisar por qué Booking muestra «Cerrado» el 18, 23 y 25 de agosto —
+    no salió de Aremko, el 18 y 25 son martes pero el 23 es domingo y no calza con nada;
+    **(c)** conectar las otras 4 cabañas cuando (a) esté resuelto (crear su Calendario en
+    el admin + pegar URLs en ambas direcciones, mismo flujo que la Torre); **(d)** la
+    primera reserva real por Booking será la prueba end-to-end del cron — mirar que el
+    bloqueo `[OTA]` aparezca solo. Al cron nuevo le faltan SENDGRID/Redvoiss (hoy
+    irrelevante: no manda nada), anotarlo si algún día se le suma alerta de overbooking
+    por email. Ver `[[project_aremko_ical_ota_sync]]`.
 28. **P-28 · Tests en rojo en main** — Detectados 4 el 2026-08-15 y confirmados como
     preexistentes (aparecen también con mi trabajo guardado en stash). Dos vienen de
     reglas que Jorge pidió ese mismo día y son arreglo trivial: strings que todavía dicen
