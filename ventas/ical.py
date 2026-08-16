@@ -98,8 +98,15 @@ def tramos_ocupados(servicio_id, desde=None):
     # Jorge volvió a abrir. Publicarlo igual dejaría la cabaña cerrada en
     # Booking para siempre, perdiendo ventas en silencio — el error opuesto a
     # la doble reserva, y más difícil de notar porque nadie reclama.
-    bloqueos = ServicioBloqueo.objects.filter(servicio_id=servicio_id,
-                                              activo=True)
+    #
+    # Y los bloqueos [OTA] (importados por ota_sync, Fase 2) NO se publican:
+    # son reservas que la propia OTA ya tiene. Reexportarlos arma un eco — la
+    # reserva de Booking volvería a Booking como evento externo, y al
+    # cancelarse allá el eco la mantendría cerrada acá.
+    from ventas.ota_sync import MOTIVO_PREFIJO_OTA
+    bloqueos = (ServicioBloqueo.objects
+                .filter(servicio_id=servicio_id, activo=True)
+                .exclude(motivo__startswith=MOTIVO_PREFIJO_OTA))
     if desde:
         bloqueos = bloqueos.filter(fecha_fin__gte=desde)
     for b in bloqueos:
