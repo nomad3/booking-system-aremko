@@ -1851,6 +1851,39 @@ def editar_carrito_endpoint(request):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['GET'])
+@authentication_classes([LunaAPIKeyAuthentication])
+def token_instagram_endpoint(request):
+    """H-107: token de Instagram vigente para el backend Go (aremko-cli).
+
+    GET /api/luna/meta/token-instagram/
+    Header: X-API-Key
+
+    La fuente de verdad es InstagramTokenConfig (admin); este mismo fetch dispara el
+    auto-refresh contra Meta cuando corresponde (~cada 7 días — la bandeja consulta
+    todo el día, así que el token nunca envejece). `token` vacío → el Go cae a su
+    env var INSTAGRAM_ACCESS_TOKEN (fallback/transición).
+
+    Respuesta: {success, token, expira_estimado, refresh_error}
+    NUNCA exponer esta respuesta al navegador: es servidor-a-servidor (Go agrega la
+    X-API-Key server-side; el API público del Go no tiene ruta hacia esto).
+    """
+    try:
+        from inbox_omnicanal.token_instagram import token_vigente_refrescando
+        token, cfg = token_vigente_refrescando()
+        return Response({
+            'success': True,
+            'token': token,
+            'expira_estimado': cfg.expira_estimado.isoformat() if cfg.expira_estimado else None,
+            'refresh_error': cfg.ultimo_error or None,
+        })
+    except Exception as e:
+        logger.error(f'[Luna API] Error en token_instagram_endpoint: {str(e)}', exc_info=True)
+        return Response({'success': False, 'error': 'internal_error',
+                         'mensaje': 'Error al leer el token de Instagram'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ============================================================================
 # ADMIN: LIMPIAR CONVERSACIÓN
 # ============================================================================

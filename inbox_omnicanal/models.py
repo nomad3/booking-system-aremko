@@ -62,3 +62,52 @@ class ChannelMessage(models.Model):
 
     def __str__(self):
         return f'[{self.canal}/{self.direction}] {self.external_id} · {self.timestamp:%Y-%m-%d %H:%M}'
+
+
+class InstagramTokenConfig(models.Model):
+    """H-107: token de acceso de Instagram Login (larga vida ~60 días) con auto-refresh.
+
+    Fuente de verdad del token que usa el backend Go (aremko-cli) para responder DMs,
+    resolver nombres de perfil y bajar adjuntos. Antes vivía solo como env var en
+    Render y venció en silencio (caso real 2026-08-15). El backend lo lee vía
+    GET /api/luna/meta/token-instagram/ (X-API-Key, con cache) y ese mismo camino lo
+    refresca contra Meta cuando corresponde (inbox_omnicanal/token_instagram.py).
+    La env var INSTAGRAM_ACCESS_TOKEN del Go quedó como FALLBACK si esto está vacío.
+    """
+    token = models.TextField(
+        blank=True,
+        help_text='Token de Instagram Login (larga vida). Pegar aquí el generado en '
+                  'developers.facebook.com; a partir de ahí se refresca solo cada ~7 días.')
+    token_actualizado_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Cuándo se pegó/cambió el token a mano (lo setea el admin). El primer '
+                  'refresh automático espera 7 días desde acá (Meta exige ≥24 h).')
+    expira_estimado = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Vencimiento estimado informado por Meta en el último refresh.')
+    ultimo_refresh_at = models.DateTimeField(
+        null=True, blank=True, help_text='Último refresh EXITOSO contra Meta.')
+    ultimo_intento_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Último intento de refresh (exitoso o no); si falla se reintenta cada 6 h.')
+    ultimo_error = models.TextField(
+        blank=True, help_text='Detalle del último refresh fallido (vacío si el último fue OK).')
+    ultimo_aviso_at = models.DateTimeField(
+        null=True, blank=True, help_text='Último email de alerta enviado (máx 1 al día).')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Token de Instagram'
+        verbose_name_plural = 'Token de Instagram'
+
+    def __str__(self):
+        if not (self.token or '').strip():
+            return 'Token Instagram (SIN TOKEN)'
+        if self.expira_estimado:
+            return f'Token Instagram (vence ~{self.expira_estimado:%Y-%m-%d})'
+        return 'Token Instagram (vencimiento por confirmar en el primer refresh)'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

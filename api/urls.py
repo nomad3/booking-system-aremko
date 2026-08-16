@@ -50,6 +50,9 @@ urlpatterns = [
     # H-079 (H-046 F2): editar el carrito EN CURSO desde la bandeja (pre-cotización)
     path('luna/carrito/editar/', luna_api_views.editar_carrito_endpoint, name='luna-editar-carrito'),
 
+    # H-107: token de Instagram para el backend Go (fuente de verdad en admin + auto-refresh)
+    path('luna/meta/token-instagram/', luna_api_views.token_instagram_endpoint, name='luna-token-instagram'),
+
     # Admin endpoints (testing/debug)
     path('luna/admin/limpiar-conversacion/', luna_api_views.limpiar_conversacion_endpoint, name='luna-limpiar-conversacion'),
 ]
