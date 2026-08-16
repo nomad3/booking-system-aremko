@@ -125,6 +125,27 @@ def _clp(n):
     return f"{int(n or 0):,}".replace(",", ".")
 
 
+# Verificado contra producción el 2026-08-14, preparando la sincronización con
+# Booking/Airbnb: `tipo_servicio='cabana'` NO significa «es una cabaña». Trae
+# también «Persona Adicional en Cabaña» (43) y «Hora Adicional Cabaña» (44), que
+# son modificadores de precio, no lugares donde dormir. La reserva 6381 tiene la
+# Torre y una persona adicional el MISMO día: contando filas son 2 noches, y fue
+# 1. Son 48 filas de adicionales sobre 1.207.
+#
+# Se distinguen por capacidad: las 5 cabañas reales admiten 2 personas; los dos
+# adicionales, 1. No es un campo que signifique «alojamiento» —el día que exista
+# una cabaña individual esto se rompe— pero es el mejor dato disponible sin
+# tocar el modelo, y vive en UN solo lugar a propósito: la agenda y el calendario
+# que se exporta a las OTAs tienen que contar exactamente las mismas noches.
+CAPACIDAD_MINIMA_ALOJAMIENTO = 2
+
+
+def filtro_alojamiento():
+    """Los `filter(**...)` que dejan solo cabañas de verdad."""
+    return {'servicio__tipo_servicio': 'cabana',
+            'servicio__capacidad_maxima__gte': CAPACIDAD_MINIMA_ALOJAMIENTO}
+
+
 def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
     """Reservas que hacen checkout hoy + las que salieron antes debiendo.
 
@@ -139,7 +160,7 @@ def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
 
     # Noches de cabaña en la ventana (la última de cada reserva define la salida).
     noches = ReservaServicio.objects.filter(
-        servicio__tipo_servicio='cabana',
+        **filtro_alojamiento(),
         fecha_agendamiento__gte=desde,
         fecha_agendamiento__lte=ayer,
         venta_reserva__isnull=False,
@@ -167,7 +188,7 @@ def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
     # todavía no se va — no importa que también tenga noches viejas.
     siguen = set(
         ReservaServicio.objects.filter(
-            servicio__tipo_servicio='cabana',
+            **filtro_alojamiento(),
             fecha_agendamiento__gte=hoy,
             venta_reserva_id__in=list(por_reserva.keys()),
         ).values_list('venta_reserva_id', flat=True)

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
+import secrets
 import random
 import string
 import re
@@ -8048,3 +8049,74 @@ class WhatsAppMessage(models.Model):
 
     def __str__(self):
         return f"[{self.direction}] {self.phone} · {self.timestamp:%Y-%m-%d %H:%M}"
+
+
+class CalendarioCabana(models.Model):
+    """Sincronización de calendario de UNA cabaña con Booking/Airbnb (iCal).
+
+    Fase 1 (export): cada cabaña activa publica un .ics con sus fechas ocupadas
+    —reservas + bloqueos manuales— que Jorge pega en el extranet de cada OTA.
+    Fase 2 (import): las URLs que devuelven las OTAs se leen por cron y se
+    convierten en bloqueos, para que una venta en Booking cierre la fecha acá.
+
+    Por qué una tabla y no una variable de entorno con un token global:
+
+    · El token va PEGADO en el extranet de Booking y de Airbnb. Con un solo
+      token compartido, rotarlo rompe todas las conexiones a la vez; con uno
+      por cabaña se rota la que haga falta.
+    · Qué cabañas sincronizan lo decide Jorge desde el admin. La alternativa
+      —deducirlo de `publicado_web`— fallaba hacia el lado peligroso: al
+      despublicar una cabaña en remodelación desaparecería del .ics, Booking la
+      vería libre y vendería una cabaña que no existe.
+    · `ultima_lectura_ok` deja a la vista cuándo leyó la OTA por última vez. Si
+      Booking dejó de leer hace dos días, eso hay que verlo ANTES de que llegue
+      la doble reserva, no después.
+    """
+    servicio = models.OneToOneField(
+        'Servicio', on_delete=models.CASCADE, related_name='calendario_externo',
+        limit_choices_to={'tipo_servicio': 'cabana'},
+        verbose_name='Cabaña')
+    token = models.CharField(
+        max_length=48, unique=True, db_index=True, editable=False,
+        help_text='Secreto de la URL del .ics. Se genera solo.')
+    activo = models.BooleanField(
+        default=True, db_index=True,
+        help_text='Si se desmarca, la URL deja de responder. Desmarcá solo si '
+                  'querés cortar la sincronización: mientras esté conectada en '
+                  'Booking, cortarla hace que ellos vean la cabaña libre.')
+    url_booking = models.URLField(
+        blank=True, max_length=500, verbose_name='URL iCal de Booking',
+        help_text='La que entrega Booking en «Calendario y precios → '
+                  'Sincronizar calendarios». Se lee para bloquear acá lo que se '
+                  'vende allá (Fase 2).')
+    url_airbnb = models.URLField(
+        blank=True, max_length=500, verbose_name='URL iCal de Airbnb',
+        help_text='La de «Conectar con otro sitio web» del anuncio (Fase 2).')
+    ultima_lectura_ok = models.DateTimeField(
+        null=True, blank=True, verbose_name='Última lectura de las OTAs',
+        help_text='Cuándo se leyeron con éxito las URLs de arriba (Fase 2).')
+    creado = models.DateTimeField(auto_now_add=True)
+    modificado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Calendario externo de cabaña'
+        verbose_name_plural = 'Calendarios externos (Booking / Airbnb)'
+        ordering = ['servicio__nombre']
+
+    def __str__(self):
+        return f'Calendario de {self.servicio.nombre}'
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(24)[:48]
+        super().save(*args, **kwargs)
+
+    def regenerar_token(self):
+        """Corta las conexiones existentes y devuelve el token nuevo.
+
+        Después de esto hay que pegar la URL nueva en Booking y Airbnb: hasta
+        que se haga, ELLOS ven la cabaña libre. Por eso no es automático.
+        """
+        self.token = secrets.token_urlsafe(24)[:48]
+        self.save(update_fields=['token', 'modificado'])
+        return self.token

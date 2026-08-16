@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views, ical_views
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
@@ -174,6 +174,12 @@ urlpatterns = [
     path('api/comanda/<str:token>/confirm/', views_comandas_cliente.comanda_cliente_pago_confirmacion, name='comanda_cliente_pago_confirmacion_api'),
 
     # Ficha de Reserva del cliente (Reserva-cliente-digital) — token firmado, solo lectura
+    # Calendario .ics por cabaña para Booking/Airbnb (H-106). El token es el
+    # que autoriza; el slug solo sirve para reconocer de un vistazo cuál se
+    # pegó en cada anuncio. Va ANTES de 'reserva/<token>/' para que un .ics no
+    # caiga en el Pase.
+    path('ical/<str:token>/<str:slug>.ics', ical_views.calendario_cabana_ics,
+         name='calendario_cabana_ics'),
     path('reserva/<str:token>/', ficha_reserva_view.ficha_reserva_cliente, name='ficha_reserva_cliente'),
     path('reserva/<str:token>/comanda/', ficha_reserva_view.ficha_comanda, name='ficha_reserva_comanda'),
     # Lo que abre el QR de El Pase: recepción registra la llegada; el cliente

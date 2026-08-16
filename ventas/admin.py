@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.forms import DateInput, TimeInput, Select
-from .models import (
+from .models import (CalendarioCabana, 
     Proveedor, CategoriaProducto, Producto, VentaReserva, ReservaProducto,
     Pago, Cliente, CategoriaServicio, Servicio, ReservaServicio,
     Region, Comuna,
@@ -7254,3 +7254,41 @@ class WhatsAppMessageAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(CalendarioCabana)
+class CalendarioCabanaAdmin(admin.ModelAdmin):
+    """Qué cabañas sincronizan con Booking/Airbnb, y con qué URL (H-106)."""
+
+    list_display = ('servicio', 'activo', 'url_ics', 'ultima_lectura_ok',
+                    'modificado')
+    list_filter = ('activo',)
+    list_editable = ('activo',)
+    readonly_fields = ('url_ics', 'token', 'creado', 'modificado')
+    fields = ('servicio', 'activo', 'url_ics', 'url_booking', 'url_airbnb',
+              'ultima_lectura_ok', 'token', 'creado', 'modificado')
+    actions = ['regenerar_tokens']
+
+    @admin.display(description='URL para pegar en Booking / Airbnb')
+    def url_ics(self, obj):
+        """La URL completa, lista para copiar del admin al extranet."""
+        if not obj.pk:
+            return '— se genera al guardar —'
+        from django.utils.html import format_html
+        from django.utils.text import slugify
+        ruta = f'/ventas/ical/{obj.token}/{slugify(obj.servicio.nombre)}.ics'
+        return format_html('<code>https://www.aremko.cl{}</code>', ruta)
+
+    @admin.action(description='🔑 Regenerar token (rompe la conexión actual)')
+    def regenerar_tokens(self, request, queryset):
+        """Cambia el secreto. OJO: hasta pegar la URL nueva en cada OTA, ellas
+        ven la cabaña LIBRE — o sea, se puede vender dos veces. Por eso avisa
+        con todas las letras en vez de hacerlo callado."""
+        for cal in queryset:
+            cal.regenerar_token()
+        self.message_user(
+            request,
+            f'{queryset.count()} token(s) regenerado(s). PEGÁ LA URL NUEVA en '
+            f'Booking y Airbnb ahora: hasta que lo hagas, ellos ven esas '
+            f'cabañas libres y pueden vender una fecha ya ocupada.',
+            level=messages.WARNING)
