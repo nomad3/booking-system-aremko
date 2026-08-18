@@ -21,7 +21,7 @@ from django.utils import timezone
 
 from ventas.models import WhatsAppMessage
 from whatsapp_agent.models import PropuestaReserva, TemaConversacion
-from whatsapp_agent.temas import clasificar_conversacion
+from whatsapp_agent.temas import VERSION_TAXONOMIA, clasificar_conversacion
 
 DIAS_POR_DEFECTO = 60
 MIN_MENSAJES = 4
@@ -63,7 +63,11 @@ class Command(BaseCommand):
             telefono__in=[t for t, _, _ in candidatos])}
         pendientes = [(t, n, u) for t, n, u in candidatos
                       if t not in ya
-                      or (ya[t].ultimo_mensaje_visto or timezone.now()) < u]
+                      or (ya[t].ultimo_mensaje_visto or timezone.now()) < u
+                      # Etiquetada con una taxonomía vieja: hay que rehacerla,
+                      # o el informe sumaría categorías que ya no significan
+                      # lo mismo.
+                      or ya[t].version_taxonomia != VERSION_TAXONOMIA]
         pendientes.sort(key=lambda c: -c[1])  # las más conversadas primero
 
         self.stdout.write(
@@ -95,7 +99,8 @@ class Command(BaseCommand):
                 telefono=tel,
                 defaults={'tema': tema, 'motivo': motivo, 'confianza': confianza,
                           'mensajes_vistos': n, 'ultimo_mensaje_visto': ultimo,
-                          'modelo': modelo})
+                          'modelo': modelo,
+                          'version_taxonomia': VERSION_TAXONOMIA})
             hechas += 1
 
         self.stdout.write(self.style.SUCCESS(

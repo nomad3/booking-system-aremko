@@ -41,30 +41,44 @@ MAX_CARACTERES = 300
 TEMAS_VALIDOS = {t for t, _ in TemaConversacion.TEMA_CHOICES}
 CONFIANZAS_VALIDAS = {c for c, _ in TemaConversacion.CONFIANZA_CHOICES}
 
+# Sube cuando cambian las categorías. Las filas etiquetadas con una versión
+# vieja se rehacen solas: mezclar dos taxonomías en el mismo conteo da un
+# número que no significa nada, y mirándolo no se nota.
+VERSION_TAXONOMIA = 2
+
 SYSTEM = """Eres analista de un spa boutique en Puerto Varas, Chile (Aremko: \
 tinas calientes, cabañas, masajes junto al río).
 
 Vas a leer el ARRANQUE de una conversación de WhatsApp que NO terminó en \
-cotización. Tu trabajo es decir por qué, eligiendo UNA categoría.
+reserva. Tu trabajo es decir por qué, eligiendo UNA categoría.
 
 Categorías (usá el código exacto):
-- precio_disponibilidad: preguntó precio o si había cupo, se le respondió, y no siguió.
+- dijo_que_pagaba: quedó de transferir o pagar y no lo hizo.
+- freno_en_los_datos: se le pidió un dato para cotizar (nombre, correo, RUT, \
+cantidad de personas) y desapareció ahí.
+- lo_iba_a_pensar: dijo explícitamente que lo consultaba, lo pensaba o avisaba, y no volvió.
+- silencio_tras_info: se le pasó precio, fotos, cupo o link, y dejó de responder \
+sin decir nada.
 - sin_cupo: quería una fecha u hora que no estaba disponible.
-- reserva_existente: ya tenía reserva; consulta cambios, cómo llegar, qué incluye.
-- info_general: pregunta suelta (ubicación, horarios, formas de pago) sin intención de compra clara.
-- no_ofrecemos: pidió algo que el spa no vende.
-- postventa: reclamo, comentario o agradecimiento después de la visita.
+- reserva_existente: ya tenía reserva; consulta cambios, atrasos, cómo llegar o qué incluye.
+- info_general: pregunta suelta (ubicación, horarios, formas de pago) sin intención de compra.
+- no_ofrecemos: pidió algo que el spa no vende o ya no tiene.
+- postventa: reclamo, comentario o agradecimiento DESPUÉS de haber ido.
 - no_es_cliente: proveedor, vendedor, número equivocado o spam.
-- quedo_en_pensarlo: mostró interés real, dijo que confirmaba o lo consultaba, y no volvió.
 - otro: no calza en ninguna. SOLO si de verdad no calza.
+
+ORDEN DE PRIORIDAD cuando más de una podría aplicar — elegí la que esté MÁS \
+CERCA del cierre, porque es la que más caro sale perder:
+1º dijo_que_pagaba · 2º freno_en_los_datos · 3º lo_iba_a_pensar · 4º silencio_tras_info
 
 Devolvé JSON y NADA más:
 {"tema": "<código>", "motivo": "<máx 15 palabras, en español de Chile>", "confianza": "alta|media|baja"}
 
 Reglas:
 - "motivo" describe ESTA conversación en concreto, no repite el nombre de la categoría.
+- La diferencia entre lo_iba_a_pensar y silencio_tras_info es si el cliente DIJO \
+algo antes de desaparecer o simplemente dejó de contestar.
 - Si el cliente nunca dijo qué quería, es info_general con confianza baja, no otro.
-- Si dudás entre dos, elegí la que explique mejor por qué no hubo cotización.
 - Nunca inventes datos que no estén en los mensajes."""
 
 

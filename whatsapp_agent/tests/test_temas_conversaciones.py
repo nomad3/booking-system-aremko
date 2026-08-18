@@ -20,8 +20,9 @@ from django.utils import timezone
 
 from ventas.models import WhatsAppMessage
 from whatsapp_agent.models import PropuestaReserva, TemaConversacion
-from whatsapp_agent.temas import (clasificar_conversacion, interpretar_respuesta,
-                                  texto_de_conversacion, MAX_MENSAJES)
+from whatsapp_agent.temas import (VERSION_TAXONOMIA, clasificar_conversacion,
+                                  interpretar_respuesta, texto_de_conversacion,
+                                  MAX_MENSAJES)
 
 AHORA = timezone.now()
 
@@ -86,10 +87,20 @@ class ClasificarConversacionTest(TestCase):
 
     def test_usa_el_generador_inyectado(self):
         class R:
-            content = '{"tema":"quedo_en_pensarlo","motivo":"dijo que confirmaba","confianza":"alta"}'
+            content = '{"tema":"dijo_que_pagaba","motivo":"quedó de transferir","confianza":"alta"}'
         r = clasificar_conversacion([_msg('a', '+56911111111')],
                                     generar=lambda s, u, m: R())
-        self.assertEqual(r[0], 'quedo_en_pensarlo')
+        self.assertEqual(r[0], 'dijo_que_pagaba')
+
+    def test_una_categoria_de_la_taxonomia_vieja_ya_no_vale(self):
+        # 'quedo_en_pensarlo' era v1 y se partió en cuatro. Si el modelo la
+        # devolviera igual, tiene que caer en 'otro' y quedar a la vista, no
+        # colarse como si fuera una categoría vigente.
+        class R:
+            content = '{"tema":"quedo_en_pensarlo","motivo":"x","confianza":"alta"}'
+        r = clasificar_conversacion([_msg('a', '+56911111111')],
+                                    generar=lambda s, u, m: R())
+        self.assertEqual(r[0], 'otro')
 
     def test_un_error_del_modelo_devuelve_None_y_no_lanza(self):
         def explota(s, u, m):
@@ -133,13 +144,23 @@ class ComandoTest(TestCase):
     def test_no_reclasifica_si_no_hay_mensajes_nuevos(self):
         TemaConversacion.objects.create(
             telefono='+56911111111', tema='sin_cupo', confianza='alta',
-            ultimo_mensaje_visto=AHORA)
+            ultimo_mensaje_visto=AHORA, version_taxonomia=VERSION_TAXONOMIA)
         salida = self._correr('--dry-run')
         self.assertIn('0 pendientes', salida)
 
     def test_reclasifica_si_llegaron_mensajes_nuevos(self):
         TemaConversacion.objects.create(
             telefono='+56911111111', tema='sin_cupo', confianza='alta',
-            ultimo_mensaje_visto=AHORA - timedelta(days=3))
+            ultimo_mensaje_visto=AHORA - timedelta(days=3),
+            version_taxonomia=VERSION_TAXONOMIA)
         salida = self._correr('--dry-run')
         self.assertIn('1 pendientes', salida)
+
+    def test_reclasifica_lo_etiquetado_con_taxonomia_vieja(self):
+        # Sin esto, el informe sumaría categorías v1 con categorías v2 —un
+        # número que no significa nada y que mirándolo no se nota.
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='sin_cupo', confianza='alta',
+            ultimo_mensaje_visto=AHORA,
+            version_taxonomia=VERSION_TAXONOMIA - 1)
+        self.assertIn('1 pendientes', self._correr('--dry-run'))

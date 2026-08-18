@@ -398,15 +398,24 @@ class TemaConversacion(models.Model):
     `ultimo_mensaje_visto`.
     """
 
+    # v2 (2026-08-18): el primer lote de 25 metió 19 en «quedó en pensarlo».
+    # No era pereza del modelo —los motivos eran concretos y distintos— sino un
+    # cajón demasiado ancho: adentro convivían una venta que se cayó pidiendo
+    # datos, una que murió esperando respuesta y otra que quedó de transferir y
+    # no transfirió. Tres problemas con tres arreglos distintos, contados como
+    # uno solo. Los cuatro primeros códigos salen de partir ese cajón, ordenados
+    # de más cerca a más lejos del cierre.
     TEMA_CHOICES = [
-        ('precio_disponibilidad', 'Preguntó precio o cupo y no siguió'),
+        ('dijo_que_pagaba', 'Quedó de transferir o pagar y no lo hizo'),
+        ('freno_en_los_datos', 'Se le pidió un dato para cotizar y desapareció'),
+        ('lo_iba_a_pensar', 'Dijo que lo consultaba y avisaba, y no volvió'),
+        ('silencio_tras_info', 'Se le pasó precio, fotos o cupo y no volvió a escribir'),
         ('sin_cupo', 'Quería una fecha u hora que no había'),
         ('reserva_existente', 'Ya tenía reserva (dudas, cambios, cómo llegar)'),
-        ('info_general', 'Información general, sin intención de compra clara'),
+        ('info_general', 'Pregunta suelta, sin intención de compra'),
         ('no_ofrecemos', 'Pidió algo que Aremko no vende'),
         ('postventa', 'Reclamo, comentario o agradecimiento tras la visita'),
         ('no_es_cliente', 'Proveedor, comercial, número equivocado o spam'),
-        ('quedo_en_pensarlo', 'Interés real: dijo que confirmaba y no volvió'),
         ('otro', 'No calza en ninguna categoría'),
     ]
     CONFIANZA_CHOICES = [('alta', 'Alta'), ('media', 'Media'), ('baja', 'Baja')]
@@ -424,6 +433,10 @@ class TemaConversacion(models.Model):
         null=True, blank=True,
         help_text='Hasta qué mensaje se leyó. Si llegan más nuevos, se reclasifica.')
     modelo = models.CharField(max_length=80, blank=True)
+    # Con qué taxonomía se etiquetó. Al cambiar las categorías, las filas viejas
+    # quedan desactualizadas y hay que rehacerlas: mezclar dos taxonomías en el
+    # mismo informe da un conteo que no significa nada, y no se nota mirándolo.
+    version_taxonomia = models.IntegerField(default=1, db_index=True)
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
 
