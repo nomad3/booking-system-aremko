@@ -1,0 +1,167 @@
+{% load humanize ventas_extras %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embudo de Luna · WhatsApp — Aremko</title>
+<style>
+  :root{
+    --tinta:#2f2a26; --suave:#7b7168; --linea:#e6ded4; --papel:#faf7f3;
+    --panel:#ffffff; --agua:#2b7a78; --alerta:#b4531f; --hueso:#f2ece4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--papel);color:var(--tinta);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-size:1.6rem;margin:0 0 4px}
+  .sub{color:var(--suave);margin:0 0 22px;font-size:.92rem}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+  .filtros a{padding:6px 14px;border:1px solid var(--linea);border-radius:20px;
+             text-decoration:none;color:var(--suave);background:var(--panel);font-size:.85rem}
+  .filtros a.on{background:var(--agua);color:#fff;border-color:var(--agua)}
+  .aviso{background:var(--hueso);border-left:3px solid var(--alerta);
+         padding:10px 14px;border-radius:4px;margin-bottom:22px;font-size:.88rem}
+  .escalones{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+             gap:14px;margin-bottom:14px}
+  .paso{background:var(--panel);border:1px solid var(--linea);border-radius:10px;padding:18px}
+  .paso .n{font-size:2rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .paso .et{color:var(--suave);font-size:.82rem;text-transform:uppercase;letter-spacing:.05em}
+  .paso .tasa{color:var(--agua);font-size:.85rem;margin-top:6px;font-weight:600}
+  .plata{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+         gap:14px;margin:26px 0}
+  .plata div{background:var(--panel);border:1px solid var(--linea);
+             border-radius:10px;padding:16px}
+  .plata .m{font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums}
+  .plata .perdida .m{color:var(--alerta)}
+  h2{font-size:1.05rem;margin:34px 0 10px}
+  .nota{color:var(--suave);font-size:.85rem;margin:0 0 12px}
+  .tabla-scroll{overflow-x:auto;border:1px solid var(--linea);border-radius:10px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:.9rem}
+  th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--linea);white-space:nowrap}
+  th{background:var(--hueso);font-weight:600;font-size:.8rem;
+     text-transform:uppercase;letter-spacing:.04em;color:var(--suave)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:2px 9px;border-radius:11px;font-size:.78rem;font-weight:600}
+  .ok{background:#dff0ee;color:#1d5c5a}
+  .no{background:#fae3d8;color:#8c3f16}
+  .gris{background:var(--hueso);color:var(--suave)}
+  .vacio{padding:26px;text-align:center;color:var(--suave)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Embudo de Luna · WhatsApp</h1>
+  <p class="sub">De {{ d.desde|date:"d/m/Y" }} a {{ d.hasta|date:"d/m/Y" }}. Solo WhatsApp:
+     Instagram y Messenger casi no producen cotizaciones y diluirían el embudo.</p>
+
+  <div class="filtros">
+    {% for v in dias_validos %}
+      <a href="?dias={{ v }}" class="{% if v == dias %}on{% endif %}">{{ v }} días</a>
+    {% endfor %}
+  </div>
+
+  {% if recortado %}
+    <div class="aviso">La ventana empieza el {{ inicio_datos|date:"d/m/Y" }}: antes de esa
+      fecha no hay mensajes reales de WhatsApp guardados.</div>
+  {% endif %}
+
+  <div class="escalones">
+    <div class="paso">
+      <div class="et">Conversaciones</div>
+      <div class="n">{{ d.conversaciones|intcomma }}</div>
+      <div class="tasa">&nbsp;</div>
+    </div>
+    <div class="paso">
+      <div class="et">Cotizaciones</div>
+      <div class="n">{{ d.cotizaciones|intcomma }}</div>
+      <div class="tasa">{{ d.pct_conv_a_cotiza }}% de las conversaciones</div>
+    </div>
+    <div class="paso">
+      <div class="et">Reservas</div>
+      <div class="n">{{ d.reservas|intcomma }}</div>
+      <div class="tasa">{{ d.pct_cotiza_a_reserva }}% de las cotizaciones</div>
+    </div>
+    <div class="paso">
+      <div class="et">De punta a punta</div>
+      <div class="n">{{ d.pct_conv_a_reserva }}%</div>
+      <div class="tasa">conversación → reserva</div>
+    </div>
+  </div>
+
+  <div class="plata">
+    <div><div class="et">Cotizado</div><div class="m">{{ d.plata_cotizada|formato_clp }}</div></div>
+    <div><div class="et">Cerrado</div><div class="m">{{ d.plata_cerrada|formato_clp }}</div></div>
+    <div class="perdida"><div class="et">Sin decisión (expiró)</div>
+      <div class="m">{{ d.plata_sin_decision|formato_clp }}</div></div>
+    <div class="perdida"><div class="et">Rechazado</div>
+      <div class="m">{{ d.plata_rechazada|formato_clp }}</div></div>
+  </div>
+
+  <h2>Cómo terminó cada cotización</h2>
+  <p class="nota"><strong>Rechazada</strong> es un «no» del cliente — se ataca con oferta o
+     precio. <strong>Expirada</strong> se apagó sin decisión en 24 horas — se ataca con
+     seguimiento. Sumarlas escondería cuál de los dos problemas tenés.</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Estado</th><th class="num">Cotizaciones</th><th class="num">Plata</th></tr></thead>
+      <tbody>
+      {% for e in d.por_estado %}
+        <tr>
+          <td>
+            {% if e.estado == 'creada' %}<span class="pill ok">Reservada</span>
+            {% elif e.estado == 'descartada' %}<span class="pill no">Rechazada</span>
+            {% elif e.estado == 'expirada' %}<span class="pill no">Expiró sin decisión</span>
+            {% else %}<span class="pill gris">Pendiente</span>{% endif %}
+          </td>
+          <td class="num">{{ e.n|intcomma }}</td>
+          <td class="num">{{ e.plata|formato_clp }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Semana a semana</h2>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr>
+        <th>Semana del</th><th class="num">Conversaciones</th><th class="num">Cotizaciones</th>
+        <th class="num">% cotiza</th><th class="num">Reservas</th><th class="num">% cierra</th>
+      </tr></thead>
+      <tbody>
+      {% for s in d.semanas %}
+        <tr>
+          <td>{{ s.semana|date:"d/m/Y" }}</td>
+          <td class="num">{{ s.conversaciones|intcomma }}</td>
+          <td class="num">{{ s.cotizaciones|intcomma }}</td>
+          <td class="num">{{ s.pct_cotiza }}%</td>
+          <td class="num">{{ s.reservas|intcomma }}</td>
+          <td class="num">{{ s.pct_cierra }}%</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="vacio">Sin datos en esta ventana.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Qué aparece en las cotizaciones que se caen</h2>
+  <p class="nota">Cuenta en cuántas cotizaciones caídas figura cada servicio. No reparte la
+     plata entre ellos: una cotización con tres servicios no dice cuál de los tres la mató.</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Servicio</th><th class="num">Cotizaciones caídas</th></tr></thead>
+      <tbody>
+      {% for s in d.servicios_que_mueren %}
+        <tr><td>{{ s.nombre }}</td><td class="num">{{ s.n|intcomma }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" class="vacio">Ninguna cotización caída en esta ventana.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

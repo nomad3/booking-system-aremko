@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views, ical_views
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views, ical_views, embudo_luna_view
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
@@ -64,6 +64,8 @@ urlpatterns = [
     path('analytics/dashboard-ventas/', analytics_views.dashboard_ventas, name='analytics_dashboard_ventas'),
     path('analytics/dashboard-operativo/', analytics_views.dashboard_operativo, name='analytics_dashboard_operativo'),
     path('analytics/dashboard-giftcards/', analytics_views.dashboard_giftcards, name='analytics_dashboard_giftcards'),
+    # Embudo de conversaciones de Luna por WhatsApp (P-30)
+    path('analytics/embudo-luna/', embudo_luna_view.embudo_luna, name='embudo_luna'),
     path('analytics/export-csv/', analytics_views.exportar_estadisticas_csv, name='analytics_export_csv'),
     path('analytics/actualizar-gasto-ads/', analytics_views.actualizar_gasto_ads_aremko_cli, name='actualizar_gasto_ads_aremko_cli'),  # H-058 Parte C (sin cron, a demanda)
     # Calendario Matriz Views
