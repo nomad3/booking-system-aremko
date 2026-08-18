@@ -200,10 +200,21 @@ class EnlaceEnElAdminTest(TestCase):
     visitarla no existe.
     """
 
-    def test_la_portada_del_admin_enlaza_el_embudo(self):
+    def _entrar(self):
         from django.contrib.auth.models import User
         User.objects.create_superuser('jefa', 'jefa@aremko.cl', 'x')
         self.client.login(username='jefa', password='x')
+
+    def test_la_portada_del_admin_enlaza_el_embudo(self):
+        self._entrar()
         resp = self.client.get('/admin/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('/ventas/analytics/embudo-luna/', resp.content.decode())
+
+    def test_la_seccion_crm_tambien_lo_enlaza(self):
+        # Es donde Jorge entró a buscarlo: el botón de la portada no le bastó
+        # porque él navega hacia ADENTRO de CRM y Marketing.
+        self._entrar()
+        resp = self.client.get('/ventas/admin/section/crm/')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('/ventas/analytics/embudo-luna/', resp.content.decode())
