@@ -164,3 +164,83 @@ class ComandoTest(TestCase):
             ultimo_mensaje_visto=AHORA,
             version_taxonomia=VERSION_TAXONOMIA - 1)
         self.assertIn('1 pendientes', self._correr('--dry-run'))
+
+
+class FallaDelProveedorTest(TestCase):
+    """Un error de la llamada NO es una clasificación.
+
+    En el lote de prueba, 3 de 25 quedaron como 'otro · respuesta ilegible'
+    porque `LLMResult` informa el problema en `.error` y deja `.text` vacío, y
+    yo no miraba ese campo. Peor que el dato equivocado era la consecuencia:
+    como quedaban «clasificadas», no se reintentaban nunca.
+    """
+
+    def test_un_error_del_proveedor_no_se_guarda_como_categoria(self):
+        class RError:
+            error = 'HTTP 429 rate limit'
+            text = ''
+        self.assertIsNone(
+            clasificar_conversacion([_msg('a', '+56911111111')],
+                                    generar=lambda s, u, m: RError()))
+
+    def test_respuesta_vacia_tampoco(self):
+        class RVacio:
+            error = ''
+            text = '   '
+        self.assertIsNone(
+            clasificar_conversacion([_msg('b', '+56911111111')],
+                                    generar=lambda s, u, m: RVacio()))
+
+    def test_reintenta_y_el_segundo_intento_sirve(self):
+        estado = {'n': 0}
+
+        class ROk:
+            error = ''
+            text = '{"tema":"sin_cupo","motivo":"no había el sábado","confianza":"alta"}'
+
+        class RError:
+            error = 'timeout'
+            text = ''
+
+        def flaky(s, u, m):
+            estado['n'] += 1
+            return RError() if estado['n'] == 1 else ROk()
+
+        r = clasificar_conversacion([_msg('c', '+56911111111')], generar=flaky)
+        self.assertEqual(r[0], 'sin_cupo')
+        self.assertEqual(estado['n'], 2)
+
+    def test_texto_ilegible_SI_se_guarda_como_otro(self):
+        # Distinto del error de red: acá el modelo contestó, mal. Eso es
+        # información sobre el modelo y tiene que quedar a la vista.
+        class RBasura:
+            error = ''
+            text = 'no entendí la pregunta'
+        r = clasificar_conversacion([_msg('d', '+56911111111')],
+                                    generar=lambda s, u, m: RBasura())
+        self.assertEqual((r[0], r[2]), ('otro', 'baja'))
+
+
+class RecuperarFallasTecnicasTest(TestCase):
+
+    def test_el_otro_por_falla_tecnica_vuelve_a_la_cola(self):
+        for i in range(5):
+            _msg(f'r{i}', '+56911111111', f'consulta {i}', horas_atras=10 - i)
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='otro', confianza='baja',
+            motivo='respuesta del modelo ilegible',
+            ultimo_mensaje_visto=AHORA, version_taxonomia=VERSION_TAXONOMIA)
+        salida = StringIO()
+        call_command('clasificar_conversaciones', '--dry-run', stdout=salida)
+        self.assertIn('1 pendientes', salida.getvalue())
+
+    def test_un_otro_legitimo_NO_vuelve_a_la_cola(self):
+        for i in range(5):
+            _msg(f's{i}', '+56922222222', f'consulta {i}', horas_atras=10 - i)
+        TemaConversacion.objects.create(
+            telefono='+56922222222', tema='otro', confianza='media',
+            motivo='pidió trabajo en el spa',
+            ultimo_mensaje_visto=AHORA, version_taxonomia=VERSION_TAXONOMIA)
+        salida = StringIO()
+        call_command('clasificar_conversaciones', '--dry-run', stdout=salida)
+        self.assertIn('0 pendientes', salida.getvalue())

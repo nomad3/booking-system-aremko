@@ -23,8 +23,19 @@ from ventas.models import WhatsAppMessage
 from whatsapp_agent.models import PropuestaReserva, TemaConversacion
 from whatsapp_agent.temas import VERSION_TAXONOMIA, clasificar_conversacion
 
+
 DIAS_POR_DEFECTO = 60
 MIN_MENSAJES = 4
+
+# Los 'otro' de confianza baja cuyo motivo delata un problema de la llamada y no
+# de la conversación. Se reintentan en la corrida siguiente.
+_MOTIVOS_TECNICOS = ('respuesta del modelo ilegible', 'falló la llamada al modelo',
+                     'el modelo devolvió una respuesta vacía')
+
+
+def _fue_falla_tecnica(fila):
+    return (fila.tema == 'otro'
+            and any(fila.motivo.startswith(m) for m in _MOTIVOS_TECNICOS))
 
 
 class Command(BaseCommand):
@@ -67,7 +78,10 @@ class Command(BaseCommand):
                       # Etiquetada con una taxonomía vieja: hay que rehacerla,
                       # o el informe sumaría categorías que ya no significan
                       # lo mismo.
-                      or ya[t].version_taxonomia != VERSION_TAXONOMIA]
+                      or ya[t].version_taxonomia != VERSION_TAXONOMIA
+                      # Quedó en 'otro' porque la respuesta no se pudo leer, no
+                      # porque la conversación no calzara: merece otro intento.
+                      or _fue_falla_tecnica(ya[t])]
         pendientes.sort(key=lambda c: -c[1])  # las más conversadas primero
 
         self.stdout.write(

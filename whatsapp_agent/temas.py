@@ -27,6 +27,7 @@ Decisiones de diseño:
 """
 import json
 import logging
+import time
 
 from whatsapp_agent.models import TemaConversacion
 
@@ -129,8 +130,38 @@ def _modelo():
         return None
 
 
+# Marca los intentos que fallaron por el proveedor y NO por el contenido. Se
+# guardan igual —para no perder el rastro— pero el comando los vuelve a tomar.
+MOTIVO_FALLA_TECNICA = 'falló la llamada al modelo'
+INTENTOS = 2
+
+
+def _una_llamada(generar, mensajes, modelo):
+    """(crudo, error). `error` no vacío = falló la llamada, no el contenido."""
+    try:
+        r = generar(SYSTEM, texto_de_conversacion(mensajes), modelo)
+    except Exception as e:  # noqa: BLE001 — una caída no puede matar el lote
+        return '', str(e)[:120]
+    # LLMResult nunca lanza: informa el problema en `.error` y deja `.text`
+    # vacío. Sin mirar ese campo, un 429 o un timeout se guardaba como si el
+    # modelo hubiera contestado cualquier cosa — y como quedaba «clasificada»,
+    # no se reintentaba nunca. En el lote de prueba fueron 3 de 25.
+    error = (getattr(r, 'error', '') or '').strip()
+    crudo = (getattr(r, 'content', None) or getattr(r, 'text', None) or '').strip()
+    if error:
+        return '', error[:120]
+    if not crudo:
+        return '', 'el modelo devolvió una respuesta vacía'
+    return crudo, ''
+
+
 def clasificar_conversacion(mensajes, generar=None):
-    """(tema, motivo, confianza, modelo) para UNA conversación. No lanza."""
+    """(tema, motivo, confianza, modelo) para UNA conversación. No lanza.
+
+    Devuelve None si la llamada falló las dos veces: esa conversación queda sin
+    clasificar y el comando la vuelve a tomar. Distinto de que el modelo haya
+    contestado algo ilegible, que sí es información y se guarda como 'otro'.
+    """
     if generar is None:
         from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
         proveedor = OpenRouterProvider()
@@ -140,11 +171,12 @@ def clasificar_conversacion(mensajes, generar=None):
                                       model=model, temperature=0)
 
     modelo = _modelo()
-    try:
-        r = generar(SYSTEM, texto_de_conversacion(mensajes), modelo)
-    except Exception as e:  # noqa: BLE001 — una caída no puede matar el lote
-        logger.warning('[temas] error del modelo: %s', e)
-        return None
-    crudo = getattr(r, 'content', None) or getattr(r, 'text', None) or str(r)
-    tema, motivo, confianza = interpretar_respuesta(crudo)
-    return tema, motivo, confianza, (modelo or getattr(r, 'model', '') or '')
+    for intento in range(INTENTOS):
+        crudo, error = _una_llamada(generar, mensajes, modelo)
+        if not error:
+            tema, motivo, confianza = interpretar_respuesta(crudo)
+            return tema, motivo, confianza, (modelo or '')
+        logger.warning('[temas] intento %s falló: %s', intento + 1, error)
+        if intento + 1 < INTENTOS:
+            time.sleep(2)  # un respiro: casi siempre es límite de tasa
+    return None
