@@ -48,6 +48,8 @@
   .no{background:#fae3d8;color:#8c3f16}
   .gris{background:var(--hueso);color:var(--suave)}
   .vacio{padding:26px;text-align:center;color:var(--suave)}
+  tr.parcial td{color:var(--suave);font-style:italic;background:#fcfaf7}
+  .marca{font-style:normal;font-size:.72rem;color:var(--alerta);margin-left:6px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -124,6 +126,7 @@
   </div>
 
   <h2>Semana a semana</h2>
+  <p class="nota">Las semanas marcadas como incompletas tienen menos de 7 días dentro de la ventana —la primera arranca a mitad de semana y la última es la que está corriendo—, así que sus porcentajes NO son comparables con el resto.</p>
   <div class="tabla-scroll">
     <table>
       <thead><tr>
@@ -132,8 +135,8 @@
       </tr></thead>
       <tbody>
       {% for s in d.semanas %}
-        <tr>
-          <td>{{ s.semana|date:"d/m/Y" }}</td>
+        <tr {% if s.parcial %}class="parcial"{% endif %}>
+          <td>{{ s.semana|date:"d/m/Y" }}{% if s.parcial %}<span class="marca">semana incompleta</span>{% endif %}</td>
           <td class="num">{{ s.conversaciones|intcomma }}</td>
           <td class="num">{{ s.cotizaciones|intcomma }}</td>
           <td class="num">{{ s.pct_cotiza }}%</td>

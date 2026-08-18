@@ -153,6 +153,11 @@ def embudo(desde, hasta, ahora):
         semanas.append({
             'semana': lun, 'conversaciones': c, 'cotizaciones': q, 'reservas': r,
             'pct_cotiza': _pct(q, c), 'pct_cierra': _pct(r, q),
+            # La primera y la última semana casi nunca están completas (la
+            # ventana empieza un jueves, termina hoy). Sin marcarlas se leen
+            # como una caída: en la primera lectura real dieron 5,6% y 9,5%
+            # contra un ~12% estable, y eso invita a una conclusión falsa.
+            'parcial': lun < desde or lun + timedelta(days=6) > hasta,
         })
 
     plata_perdida = sum(plata_estado.get(e, 0) for e in ESTADOS_MUERTOS)

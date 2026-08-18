@@ -218,3 +218,27 @@ class EnlaceEnElAdminTest(TestCase):
         resp = self.client.get('/ventas/admin/section/crm/')
         self.assertEqual(resp.status_code, 200)
         self.assertIn('/ventas/analytics/embudo-luna/', resp.content.decode())
+
+
+class SemanasParcialesTest(TestCase):
+    """Una semana a medias se lee como una caída si no se avisa.
+
+    En la primera lectura real la primera semana marcó 5,6% y la última 9,5%
+    contra un ~12% estable — no era una baja, era que faltaban días.
+    """
+
+    def test_primera_y_ultima_semana_van_marcadas(self):
+        # Ventana que arranca un miércoles y termina un jueves: las dos puntas
+        # quedan incompletas y el medio no.
+        desde, hasta = date(2026, 7, 1), date(2026, 7, 23)
+        _mensaje('a', '+56911111111', dias_atras=(timezone.localdate() - date(2026, 7, 2)).days)
+        d = embudo(desde, hasta, AHORA)
+        for s in d['semanas']:
+            esperado = s['semana'] < desde or s['semana'] + timedelta(days=6) > hasta
+            self.assertEqual(s['parcial'], esperado, f"semana {s['semana']}")
+
+    def test_una_semana_entera_no_va_marcada(self):
+        lunes, domingo = date(2026, 7, 6), date(2026, 7, 12)
+        _mensaje('b', '+56922222222', dias_atras=(timezone.localdate() - date(2026, 7, 8)).days)
+        d = embudo(lunes, domingo, AHORA)
+        self.assertEqual([s['parcial'] for s in d['semanas']], [False])
