@@ -48,8 +48,6 @@
   .no{background:#fae3d8;color:#8c3f16}
   .gris{background:var(--hueso);color:var(--suave)}
   .vacio{padding:26px;text-align:center;color:var(--suave)}
-  tr.parcial td{color:var(--suave);font-style:italic;background:#fcfaf7}
-  .marca{font-style:normal;font-size:.72rem;color:var(--alerta);margin-left:6px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -125,18 +123,21 @@
     </table>
   </div>
 
-  <h2>Semana a semana</h2>
-  <p class="nota">Las semanas marcadas como incompletas tienen menos de 7 días dentro de la ventana —la primera arranca a mitad de semana y la última es la que está corriendo—, así que sus porcentajes NO son comparables con el resto.</p>
+  <h2>Cada 7 días</h2>
+  <p class="nota">Ventanas móviles de 7 días completos contadas desde hoy hacia atrás, no semanas
+     de calendario: así todas duran lo mismo y sus porcentajes se pueden comparar de frente.
+     {% if d.dias_descartados %}Quedaron fuera los {{ d.dias_descartados }} día{{ d.dias_descartados|pluralize }}
+     más viejo{{ d.dias_descartados|pluralize }} de la ventana, que no alcanzaban para completar 7.{% endif %}</p>
   <div class="tabla-scroll">
     <table>
       <thead><tr>
-        <th>Semana del</th><th class="num">Conversaciones</th><th class="num">Cotizaciones</th>
+        <th>Período</th><th class="num">Conversaciones</th><th class="num">Cotizaciones</th>
         <th class="num">% cotiza</th><th class="num">Reservas</th><th class="num">% cierra</th>
       </tr></thead>
       <tbody>
       {% for s in d.semanas %}
-        <tr {% if s.parcial %}class="parcial"{% endif %}>
-          <td>{{ s.semana|date:"d/m/Y" }}{% if s.parcial %}<span class="marca">semana incompleta</span>{% endif %}</td>
+        <tr>
+          <td>{{ s.desde|date:"d/m" }} &ndash; {{ s.hasta|date:"d/m/Y" }}</td>
           <td class="num">{{ s.conversaciones|intcomma }}</td>
           <td class="num">{{ s.cotizaciones|intcomma }}</td>
           <td class="num">{{ s.pct_cotiza }}%</td>

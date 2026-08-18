@@ -44,31 +44,31 @@ def estado_efectivo(estado, expires_at, ahora):
     return estado
 
 
-def _lunes(d):
-    """El lunes de la semana de `d` — la etiqueta de cada bucket."""
-    return d - timedelta(days=d.weekday())
+def ventanas_de_7_dias(desde, hasta):
+    """[(inicio, fin)] de 7 días COMPLETOS, ancladas a `hasta` y hacia atrás.
+
+    Pedido de Jorge (2026-08-18): «sería mejor que las semanas fueran todas
+    completas, es decir la última, la vigente, los últimos 7 días y así hacia
+    atrás».
+
+    Con semanas de calendario (lunes a domingo) siempre quedaban dos ventanas a
+    medias —la primera de la ventana y la que está corriendo— y sus porcentajes
+    se leían como caídas: en la lectura real dieron 5,6% y 7,8% contra un ~12%
+    estable. Con ventanas móviles todas duran lo mismo y se pueden comparar de
+    frente. El costo es que sobran hasta 6 días al principio, que se descartan:
+    es preferible perder unos días viejos antes que mostrar un número que
+    invita a una conclusión falsa.
+    """
+    ventanas, fin = [], hasta
+    while fin - timedelta(days=6) >= desde:
+        ventanas.append((fin - timedelta(days=6), fin))
+        fin -= timedelta(days=7)
+    ventanas.reverse()
+    return ventanas
 
 
 def _pct(parte, total):
     return round(100 * parte / total, 1) if total else 0.0
-
-
-def conversaciones_por_semana(desde, hasta):
-    """{lunes: nº de teléfonos distintos que escribieron esa semana}.
-
-    Cuenta ENTRANTES: una conversación existe cuando alguien nos habla. Los
-    salientes solos son campañas, no demanda. Un teléfono activo dos semanas
-    cuenta en las dos — es «conversaciones activas por semana», no altas.
-    """
-    from ventas.models import WhatsAppMessage
-
-    filas = (WhatsAppMessage.objects
-             .filter(direction='in', timestamp__date__gte=desde,
-                     timestamp__date__lte=hasta)
-             .annotate(sem=TruncWeek('timestamp'))
-             .values('sem')
-             .annotate(n=Count('phone', distinct=True)))
-    return {_lunes(f['sem'].date()): f['n'] for f in filas if f['sem']}
 
 
 def conversaciones_totales(desde, hasta):
@@ -138,26 +138,21 @@ def embudo(desde, hasta, ahora):
     cotiz = len(props)
     reservas = por_estado.get('creada', 0)
 
-    # Serie semanal: un bucket por lunes, aunque alguna fuente no tenga datos.
-    conv_sem = conversaciones_por_semana(desde, hasta)
-    cot_sem, res_sem = {}, {}
-    for p in props:
-        lun = _lunes(p.created_at.date())
-        cot_sem[lun] = cot_sem.get(lun, 0) + 1
-        if estado_efectivo(p.estado, p.expires_at, ahora) == 'creada':
-            res_sem[lun] = res_sem.get(lun, 0) + 1
-
+    # Serie por ventanas móviles de 7 días: todas completas, comparables entre sí.
+    ventanas = ventanas_de_7_dias(desde, hasta)
     semanas = []
-    for lun in sorted(set(conv_sem) | set(cot_sem) | set(res_sem)):
-        c, q, r = conv_sem.get(lun, 0), cot_sem.get(lun, 0), res_sem.get(lun, 0)
+    for ini, fin in ventanas:
+        c = conversaciones_totales(ini, fin)
+        q = r = 0
+        for p in props:
+            if ini <= p.created_at.date() <= fin:
+                q += 1
+                if estado_efectivo(p.estado, p.expires_at, ahora) == 'creada':
+                    r += 1
         semanas.append({
-            'semana': lun, 'conversaciones': c, 'cotizaciones': q, 'reservas': r,
+            'desde': ini, 'hasta': fin, 'conversaciones': c,
+            'cotizaciones': q, 'reservas': r,
             'pct_cotiza': _pct(q, c), 'pct_cierra': _pct(r, q),
-            # La primera y la última semana casi nunca están completas (la
-            # ventana empieza un jueves, termina hoy). Sin marcarlas se leen
-            # como una caída: en la primera lectura real dieron 5,6% y 9,5%
-            # contra un ~12% estable, y eso invita a una conclusión falsa.
-            'parcial': lun < desde or lun + timedelta(days=6) > hasta,
         })
 
     plata_perdida = sum(plata_estado.get(e, 0) for e in ESTADOS_MUERTOS)
@@ -176,5 +171,7 @@ def embudo(desde, hasta, ahora):
         'plata_sin_decision': plata_estado.get('expirada', 0),
         'plata_rechazada': plata_estado.get('descartada', 0),
         'semanas': semanas,
+        # Días viejos que no alcanzaron para una ventana entera.
+        'dias_descartados': (ventanas[0][0] - desde).days if ventanas else 0,
         'servicios_que_mueren': servicios_que_mueren(props, ahora),
     }

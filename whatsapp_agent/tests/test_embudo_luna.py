@@ -17,7 +17,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from ventas.models import Cliente, Servicio, WhatsAppMessage
-from whatsapp_agent.embudo import embudo, estado_efectivo, servicios_que_mueren
+from whatsapp_agent.embudo import (embudo, estado_efectivo,
+                                   servicios_que_mueren, ventanas_de_7_dias)
 from whatsapp_agent.models import PropuestaReserva
 
 AHORA = timezone.now()
@@ -220,25 +221,39 @@ class EnlaceEnElAdminTest(TestCase):
         self.assertIn('/ventas/analytics/embudo-luna/', resp.content.decode())
 
 
-class SemanasParcialesTest(TestCase):
-    """Una semana a medias se lee como una caída si no se avisa.
+class VentanasDe7DiasTest(TestCase):
+    """Todas las ventanas duran 7 días, ancladas a hoy y hacia atrás.
 
-    En la primera lectura real la primera semana marcó 5,6% y la última 9,5%
-    contra un ~12% estable — no era una baja, era que faltaban días.
+    Con semanas de calendario la primera y la última siempre quedaban a medias
+    y sus porcentajes se leían como caídas (5,6% y 7,8% contra un ~12% estable).
+    Jorge pidió ventanas móviles: «la última, la vigente, los últimos 7 días y
+    así hacia atrás».
     """
 
-    def test_primera_y_ultima_semana_van_marcadas(self):
-        # Ventana que arranca un miércoles y termina un jueves: las dos puntas
-        # quedan incompletas y el medio no.
-        desde, hasta = date(2026, 7, 1), date(2026, 7, 23)
-        _mensaje('a', '+56911111111', dias_atras=(timezone.localdate() - date(2026, 7, 2)).days)
-        d = embudo(desde, hasta, AHORA)
-        for s in d['semanas']:
-            esperado = s['semana'] < desde or s['semana'] + timedelta(days=6) > hasta
-            self.assertEqual(s['parcial'], esperado, f"semana {s['semana']}")
+    def test_todas_duran_exactamente_7_dias(self):
+        vs = ventanas_de_7_dias(date(2026, 6, 1), date(2026, 8, 18))
+        self.assertTrue(vs)
+        for ini, fin in vs:
+            self.assertEqual((fin - ini).days, 6)
 
-    def test_una_semana_entera_no_va_marcada(self):
-        lunes, domingo = date(2026, 7, 6), date(2026, 7, 12)
-        _mensaje('b', '+56922222222', dias_atras=(timezone.localdate() - date(2026, 7, 8)).days)
-        d = embudo(lunes, domingo, AHORA)
-        self.assertEqual([s['parcial'] for s in d['semanas']], [False])
+    def test_la_ultima_termina_hoy(self):
+        hasta = date(2026, 8, 18)
+        vs = ventanas_de_7_dias(date(2026, 6, 1), hasta)
+        self.assertEqual(vs[-1], (date(2026, 8, 12), hasta))
+
+    def test_no_se_pisan_ni_dejan_huecos(self):
+        vs = ventanas_de_7_dias(date(2026, 6, 1), date(2026, 8, 18))
+        for (_, fin_previa), (ini_sig, _) in zip(vs, vs[1:]):
+            self.assertEqual(ini_sig - fin_previa, timedelta(days=1))
+
+    def test_los_dias_sobrantes_se_descartan_y_se_informan(self):
+        # 10 días dan una sola ventana de 7; los 3 más viejos quedan fuera.
+        desde, hasta = date(2026, 8, 9), date(2026, 8, 18)
+        vs = ventanas_de_7_dias(desde, hasta)
+        self.assertEqual(len(vs), 1)
+        d = embudo(desde, hasta, AHORA)
+        self.assertEqual(d['dias_descartados'], 3)
+
+    def test_menos_de_7_dias_no_da_ninguna_ventana(self):
+        self.assertEqual(
+            ventanas_de_7_dias(date(2026, 8, 15), date(2026, 8, 18)), [])
