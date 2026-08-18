@@ -17,9 +17,11 @@ from django.test import TestCase
 from django.utils import timezone
 
 from ventas.models import Cliente, Servicio, WhatsAppMessage
-from whatsapp_agent.embudo import (embudo, estado_efectivo,
-                                   servicios_que_mueren, ventanas_de_7_dias)
-from whatsapp_agent.models import PropuestaReserva
+from whatsapp_agent.embudo import (candidatos_sin_cotizar, embudo,
+                                   estado_efectivo, servicios_que_mueren,
+                                   temas_de_las_caidas, ventanas_de_7_dias)
+from whatsapp_agent.models import PropuestaReserva, TemaConversacion
+from whatsapp_agent.temas import VERSION_TAXONOMIA
 
 AHORA = timezone.now()
 HOY = timezone.localdate()
@@ -257,3 +259,93 @@ class VentanasDe7DiasTest(TestCase):
     def test_menos_de_7_dias_no_da_ninguna_ventana(self):
         self.assertEqual(
             ventanas_de_7_dias(date(2026, 8, 15), date(2026, 8, 18)), [])
+
+
+class CandidatosSinCotizarTest(TestCase):
+    """Fuente única del comando `clasificar_conversaciones` y del panel de
+    temas: si esta definición cambia, cambia en los dos lugares a la vez."""
+
+    def test_escribio_pero_nunca_cotizo_es_candidato(self):
+        for i in range(4):
+            _mensaje(f'a{i}', '+56911111111', dias_atras=3)
+        candidatos = candidatos_sin_cotizar(DESDE, HOY)
+        self.assertEqual([t for t, _, _ in candidatos], ['+56911111111'])
+
+    def test_el_que_ya_cotizo_no_es_candidato_aunque_sea_de_otro_mes(self):
+        for i in range(4):
+            _mensaje(f'b{i}', '+56922222222', dias_atras=3)
+        # La cotización es VIEJA, de fuera de la ventana — igual lo saca:
+        # ya se resolvió, no es una venta perdida de esta ventana.
+        _propuesta('vieja', canal='whatsapp', dias_atras=90)
+        PropuestaReserva.objects.filter(propuesta_id='vieja').update(
+            external_id='+56922222222')
+        candidatos = candidatos_sin_cotizar(DESDE, HOY)
+        self.assertEqual(candidatos, [])
+
+    def test_menos_del_minimo_de_mensajes_no_es_candidato(self):
+        _mensaje('c0', '+56933333333', dias_atras=3)
+        self.assertEqual(candidatos_sin_cotizar(DESDE, HOY, min_mensajes=4), [])
+        self.assertEqual(
+            [t for t, _, _ in candidatos_sin_cotizar(DESDE, HOY, min_mensajes=1)],
+            ['+56933333333'])
+
+
+class TemasDeLasCaidasTest(TestCase):
+
+    def _candidato(self, tel, n=4):
+        for i in range(n):
+            _mensaje(f'{tel}-{i}', tel, dias_atras=3)
+
+    def test_reparte_por_tema_con_porcentaje(self):
+        self._candidato('+56911111111')
+        self._candidato('+56922222222')
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='sin_cupo', confianza='alta',
+            version_taxonomia=VERSION_TAXONOMIA)
+        TemaConversacion.objects.create(
+            telefono='+56922222222', tema='sin_cupo', confianza='alta',
+            version_taxonomia=VERSION_TAXONOMIA)
+        d = temas_de_las_caidas(DESDE, HOY)
+        self.assertEqual(d['temas'], [{'tema': 'sin_cupo',
+                                       'nombre': 'Quería una fecha u hora que no había',
+                                       'n': 2, 'pct': 100.0}])
+
+    def test_declara_su_cobertura_cuando_falta_clasificar(self):
+        self._candidato('+56911111111')
+        self._candidato('+56922222222')
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='sin_cupo', confianza='alta',
+            version_taxonomia=VERSION_TAXONOMIA)
+        # +56922222222 quedó SIN clasificar.
+        d = temas_de_las_caidas(DESDE, HOY)
+        self.assertEqual(d['total_sin_cotizar'], 2)
+        self.assertEqual(d['total_clasificadas'], 1)
+        self.assertEqual(d['faltan_clasificar'], 1)
+        self.assertEqual(d['cobertura_pct'], 50.0)
+
+    def test_taxonomia_vieja_no_cuenta_como_clasificada(self):
+        # Mismo principio que el comando: una fila v1 no puede sumar en un
+        # informe que lee categorías v2 — mezclaría cosas que ya no significan
+        # lo mismo.
+        self._candidato('+56911111111')
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='sin_cupo', confianza='alta',
+            version_taxonomia=VERSION_TAXONOMIA - 1)
+        d = temas_de_las_caidas(DESDE, HOY)
+        self.assertEqual(d['total_clasificadas'], 0)
+        self.assertEqual(d['temas'], [])
+
+    def test_sin_candidatos_la_cobertura_es_cero_y_no_revienta(self):
+        d = temas_de_las_caidas(DESDE, HOY)
+        self.assertEqual(d, {'temas': [], 'total_sin_cotizar': 0,
+                             'total_clasificadas': 0, 'faltan_clasificar': 0,
+                             'cobertura_pct': 0.0})
+
+    def test_el_embudo_completo_incluye_los_temas(self):
+        self._candidato('+56911111111')
+        TemaConversacion.objects.create(
+            telefono='+56911111111', tema='freno_en_los_datos', confianza='alta',
+            version_taxonomia=VERSION_TAXONOMIA)
+        d = embudo(DESDE, HOY, AHORA)
+        self.assertEqual(d['temas_que_no_cotizan'][0]['tema'], 'freno_en_los_datos')
+        self.assertEqual(d['temas_total_sin_cotizar'], 1)

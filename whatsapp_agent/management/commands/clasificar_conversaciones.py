@@ -20,7 +20,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from ventas.models import WhatsAppMessage
-from whatsapp_agent.models import PropuestaReserva, TemaConversacion
+from whatsapp_agent.embudo import candidatos_sin_cotizar
+from whatsapp_agent.models import TemaConversacion
 from whatsapp_agent.temas import VERSION_TAXONOMIA, clasificar_conversacion
 
 
@@ -54,20 +55,10 @@ class Command(BaseCommand):
         hasta = timezone.localdate()
         desde = hasta - timedelta(days=opts['dias'])
 
-        cotizaron = set(PropuestaReserva.objects
-                        .filter(canal='whatsapp')
-                        .values_list('external_id', flat=True))
-
-        entrantes = {}
-        for tel, ts in (WhatsAppMessage.objects
-                        .filter(direction='in', timestamp__date__gte=desde,
-                                timestamp__date__lte=hasta)
-                        .values_list('phone', 'timestamp')):
-            n, ultimo = entrantes.get(tel, (0, None))
-            entrantes[tel] = (n + 1, max(ultimo, ts) if ultimo else ts)
-
-        candidatos = [(t, n, u) for t, (n, u) in entrantes.items()
-                      if t not in cotizaron and n >= opts['min_mensajes']]
+        # Misma función que usa el panel de temas del embudo (whatsapp_agent.
+        # embudo): una sola definición de «sin cotizar», no dos que puedan
+        # empezar a contar distinto con el tiempo.
+        candidatos = candidatos_sin_cotizar(desde, hasta, opts['min_mensajes'])
 
         # Ya clasificadas y sin mensajes nuevos: no se vuelven a pagar.
         ya = {c.telefono: c for c in TemaConversacion.objects.filter(

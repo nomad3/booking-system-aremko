@@ -48,6 +48,7 @@
   .no{background:#fae3d8;color:#8c3f16}
   .gris{background:var(--hueso);color:var(--suave)}
   .vacio{padding:26px;text-align:center;color:var(--suave)}
+  code{background:var(--hueso);padding:1px 6px;border-radius:4px;font-size:.85em}
 </style>
 </head>
 <body>
@@ -97,6 +98,34 @@
       <div class="m">{{ d.plata_sin_decision|formato_clp }}</div></div>
     <div class="perdida"><div class="et">Rechazado</div>
       <div class="m">{{ d.plata_rechazada|formato_clp }}</div></div>
+  </div>
+
+  <h2>Por qué no llegan a cotizar</h2>
+  <p class="nota">Estas conversaciones NUNCA recibieron una cotización formal — por eso el número
+     que importa acá es CUÁNTAS, no CUÁNTO. Se clasificaron leyendo el arranque de cada una con
+     IA: sirve para saber qué atacar primero, no es un conteo perfecto.
+     {% if d.temas_faltan %}<br>Cobertura: {{ d.temas_total_clasificadas|intcomma }} de
+     {{ d.temas_total_sin_cotizar|intcomma }} ({{ d.temas_cobertura_pct }}%) — faltan
+     {{ d.temas_faltan|intcomma }} por clasificar. Correr
+     <code>python manage.py clasificar_conversaciones --limit {{ d.temas_faltan }}</code>
+     en la Shell de Render para completarlo.{% endif %}</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Tema</th><th class="num">Conversaciones</th><th class="num">%</th></tr></thead>
+      <tbody>
+      {% for t in d.temas_que_no_cotizan %}
+        <tr>
+          <td>{{ t.nombre }}</td>
+          <td class="num">{{ t.n|intcomma }}</td>
+          <td class="num">{{ t.pct }}%</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="vacio">Todavía no hay conversaciones clasificadas en esta
+          ventana. Correr <code>python manage.py clasificar_conversaciones</code> en la Shell
+          de Render.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
 
   <h2>Cómo terminó cada cotización</h2>

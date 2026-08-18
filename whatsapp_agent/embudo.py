@@ -80,6 +80,83 @@ def conversaciones_totales(desde, hasta):
             .values('phone').distinct().count())
 
 
+# El mínimo de mensajes entrantes para que una conversación sin cotizar valga
+# la pena clasificar (P-31). Los de 1 mensaje suelen ser número equivocado o
+# spam y cuestan lo mismo clasificar que los que importan.
+MIN_MENSAJES_TEMA = 4
+
+
+def candidatos_sin_cotizar(desde, hasta, min_mensajes=MIN_MENSAJES_TEMA):
+    """[(telefono, n_mensajes, ultimo_mensaje)] — escribieron en la ventana,
+    tuvieron conversación de verdad y NUNCA recibieron una cotización.
+
+    Fuente única para el comando `clasificar_conversaciones` y para el panel
+    de temas del embudo: si esta definición cambia, cambia en los dos lugares
+    a la vez y no hay riesgo de que uno cuente distinto que el otro.
+
+    «Nunca cotizó» va SIN ventana de fecha a propósito: alguien puede escribir
+    hoy y haber recibido una cotización real hace un mes — eso no es una venta
+    perdida, es una que ya se resolvió antes.
+    """
+    from ventas.models import WhatsAppMessage
+    from whatsapp_agent.models import PropuestaReserva
+
+    cotizaron = set(PropuestaReserva.objects
+                    .filter(canal='whatsapp')
+                    .values_list('external_id', flat=True))
+    entrantes = {}
+    for tel, ts in (WhatsAppMessage.objects
+                    .filter(direction='in', timestamp__date__gte=desde,
+                            timestamp__date__lte=hasta)
+                    .values_list('phone', 'timestamp')):
+        n, ultimo = entrantes.get(tel, (0, None))
+        entrantes[tel] = (n + 1, max(ultimo, ts) if ultimo else ts)
+    return [(t, n, u) for t, (n, u) in entrantes.items()
+            if t not in cotizaron and n >= min_mensajes]
+
+
+def temas_de_las_caidas(desde, hasta, tope=10):
+    """Reparto de temas entre las conversaciones sin cotizar YA clasificadas.
+
+    Declara su cobertura a propósito, mismo principio que el panel financiero
+    de Jorge («un panel declara su cobertura»): si la ventana pedida es más
+    ancha que la última corrida de `clasificar_conversaciones`, va a faltar
+    clasificar una parte, y mostrar el reparto como si fuera completo
+    escondería justo esa brecha.
+
+    Sin plata: estas conversaciones nunca generaron una `PropuestaReserva`, así
+    que no hay monto que sumarles — el número que importa acá es CUÁNTAS, no
+    CUÁNTO.
+    """
+    from whatsapp_agent.models import TemaConversacion
+    from whatsapp_agent.temas import VERSION_TAXONOMIA
+
+    candidatos = candidatos_sin_cotizar(desde, hasta)
+    telefonos = [t for t, _, _ in candidatos]
+    clasificadas = list(TemaConversacion.objects
+                        .filter(telefono__in=telefonos,
+                                version_taxonomia=VERSION_TAXONOMIA))
+
+    conteo = {}
+    for c in clasificadas:
+        conteo[c.tema] = conteo.get(c.tema, 0) + 1
+    etiquetas = dict(TemaConversacion.TEMA_CHOICES)
+    total = len(clasificadas)
+    filas = [{'tema': k, 'nombre': etiquetas.get(k, k), 'n': v,
+              'pct': _pct(v, total)}
+             for k, v in conteo.items()]
+    filas.sort(key=lambda f: -f['n'])
+
+    total_candidatos = len(candidatos)
+    return {
+        'temas': filas[:tope],
+        'total_sin_cotizar': total_candidatos,
+        'total_clasificadas': total,
+        'faltan_clasificar': max(total_candidatos - total, 0),
+        'cobertura_pct': _pct(total, total_candidatos),
+    }
+
+
 def _propuestas(desde, hasta):
     from whatsapp_agent.models import PropuestaReserva
 
@@ -156,6 +233,7 @@ def embudo(desde, hasta, ahora):
         })
 
     plata_perdida = sum(plata_estado.get(e, 0) for e in ESTADOS_MUERTOS)
+    d_temas = temas_de_las_caidas(desde, hasta)
     return {
         'desde': desde, 'hasta': hasta,
         'conversaciones': convs, 'cotizaciones': cotiz, 'reservas': reservas,
@@ -174,4 +252,9 @@ def embudo(desde, hasta, ahora):
         # Días viejos que no alcanzaron para una ventana entera.
         'dias_descartados': (ventanas[0][0] - desde).days if ventanas else 0,
         'servicios_que_mueren': servicios_que_mueren(props, ahora),
+        'temas_que_no_cotizan': d_temas['temas'],
+        'temas_total_sin_cotizar': d_temas['total_sin_cotizar'],
+        'temas_total_clasificadas': d_temas['total_clasificadas'],
+        'temas_faltan': d_temas['faltan_clasificar'],
+        'temas_cobertura_pct': d_temas['cobertura_pct'],
     }
