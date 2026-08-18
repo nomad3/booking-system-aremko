@@ -17,9 +17,10 @@ from django.test import TestCase
 from django.utils import timezone
 
 from ventas.models import Cliente, Servicio, WhatsAppMessage
-from whatsapp_agent.embudo import (candidatos_sin_cotizar, embudo,
-                                   estado_efectivo, servicios_que_mueren,
-                                   temas_de_las_caidas, ventanas_de_7_dias)
+from whatsapp_agent.embudo import (candidatos_sin_cotizar, desempeno_luna,
+                                   embudo, estado_efectivo,
+                                   servicios_que_mueren, temas_de_las_caidas,
+                                   velocidad_respuesta, ventanas_de_7_dias)
 from whatsapp_agent.models import PropuestaReserva, TemaConversacion
 from whatsapp_agent.temas import VERSION_TAXONOMIA
 
@@ -187,6 +188,48 @@ class PaginaTest(TestCase):
         # «80 000» con espacio, que acá se lee mal.
         self.assertIn('$80.000', cuerpo)
 
+    def test_los_cuatro_graficos_y_sus_datos(self):
+        """P-32: no basta con que la página cargue — un <canvas> vacío o un
+        JSON roto no se nota mirando el HTML por arriba."""
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jefa2', 'j2@aremko.cl', 'x')
+        self.client.login(username='jefa2', password='x')
+        _mensaje('m1', '+56911111111', dias_atras=3)
+        _propuesta('p1', estado='creada', total=50000, dias_atras=3)
+        _feedback(editado=False, dias_atras=3)
+        WhatsAppMessage.objects.create(
+            wa_message_id='in-x', phone='+56911111111', direction='in',
+            timestamp=AHORA - timedelta(days=3))
+        WhatsAppMessage.objects.create(
+            wa_message_id='out-x', phone='+56911111111', direction='out',
+            timestamp=AHORA - timedelta(days=3) + timedelta(minutes=10))
+        resp = self.client.get(self.URL)
+        cuerpo = resp.content.decode()
+
+        for canvas_id in ('chartConversion', 'chartVolumen', 'chartAgente',
+                          'chartRespuesta'):
+            self.assertIn(f'id="{canvas_id}"', cuerpo)
+        self.assertIn('chart.js@4.4.0', cuerpo)
+        self.assertIn('id="datos-graficos"', cuerpo)
+
+        # El JSON embebido tiene que ser válido y traer las nueve series.
+        import json
+        import re
+        bloque = re.search(
+            r'<script id="datos-graficos"[^>]*>(.*?)</script>', cuerpo, re.S)
+        self.assertIsNotNone(bloque, 'no se encontró el bloque json_script')
+        datos = json.loads(bloque.group(1))
+        for clave in ('labels', 'conversaciones', 'cotizaciones', 'reservas',
+                     'pct_cotiza', 'pct_cierra', 'pct_sin_editar',
+                     'pct_escalado', 'mediana_respuesta_min'):
+            self.assertIn(clave, datos)
+        # Las nueve series comparten el mismo largo — una desalineada
+        # correría los puntos de un gráfico contra el eje de otro.
+        largos = {len(v) for v in datos.values()}
+        self.assertEqual(len(largos), 1, f'series de largo distinto: {datos}')
+        self.assertGreater(datos['cotizaciones'][-1], 0)
+        self.assertGreater(datos['mediana_respuesta_min'][-1], 0)
+
     def test_ventana_invalida_cae_al_default(self):
         from django.contrib.auth.models import User
         User.objects.create_superuser('jefe2', 'j2@aremko.cl', 'x')
@@ -349,3 +392,111 @@ class TemasDeLasCaidasTest(TestCase):
         d = embudo(DESDE, HOY, AHORA)
         self.assertEqual(d['temas_que_no_cotizan'][0]['tema'], 'freno_en_los_datos')
         self.assertEqual(d['temas_total_sin_cotizar'], 1)
+
+
+
+def _feedback(phone='+56911111111', editado=False, tiene_borrador=True, dias_atras=1):
+    from whatsapp_agent.models import AgenteFeedback
+    f = AgenteFeedback.objects.create(
+        phone=phone, wa_message_id=f'wa-{phone}-{dias_atras}-{editado}-{tiene_borrador}',
+        borrador='texto del borrador' if tiene_borrador else '',
+        enviado='texto enviado', editado=editado)
+    AgenteFeedback.objects.filter(pk=f.pk).update(
+        created_at=AHORA - timedelta(days=dias_atras))
+    return f
+
+
+def _sugerencia(wid, phone='+56911111111', escalar=False, dias_atras=1):
+    from whatsapp_agent.models import SugerenciaAgenteWhatsApp
+    s = SugerenciaAgenteWhatsApp.objects.create(
+        wa_message_id=wid, phone=phone, escalar=escalar)
+    SugerenciaAgenteWhatsApp.objects.filter(pk=s.pk).update(
+        created_at=AHORA - timedelta(days=dias_atras))
+    return s
+
+
+class DesempenoLunaTest(TestCase):
+    """P-32: cómo evoluciona lo que Luna redacta — no confundir con el
+    embudo de ventas, es la calidad del agente en sí."""
+
+    def test_pct_sin_editar_y_pct_escalado(self):
+        _feedback(editado=False, dias_atras=2)
+        _feedback(editado=False, dias_atras=2)
+        _feedback(editado=True, dias_atras=2)
+        _sugerencia('s1', escalar=True, dias_atras=2)
+        _sugerencia('s2', escalar=False, dias_atras=2)
+        serie = desempeno_luna(DESDE, HOY)
+        semana = next(s for s in serie if s['desde'] <= (HOY - timedelta(days=2)) <= s['hasta'])
+        self.assertEqual(semana['pct_sin_editar'], _pct_esperado(2, 3))
+        self.assertEqual(semana['pct_escalado'], _pct_esperado(1, 2))
+
+    def test_feedback_sin_borrador_no_cuenta(self):
+        # Deborah escribió de cero, sin propuesta de Luna que evaluar — no es
+        # ni un acierto ni un error del agente.
+        _feedback(tiene_borrador=False, dias_atras=2)
+        serie = desempeno_luna(DESDE, HOY)
+        semana = next(s for s in serie if s['desde'] <= (HOY - timedelta(days=2)) <= s['hasta'])
+        self.assertEqual(semana['total_borradores'], 0)
+
+    def test_ventana_sin_datos_no_revienta(self):
+        serie = desempeno_luna(DESDE, HOY)
+        self.assertTrue(serie)
+        for s in serie:
+            self.assertEqual(s['pct_sin_editar'], 0.0)
+            self.assertEqual(s['pct_escalado'], 0.0)
+
+    def test_mismas_ventanas_que_el_resto_de_la_pagina(self):
+        self.assertEqual([(s['desde'], s['hasta']) for s in desempeno_luna(DESDE, HOY)],
+                         ventanas_de_7_dias(DESDE, HOY))
+
+
+class VelocidadRespuestaTest(TestCase):
+    """P-32: mediana de minutos hasta la primera respuesta — la métrica de
+    alerta temprana: sube antes de que la caída se note en las ventas."""
+
+    def test_mide_el_delta_entre_entrante_y_la_respuesta_que_le_sigue(self):
+        base = AHORA - timedelta(days=2)
+        WhatsAppMessage.objects.create(
+            wa_message_id='in1', phone='+56911111111', direction='in',
+            timestamp=base)
+        WhatsAppMessage.objects.create(
+            wa_message_id='out1', phone='+56911111111', direction='out',
+            timestamp=base + timedelta(minutes=15))
+        serie = velocidad_respuesta(DESDE, HOY)
+        semana = next(s for s in serie if s['desde'] <= base.date() <= s['hasta'])
+        self.assertEqual(semana['mediana_min'], 15)
+        self.assertEqual(semana['n'], 1)
+
+    def test_entrantes_seguidos_solo_cuentan_el_primero(self):
+        # Dos mensajes del cliente antes de que alguien conteste: el reloj
+        # arranca en el PRIMERO, no se reinicia con el segundo.
+        base = AHORA - timedelta(days=2)
+        WhatsAppMessage.objects.create(wa_message_id='a', phone='+56922222222',
+                                       direction='in', timestamp=base)
+        WhatsAppMessage.objects.create(wa_message_id='b', phone='+56922222222',
+                                       direction='in', timestamp=base + timedelta(minutes=5))
+        WhatsAppMessage.objects.create(wa_message_id='c', phone='+56922222222',
+                                       direction='out', timestamp=base + timedelta(minutes=20))
+        serie = velocidad_respuesta(DESDE, HOY)
+        semana = next(s for s in serie if s['desde'] <= base.date() <= s['hasta'])
+        self.assertEqual(semana['mediana_min'], 20)
+
+    def test_saliente_sin_entrante_previo_no_cuenta(self):
+        # Un mensaje nuestro que abre conversación (recordatorio, campaña) no
+        # es una "respuesta" — no hay pregunta que estuviera esperando.
+        WhatsAppMessage.objects.create(
+            wa_message_id='solo', phone='+56933333333', direction='out',
+            timestamp=AHORA - timedelta(days=2))
+        for s in velocidad_respuesta(DESDE, HOY):
+            self.assertEqual(s['n'], 0)
+
+    def test_sin_respuesta_todavia_no_cuenta(self):
+        WhatsAppMessage.objects.create(
+            wa_message_id='pendiente', phone='+56944444444', direction='in',
+            timestamp=AHORA - timedelta(days=2))
+        for s in velocidad_respuesta(DESDE, HOY):
+            self.assertIsNone(s['mediana_min'])
+
+
+def _pct_esperado(parte, total):
+    return round(100 * parte / total, 1) if total else 0.0

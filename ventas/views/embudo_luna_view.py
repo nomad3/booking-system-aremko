@@ -28,10 +28,28 @@ def embudo_luna(request):
     hasta = timezone.localdate()
     desde = hasta - timedelta(days=dias)
     datos = embudo(desde, hasta, ahora)
+
+    # Payload chico y ya-listo para Chart.js: las tres series comparten las
+    # mismas ventanas por construcción (las tres llaman a ventanas_de_7_dias
+    # con el mismo desde/hasta dentro de embudo()), así que alinean por
+    # posición sin necesidad de cruzarlas por fecha.
+    graficos = {
+        'labels': [s['hasta'].strftime('%d/%m') for s in datos['semanas']],
+        'conversaciones': [s['conversaciones'] for s in datos['semanas']],
+        'cotizaciones': [s['cotizaciones'] for s in datos['semanas']],
+        'reservas': [s['reservas'] for s in datos['semanas']],
+        'pct_cotiza': [s['pct_cotiza'] for s in datos['semanas']],
+        'pct_cierra': [s['pct_cierra'] for s in datos['semanas']],
+        'pct_sin_editar': [s['pct_sin_editar'] for s in datos['serie_agente']],
+        'pct_escalado': [s['pct_escalado'] for s in datos['serie_agente']],
+        'mediana_respuesta_min': [s['mediana_min'] for s in datos['serie_respuesta']],
+    }
+
     return render(request, 'ventas/embudo_luna.html', {
         'd': datos,
         'dias': dias,
         'dias_validos': DIAS_VALIDOS,
+        'graficos': graficos,
         # Para que quede a la vista por qué la ventana puede ser más corta de
         # lo pedido: antes de esta fecha no hay datos reales de WhatsApp.
         'recortado': desde < INICIO_DATOS_REALES,

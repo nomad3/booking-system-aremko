@@ -157,6 +157,133 @@ def temas_de_las_caidas(desde, hasta, tope=10):
     }
 
 
+def _mediana(valores):
+    if not valores:
+        return None
+    vals = sorted(valores)
+    n = len(vals)
+    medio = n // 2
+    return vals[medio] if n % 2 else (vals[medio - 1] + vals[medio]) / 2
+
+
+def _indice_de_ventana(fecha, ventanas):
+    """La ventana que contiene `fecha`, o None si cae en los días descartados
+    (antes de la primera ventana) — mismo criterio que `dias_descartados`."""
+    for i, (ini, fin) in enumerate(ventanas):
+        if ini <= fecha <= fin:
+            return i
+    return None
+
+
+def desempeno_luna(desde, hasta):
+    """Serie de desempeño de Luna por ventana de 7 días (P-32): % de sus
+    borradores que Deborah usa TAL CUAL, y % de entrantes que Luna deriva a
+    un humano en vez de proponer texto.
+
+    Misma fuente que `/api/metrics/agente` (AgenteFeedback,
+    SugerenciaAgenteWhatsApp) pero bucketeada en las MISMAS ventanas móviles
+    del resto de esta página, no en semanas ISO — para que las cuatro curvas
+    del tablero compartan un solo eje de tiempo. Los números van a salir
+    parecidos a los de ese endpoint, no idénticos: los bordes de cada bucket
+    no caen los mismos días.
+    """
+    from whatsapp_agent.models import AgenteFeedback, SugerenciaAgenteWhatsApp
+
+    ventanas = ventanas_de_7_dias(desde, hasta)
+    if not ventanas:
+        return []
+
+    tope_desde, tope_hasta = ventanas[0][0], ventanas[-1][1]
+    borradores = [[0, 0] for _ in ventanas]  # [total, sin_editar]
+    for f in (AgenteFeedback.objects
+             .filter(created_at__date__gte=tope_desde, created_at__date__lte=tope_hasta)
+             .only('created_at', 'borrador', 'editado')):
+        if not (f.borrador or '').strip():
+            continue
+        idx = _indice_de_ventana(f.created_at.date(), ventanas)
+        if idx is None:
+            continue
+        borradores[idx][0] += 1
+        if not f.editado:
+            borradores[idx][1] += 1
+
+    sugerencias = [[0, 0] for _ in ventanas]  # [total, escalados]
+    for s in (SugerenciaAgenteWhatsApp.objects
+             .filter(created_at__date__gte=tope_desde, created_at__date__lte=tope_hasta)
+             .only('created_at', 'escalar')):
+        idx = _indice_de_ventana(s.created_at.date(), ventanas)
+        if idx is None:
+            continue
+        sugerencias[idx][0] += 1
+        if s.escalar:
+            sugerencias[idx][1] += 1
+
+    serie = []
+    for i, (ini, fin) in enumerate(ventanas):
+        total_b, sin_editar = borradores[i]
+        total_s, escalados = sugerencias[i]
+        serie.append({
+            'desde': ini, 'hasta': fin,
+            'pct_sin_editar': _pct(sin_editar, total_b),
+            'pct_escalado': _pct(escalados, total_s),
+            'total_borradores': total_b,
+            'total_sugerencias': total_s,
+        })
+    return serie
+
+
+def velocidad_respuesta(desde, hasta):
+    """Mediana de minutos hasta la primera respuesta, por ventana de 7 días.
+
+    Solo WhatsApp, mismo recorte que el resto de la página. Por conversación:
+    el tiempo entre el primer mensaje ENTRANTE sin responder y la primera
+    respuesta SALIENTE que le sigue — mismo cálculo que
+    `_acumular_primera_respuesta` de `/api/metrics/canales`, bucketeado en
+    las ventanas móviles de esta página.
+
+    Sube cuando el equipo se atrasa; suele subir ANTES de que la caída se
+    note en las ventas — es la métrica de alerta temprana de las cuatro.
+    """
+    from ventas.models import WhatsAppMessage
+
+    ventanas = ventanas_de_7_dias(desde, hasta)
+    if not ventanas:
+        return []
+
+    tope_desde, tope_hasta = ventanas[0][0], ventanas[-1][1]
+    por_telefono = {}
+    for f in (WhatsAppMessage.objects
+             .filter(timestamp__date__gte=tope_desde, timestamp__date__lte=tope_hasta)
+             .values('phone', 'direction', 'timestamp')
+             .order_by('timestamp')):
+        por_telefono.setdefault(f['phone'], []).append((f['timestamp'], f['direction']))
+
+    deltas_por_ventana = [[] for _ in ventanas]
+    for mensajes in por_telefono.values():
+        primer_in = None
+        for ts, direction in mensajes:  # ya vienen ordenados por timestamp
+            if direction == 'in':
+                if primer_in is None:
+                    primer_in = ts
+            elif primer_in is not None:
+                dmin = (ts - primer_in).total_seconds() / 60.0
+                if dmin >= 0:
+                    idx = _indice_de_ventana(primer_in.date(), ventanas)
+                    if idx is not None:
+                        deltas_por_ventana[idx].append(dmin)
+                primer_in = None
+
+    serie = []
+    for (ini, fin), deltas in zip(ventanas, deltas_por_ventana):
+        mediana = _mediana(deltas)
+        serie.append({
+            'desde': ini, 'hasta': fin,
+            'mediana_min': round(mediana) if mediana is not None else None,
+            'n': len(deltas),
+        })
+    return serie
+
+
 def _propuestas(desde, hasta):
     from whatsapp_agent.models import PropuestaReserva
 
@@ -234,6 +361,8 @@ def embudo(desde, hasta, ahora):
 
     plata_perdida = sum(plata_estado.get(e, 0) for e in ESTADOS_MUERTOS)
     d_temas = temas_de_las_caidas(desde, hasta)
+    serie_agente = desempeno_luna(desde, hasta)
+    serie_respuesta = velocidad_respuesta(desde, hasta)
     return {
         'desde': desde, 'hasta': hasta,
         'conversaciones': convs, 'cotizaciones': cotiz, 'reservas': reservas,
@@ -257,4 +386,6 @@ def embudo(desde, hasta, ahora):
         'temas_total_clasificadas': d_temas['total_clasificadas'],
         'temas_faltan': d_temas['faltan_clasificar'],
         'temas_cobertura_pct': d_temas['cobertura_pct'],
+        'serie_agente': serie_agente,
+        'serie_respuesta': serie_respuesta,
     }

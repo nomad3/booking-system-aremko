@@ -8,6 +8,7 @@
   :root{
     --tinta:#2f2a26; --suave:#7b7168; --linea:#e6ded4; --papel:#faf7f3;
     --panel:#ffffff; --agua:#2b7a78; --alerta:#b4531f; --hueso:#f2ece4;
+    --dato2:#b98a2e; /* segunda serie en los gráficos de dos líneas */
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--papel);color:var(--tinta);
@@ -49,6 +50,12 @@
   .gris{background:var(--hueso);color:var(--suave)}
   .vacio{padding:26px;text-align:center;color:var(--suave)}
   code{background:var(--hueso);padding:1px 6px;border-radius:4px;font-size:.85em}
+  .graficos{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));
+            gap:16px;margin:18px 0 34px}
+  .grafico{background:var(--panel);border:1px solid var(--linea);border-radius:10px;
+           padding:16px 16px 10px}
+  .grafico h3{margin:0 0 12px;font-size:.92rem;font-weight:600}
+  .grafico .alto{position:relative;height:250px}
 </style>
 </head>
 <body>
@@ -98,6 +105,30 @@
       <div class="m">{{ d.plata_sin_decision|formato_clp }}</div></div>
     <div class="perdida"><div class="et">Rechazado</div>
       <div class="m">{{ d.plata_rechazada|formato_clp }}</div></div>
+  </div>
+
+  <h2>Cómo evoluciona</h2>
+  <p class="nota">Mismas ventanas móviles de 7 días que el resto de la página. Los dos
+     gráficos de Luna salen de una fuente distinta (lo que redacta el agente y cuánto
+     Deborah lo corrige) — si esta ventana no tiene actividad del agente, esas dos curvas
+     van a salir vacías, y eso es correcto, no un error.</p>
+  <div class="graficos">
+    <div class="grafico">
+      <h3>Conversión: % que cotiza y % que cierra</h3>
+      <div class="alto"><canvas id="chartConversion"></canvas></div>
+    </div>
+    <div class="grafico">
+      <h3>Volumen: conversaciones, cotizaciones, reservas</h3>
+      <div class="alto"><canvas id="chartVolumen"></canvas></div>
+    </div>
+    <div class="grafico">
+      <h3>Desempeño de Luna: % sin editar y % escalado</h3>
+      <div class="alto"><canvas id="chartAgente"></canvas></div>
+    </div>
+    <div class="grafico">
+      <h3>Velocidad de respuesta (mediana, minutos)</h3>
+      <div class="alto"><canvas id="chartRespuesta"></canvas></div>
+    </div>
   </div>
 
   <h2>Por qué no llegan a cotizar</h2>
@@ -196,5 +227,99 @@
     </table>
   </div>
 </div>
+{{ graficos|json_script:"datos-graficos" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var G = JSON.parse(document.getElementById('datos-graficos').textContent);
+  var AGUA = '#2b7a78', DATO2 = '#b98a2e', SUAVE = '#7b7168', LINEA = '#e6ded4';
+
+  Chart.defaults.font.family =
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.color = SUAVE;
+  Chart.defaults.borderColor = LINEA;
+
+  var pctTicks = { callback: function (v) { return v + '%'; } };
+
+  function grafico(canvas, config) {
+    var base = {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+    };
+    config.options = Object.assign(base, config.options || {});
+    return new Chart(canvas, config);
+  }
+
+  grafico(document.getElementById('chartConversion'), {
+    type: 'line',
+    data: {
+      labels: G.labels,
+      datasets: [
+        { label: '% cotiza', data: G.pct_cotiza, borderColor: AGUA,
+          backgroundColor: AGUA, tension: .3, pointRadius: 3 },
+        { label: '% cierra', data: G.pct_cierra, borderColor: DATO2,
+          backgroundColor: DATO2, tension: .3, pointRadius: 3 },
+      ],
+    },
+    options: { scales: { y: { beginAtZero: true, ticks: pctTicks } } },
+  });
+
+  // Combinado: conversaciones en barras (escala grande, eje izquierdo) +
+  // cotizaciones/reservas en línea (escala chica, eje derecho) — juntarlas
+  // en un solo eje habría dejado las dos últimas invisibles.
+  grafico(document.getElementById('chartVolumen'), {
+    type: 'bar',
+    data: {
+      labels: G.labels,
+      datasets: [
+        { type: 'bar', label: 'Conversaciones', data: G.conversaciones,
+          backgroundColor: LINEA, borderColor: LINEA, yAxisID: 'y' },
+        { type: 'line', label: 'Cotizaciones', data: G.cotizaciones,
+          borderColor: AGUA, backgroundColor: AGUA, tension: .3,
+          pointRadius: 3, yAxisID: 'y1' },
+        { type: 'line', label: 'Reservas', data: G.reservas,
+          borderColor: DATO2, backgroundColor: DATO2, tension: .3,
+          pointRadius: 3, yAxisID: 'y1' },
+      ],
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true, position: 'left',
+             title: { display: true, text: 'Conversaciones' } },
+        y1: { beginAtZero: true, position: 'right',
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Cotiz. / Reservas' } },
+      },
+    },
+  });
+
+  grafico(document.getElementById('chartAgente'), {
+    type: 'line',
+    data: {
+      labels: G.labels,
+      datasets: [
+        { label: '% sin editar', data: G.pct_sin_editar, borderColor: AGUA,
+          backgroundColor: AGUA, tension: .3, pointRadius: 3, spanGaps: true },
+        { label: '% escalado', data: G.pct_escalado, borderColor: DATO2,
+          backgroundColor: DATO2, tension: .3, pointRadius: 3, spanGaps: true },
+      ],
+    },
+    options: { scales: { y: { beginAtZero: true, max: 100, ticks: pctTicks } } },
+  });
+
+  grafico(document.getElementById('chartRespuesta'), {
+    type: 'line',
+    data: {
+      labels: G.labels,
+      datasets: [
+        { label: 'Mediana (min)', data: G.mediana_respuesta_min, borderColor: AGUA,
+          backgroundColor: AGUA, tension: .3, pointRadius: 3, spanGaps: true },
+      ],
+    },
+    options: { scales: { y: { beginAtZero: true } } },
+  });
+})();
+</script>
 </body>
 </html>
