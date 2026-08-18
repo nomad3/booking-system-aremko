@@ -190,3 +190,20 @@ class PaginaTest(TestCase):
         self.client.login(username='jefe2', password='x')
         self.assertEqual(self.client.get(self.URL + '?dias=abc').status_code, 200)
         self.assertEqual(self.client.get(self.URL + '?dias=9999').status_code, 200)
+
+
+class EnlaceEnElAdminTest(TestCase):
+    """El tablero tiene que ser ALCANZABLE, no solo existir.
+
+    La primera versión quedó publicada sin enlace en ninguna parte: Jorge entró
+    al admin y no lo encontró. Una página que hay que saber de memoria para
+    visitarla no existe.
+    """
+
+    def test_la_portada_del_admin_enlaza_el_embudo(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jefa', 'jefa@aremko.cl', 'x')
+        self.client.login(username='jefa', password='x')
+        resp = self.client.get('/admin/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('/ventas/analytics/embudo-luna/', resp.content.decode())
