@@ -377,3 +377,61 @@ class PropuestaReserva(models.Model):
         """True si es pendiente y no ha expirado."""
         from django.utils import timezone
         return self.estado == 'pendiente' and timezone.now() < self.expires_at
+
+
+class TemaConversacion(models.Model):
+    """De qué habló una conversación de WhatsApp que NO terminó en cotización (P-31).
+
+    El embudo mostró dónde se pierde la venta (solo el ~13% de las conversaciones
+    llega a cotizarse); esto contesta POR QUÉ. Medido el 2026-08-18 sobre 60 días:
+
+      · 1.655 teléfonos escribieron y nunca recibieron cotización
+      · de esos, **966 mandaron 4 mensajes o más** — conversaciones de verdad
+      · y solo 2 quedaron sin respuesta nuestra
+
+    Ese último número descarta la explicación barata («no contestamos»): sí
+    contestamos, el cliente sí conversa, y aun así no sale cotización. Eso es lo
+    que hay que entender, y no se puede contando: hay que leer.
+
+    La clasificación se CACHEA acá —una fila por teléfono— porque cuesta plata y
+    no cambia sola. Se rehace solo si llegaron mensajes nuevos después de
+    `ultimo_mensaje_visto`.
+    """
+
+    TEMA_CHOICES = [
+        ('precio_disponibilidad', 'Preguntó precio o cupo y no siguió'),
+        ('sin_cupo', 'Quería una fecha u hora que no había'),
+        ('reserva_existente', 'Ya tenía reserva (dudas, cambios, cómo llegar)'),
+        ('info_general', 'Información general, sin intención de compra clara'),
+        ('no_ofrecemos', 'Pidió algo que Aremko no vende'),
+        ('postventa', 'Reclamo, comentario o agradecimiento tras la visita'),
+        ('no_es_cliente', 'Proveedor, comercial, número equivocado o spam'),
+        ('quedo_en_pensarlo', 'Interés real: dijo que confirmaba y no volvió'),
+        ('otro', 'No calza en ninguna categoría'),
+    ]
+    CONFIANZA_CHOICES = [('alta', 'Alta'), ('media', 'Media'), ('baja', 'Baja')]
+
+    telefono = models.CharField(max_length=20, unique=True, db_index=True)
+    tema = models.CharField(max_length=30, choices=TEMA_CHOICES, db_index=True)
+    # Texto libre corto del modelo. Sirve para dos cosas: leer un ejemplo
+    # concreto sin abrir la conversación, y detectar categorías que faltan
+    # cuando 'otro' crece.
+    motivo = models.CharField(max_length=200, blank=True)
+    confianza = models.CharField(max_length=6, choices=CONFIANZA_CHOICES,
+                                 default='media', db_index=True)
+    mensajes_vistos = models.IntegerField(default=0)
+    ultimo_mensaje_visto = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Hasta qué mensaje se leyó. Si llegan más nuevos, se reclasifica.')
+    modelo = models.CharField(max_length=80, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Tema de conversación'
+        verbose_name_plural = 'Temas de conversaciones'
+        ordering = ['-actualizado']
+        indexes = [models.Index(fields=['tema', 'confianza'])]
+
+    def __str__(self):
+        return f'{self.telefono} · {self.get_tema_display()}'
