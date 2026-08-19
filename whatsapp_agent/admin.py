@@ -2,9 +2,23 @@ from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
 from .models import (
-    AgenteFeedback, AusenciaEnviada, PropuestaReserva, SugerenciaAgenteWhatsApp,
-    SugerenciaAprendizaje, WhatsAppAgentConfig,
+    AgenteFeedback, AusenciaEnviada, PropuestaReserva, RecordatorioLuna,
+    SugerenciaAgenteWhatsApp, SugerenciaAprendizaje, WhatsAppAgentConfig,
 )
+
+
+@admin.register(RecordatorioLuna)
+class RecordatorioLunaAdmin(admin.ModelAdmin):
+    """Bitácora de recordatorios (H-109): qué se decidió enviar y cómo terminó.
+    Solo lectura — las filas las crea el cron y las cierra el Go."""
+    list_display = ('created_at', 'tipo', 'phone', 'estado', 'error', 'enviado_at')
+    list_filter = ('tipo', 'estado')
+    search_fields = ('phone',)
+    readonly_fields = ('tipo', 'phone', 'propuesta', 'reserva_id', 'texto',
+                       'estado', 'error', 'created_at', 'enviado_at')
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(WhatsAppAgentConfig)

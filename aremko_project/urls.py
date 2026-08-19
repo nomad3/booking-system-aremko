@@ -109,6 +109,11 @@ urlpatterns = [
     path('api/whatsapp/pending-template-sends', whatsapp_api_views.pending_template_sends, name='whatsapp_pending_template_sends'),
     path('api/whatsapp/mark-template-sent', whatsapp_api_views.mark_template_sent, name='whatsapp_mark_template_sent'),
     path('api/whatsapp/mark-template-failed', whatsapp_api_views.mark_template_failed, name='whatsapp_mark_template_failed'),
+    # H-109: recordatorios de Luna (cotizaciones por vencer / sin respuesta,
+    # reservas sin pago). Django decide, Go envía como mensaje de sesión.
+    path('api/whatsapp/pending-luna-nudges', whatsapp_api_views.pending_luna_nudges, name='whatsapp_pending_luna_nudges'),
+    path('api/whatsapp/luna-nudges/mark-sent', whatsapp_api_views.mark_luna_nudge_sent, name='whatsapp_mark_luna_nudge_sent'),
+    path('api/whatsapp/luna-nudges/mark-failed', whatsapp_api_views.mark_luna_nudge_failed, name='whatsapp_mark_luna_nudge_failed'),
 
     # Métricas / Tablero de Evolución (H-021+H-022): agregación read-only, series semanales. X-API-Key.
     path('api/metrics/campanas', metrics_api_views.metrics_campanas, name='metrics_campanas'),

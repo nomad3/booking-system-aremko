@@ -1362,6 +1362,147 @@ def mark_template_failed(request):
     })
 
 
+# ============================================================================
+# H-109 — Recordatorios de Luna: Django decide, el Go envía (mensaje de sesión).
+# Mismo patrón que las plantillas de arriba, pero con texto libre: por eso el
+# pull REVALIDA la ventana de 24h de Meta al momento de entregar.
+# ============================================================================
+
+def pending_luna_nudges(request):
+    """GET /api/whatsapp/pending-luna-nudges?limit=N — recordatorios listos
+    para que el Go los mande como mensaje de sesión (H-109).
+
+    Un recordatorio que esperó demasiado (Go caído, cron detenido) puede haber
+    perdido la ventana de 24h: acá se marca 'fallido' en vez de entregarlo —
+    mejor un recordatorio menos que un mensaje que Meta rechaza o, peor, uno
+    que llega fuera de contexto al día siguiente.
+    """
+    from whatsapp_agent.models import RecordatorioLuna
+    from whatsapp_agent.recordatorios import dentro_de_ventana
+
+    err = _check_luna_key(request)
+    if err:
+        return err
+
+    try:
+        limit = min(max(int(request.GET.get('limit', 50)), 1), 200)
+    except (ValueError, TypeError):
+        limit = 50
+
+    ahora = timezone.now()
+    items = []
+    for r in (RecordatorioLuna.objects
+              .filter(estado='pendiente_envio')
+              .order_by('created_at')[:limit]):
+        if not dentro_de_ventana(r.phone, ahora):
+            r.estado = 'fallido'
+            r.error = 'ventana de 24h cerrada al momento del pull'
+            r.save(update_fields=['estado', 'error'])
+            continue
+        items.append({
+            'recordatorio_id': r.id,
+            'phone': r.phone,
+            'texto': r.texto,
+        })
+
+    return JsonResponse({'count': len(items), 'pending': items})
+
+
+@csrf_exempt
+def mark_luna_nudge_sent(request):
+    """POST /api/whatsapp/luna-nudges/mark-sent — Go confirma el envío.
+
+    Body JSON: { "recordatorio_id": 123, "wa_message_id": "wamid..." }
+    Registra el saliente en el hilo (idempotente por wa_message_id) para que
+    la bandeja muestre el recordatorio como cualquier otro mensaje.
+    """
+    from whatsapp_agent.models import RecordatorioLuna
+
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    rec_id = data.get('recordatorio_id')
+    wa_id = (data.get('wa_message_id') or '').strip()
+    if not rec_id:
+        return JsonResponse({'error': 'recordatorio_id es obligatorio'}, status=400)
+
+    rec = RecordatorioLuna.objects.filter(id=rec_id).first()
+    if not rec:
+        return JsonResponse({'error': 'recordatorio no encontrado'}, status=404)
+
+    if rec.estado == 'enviado':
+        return JsonResponse({'success': True, 'idempotent': True,
+                             'recordatorio_id': rec.id, 'estado': rec.estado})
+
+    now = timezone.now()
+    rec.estado = 'enviado'
+    rec.enviado_at = now
+    rec.save(update_fields=['estado', 'enviado_at'])
+
+    message_id = None
+    if wa_id:
+        existing = WhatsAppMessage.objects.filter(wa_message_id=wa_id).first()
+        if existing:
+            message_id = existing.id
+        else:
+            msg = WhatsAppMessage.objects.create(
+                direction='out', wa_message_id=wa_id, phone=rec.phone[:20],
+                body=rec.texto, msg_type='text', timestamp=now, status='sent',
+            )
+            message_id = msg.id
+
+    return JsonResponse({'success': True, 'recordatorio_id': rec.id,
+                         'estado': rec.estado, 'message_id': message_id})
+
+
+@csrf_exempt
+def mark_luna_nudge_failed(request):
+    """POST /api/whatsapp/luna-nudges/mark-failed — Go reporta fallo de envío.
+
+    Body JSON: { "recordatorio_id": 123, "error": "..." }
+    Queda 'fallido' con el error a la vista en el admin. NO se reintenta solo:
+    un recordatorio es oportuno una vez; si falló, mejor que lo vea un humano.
+    """
+    from whatsapp_agent.models import RecordatorioLuna
+
+    err = _check_luna_key(request)
+    if err:
+        return err
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    try:
+        data = json.loads(request.body or b'{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    rec_id = data.get('recordatorio_id')
+    error_txt = (data.get('error') or '').strip()
+    if not rec_id:
+        return JsonResponse({'error': 'recordatorio_id es obligatorio'}, status=400)
+
+    rec = RecordatorioLuna.objects.filter(id=rec_id).first()
+    if not rec:
+        return JsonResponse({'error': 'recordatorio no encontrado'}, status=404)
+
+    if rec.estado != 'pendiente_envio':
+        return JsonResponse({'success': True, 'idempotent': True,
+                             'recordatorio_id': rec.id, 'estado': rec.estado})
+
+    rec.estado = 'fallido'
+    rec.error = error_txt[:200]
+    rec.save(update_fields=['estado', 'error'])
+
+    return JsonResponse({'success': True, 'recordatorio_id': rec.id,
+                         'estado': rec.estado})
+
+
 # ---------------------------------------------------------------------------
 # Verificación del Ritual del Río (página HTML, login de staff)
 # ---------------------------------------------------------------------------

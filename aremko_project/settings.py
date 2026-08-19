@@ -136,6 +136,18 @@ OVC_RUN_TEMPLATE_CAMPAIGN_URL = os.getenv(
 OVC_TEMPLATE_CAMPAIGN_TIMEOUT = int(os.getenv('OVC_TEMPLATE_CAMPAIGN_TIMEOUT', '120'))
 
 # ────────────────────────────────────────────────────────────────────────────
+# Recordatorios de Luna (H-109)
+# ────────────────────────────────────────────────────────────────────────────
+# Cotizaciones sin respuesta / por vencer y reservas aprobadas sin pago.
+# `generar_recordatorios_luna` (cron) deja RecordatorioLuna en pendiente_envio
+# y llama a esta URL del Go: pull pending-luna-nudges → mensaje de sesión →
+# mark-sent/failed. VACÍA por defecto = interruptor general apagado (los
+# recordatorios quedan en bitácora sin enviarse; setear la env var cuando el
+# runner del Go exista — handoff H-109).
+LUNA_NUDGES_RUN_URL = os.getenv('LUNA_NUDGES_RUN_URL', '')
+LUNA_NUDGES_TIMEOUT = int(os.getenv('LUNA_NUDGES_TIMEOUT', '60'))
+
+# ────────────────────────────────────────────────────────────────────────────
 # Operación Vuelta a Casa — Variaciones IA on-demand
 # ────────────────────────────────────────────────────────────────────────────
 # Toggle global para que los endpoints /siguiente/ y /marcar-enviado/ devuelvan

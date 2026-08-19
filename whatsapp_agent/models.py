@@ -448,3 +448,55 @@ class TemaConversacion(models.Model):
 
     def __str__(self):
         return f'{self.telefono} · {self.get_tema_display()}'
+
+
+class RecordatorioLuna(models.Model):
+    """Recordatorio saliente decidido por Django y enviado por el Go (H-109).
+
+    Tres momentos donde el embudo pierde plata en silencio (medidos el
+    2026-08-19: $3,4M/mes expiran sin decisión y hay reservas aprobadas que
+    nadie paga): cotización sin respuesta, cotización por vencer, y reserva
+    creada sin pago. El texto es DETERMINISTA (lo arma el cron, no el LLM) y
+    la fila es la bitácora: qué se decidió enviar, cuándo salió y si falló.
+
+    Mismo patrón que la campaña de plantillas (H-012): Django decide, el Go
+    envía (pull `pending-luna-nudges` → mensaje de sesión → mark-sent/failed).
+    La diferencia: acá es mensaje LIBRE de sesión, no plantilla Meta — por eso
+    el generador solo elige clientes cuyo último entrante tiene <23h (ventana
+    de 24h de Meta con margen), y el pull la revalida por si el envío esperó.
+    """
+
+    TIPO_CHOICES = [
+        ('cotizacion_lista', 'Cotización enviada y sin respuesta'),
+        ('cotizacion_por_vencer', 'Cotización a punto de expirar'),
+        ('pago_pendiente', 'Reserva aprobada sin pago'),
+    ]
+    ESTADO_CHOICES = [
+        ('pendiente_envio', 'Pendiente de envío'),
+        ('enviado', 'Enviado'),
+        ('fallido', 'Fallido'),
+    ]
+
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, db_index=True)
+    phone = models.CharField(max_length=20, db_index=True)
+    propuesta = models.ForeignKey(
+        PropuestaReserva, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='recordatorios')
+    reserva_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='VentaReserva.id (solo tipo pago_pendiente)')
+    texto = models.TextField(help_text='El mensaje EXACTO que se envía.')
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES,
+                              default='pendiente_envio', db_index=True)
+    error = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    enviado_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Recordatorio de Luna'
+        verbose_name_plural = 'Recordatorios de Luna'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['estado', 'created_at'])]
+
+    def __str__(self):
+        return f'[{self.tipo}/{self.estado}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
