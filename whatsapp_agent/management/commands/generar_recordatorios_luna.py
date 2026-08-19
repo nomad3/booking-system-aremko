@@ -55,10 +55,19 @@ class Command(BaseCommand):
                 f'{pendientes} pendiente(s) SIN enviar: falta LUNA_NUDGES_RUN_URL '
                 '(el runner del Go, handoff H-109).'))
             return
+        api_key = getattr(settings, 'LUNA_API_KEY', '') or ''
+        if not api_key:
+            self.stdout.write(self.style.WARNING(
+                f'{pendientes} pendiente(s) SIN enviar: falta LUNA_API_KEY.'))
+            return
 
         import requests
         try:
-            r = requests.post(url, timeout=getattr(settings, 'LUNA_NUDGES_TIMEOUT', 60))
+            # Mismo patrón que _disparar_campana_plantillas (H-012): el runner
+            # del Go exige X-API-Key = LUNA_API_KEY. Sin el header responde 401
+            # (bug real del primer ciclo, 2026-08-19).
+            r = requests.post(url, headers={'X-API-Key': api_key},
+                              timeout=getattr(settings, 'LUNA_NUDGES_TIMEOUT', 60))
             self.stdout.write(f'Disparo al Go: HTTP {r.status_code} · {r.text[:200]}')
         except Exception as e:  # noqa: BLE001 — el cron no debe morir por el Go
             self.stdout.write(self.style.WARNING(
