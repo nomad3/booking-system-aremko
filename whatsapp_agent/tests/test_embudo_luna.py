@@ -16,13 +16,19 @@ from datetime import date, timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from ventas.models import Cliente, Servicio, WhatsAppMessage
+from ventas.models import Cliente, Servicio, VentaReserva, WhatsAppMessage
 from whatsapp_agent.embudo import (candidatos_sin_cotizar, desempeno_luna,
                                    embudo, estado_efectivo,
                                    servicios_que_mueren, temas_de_las_caidas,
-                                   velocidad_respuesta, ventanas_de_7_dias)
+                                   velocidad_respuesta, ventanas_de_7_dias,
+                                   ventas_whatsapp_vs_total)
 from whatsapp_agent.models import PropuestaReserva, TemaConversacion
 from whatsapp_agent.temas import VERSION_TAXONOMIA
+# Las señales de CRM sobre VentaReserva consultan `crm_service_history`, que no
+# existe en la base de test (drift AR-033/034): sin este mixin, crear una
+# VentaReserva directo aborta la transacción. Mismo apaño que
+# ventas/tests_ical_cabanas.py y ventas/tests_ota_sync.py.
+from whatsapp_agent.tests.test_giftcards_luna import _SinSenalesDeVenta
 
 AHORA = timezone.now()
 HOY = timezone.localdate()
@@ -188,7 +194,7 @@ class PaginaTest(TestCase):
         # «80 000» con espacio, que acá se lee mal.
         self.assertIn('$80.000', cuerpo)
 
-    def test_los_cuatro_graficos_y_sus_datos(self):
+    def test_los_cinco_graficos_y_sus_datos(self):
         """P-32: no basta con que la página cargue — un <canvas> vacío o un
         JSON roto no se nota mirando el HTML por arriba."""
         from django.contrib.auth.models import User
@@ -207,12 +213,11 @@ class PaginaTest(TestCase):
         cuerpo = resp.content.decode()
 
         for canvas_id in ('chartConversion', 'chartVolumen', 'chartAgente',
-                          'chartRespuesta'):
+                          'chartRespuesta', 'chartVentasWhatsapp'):
             self.assertIn(f'id="{canvas_id}"', cuerpo)
         self.assertIn('chart.js@4.4.0', cuerpo)
         self.assertIn('id="datos-graficos"', cuerpo)
 
-        # El JSON embebido tiene que ser válido y traer las nueve series.
         import json
         import re
         bloque = re.search(
@@ -221,14 +226,43 @@ class PaginaTest(TestCase):
         datos = json.loads(bloque.group(1))
         for clave in ('labels', 'conversaciones', 'cotizaciones', 'reservas',
                      'pct_cotiza', 'pct_cierra', 'pct_sin_editar',
-                     'pct_escalado', 'mediana_respuesta_min'):
-            self.assertIn(clave, datos)
-        # Las nueve series comparten el mismo largo — una desalineada
+                     'pct_escalado', 'pct_respuesta_rapida',
+                     'mediana_respuesta_lenta_min', 'pct_ventas_whatsapp'):
+            self.assertIn(clave, datos, f'falta la clave {clave}')
+        # Todas las series comparten el mismo largo — una desalineada
         # correría los puntos de un gráfico contra el eje de otro.
         largos = {len(v) for v in datos.values()}
         self.assertEqual(len(largos), 1, f'series de largo distinto: {datos}')
         self.assertGreater(datos['cotizaciones'][-1], 0)
-        self.assertGreater(datos['mediana_respuesta_min'][-1], 0)
+
+
+class PaginaConVentaRealTest(_SinSenalesDeVenta, TestCase):
+    """Aparte, porque crear una VentaReserva real dispara señales de CRM que
+    exigen el mixin — no se puede mezclar con PaginaTest sin ensuciarla."""
+
+    URL = '/ventas/analytics/embudo-luna/'
+
+    def test_la_venta_de_whatsapp_llega_hasta_el_json_de_la_pagina(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jefa3', 'j3@aremko.cl', 'x')
+        self.client.login(username='jefa3', password='x')
+        v = VentaReserva.objects.create(
+            cliente=Cliente.objects.create(nombre='Cliente Test',
+                                           telefono='+56977777777'),
+            total=90000, estado_reserva='checkout', estado_pago='pagado')
+        VentaReserva.objects.filter(pk=v.pk).update(
+            fecha_reserva=AHORA - timedelta(days=3))
+        _propuesta('pw-pagina', estado='creada', total=90000, dias_atras=3)
+        PropuestaReserva.objects.filter(propuesta_id='pw-pagina').update(
+            reserva_id=v.id)
+
+        resp = self.client.get(self.URL)
+        import json
+        import re
+        datos = json.loads(re.search(
+            r'<script id="datos-graficos"[^>]*>(.*?)</script>',
+            resp.content.decode(), re.S).group(1))
+        self.assertEqual(max(datos['pct_ventas_whatsapp']), 100.0)
 
     def test_ventana_invalida_cae_al_default(self):
         from django.contrib.auth.models import User
@@ -451,51 +485,150 @@ class DesempenoLunaTest(TestCase):
 
 
 class VelocidadRespuestaTest(TestCase):
-    """P-32: mediana de minutos hasta la primera respuesta — la métrica de
-    alerta temprana: sube antes de que la caída se note en las ventas."""
+    """P-32 v2: dos señales, no una.
 
-    def test_mide_el_delta_entre_entrante_y_la_respuesta_que_le_sigue(self):
+    La mediana global salió CLAVADA en 1 minuto durante 10 ventanas seguidas
+    — no era un bug (verificado a mano con Jorge el 2026-08-18 sobre 11.766
+    pares reales), sino que el 62% de las respuestas es automática y bajo 90
+    segundos, y ese cluster tan grande tapa la parte que sí varía. Por eso
+    ahora se reporta `pct_rapido` (cuánto cubre la automatización) y
+    `mediana_lenta_min` (SOLO de lo que tardó ≥90s — la que se parece a
+    gestión humana) por separado.
+    """
+
+    def test_bajo_el_umbral_cuenta_como_rapida_y_no_entra_a_la_mediana(self):
         base = AHORA - timedelta(days=2)
         WhatsAppMessage.objects.create(
             wa_message_id='in1', phone='+56911111111', direction='in',
             timestamp=base)
         WhatsAppMessage.objects.create(
             wa_message_id='out1', phone='+56911111111', direction='out',
-            timestamp=base + timedelta(minutes=15))
+            timestamp=base + timedelta(seconds=45))  # bajo el umbral (90s)
         serie = velocidad_respuesta(DESDE, HOY)
         semana = next(s for s in serie if s['desde'] <= base.date() <= s['hasta'])
-        self.assertEqual(semana['mediana_min'], 15)
+        self.assertEqual(semana['pct_rapido'], 100.0)
+        self.assertIsNone(semana['mediana_lenta_min'])  # nada en la cola lenta
         self.assertEqual(semana['n'], 1)
+
+    def test_sobre_el_umbral_entra_a_la_mediana_lenta(self):
+        base = AHORA - timedelta(days=2)
+        WhatsAppMessage.objects.create(
+            wa_message_id='in2', phone='+56922222222', direction='in',
+            timestamp=base)
+        WhatsAppMessage.objects.create(
+            wa_message_id='out2', phone='+56922222222', direction='out',
+            timestamp=base + timedelta(minutes=20))  # sobre el umbral
+        serie = velocidad_respuesta(DESDE, HOY)
+        semana = next(s for s in serie if s['desde'] <= base.date() <= s['hasta'])
+        self.assertEqual(semana['pct_rapido'], 0.0)
+        self.assertEqual(semana['mediana_lenta_min'], 20)
 
     def test_entrantes_seguidos_solo_cuentan_el_primero(self):
         # Dos mensajes del cliente antes de que alguien conteste: el reloj
         # arranca en el PRIMERO, no se reinicia con el segundo.
         base = AHORA - timedelta(days=2)
-        WhatsAppMessage.objects.create(wa_message_id='a', phone='+56922222222',
+        WhatsAppMessage.objects.create(wa_message_id='a', phone='+56933333333',
                                        direction='in', timestamp=base)
-        WhatsAppMessage.objects.create(wa_message_id='b', phone='+56922222222',
+        WhatsAppMessage.objects.create(wa_message_id='b', phone='+56933333333',
                                        direction='in', timestamp=base + timedelta(minutes=5))
-        WhatsAppMessage.objects.create(wa_message_id='c', phone='+56922222222',
+        WhatsAppMessage.objects.create(wa_message_id='c', phone='+56933333333',
                                        direction='out', timestamp=base + timedelta(minutes=20))
         serie = velocidad_respuesta(DESDE, HOY)
         semana = next(s for s in serie if s['desde'] <= base.date() <= s['hasta'])
-        self.assertEqual(semana['mediana_min'], 20)
+        self.assertEqual(semana['mediana_lenta_min'], 20)
 
     def test_saliente_sin_entrante_previo_no_cuenta(self):
         # Un mensaje nuestro que abre conversación (recordatorio, campaña) no
         # es una "respuesta" — no hay pregunta que estuviera esperando.
         WhatsAppMessage.objects.create(
-            wa_message_id='solo', phone='+56933333333', direction='out',
+            wa_message_id='solo', phone='+56944444444', direction='out',
             timestamp=AHORA - timedelta(days=2))
         for s in velocidad_respuesta(DESDE, HOY):
             self.assertEqual(s['n'], 0)
 
     def test_sin_respuesta_todavia_no_cuenta(self):
         WhatsAppMessage.objects.create(
-            wa_message_id='pendiente', phone='+56944444444', direction='in',
+            wa_message_id='pendiente', phone='+56955555555', direction='in',
             timestamp=AHORA - timedelta(days=2))
         for s in velocidad_respuesta(DESDE, HOY):
-            self.assertIsNone(s['mediana_min'])
+            self.assertEqual(s['n'], 0)
+            self.assertIsNone(s['mediana_lenta_min'])
+
+    def test_umbral_configurable(self):
+        base = AHORA - timedelta(days=2)
+        WhatsAppMessage.objects.create(
+            wa_message_id='in3', phone='+56966666666', direction='in',
+            timestamp=base)
+        WhatsAppMessage.objects.create(
+            wa_message_id='out3', phone='+56966666666', direction='out',
+            timestamp=base + timedelta(seconds=100))
+        # Con el umbral por defecto (90s) esto es "lenta"...
+        semana_def = next(s for s in velocidad_respuesta(DESDE, HOY)
+                          if s['desde'] <= base.date() <= s['hasta'])
+        self.assertEqual(semana_def['pct_rapido'], 0.0)
+        # ...pero con un umbral más ancho (120s) pasa a ser "rápida".
+        semana_ancha = next(s for s in velocidad_respuesta(DESDE, HOY, umbral_seg=120)
+                            if s['desde'] <= base.date() <= s['hasta'])
+        self.assertEqual(semana_ancha['pct_rapido'], 100.0)
+
+
+class VentasWhatsappVsTotalTest(_SinSenalesDeVenta, TestCase):
+    """P-32: cuánto de las ventas TOTALES de Aremko vino de WhatsApp.
+
+    Mismo filtro que /ventas/analytics/dashboard-ventas/ (estado_reserva en
+    pendiente/checkin/checkout + estado_pago='pagado'), para que el % se
+    pueda cruzar contra ese tablero sin que los denominadores disientan.
+    """
+
+    _contador_telefono = 0
+
+    def _venta(self, total, estado_reserva='checkout', estado_pago='pagado',
+              dias_atras=2):
+        # Formato chileno válido: +56 9 y 8 dígitos (Cliente.save() lo valida).
+        VentasWhatsappVsTotalTest._contador_telefono += 1
+        telefono = f'+569{VentasWhatsappVsTotalTest._contador_telefono:08d}'
+        v = VentaReserva.objects.create(
+            cliente=Cliente.objects.create(nombre=f'Cliente {total}',
+                                           telefono=telefono),
+            total=total, estado_reserva=estado_reserva, estado_pago=estado_pago)
+        VentaReserva.objects.filter(pk=v.pk).update(
+            fecha_reserva=AHORA - timedelta(days=dias_atras))
+        return v
+
+    def test_una_venta_sin_propuesta_es_solo_del_total(self):
+        self._venta(100000)
+        serie = ventas_whatsapp_vs_total(DESDE, HOY)
+        semana = next(s for s in serie if s['total_aremko'] > 0)
+        self.assertEqual(semana['total_aremko'], 100000)
+        self.assertEqual(semana['total_whatsapp'], 0)
+
+    def test_una_venta_con_propuesta_de_whatsapp_cuenta_en_los_dos(self):
+        v = self._venta(80000)
+        _propuesta('pw1', estado='creada', total=80000, dias_atras=2)
+        PropuestaReserva.objects.filter(propuesta_id='pw1').update(reserva_id=v.id)
+        serie = ventas_whatsapp_vs_total(DESDE, HOY)
+        semana = next(s for s in serie if s['total_aremko'] > 0)
+        self.assertEqual(semana['total_aremko'], 80000)
+        self.assertEqual(semana['total_whatsapp'], 80000)
+        self.assertEqual(semana['pct_whatsapp'], 100.0)
+
+    def test_una_venta_no_pagada_no_cuenta_en_ningun_lado(self):
+        # Mismo criterio que el dashboard de ventas: solo lo PAGADO es venta.
+        self._venta(50000, estado_pago='pendiente')
+        for s in ventas_whatsapp_vs_total(DESDE, HOY):
+            self.assertEqual(s['total_aremko'], 0)
+
+    def test_adicion_a_reserva_existente_tambien_cuenta_como_whatsapp(self):
+        # H-060: una propuesta con reserva_existente_id, al aprobarse, deja
+        # reserva_id apuntando a la MISMA venta ya creada — debe contar igual.
+        v = self._venta(60000)
+        _propuesta('pw2', estado='creada', total=15000, dias_atras=2)
+        PropuestaReserva.objects.filter(propuesta_id='pw2').update(
+            reserva_id=v.id, reserva_existente_id=v.id)
+        serie = ventas_whatsapp_vs_total(DESDE, HOY)
+        semana = next(s for s in serie if s['total_aremko'] > 0)
+        # Cuenta el total de LA VENTA (60.000), no el de la propuesta de adición.
+        self.assertEqual(semana['total_whatsapp'], 60000)
 
 
 def _pct_esperado(parte, total):

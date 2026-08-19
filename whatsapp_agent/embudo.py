@@ -232,17 +232,31 @@ def desempeno_luna(desde, hasta):
     return serie
 
 
-def velocidad_respuesta(desde, hasta):
-    """Mediana de minutos hasta la primera respuesta, por ventana de 7 días.
+UMBRAL_RESPUESTA_AUTOMATICA_SEG = 90
 
-    Solo WhatsApp, mismo recorte que el resto de la página. Por conversación:
-    el tiempo entre el primer mensaje ENTRANTE sin responder y la primera
-    respuesta SALIENTE que le sigue — mismo cálculo que
+
+def velocidad_respuesta(desde, hasta, umbral_seg=UMBRAL_RESPUESTA_AUTOMATICA_SEG):
+    """Velocidad de respuesta por ventana de 7 días, en DOS señales (no una).
+
+    Primera versión medía solo la mediana global y salió CLAVADA en 1 minuto
+    en las 10 ventanas — no era un error de cálculo (se verificó a mano con
+    Jorge el 2026-08-18 sobre 11.766 pares reales), sino un mal indicador:
+    el 62% de las respuestas llega en menos de 90 segundos —automatizadas—,
+    y ese cluster tan grande y tan estable domina la mediana todas las
+    semanas por igual, tapando la parte que sí varía.
+
+    Ahora se separa en:
+      - `pct_rapido`: % de respuestas bajo `umbral_seg` — cuánto cubre la
+        automatización. Sube cuando Luna resuelve más sola.
+      - `mediana_lenta_min`: mediana de minutos SOLO de lo que tardó más que
+        el umbral — lo que de verdad depende de que alguien intervenga. Esta
+        es la que se parece a «gestión de Deborah»; sube cuando el equipo se
+        atrasa, y suele subir ANTES de que la caída se note en las ventas.
+
+    Por conversación: el tiempo entre el primer ENTRANTE sin responder y la
+    primera SALIENTE que le sigue — mismo cálculo que
     `_acumular_primera_respuesta` de `/api/metrics/canales`, bucketeado en
     las ventanas móviles de esta página.
-
-    Sube cuando el equipo se atrasa; suele subir ANTES de que la caída se
-    note en las ventas — es la métrica de alerta temprana de las cuatro.
     """
     from ventas.models import WhatsAppMessage
 
@@ -258,7 +272,9 @@ def velocidad_respuesta(desde, hasta):
              .order_by('timestamp')):
         por_telefono.setdefault(f['phone'], []).append((f['timestamp'], f['direction']))
 
-    deltas_por_ventana = [[] for _ in ventanas]
+    total_por_ventana = [0 for _ in ventanas]
+    rapidas_por_ventana = [0 for _ in ventanas]
+    lentas_por_ventana = [[] for _ in ventanas]  # minutos, solo las >= umbral
     for mensajes in por_telefono.values():
         primer_in = None
         for ts, direction in mensajes:  # ya vienen ordenados por timestamp
@@ -266,20 +282,88 @@ def velocidad_respuesta(desde, hasta):
                 if primer_in is None:
                     primer_in = ts
             elif primer_in is not None:
-                dmin = (ts - primer_in).total_seconds() / 60.0
-                if dmin >= 0:
+                dseg = (ts - primer_in).total_seconds()
+                if dseg >= 0:
                     idx = _indice_de_ventana(primer_in.date(), ventanas)
                     if idx is not None:
-                        deltas_por_ventana[idx].append(dmin)
+                        total_por_ventana[idx] += 1
+                        if dseg < umbral_seg:
+                            rapidas_por_ventana[idx] += 1
+                        else:
+                            lentas_por_ventana[idx].append(dseg / 60.0)
                 primer_in = None
 
     serie = []
-    for (ini, fin), deltas in zip(ventanas, deltas_por_ventana):
-        mediana = _mediana(deltas)
+    for i, (ini, fin) in enumerate(ventanas):
+        mediana_lenta = _mediana(lentas_por_ventana[i])
         serie.append({
             'desde': ini, 'hasta': fin,
-            'mediana_min': round(mediana) if mediana is not None else None,
-            'n': len(deltas),
+            'pct_rapido': _pct(rapidas_por_ventana[i], total_por_ventana[i]),
+            'mediana_lenta_min': (round(mediana_lenta)
+                                  if mediana_lenta is not None else None),
+            'n': total_por_ventana[i],
+        })
+    return serie
+
+
+def ventas_whatsapp_vs_total(desde, hasta):
+    """Cuánto de las ventas TOTALES de Aremko vino de una cotización de Luna
+    por WhatsApp, por ventana de 7 días.
+
+    Mismo filtro de «venta real» que ya usa `/ventas/analytics/dashboard-ventas/`
+    (`estado_reserva` en pendiente/checkin/checkout + `estado_pago='pagado'`),
+    para que el % se pueda cruzar contra ese tablero sin que los denominadores
+    disientan. Bucketea por `fecha_reserva` (el campo que ESE tablero ya trata
+    como «cuándo se vendió»), no por fecha de servicio.
+
+    Una venta es «de WhatsApp» si alguna `PropuestaReserva` de ese canal, ya
+    aprobada, apunta a ella por `reserva_id` — cubre reservas nuevas Y
+    adiciones a una reserva existente (H-060) y gift cards (comparten el
+    mismo `crear_reserva`), sin necesidad de marcar nada en `VentaReserva`.
+
+    Límite honesto: «total Aremko» es lo que vive en ESTE sistema. Las
+    reservas que llegan por Booking/Airbnb hoy solo bloquean el calendario
+    (P-27) — no generan una `VentaReserva» — así que no están en ninguno de
+    los dos lados de esta cuenta.
+    """
+    from ventas.models import VentaReserva
+    from whatsapp_agent.models import PropuestaReserva
+
+    ventanas = ventanas_de_7_dias(desde, hasta)
+    if not ventanas:
+        return []
+
+    ids_whatsapp = set(PropuestaReserva.objects
+                       .filter(canal='whatsapp', estado='creada',
+                               reserva_id__isnull=False)
+                       .values_list('reserva_id', flat=True))
+
+    tope_desde, tope_hasta = ventanas[0][0], ventanas[-1][1]
+    filas = (VentaReserva.objects
+             .filter(estado_reserva__in=['pendiente', 'checkin', 'checkout'],
+                     estado_pago='pagado',
+                     fecha_reserva__date__gte=tope_desde,
+                     fecha_reserva__date__lte=tope_hasta)
+             .values_list('id', 'fecha_reserva', 'total'))
+
+    total_por_ventana = [0 for _ in ventanas]
+    whatsapp_por_ventana = [0 for _ in ventanas]
+    for vid, fecha_reserva, total in filas:
+        idx = _indice_de_ventana(fecha_reserva.date(), ventanas)
+        if idx is None:
+            continue
+        monto = int(total or 0)
+        total_por_ventana[idx] += monto
+        if vid in ids_whatsapp:
+            whatsapp_por_ventana[idx] += monto
+
+    serie = []
+    for i, (ini, fin) in enumerate(ventanas):
+        serie.append({
+            'desde': ini, 'hasta': fin,
+            'total_aremko': total_por_ventana[i],
+            'total_whatsapp': whatsapp_por_ventana[i],
+            'pct_whatsapp': _pct(whatsapp_por_ventana[i], total_por_ventana[i]),
         })
     return serie
 
@@ -363,6 +447,9 @@ def embudo(desde, hasta, ahora):
     d_temas = temas_de_las_caidas(desde, hasta)
     serie_agente = desempeno_luna(desde, hasta)
     serie_respuesta = velocidad_respuesta(desde, hasta)
+    serie_ventas = ventas_whatsapp_vs_total(desde, hasta)
+    total_aremko_periodo = sum(s['total_aremko'] for s in serie_ventas)
+    total_whatsapp_periodo = sum(s['total_whatsapp'] for s in serie_ventas)
     return {
         'desde': desde, 'hasta': hasta,
         'conversaciones': convs, 'cotizaciones': cotiz, 'reservas': reservas,
@@ -388,4 +475,8 @@ def embudo(desde, hasta, ahora):
         'temas_cobertura_pct': d_temas['cobertura_pct'],
         'serie_agente': serie_agente,
         'serie_respuesta': serie_respuesta,
+        'serie_ventas': serie_ventas,
+        'total_aremko_periodo': total_aremko_periodo,
+        'total_whatsapp_periodo': total_whatsapp_periodo,
+        'pct_whatsapp_periodo': _pct(total_whatsapp_periodo, total_aremko_periodo),
     }

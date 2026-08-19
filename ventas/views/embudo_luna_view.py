@@ -29,10 +29,10 @@ def embudo_luna(request):
     desde = hasta - timedelta(days=dias)
     datos = embudo(desde, hasta, ahora)
 
-    # Payload chico y ya-listo para Chart.js: las tres series comparten las
-    # mismas ventanas por construcción (las tres llaman a ventanas_de_7_dias
-    # con el mismo desde/hasta dentro de embudo()), así que alinean por
-    # posición sin necesidad de cruzarlas por fecha.
+    # Payload chico y ya-listo para Chart.js: las series comparten las mismas
+    # ventanas por construcción (todas llaman a ventanas_de_7_dias con el
+    # mismo desde/hasta dentro de embudo()), así que alinean por posición sin
+    # necesidad de cruzarlas por fecha.
     graficos = {
         'labels': [s['hasta'].strftime('%d/%m') for s in datos['semanas']],
         'conversaciones': [s['conversaciones'] for s in datos['semanas']],
@@ -42,7 +42,13 @@ def embudo_luna(request):
         'pct_cierra': [s['pct_cierra'] for s in datos['semanas']],
         'pct_sin_editar': [s['pct_sin_editar'] for s in datos['serie_agente']],
         'pct_escalado': [s['pct_escalado'] for s in datos['serie_agente']],
-        'mediana_respuesta_min': [s['mediana_min'] for s in datos['serie_respuesta']],
+        # v2 (2026-08-18): la mediana global salía clavada en 1 minuto — el
+        # 62% de las respuestas es automática y bajo 90s, y ese cluster tapa
+        # la parte que sí varía. Ahora dos señales en vez de una.
+        'pct_respuesta_rapida': [s['pct_rapido'] for s in datos['serie_respuesta']],
+        'mediana_respuesta_lenta_min': [s['mediana_lenta_min']
+                                        for s in datos['serie_respuesta']],
+        'pct_ventas_whatsapp': [s['pct_whatsapp'] for s in datos['serie_ventas']],
     }
 
     return render(request, 'ventas/embudo_luna.html', {

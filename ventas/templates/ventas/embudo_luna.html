@@ -107,11 +107,26 @@
       <div class="m">{{ d.plata_rechazada|formato_clp }}</div></div>
   </div>
 
+  <h2>Frente al negocio</h2>
+  <p class="nota">Ventas REALES de Aremko en este período (mismo filtro que
+     <code>/ventas/analytics/dashboard-ventas/</code>: reserva pagada, no cancelada) y cuánto de
+     eso vino de una cotización aprobada por WhatsApp. Límite honesto: «Total Aremko» es lo que
+     vive en este sistema — las reservas que llegan por Booking o Airbnb hoy solo bloquean el
+     calendario (no generan una venta acá), así que no están sumadas en ninguno de los dos lados.</p>
+  <div class="plata">
+    <div><div class="et">Total Aremko</div>
+      <div class="m">{{ d.total_aremko_periodo|formato_clp }}</div></div>
+    <div><div class="et">De eso, vía WhatsApp</div>
+      <div class="m">{{ d.total_whatsapp_periodo|formato_clp }}</div></div>
+    <div><div class="et">% que representa</div>
+      <div class="m">{{ d.pct_whatsapp_periodo }}%</div></div>
+  </div>
+
   <h2>Cómo evoluciona</h2>
-  <p class="nota">Mismas ventanas móviles de 7 días que el resto de la página. Los dos
-     gráficos de Luna salen de una fuente distinta (lo que redacta el agente y cuánto
-     Deborah lo corrige) — si esta ventana no tiene actividad del agente, esas dos curvas
-     van a salir vacías, y eso es correcto, no un error.</p>
+  <p class="nota">Mismas ventanas móviles de 7 días que el resto de la página. Los gráficos de
+     Luna y de respuesta salen de fuentes distintas al embudo (lo que redacta el agente, y los
+     mensajes crudos de WhatsApp) — si esta ventana no tiene esa actividad, esas curvas van a
+     salir vacías, y eso es correcto, no un error.</p>
   <div class="graficos">
     <div class="grafico">
       <h3>Conversión: % que cotiza y % que cierra</h3>
@@ -126,8 +141,12 @@
       <div class="alto"><canvas id="chartAgente"></canvas></div>
     </div>
     <div class="grafico">
-      <h3>Velocidad de respuesta (mediana, minutos)</h3>
+      <h3>Respuesta: % automática (&lt;90s) y mediana de la lenta (min)</h3>
       <div class="alto"><canvas id="chartRespuesta"></canvas></div>
+    </div>
+    <div class="grafico">
+      <h3>% de las ventas de Aremko que vienen de WhatsApp</h3>
+      <div class="alto"><canvas id="chartVentasWhatsapp"></canvas></div>
     </div>
   </div>
 
@@ -308,16 +327,45 @@
     options: { scales: { y: { beginAtZero: true, max: 100, ticks: pctTicks } } },
   });
 
+  // Dos ejes porque son dos unidades distintas: % a la izquierda, minutos a
+  // la derecha. La mediana GLOBAL salía clavada en 1 minuto en las 10
+  // ventanas —no era un bug, el 62% de las respuestas es automática y bajo
+  // 90s, y ese cluster tapaba la parte que sí varía—, por eso son dos
+  // señales separadas y no una.
   grafico(document.getElementById('chartRespuesta'), {
     type: 'line',
     data: {
       labels: G.labels,
       datasets: [
-        { label: 'Mediana (min)', data: G.mediana_respuesta_min, borderColor: AGUA,
-          backgroundColor: AGUA, tension: .3, pointRadius: 3, spanGaps: true },
+        { label: '% respondido en <90s', data: G.pct_respuesta_rapida,
+          borderColor: AGUA, backgroundColor: AGUA, tension: .3,
+          pointRadius: 3, spanGaps: true, yAxisID: 'y' },
+        { label: 'Mediana de la lenta (min)', data: G.mediana_respuesta_lenta_min,
+          borderColor: DATO2, backgroundColor: DATO2, tension: .3,
+          pointRadius: 3, spanGaps: true, yAxisID: 'y1' },
       ],
     },
-    options: { scales: { y: { beginAtZero: true } } },
+    options: {
+      scales: {
+        y: { beginAtZero: true, position: 'left', ticks: pctTicks,
+             title: { display: true, text: '% automática' } },
+        y1: { beginAtZero: true, position: 'right',
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Minutos' } },
+      },
+    },
+  });
+
+  grafico(document.getElementById('chartVentasWhatsapp'), {
+    type: 'line',
+    data: {
+      labels: G.labels,
+      datasets: [
+        { label: '% de ventas vía WhatsApp', data: G.pct_ventas_whatsapp,
+          borderColor: AGUA, backgroundColor: AGUA, tension: .3, pointRadius: 3 },
+      ],
+    },
+    options: { scales: { y: { beginAtZero: true, ticks: pctTicks } } },
   });
 })();
 </script>
