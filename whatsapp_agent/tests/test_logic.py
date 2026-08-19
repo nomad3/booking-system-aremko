@@ -152,6 +152,19 @@ def test_build_system_prompt_con_disponibilidad():
     assert 'por noche' in sp  # cabañas no en horas
 
 
+def test_build_system_prompt_sin_cupo_contraofrece_otro_dia():
+    # P-32 (2026-08-19): 11 conversaciones/mes mueren en "quería una fecha u
+    # hora que no había". La regla obliga a contraofrecer 1-2 días cercanos en
+    # el MISMO mensaje — nunca un "no hay" seco — tanto en disponibilidad
+    # general como en el anti-overbooking de cabañas.
+    sp = prompt.build_system_prompt(
+        'Asistente Aremko.', 'SERVICIOS PUBLICADOS:\n• Tina — $140.000',
+        'https://www.aremko.cl/', fecha_hoy='2026-06-14 (domingo)',
+    )
+    assert 'NUNCA cierres con un "no hay" seco' in sp
+    assert 'ofrece revisar otra noche cercana' in sp
+
+
 def test_build_system_prompt_con_conocimiento():
     sp = prompt.build_system_prompt(
         'Asistente Aremko.',
