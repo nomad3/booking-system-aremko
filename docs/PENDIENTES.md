@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-08-15 (wrapup nocturno — se agregaron P-27 y P-28)_
+_Última revisión: 2026-08-19 (análisis del embudo — se agregaron P-33 y P-34)_
 
 ## Web y marketing
 
@@ -226,6 +226,24 @@ _Última revisión: 2026-08-15 (wrapup nocturno — se agregaron P-27 y P-28)_
     cerrar en el template de la agenda. Los otros dos son cambios de comportamiento de
     otra sesión — **no tocarlos sin preguntar**. Falta la decisión de Jorge sobre si
     arreglar los dos primeros.
+33. **P-33 · Activar los recordatorios de Luna (H-109)** — El lado Django está EN PROD
+    (2026-08-19): bitácora `RecordatorioLuna`, comando cron `generar_recordatorios_luna`
+    (--dry-run) y endpoints `pending-luna-nudges`/`mark-sent`/`mark-failed`. Tres tipos:
+    cotización ≥6h sin respuesta, cotización ≤3h de expirar, reserva aprobada sin pago
+    (6-72h). Falta, EN ORDEN: **(a)** el runner del Go en aremko-cli (handoff H-109 en
+    `docs/HANDOFFS.md`, contrato cerrado — pull → mensaje de sesión → mark);
+    **(b)** migración `python manage.py migrate whatsapp_agent` en la Shell de Render;
+    **(c)** dry-run vigilado: `python manage.py generar_recordatorios_luna --dry-run`;
+    **(d)** env `LUNA_NUDGES_RUN_URL` en el Django de Render (interruptor general,
+    hoy vacía = apagado); **(e)** Cron Job Render cada hora. Plata en juego medida:
+    $3,4M/mes expiran sin decisión.
+34. **P-34 · Estudio de primeras respuestas (palanca 3 del embudo)** — Jorge lo dejó
+    "para pensar" el 2026-08-18 y quedó priorizado en el análisis del 19: el 52% de las
+    conversaciones (249/mes) recibe precio/info y se apaga. Muestrear 30-50 de esas
+    conversaciones, comparar qué primeras respuestas obtuvieron réplica y cuáles no, y
+    recién ahí rediseñar el guion de respuesta a precio (precio + 2 horarios concretos +
+    pregunta de cierre). Después de eso: clasificar motivo de rechazo (las 37 rechazadas
+    del mes, $3,9M) con el mismo pipeline de temas.
 
 ## Asistente de Publicaciones (community manager)
 
