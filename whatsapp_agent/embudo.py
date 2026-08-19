@@ -413,6 +413,18 @@ def servicios_que_mueren(propuestas, ahora, tope=10):
 def embudo(desde, hasta, ahora):
     """El cuadro completo para el tablero. `ahora` entra por parámetro para
     que los tests puedan fijar el reloj."""
+    # VentaReserva/Pago son datos del NEGOCIO, no de WhatsApp: existen desde
+    # mucho antes de INICIO_DATOS_REALES y no tienen la contaminación de 2017
+    # que justifica ese recorte. Se guarda el `desde` ORIGINAL acá, antes del
+    # clamp de abajo, para pasárselo a ventas_whatsapp_vs_total().
+    #
+    # Bug real, encontrado por Jorge el 2026-08-19: con el clamp aplicado a
+    # TODO el embudo, pedir 180 días recortaba a ~79 (01/06→19/08) también
+    # para las ventas — «Total Aremko» daba $55,4M cuando el real, con los
+    # 180 días completos, era $125,8M. La misma clamp que protege la serie de
+    # mensajes de WhatsApp estaba comiéndose 101 días de ventas reales sin
+    # avisar en ningún lado.
+    desde_ventas = desde
     desde = max(desde, INICIO_DATOS_REALES)
     props = list(_propuestas(desde, hasta))
 
@@ -447,7 +459,7 @@ def embudo(desde, hasta, ahora):
     d_temas = temas_de_las_caidas(desde, hasta)
     serie_agente = desempeno_luna(desde, hasta)
     serie_respuesta = velocidad_respuesta(desde, hasta)
-    serie_ventas = ventas_whatsapp_vs_total(desde, hasta)
+    serie_ventas = ventas_whatsapp_vs_total(desde_ventas, hasta)
     total_aremko_periodo = sum(s['total_aremko'] for s in serie_ventas)
     total_whatsapp_periodo = sum(s['total_whatsapp'] for s in serie_ventas)
     return {

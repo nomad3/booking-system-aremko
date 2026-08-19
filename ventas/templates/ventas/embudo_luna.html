@@ -112,7 +112,11 @@
      <code>/ventas/analytics/dashboard-ventas/</code>: reserva pagada, no cancelada) y cuánto de
      eso vino de una cotización aprobada por WhatsApp. Límite honesto: «Total Aremko» es lo que
      vive en este sistema — las reservas que llegan por Booking o Airbnb hoy solo bloquean el
-     calendario (no generan una venta acá), así que no están sumadas en ninguno de los dos lados.</p>
+     calendario (no generan una venta acá), así que no están sumadas en ninguno de los dos lados.
+     {% if recortado %}A diferencia del resto de la página, este cuadro SÍ cubre los {{ dias }}
+     días completos pedidos, desde el {{ desde_ventas|date:"d/m/Y" }}: son datos de venta
+     (VentaReserva/Pago), no mensajes de WhatsApp, y no tienen la contaminación de 2017 que obliga
+     a recortar la ventana de arriba.{% endif %}</p>
   <div class="plata">
     <div><div class="et">Total Aremko</div>
       <div class="m">{{ d.total_aremko_periodo|formato_clp }}</div></div>

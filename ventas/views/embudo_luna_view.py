@@ -60,4 +60,9 @@ def embudo_luna(request):
         # lo pedido: antes de esta fecha no hay datos reales de WhatsApp.
         'recortado': desde < INICIO_DATOS_REALES,
         'inicio_datos': INICIO_DATOS_REALES,
+        # «Frente al negocio» lee VentaReserva/Pago, no mensajes de WhatsApp,
+        # así que NO se recorta a INICIO_DATOS_REALES — cubre el período
+        # completo pedido. Se expone acá con nombre propio para que el
+        # template pueda aclarar que es una ventana distinta a la de arriba.
+        'desde_ventas': desde,
     })

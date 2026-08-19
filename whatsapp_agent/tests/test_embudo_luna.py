@@ -133,6 +133,30 @@ class EmbudoTest(TestCase):
         self.assertEqual(embudo(DESDE, HOY, AHORA)['conversaciones'], 1)
 
 
+class EmbudoNoRecortaVentasTest(_SinSenalesDeVenta, TestCase):
+    """Bug real, encontrado por Jorge el 2026-08-19: el clamp a
+    INICIO_DATOS_REALES existe para proteger las series de WhatsApp (mensajes,
+    propuestas) de la fila de prueba de 2017 — pero `embudo()` se lo aplicaba
+    también a `ventas_whatsapp_vs_total()`, que lee VentaReserva/Pago: datos
+    del NEGOCIO, con historia propia, sin esa contaminación. Con eso, pedir
+    180 días recortaba a ~79 también para las ventas: «Total Aremko» daba
+    $55,4M cuando el real era $125,8M.
+    """
+
+    def test_una_venta_anterior_a_inicio_datos_reales_igual_cuenta(self):
+        v = VentaReserva.objects.create(
+            cliente=Cliente.objects.create(nombre='Cliente viejo',
+                                           telefono='+56911112222'),
+            total=70000, estado_reserva='checkout', estado_pago='pagado')
+        VentaReserva.objects.filter(pk=v.pk).update(
+            fecha_reserva=timezone.make_aware(timezone.datetime(2026, 3, 1)))
+        d = embudo(date(2026, 1, 1), HOY, AHORA)
+        # La serie de WhatsApp sigue recortada (protege el ruido de 2017)...
+        self.assertEqual(d['desde'], date(2026, 6, 1))
+        # ...pero la venta de marzo, anterior a ese recorte, cuenta igual.
+        self.assertEqual(d['total_aremko_periodo'], 70000)
+
+
 class ServiciosQueMuerenTest(TestCase):
 
     def setUp(self):
