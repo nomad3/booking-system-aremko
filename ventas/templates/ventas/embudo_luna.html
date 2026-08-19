@@ -109,22 +109,59 @@
 
   <h2>Frente al negocio</h2>
   <p class="nota">Ventas REALES de Aremko en este período (mismo filtro que
-     <code>/ventas/analytics/dashboard-ventas/</code>: reserva pagada, no cancelada) y cuánto de
-     eso vino de una cotización aprobada por WhatsApp. Límite honesto: «Total Aremko» es lo que
-     vive en este sistema — las reservas que llegan por Booking o Airbnb hoy solo bloquean el
-     calendario (no generan una venta acá), así que no están sumadas en ninguno de los dos lados.
-     {% if recortado %}A diferencia del resto de la página, este cuadro SÍ cubre los {{ dias }}
+     <code>/ventas/analytics/dashboard-ventas/</code>: reserva pagada, no cancelada). Límite
+     honesto: es lo que vive en este sistema — las reservas que llegan por Booking o Airbnb hoy
+     solo bloquean el calendario (no generan una venta acá), así que no están sumadas.
+     {% if recortado %}A diferencia del resto de la página, este número SÍ cubre los {{ dias }}
      días completos pedidos, desde el {{ desde_ventas|date:"d/m/Y" }}: son datos de venta
      (VentaReserva/Pago), no mensajes de WhatsApp, y no tienen la contaminación de 2017 que obliga
      a recortar la ventana de arriba.{% endif %}</p>
   <div class="plata">
     <div><div class="et">Total Aremko</div>
       <div class="m">{{ d.total_aremko_periodo|formato_clp }}</div></div>
-    <div><div class="et">De eso, vía WhatsApp</div>
-      <div class="m">{{ d.total_whatsapp_periodo|formato_clp }}</div></div>
-    <div><div class="et">% que representa</div>
-      <div class="m">{{ d.pct_whatsapp_periodo }}%</div></div>
   </div>
+
+  {% if d.desglose_canal_real %}
+  <h2>De dónde vienen esas ventas</h2>
+  <p class="nota">Encontrado junto con Jorge el 19/08/2026: contar solo lo que Luna cierra sola
+     (como en el cuadro de arriba en versiones anteriores) subestimaba mucho el canal real —
+     Deborah decide toda la disponibilidad, así que casi nadie compra sin hablar con ella, y su
+     canal principal también es WhatsApp. Acá se cruza el teléfono de cada cliente contra quién ha
+     escrito alguna vez por WhatsApp. <strong>Ventana más corta</strong> que el cuadro de arriba —
+     de las {{ d.desglose_canal_real.total_n|intcomma }} ventas
+     ({{ d.desglose_canal_real.total_monto|formato_clp }}) desde el
+     {{ d.desglose_canal_real.desde|date:"d/m/Y" }}: los mensajes reales de WhatsApp no existen
+     antes de esa fecha, así que cruzar más atrás daría un «sin rastro» falso, no real. El cruce es
+     «alguna vez escribió», sin exigir cercanía a la fecha de venta: si hay sesgo, es hacia
+     SUBESTIMAR el WhatsApp real (alguien pudo reservar con otro número), no a inflarlo.</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Categoría</th><th class="num">Ventas</th><th class="num">Monto</th><th class="num">%</th></tr></thead>
+      <tbody>
+        <tr><td>Luna cierra sola (cotización automática)</td>
+          <td class="num">{{ d.desglose_canal_real.luna.n|intcomma }}</td>
+          <td class="num">{{ d.desglose_canal_real.luna.monto|formato_clp }}</td>
+          <td class="num">{{ d.desglose_canal_real.luna.pct }}%</td></tr>
+        <tr><td>Deborah a mano, con rastro de WhatsApp</td>
+          <td class="num">{{ d.desglose_canal_real.deborah_whatsapp.n|intcomma }}</td>
+          <td class="num">{{ d.desglose_canal_real.deborah_whatsapp.monto|formato_clp }}</td>
+          <td class="num">{{ d.desglose_canal_real.deborah_whatsapp.pct }}%</td></tr>
+        <tr><td><strong>Toca WhatsApp de algún modo</strong></td>
+          <td class="num"><strong>{{ d.desglose_canal_real.toca_whatsapp_n|intcomma }}</strong></td>
+          <td class="num"><strong>{{ d.desglose_canal_real.toca_whatsapp_monto|formato_clp }}</strong></td>
+          <td class="num"><strong>{{ d.desglose_canal_real.toca_whatsapp_pct }}%</strong></td></tr>
+        <tr><td>Flow (autoservicio por la web)</td>
+          <td class="num">{{ d.desglose_canal_real.flow.n|intcomma }}</td>
+          <td class="num">{{ d.desglose_canal_real.flow.monto|formato_clp }}</td>
+          <td class="num">{{ d.desglose_canal_real.flow.pct }}%</td></tr>
+        <tr><td>Otro / no identificado</td>
+          <td class="num">{{ d.desglose_canal_real.otro.n|intcomma }}</td>
+          <td class="num">{{ d.desglose_canal_real.otro.monto|formato_clp }}</td>
+          <td class="num">{{ d.desglose_canal_real.otro.pct }}%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <h2>Cómo evoluciona</h2>
   <p class="nota">Mismas ventanas móviles de 7 días que el resto de la página. Los gráficos de
@@ -149,7 +186,7 @@
       <div class="alto"><canvas id="chartRespuesta"></canvas></div>
     </div>
     <div class="grafico">
-      <h3>% de las ventas de Aremko que vienen de WhatsApp</h3>
+      <h3>% de las ventas que Luna cierra SOLA (cotización automática)</h3>
       <div class="alto"><canvas id="chartVentasWhatsapp"></canvas></div>
     </div>
   </div>
@@ -365,7 +402,7 @@
     data: {
       labels: G.labels,
       datasets: [
-        { label: '% de ventas vía WhatsApp', data: G.pct_ventas_whatsapp,
+        { label: '% que cierra Luna sola', data: G.pct_ventas_whatsapp,
           borderColor: AGUA, backgroundColor: AGUA, tension: .3, pointRadius: 3 },
       ],
     },

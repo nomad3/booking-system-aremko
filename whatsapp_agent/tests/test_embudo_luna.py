@@ -16,9 +16,9 @@ from datetime import date, timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from ventas.models import Cliente, Servicio, VentaReserva, WhatsAppMessage
+from ventas.models import Cliente, Pago, Servicio, VentaReserva, WhatsAppMessage
 from whatsapp_agent.embudo import (candidatos_sin_cotizar, desempeno_luna,
-                                   embudo, estado_efectivo,
+                                   desglose_canal_real, embudo, estado_efectivo,
                                    servicios_que_mueren, temas_de_las_caidas,
                                    velocidad_respuesta, ventanas_de_7_dias,
                                    ventas_whatsapp_vs_total)
@@ -653,6 +653,109 @@ class VentasWhatsappVsTotalTest(_SinSenalesDeVenta, TestCase):
         semana = next(s for s in serie if s['total_aremko'] > 0)
         # Cuenta el total de LA VENTA (60.000), no el de la propuesta de adición.
         self.assertEqual(semana['total_whatsapp'], 60000)
+
+
+class DesgloseCanalRealTest(_SinSenalesDeVenta, TestCase):
+    """P-32 (2026-08-19): `ventas_whatsapp_vs_total` solo cuenta lo que Luna
+    cierra SOLA — subestima el canal real, porque Deborah cierra la mayoría a
+    mano pero también por WhatsApp. Verificado con Jorge cruzando teléfono de
+    cliente contra quién ha escrito alguna vez por WhatsApp.
+    """
+
+    _contador_telefono = 0
+
+    def _telefono(self):
+        DesgloseCanalRealTest._contador_telefono += 1
+        return f'+569{DesgloseCanalRealTest._contador_telefono:08d}'
+
+    def _venta(self, total, telefono=None, dias_atras=2):
+        telefono = telefono or self._telefono()
+        v = VentaReserva.objects.create(
+            cliente=Cliente.objects.create(nombre=f'Cliente {total}',
+                                           telefono=telefono),
+            total=total, estado_reserva='checkout', estado_pago='pagado')
+        VentaReserva.objects.filter(pk=v.pk).update(
+            fecha_reserva=AHORA - timedelta(days=dias_atras))
+        # Refrescar es obligatorio acá: Pago.save() llama a
+        # self.venta_reserva.calcular_total() -> .save(), y si a esa venta le
+        # creamos después un Pago pasando este mismo objeto, un `v` con el
+        # fecha_reserva viejo en memoria (el de ANTES del update de arriba)
+        # se reescribe encima y pierde el cambio, en silencio.
+        v.refresh_from_db()
+        return v
+
+    def test_venta_de_luna_se_categoriza_luna(self):
+        v = self._venta(80000)
+        _propuesta('dcr-luna', estado='creada', total=80000, dias_atras=2)
+        PropuestaReserva.objects.filter(propuesta_id='dcr-luna').update(reserva_id=v.id)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['luna']['n'], 1)
+        self.assertEqual(d['luna']['monto'], 80000)
+
+    def test_venta_pagada_con_flow_se_categoriza_flow(self):
+        v = self._venta(50000)
+        Pago.objects.create(venta_reserva=v, metodo_pago='flow', monto=50000)
+        # Pago.save() llama a venta_reserva.calcular_total(), que recalcula
+        # `total` desde las líneas reales de la reserva (0 acá: esta venta
+        # sintética no tiene ReservaServicio/ReservaProducto) y lo pisa a 0.
+        # Se re-fija para medir lo que este test dice medir, no ese efecto
+        # de lado de un método que no es el que se está probando.
+        VentaReserva.objects.filter(pk=v.pk).update(total=50000)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['flow']['n'], 1)
+        self.assertEqual(d['flow']['monto'], 50000)
+
+    def test_venta_con_historial_whatsapp_se_categoriza_deborah_whatsapp(self):
+        telefono = self._telefono()
+        _mensaje('dcr-msg1', telefono, dias_atras=5)
+        self._venta(40000, telefono=telefono)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['deborah_whatsapp']['n'], 1)
+        self.assertEqual(d['deborah_whatsapp']['monto'], 40000)
+
+    def test_venta_sin_ningun_rastro_es_otro(self):
+        self._venta(30000)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['otro']['n'], 1)
+        self.assertEqual(d['otro']['monto'], 30000)
+
+    def test_luna_tiene_prioridad_sobre_flow_y_whatsapp(self):
+        # Una venta que calificaría para las tres categorías a la vez debe
+        # quedar en la más específica (Luna), no repartirse ni duplicarse.
+        telefono = self._telefono()
+        _mensaje('dcr-msg2', telefono, dias_atras=5)
+        v = self._venta(90000, telefono=telefono)
+        Pago.objects.create(venta_reserva=v, metodo_pago='flow', monto=90000)
+        _propuesta('dcr-prioridad', estado='creada', total=90000, dias_atras=2)
+        PropuestaReserva.objects.filter(propuesta_id='dcr-prioridad').update(reserva_id=v.id)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['luna']['n'], 1)
+        self.assertEqual(d['flow']['n'], 0)
+        self.assertEqual(d['deborah_whatsapp']['n'], 0)
+
+    def test_flow_tiene_prioridad_sobre_historial_whatsapp(self):
+        telefono = self._telefono()
+        _mensaje('dcr-msg4', telefono, dias_atras=5)
+        v = self._venta(60000, telefono=telefono)
+        Pago.objects.create(venta_reserva=v, metodo_pago='flow', monto=60000)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['flow']['n'], 1)
+        self.assertEqual(d['deborah_whatsapp']['n'], 0)
+
+    def test_recorta_a_inicio_datos_reales(self):
+        d = desglose_canal_real(date(2017, 1, 1), HOY)
+        self.assertEqual(d['desde'], date(2026, 6, 1))
+
+    def test_toca_whatsapp_suma_luna_y_deborah(self):
+        v1 = self._venta(80000)
+        _propuesta('dcr-tw1', estado='creada', total=80000, dias_atras=2)
+        PropuestaReserva.objects.filter(propuesta_id='dcr-tw1').update(reserva_id=v1.id)
+        telefono = self._telefono()
+        _mensaje('dcr-msg3', telefono, dias_atras=5)
+        self._venta(40000, telefono=telefono)
+        d = desglose_canal_real(DESDE, HOY)
+        self.assertEqual(d['toca_whatsapp_n'], 2)
+        self.assertEqual(d['toca_whatsapp_monto'], 120000)
 
 
 def _pct_esperado(parte, total):

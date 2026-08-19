@@ -368,6 +368,94 @@ def ventas_whatsapp_vs_total(desde, hasta):
     return serie
 
 
+def desglose_canal_real(desde, hasta):
+    """De las ventas reales, cuánto cerró Luna sola, cuánto cerró Deborah a
+    mano pero con rastro de conversación en WhatsApp, cuánto fue autoservicio
+    por Flow, y cuánto no se puede explicar con lo que hay hoy.
+
+    Encontrado junto con Jorge (2026-08-19): `ventas_whatsapp_vs_total` solo
+    cuenta lo que Luna cierra SOLA (una `PropuestaReserva` aprobada) — pero
+    Deborah decide toda la disponibilidad, así que casi nadie compra sin
+    hablar con ella, y su canal principal también es WhatsApp. Se verificó
+    cruzando el teléfono del cliente contra quién ha escrito alguna vez por
+    WhatsApp: de las ventas que Luna no cierra, ~70% igual tiene ese rastro.
+
+    Prioridad de clasificación (una venta cae en la PRIMERA que cumple):
+    1. `luna` — mismo criterio que `ventas_whatsapp_vs_total`.
+    2. `flow` — pagada con Flow: autoservicio verificable por el método de
+       pago, sin importar si hubo algún contacto previo por WhatsApp.
+    3. `deborah_whatsapp` — el teléfono del cliente escribió alguna vez por
+       WhatsApp (entrante). No exige cercanía a la fecha de la venta: si hay
+       sesgo, es hacia SUBESTIMAR (alguien pudo reservar con otro número), no
+       a inflar.
+    4. `otro` — nada de lo anterior. Puede ser Instagram, teléfono, boca a
+       boca, o un cliente con un número distinto al que usa para escribir.
+
+    Límite duro de fecha: los mensajes reales de WhatsApp recién arrancan el
+    13/06/2026 (antes solo hay una fila de prueba de 2017) — por eso esta
+    función SIEMPRE recorta `desde` a `INICIO_DATOS_REALES`, sin importar lo
+    que pida el resto del tablero. Cruzar contra un período sin mensajes
+    daría un «sin rastro» falso, no real — sería repetir en sentido inverso
+    el mismo error que el bug de `desde_ventas` en `embudo()`.
+    """
+    from ventas.models import Pago, VentaReserva, WhatsAppMessage
+    from whatsapp_agent.models import PropuestaReserva
+
+    desde = max(desde, INICIO_DATOS_REALES)
+    if desde > hasta:
+        return None
+
+    filas = (VentaReserva.objects
+             .filter(estado_reserva__in=['pendiente', 'checkin', 'checkout'],
+                     estado_pago='pagado',
+                     fecha_reserva__date__gte=desde,
+                     fecha_reserva__date__lte=hasta)
+             .values_list('id', 'total', 'cliente__telefono'))
+
+    ids_luna = set(PropuestaReserva.objects
+                   .filter(canal='whatsapp', estado='creada',
+                           reserva_id__isnull=False)
+                   .values_list('reserva_id', flat=True))
+    ids_flow = set(Pago.objects
+                   .filter(metodo_pago='flow',
+                           venta_reserva__fecha_reserva__date__gte=desde,
+                           venta_reserva__fecha_reserva__date__lte=hasta)
+                   .values_list('venta_reserva_id', flat=True))
+    tels_whatsapp = set(WhatsAppMessage.objects.filter(direction='in')
+                        .values_list('phone', flat=True))
+
+    conteo = {c: [0, 0] for c in ('luna', 'flow', 'deborah_whatsapp', 'otro')}
+    for vid, total, telefono in filas:
+        monto = int(total or 0)
+        if vid in ids_luna:
+            cat = 'luna'
+        elif vid in ids_flow:
+            cat = 'flow'
+        elif telefono and telefono in tels_whatsapp:
+            cat = 'deborah_whatsapp'
+        else:
+            cat = 'otro'
+        conteo[cat][0] += 1
+        conteo[cat][1] += monto
+
+    total_monto = sum(m for _, m in conteo.values())
+
+    def _cat(nombre):
+        n, monto = conteo[nombre]
+        return {'n': n, 'monto': monto, 'pct': _pct(monto, total_monto)}
+
+    monto_whatsapp = conteo['luna'][1] + conteo['deborah_whatsapp'][1]
+    return {
+        'desde': desde, 'hasta': hasta,
+        'total_n': sum(n for n, _ in conteo.values()), 'total_monto': total_monto,
+        'luna': _cat('luna'), 'flow': _cat('flow'),
+        'deborah_whatsapp': _cat('deborah_whatsapp'), 'otro': _cat('otro'),
+        'toca_whatsapp_n': conteo['luna'][0] + conteo['deborah_whatsapp'][0],
+        'toca_whatsapp_monto': monto_whatsapp,
+        'toca_whatsapp_pct': _pct(monto_whatsapp, total_monto),
+    }
+
+
 def _propuestas(desde, hasta):
     from whatsapp_agent.models import PropuestaReserva
 
@@ -462,6 +550,10 @@ def embudo(desde, hasta, ahora):
     serie_ventas = ventas_whatsapp_vs_total(desde_ventas, hasta)
     total_aremko_periodo = sum(s['total_aremko'] for s in serie_ventas)
     total_whatsapp_periodo = sum(s['total_whatsapp'] for s in serie_ventas)
+    # `desde` acá ya está clampeado a INICIO_DATOS_REALES (línea de arriba);
+    # desglose_canal_real() lo vuelve a clampear igual, así que pasarlo tal
+    # cual es seguro incluso si este bloque se reordena en el futuro.
+    desglose_canal = desglose_canal_real(desde, hasta)
     return {
         'desde': desde, 'hasta': hasta,
         'conversaciones': convs, 'cotizaciones': cotiz, 'reservas': reservas,
@@ -491,4 +583,5 @@ def embudo(desde, hasta, ahora):
         'total_aremko_periodo': total_aremko_periodo,
         'total_whatsapp_periodo': total_whatsapp_periodo,
         'pct_whatsapp_periodo': _pct(total_whatsapp_periodo, total_aremko_periodo),
+        'desglose_canal_real': desglose_canal,
     }
