@@ -226,6 +226,8 @@ class EndpointsGoTest(TestCase):
         self.assertIn('ventana', r.error)
 
     def test_mark_sent_cierra_y_registra_el_saliente(self):
+        cliente = Cliente.objects.create(nombre='Recordado',
+                                         telefono='+56955555555')
         r = self._recordatorio()
         resp = self.client.post(
             '/api/whatsapp/luna-nudges/mark-sent',
@@ -235,8 +237,10 @@ class EndpointsGoTest(TestCase):
         r.refresh_from_db()
         self.assertEqual(r.estado, 'enviado')
         self.assertIsNotNone(r.enviado_at)
-        self.assertTrue(WhatsAppMessage.objects.filter(
-            wa_message_id='wamid.test1', direction='out').exists())
+        msg = WhatsAppMessage.objects.get(wa_message_id='wamid.test1',
+                                          direction='out')
+        # El saliente queda enganchado al Cliente, igual que mark_template_sent.
+        self.assertEqual(msg.cliente_id, cliente.id)
 
     def test_mark_sent_es_idempotente(self):
         r = self._recordatorio()

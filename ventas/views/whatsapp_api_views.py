@@ -1452,9 +1452,13 @@ def mark_luna_nudge_sent(request):
         if existing:
             message_id = existing.id
         else:
+            # Enganchar el cliente igual que mark_template_sent — solo lookup,
+            # sin crear: quien recibe un recordatorio ya existe como Cliente.
+            cliente = Cliente.objects.filter(telefono=rec.phone).first()
             msg = WhatsAppMessage.objects.create(
-                direction='out', wa_message_id=wa_id, phone=rec.phone[:20],
-                body=rec.texto, msg_type='text', timestamp=now, status='sent',
+                cliente=cliente, direction='out', wa_message_id=wa_id,
+                phone=rec.phone[:20], body=rec.texto, msg_type='text',
+                timestamp=now, status='sent',
             )
             message_id = msg.id
 
