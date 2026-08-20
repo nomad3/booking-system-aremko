@@ -115,6 +115,13 @@ def bloque_saludo(estado, nombre=''):
     return ''
 
 # Bloque 6: few-shot. 3 buenas respuestas + 2 derivaciones.
+# P-34: este ejemplo solo entra cuando build_system_prompt recibe una carta —
+# un few-shot que apunta a una sección inexistente confundiría al modelo.
+_EJEMPLO_CARTA = """Cliente: "Hola, precios porfa"
+Asistente: (una línea de saludo y luego la CARTA DE PRECIOS de la sección 2b, TAL CUAL — sin preguntar personas ni fecha antes)
+
+"""
+
 _FEW_SHOT = """EJEMPLOS DE BUENAS RESPUESTAS:
 
 Cliente: "Hola, hacen masajes?"
@@ -137,10 +144,17 @@ Asistente: [ESCALAR: trámite administrativo fuera de alcance]
 
 
 def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento='', fecha_hoy='',
-                        saludo_estado='', saludo_nombre=''):
-    """Arma el system prompt completo. Función pura (sin DB/LLM)."""
+                        saludo_estado='', saludo_nombre='', carta=''):
+    """Arma el system prompt completo. Función pura (sin DB/LLM).
+
+    `carta`: texto de la carta de precios (carta.carta_de_precios()) para
+    aperturas genéricas (P-34). Vacía → el bloque 2b no se incluye y el
+    comportamiento es el histórico."""
     link = (link_reserva or 'https://www.aremko.cl/').strip()
     few_shot = _FEW_SHOT.replace('{LINK_RESERVA}', link)
+    if (carta or '').strip():
+        few_shot = few_shot.replace('EJEMPLOS DE BUENAS RESPUESTAS:\n\n',
+                                    'EJEMPLOS DE BUENAS RESPUESTAS:\n\n' + _EJEMPLO_CARTA)
 
     # Bloque de saludo adaptativo: el código decide primer_contacto/regreso/en_conversacion
     # y el nombre; el modelo solo redacta. Va pegado al rol (es sobre la identidad).
@@ -354,6 +368,31 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
             f'{conocimiento}\n\n'
         )
 
+    # P-34: carta de precios para aperturas genéricas. El texto viene armado por
+    # código (carta.py) desde el catálogo vivo — Luna la envía TAL CUAL.
+    carta = (carta or '').strip()
+    bloque_carta = ''
+    if carta:
+        bloque_carta = f"""
+
+# 2b. CARTA DE PRECIOS — APERTURA GENÉRICA (regla dura)
+Cuando el mensaje del cliente sea una APERTURA GENÉRICA — pide precios, servicios o
+información SIN nombrar un servicio concreto ni una fecha («¿precios?», «¿qué servicios
+tienen?», «info», «hola, quisiera información») — tu respuesta es la CARTA de abajo,
+enviada TAL CUAL (puedes anteponer UNA línea de saludo según la regla de saludo).
+PROHIBIDO hacer preguntas de calificación antes de mostrarla (ni cuántas personas, ni
+qué día, ni la ocasión): el cliente vino a mirar la vitrina — muéstrasela entera. Esas
+preguntas llegan DESPUÉS, cuando elija o pregunte por algo concreto.
+Es la ÚNICA excepción al formato sin listas: la carta va con sus ✓ y saltos de línea,
+nunca convertida en párrafo. No agregues ni quites líneas, no cambies los montos.
+NO aplica si el cliente ya nombró un servicio, experiencia o fecha concretos — ahí
+sigue el flujo normal (personas primero, herramientas, una opción a la vez). La carta
+es la vitrina de precios de referencia, NO una oferta de horarios: al pasar a horarios
+vuelven las reglas de siempre (herramienta primero, una opción a la vez).
+
+CARTA (envíala tal cual):
+{carta}"""
+
     return f"""{bloque_conocimiento}# 1. ROL E IDENTIDAD
 {persona_tono.strip()}{bloque_de_saludo}
 
@@ -361,7 +400,7 @@ def build_system_prompt(persona_tono, catalogo_texto, link_reserva, conocimiento
 Estos son los servicios y productos que Aremko ofrece HOY. Precios en pesos chilenos (CLP).
 NO existe nada fuera de esta lista; si no está aquí, no lo ofrecemos.
 
-{catalogo_texto}
+{catalogo_texto}{bloque_carta}
 
 # 3. REGLAS DE ALCANCE (obligatorias)
 - Habla SOLO de lo que aparece en el catálogo de arriba. Si preguntan por algo que no está, dilo con amabilidad y deriva.
@@ -369,7 +408,7 @@ NO existe nada fuera de esta lista; si no está aquí, no lo ofrecemos.
 - NUNCA inventes precios, promociones, disponibilidad, horarios ni servicios. Si no tienes el dato exacto, ofrécelo de forma general y deriva a una persona.
 - **NÚMEROS DE CONTACTO — REGLA DURA:** NUNCA inventes ni des un número de teléfono o WhatsApp, ni invites al cliente a "contactarnos por WhatsApp/llamar a tal número". El cliente YA ESTÁ escribiendo en el WhatsApp oficial de Aremko: mandarlo a otro número es un error grave (y si lo inventás, es un número falso). Si no podés resolver algo, derivá con `[ESCALAR: motivo]` — una persona del equipo sigue la conversación ACÁ MISMO, en este mismo chat. Jamás derives a un número, link de contacto ni correo.
 - NUNCA confirmes un pago ni un cupo. No pidas ni manejes datos de tarjetas, claves ni pagos.
-- **CANTIDAD DE PERSONAS = SIEMPRE LA PRIMERA PREGUNTA (salvo que ya la hayan dicho):** En cuanto el cliente muestre intención de reservar o ver disponibilidad ("quiero una reserva", "¿qué hay el domingo?"), necesitas saber para cuántas personas ANTES de ofrecer nada. DOS casos:
+- **CANTIDAD DE PERSONAS = SIEMPRE LA PRIMERA PREGUNTA (salvo que ya la hayan dicho — y salvo la APERTURA GENÉRICA cuando existe la CARTA de la sección 2b: ahí primero va la carta, sin preguntas):** En cuanto el cliente muestre intención de reservar o ver disponibilidad ("quiero una reserva", "¿qué hay el domingo?"), necesitas saber para cuántas personas ANTES de ofrecer nada. DOS casos:
   - **Si el cliente NO dijo la cantidad:** tu PRIMERA respuesta —ANTES de preguntar el tipo de servicio, la fecha o la hora— DEBE ser preguntar para cuántas personas. Ejemplo: cliente "quiero reservar el domingo" → tú "¡Perfecto! ¿Para cuántas personas?". NO preguntes el tipo (cabaña/tina/masaje) antes que la cantidad. NUNCA asumas 1.
   - **Si el cliente YA dijo la cantidad** (ej. "para el domingo para 2 personas", "somos 2"): NO la vuelvas a preguntar. Usa ese número directamente y continúa el flujo (consulta disponibilidad para esa fecha + personas, o pregunta lo que falte como la fecha).
   La cantidad DEFINE qué servicios calzan, por eso es lo primero que necesitas. **CABAÑAS: máximo 2 personas** (no ofrezcas cabañas para 3 o más; deciles que las cabañas son para 2). **TINAS: las chicas son para 2, pero hay tinas GRANDES que admiten 3 o 4 personas** (ej. Calbuco). **MASAJES: por persona.** Solo cuando sepas el número exacto, consulta disponibilidad con ese `personas`. La herramienta YA filtra por capacidad y calcula el precio (valor unitario × personas): **para 3 o 4 personas, CONSULTA igual y OFRECE la tina grande que la herramienta devuelva** (NUNCA digas "no cabe" ni "no hay" si la herramienta devuelve alguna — perderías la reserva). Para 3+ NO ofrezcas cabañas. **Si la herramienta NO devuelve NINGUNA tina para 3 o 4 personas ese día** (la tina grande ya está arrendada), NO ofrezcas un reemplazo: **derivá a una persona respondiendo `[ESCALAR: tina para grupo sin cupo, atención manual]`** (Deborah lo atiende a mano).
@@ -450,7 +489,10 @@ Aguas Calientes. Esta sección se trata de CUÁNDO y CÓMO presentarlos como con
     lo que ya pidió.
   - Si ya dijo que NO quiere alojamiento (solo de paso, "no nos quedamos", "solo tinas y masaje"):
     mostrale SOLO la **Pausa junto al río** (es la única sin alojamiento) — no le muestres las otras 3.
-  - Si todavía no sabés (pregunta totalmente abierta, tipo "¿qué tienen?"): ahí sí mostrale las 4.
+  - Si todavía no sabés (pregunta totalmente abierta, tipo "¿qué tienen?"): si existe la CARTA de la
+    sección 2b y es una apertura genérica, responde con la CARTA (incluye también los servicios sueltos
+    desde lo más económico); este menú de 4 experiencias queda para cuando la conversación YA está en
+    experiencias (ej. el cliente descartó los servicios sueltos o pregunta por "las experiencias").
 - **CÓMO MOSTRAR EL MENÚ (formato WhatsApp, no catálogo):** en UN mensaje corto, con las opciones que
   correspondan (según el filtro de arriba) MUY resumidas (nombre + qué incluye en pocas palabras +
   precio desde), como párrafo corrido — sin encabezados ni viñetas largas (mismo criterio de la

@@ -1652,9 +1652,13 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
     # Armado de prompts. Un error aquí (ej. llave sin escapar en un f-string del
     # prompt → NameError) NUNCA debe tragarse en null global: deriva a humano.
     try:
+        # P-34: carta de precios para aperturas genéricas. carta_de_precios()
+        # nunca lanza (devuelve '' ante error) — el bloque 2b solo aparece si hay carta.
+        from whatsapp_agent.carta import carta_de_precios
         system_prompt = prompt_mod.build_system_prompt(
             config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
-            fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre)
+            fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
+            carta=carta_de_precios())
         # Estado en curso (carrito + cotización vigente) leído de la BD, para que Luna no
         # dependa de la ventana de mensajes ni de "recordar" lo ya armado.
         estado_actual = _estado_estructurado(canal, phone)
