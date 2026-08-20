@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-08-20 (P-33 recordatorios de Luna CERRADO; sigue P-34)_
+_Última revisión: 2026-08-20 (P-33 cerrado; P-34 carta EN PROD, revisar resultados ~27/08)_
 
 ## Web y marketing
 
@@ -229,13 +229,20 @@ _Última revisión: 2026-08-20 (P-33 recordatorios de Luna CERRADO; sigue P-34)_
 <!-- P-33 (recordatorios de Luna, H-109) CERRADO 2026-08-20: runner Go + migración +
      env + cron recordatorios_luna operativos; 2 recordatorios reales enviados y
      verificados E2E. Detalle en docs/HANDOFFS.md fila H-109. -->
-34. **P-34 · Estudio de primeras respuestas (palanca 3 del embudo)** — Jorge lo dejó
-    "para pensar" el 2026-08-18 y quedó priorizado en el análisis del 19: el 52% de las
-    conversaciones (249/mes) recibe precio/info y se apaga. Muestrear 30-50 de esas
-    conversaciones, comparar qué primeras respuestas obtuvieron réplica y cuáles no, y
-    recién ahí rediseñar el guion de respuesta a precio (precio + 2 horarios concretos +
-    pregunta de cierre). Después de eso: clasificar motivo de rechazo (las 37 rechazadas
-    del mes, $3,9M) con el mismo pipeline de temas.
+34. **P-34 · Primeras respuestas: medir el efecto de la carta + motivo de rechazo** —
+    **HECHO (2026-08-20):** estudio con `estudiar_primeras_respuestas` (369 muertas vs
+    255 cotizadas: el separador es la CONCRETUD — horarios 49,6% vs 76,5%; velocidad y
+    largo no separan; el 67% de las muertas YA cerraba preguntando) + **carta de precios
+    EN PROD** (`whatsapp_agent/carta.py`, commit 67049335): apertura genérica → escalera
+    completa $40k→$290k desde el catálogo vivo, sin preguntas de calificación antes.
+    Verificada en vivo por Jorge con "servicios" y "precios". **FALTA:**
+    **(a) Revisar resultados ~27/08** — antes de mirar, correr
+    `python manage.py clasificar_conversaciones --dias 10 --limit 60` (las conversaciones
+    nuevas necesitan clasificación para comparar); luego re-correr
+    `estudiar_primeras_respuestas` y mirar en el embudo si % cotiza sigue subiendo y si
+    `silencio_tras_info` baja su participación entre las clasificadas nuevas.
+    **(b) Clasificar motivo de rechazo** (las 37 rechazadas del mes, $3,9M) con el mismo
+    pipeline de temas — palanca 2 del análisis, aún sin empezar.
 
 ## Asistente de Publicaciones (community manager)
 
