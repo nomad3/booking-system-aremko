@@ -39,12 +39,30 @@ def encabezado(*cols):
     print("|" + "---|" * len(cols))
 
 
+def _detectar_version_google():
+    """Google retira versiones de la API ~cada año (síntoma: 404 HTML).
+
+    Prueba de la más nueva a la más vieja hasta que una responda, ajustando
+    el módulo del reporter en memoria (no toca configuración persistente).
+    """
+    for v in ("v27", "v26", "v25", "v24", "v23", "v22", "v21"):
+        gads.GOOGLE_ADS_API_BASE = f"https://googleads.googleapis.com/{v}"
+        if gads.get_account_summary() is not None:
+            return v
+    return None
+
+
 def seccion_google():
     print(f"# Google Ads — últimos {DIAS_VENTANA} días — {date.today().isoformat()}\n")
+    version = _detectar_version_google()
+    if version is None:
+        print("⚠️ Sin acceso a Google Ads API (credenciales ausentes/ inválidas "
+              "o ninguna versión v21-v27 respondió). Sección omitida.\n")
+        return
+    print(f"_Versión de API detectada: {version}_\n")
     campañas = gads.get_campaigns_summary(days=DIAS_VENTANA)
     if campañas is None:
-        print("⚠️ Sin acceso a Google Ads API (credenciales GOOGLE_ADS_* "
-              "ausentes o inválidas). Sección omitida.\n")
+        print("⚠️ Campañas no disponibles pese a versión detectada. Sección omitida.\n")
         return
 
     print("## Campañas\n")
@@ -85,45 +103,54 @@ def seccion_google():
 
 
 def seccion_meta():
-    print(f"\n# Meta Ads — {date.today().isoformat()}\n")
+    """Insights lifetime por campaña (date_preset=maximum).
+
+    El listado de get_campaigns_summary trae `insights{}` sin rango de fechas
+    y sale en cero cuando no hubo gasto en la ventana por defecto; por eso
+    aquí se consulta el endpoint de insights de la cuenta con
+    date_preset=maximum, que agrega TODO el historial de cada campaña.
+    """
+    print(f"\n# Meta Ads (lifetime por campaña) — {date.today().isoformat()}\n")
     for cuenta, etiqueta in (
         (meta.AD_ACCOUNT_PRINCIPAL, "cuenta principal (CLP)"),
         (meta.AD_ACCOUNT_BOOSTED_IG, "cuenta boosts IG (CLP)"),
     ):
         print(f"## {etiqueta} — {cuenta}\n")
         try:
-            campañas = meta.get_campaigns_summary(account_id=cuenta, limit=50)
+            filas = []
+            params = {
+                "level": "campaign",
+                "fields": "campaign_name,spend,impressions,clicks,ctr,actions",
+                "date_preset": "maximum",
+                "limit": 100,
+            }
+            data = meta._get(f"/{cuenta}/insights", params)
+            filas.extend(data.get("data", []))
+            # una página extra por si hay más de 100 campañas con gasto
+            siguiente = (data.get("paging") or {}).get("next")
+            if siguiente:
+                import requests as _rq
+                data2 = _rq.get(siguiente, timeout=30).json()
+                filas.extend(data2.get("data", []))
         except Exception as exc:  # credenciales o permisos
             print(f"⚠️ Sin acceso: {exc}\n")
             continue
-        if not campañas:
-            print("(sin campañas)\n")
+        if not filas:
+            print("(sin campañas con gasto)\n")
             continue
-        encabezado("campaña", "estado", "objetivo", "creada", "gasto",
-                   "impresiones", "clics", "CTR")
-        for c in campañas:
-            linea(c.get("name"), c.get("status"), c.get("objective"),
-                  (c.get("created_time") or "")[:10],
-                  f"{c.get('spend', 0):,.0f}", c.get("impressions", 0),
-                  c.get("clicks", 0), c.get("ctr", 0))
+        filas.sort(key=lambda r: float(r.get("spend") or 0), reverse=True)
+        encabezado("campaña", "gasto", "impresiones", "clics", "CTR",
+                   "leads", "mensajes", "link clicks")
+        for r in filas[:40]:
+            acciones = meta._extract_action_metrics(r.get("actions") or [])
+            mensajes = next((int(a.get("value") or 0)
+                             for a in (r.get("actions") or [])
+                             if a.get("action_type") ==
+                             "onsite_conversion.messaging_conversation_started_7d"), 0)
+            linea(r.get("campaign_name"), f"{float(r.get('spend') or 0):,.0f}",
+                  r.get("impressions"), r.get("clicks"), r.get("ctr"),
+                  acciones["leads"], mensajes, acciones["link_clicks"])
         print()
-        try:
-            detalle = meta.get_active_campaigns_detail(
-                account_id=cuenta, days=28, max_campaigns=10)
-        except Exception as exc:
-            print(f"⚠️ Detalle no disponible: {exc}\n")
-            continue
-        if detalle:
-            print("### Campañas activas (28 días): totales\n")
-            for d in detalle:
-                print(f"**{d.get('name')}** (inicio hace "
-                      f"{d.get('days_since_start')} días)\n")
-                totals = d.get("totals") or {}
-                encabezado("métrica", "valor")
-                for clave, valor in totals.items():
-                    if valor not in (None, "", 0):
-                        linea(clave, valor)
-                print()
 
 
 if __name__ == "__main__":
