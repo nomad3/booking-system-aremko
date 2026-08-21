@@ -249,6 +249,21 @@ _Última revisión: 2026-08-20 (P-33 cerrado; P-34 carta EN PROD, revisar result
     (patrón ausencia/confirmaciones, modelo='codigo') detectando la apertura genérica
     por regex antes del LLM.
 
+35. **P-35 · La bandeja debe mostrar si el mensaje REALMENTE llegó (status del webhook)** —
+    Detectado 2026-08-21 con el caso del error 131042: Deborah estuvo días usando
+    "Contactando" viendo "Enviado ✓" mientras Meta descartaba cada plantilla segundos
+    después. Causa estructural: un **200 de la Cloud API solo significa "aceptado"**; el
+    veredicto real llega asíncrono por webhook (`sent` → `delivered` → `read`, o `failed`
+    con su código). Hoy el backend Go solo LOGUEA esos statuses (`handlers/whatsapp.go`,
+    desde el commit 1cb2906 con el motivo del fallo incluido) y nadie los ve.
+    **Qué construir:** el webhook reenvía el status a Django (endpoint nuevo, keyeado por
+    `wa_message_id`, idempotente) → se guarda en el saliente → la bandeja lo muestra
+    (✓ enviado / ✓✓ entregado / leído / ⚠️ falló + motivo en español). Beneficia a los
+    tres flujos que envían sin humano mirando: Contactando, campañas OVC
+    (`run-template-campaign`) y los recordatorios de Luna (H-109). Mínimo viable: marcar
+    en rojo los `failed` con el motivo traducido; lo demás es lujo.
+    Ver `[[feedback_whatsapp_plantillas_facturacion_131042]]`.
+
 ## Asistente de Publicaciones (community manager)
 
 > Este módulo (cola semanal + revisión IA de material + publicar en un clic) se
