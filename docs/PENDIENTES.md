@@ -243,6 +243,11 @@ _Última revisión: 2026-08-20 (P-33 cerrado; P-34 carta EN PROD, revisar result
     `silencio_tras_info` baja su participación entre las clasificadas nuevas.
     **(b) Clasificar motivo de rechazo** (las 37 rechazadas del mes, $3,9M) con el mismo
     pipeline de temas — palanca 2 del análisis, aún sin empezar.
+    **(c) Opcional si el drift molesta:** Luna RE-ESCRIBE la carta en vez de pegarla
+    (visto 20/08 21:49: le agregó «desde» al Refugio, que es precio plano). Si aparecen
+    montos alterados o líneas perdidas, endurecer con respuesta determinista en código
+    (patrón ausencia/confirmaciones, modelo='codigo') detectando la apertura genérica
+    por regex antes del LLM.
 
 ## Asistente de Publicaciones (community manager)
 
