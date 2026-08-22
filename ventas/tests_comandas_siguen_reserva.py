@@ -15,9 +15,12 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
+from django.contrib.auth.models import User
+
 from ventas.comandas_objetivo import objetivo_de, reanclar_comandas
-from ventas.models import (CategoriaServicio, Cliente, Comanda, ReservaServicio,
-                           Servicio, VentaReserva)
+from ventas.models import (CategoriaServicio, Cliente, Comanda, Producto,
+                           ReservaProducto, ReservaServicio, Servicio,
+                           VentaReserva)
 from ventas.views.agenda_operativa_view import calcular_destino_comanda
 from whatsapp_agent.tests.test_giftcards_luna import _SinSenalesDeVenta
 
@@ -167,3 +170,23 @@ class EtiquetaDestinoTest(_Base):
         self._servicio(v, self.cabana, HOY - timedelta(days=1), '16:00')
         d = calcular_destino_comanda(v, hoy=HOY)
         self.assertEqual(d['label'], 'Cabaña Arrayan · (en curso)')
+
+
+class FechaEntregaSoloLecturaEnElAdminTest(_Base):
+    """Pieza 2 del caso 6586: la «Fecha de entrega» del producto ya no se edita
+    en la reserva. Para el sistema significa «YA se entregó» (descuenta stock),
+    pero el tooltip decía «fue/será entregado» y se usaba como fecha planificada."""
+
+    def test_el_inline_muestra_entregado_el_y_no_deja_editar_fecha_entrega(self):
+        admin_user = User.objects.create_superuser('jefe', 'j@aremko.cl', 'x')
+        self.client.force_login(admin_user)
+        v = self._reserva()
+        prod = Producto.objects.create(nombre='Tabla Mixta', precio_base=36000,
+                                       cantidad_disponible=24)
+        ReservaProducto.objects.create(venta_reserva=v, producto=prod, cantidad=1)
+        resp = self.client.get(f'/admin/ventas/ventareserva/{v.id}/change/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Entregado el')
+        self.assertContains(resp, '— (pendiente)')
+        # Ningún input editable de fecha_entrega en el inline de productos.
+        self.assertNotContains(resp, 'reservaproductos-0-fecha_entrega')

@@ -165,8 +165,25 @@ def productos_vendibles(ids_visibles=None):
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1
-    fields = ['producto', 'cantidad', 'fecha_entrega', 'mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
-    readonly_fields = ['mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
+    # `fecha_entrega` ya NO se edita acá. Para el sistema significa «YA se
+    # entregó» (al dejar de ser NULL descuenta el stock, señal
+    # actualizar_inventario), pero la columna decía "Fecha de Entrega" y el
+    # tooltip "fue/será entregado" — así que se usaba como fecha PLANIFICADA:
+    # caso real 6586 (2026-08-22), Deborah la puso al 29/08 para correr unas
+    # comandas y el stock se descontó ese día, una semana antes. La fecha
+    # planificada vive en la comanda (Fecha/Hora Entrega Objetivo) y la
+    # entrega real la marcan el botón "Entregar" de la agenda y el cron.
+    fields = ['producto', 'cantidad', 'entregado_el', 'mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
+    readonly_fields = ['entregado_el', 'mostrar_valor_unitario', 'mostrar_valor_total', 'estado_comanda']
+
+    def entregado_el(self, obj):
+        """Solo lectura: cuándo se entregó de verdad (lo que descuenta stock)."""
+        if not obj or not obj.pk:
+            return '—'
+        if obj.fecha_entrega:
+            return obj.fecha_entrega.strftime('%d/%m/%Y')
+        return '— (pendiente)'
+    entregado_el.short_description = 'Entregado el'
 
     def estado_comanda(self, obj):
         """Estado de preparación según la comanda de cocina que contiene este
@@ -217,8 +234,6 @@ class ReservaProductoInline(admin.TabularInline):
         # Ajustar anchos de campos específicos
         if db_field.name == 'cantidad':
             formfield.widget.attrs['style'] = 'width: 80px;'
-        elif db_field.name == 'fecha_entrega':
-            formfield.widget.attrs['style'] = 'width: 150px;'
 
         return formfield
 
