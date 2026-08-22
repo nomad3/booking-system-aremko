@@ -190,3 +190,39 @@ class FechaEntregaSoloLecturaEnElAdminTest(_Base):
         self.assertContains(resp, '— (pendiente)')
         # Ningún input editable de fecha_entrega en el inline de productos.
         self.assertNotContains(resp, 'reservaproductos-0-fecha_entrega')
+
+
+class ComentarioDeLaReservaEnLaComandaTest(_Base):
+    """Jorge 2026-08-22: «agrega en las comandas el comentario que aparece en
+    cada reserva, muchas veces esa información ayuda a preparar la comanda».
+    Se lee EN VIVO de la reserva (no de la copia en notas_generales) y sale
+    tanto en el render del servidor como en el JSON del polling."""
+
+    def _comanda_de_hoy_con_comentario(self, comentario):
+        v = self._reserva()
+        VentaReserva.objects.filter(pk=v.pk).update(comentarios=comentario)
+        hoy = timezone.localdate()
+        return self._comanda(v, objetivo_de(hoy, '18:00')), v
+
+    def test_el_json_del_polling_trae_el_comentario(self):
+        self.client.force_login(User.objects.create_superuser('j2', 'j2@aremko.cl', 'x'))
+        c, _ = self._comanda_de_hoy_con_comentario('Sin cebolla — alergia al maní')
+        resp = self.client.get('/ventas/agenda-operativa/api/comandas-pendientes/')
+        self.assertEqual(resp.status_code, 200)
+        fila = next(x for x in resp.json()['comandas'] if x['id'] == c.id)
+        self.assertEqual(fila['comentario_reserva'], 'Sin cebolla — alergia al maní')
+
+    def test_la_pagina_pinta_el_comentario_en_la_tarjeta(self):
+        self.client.force_login(User.objects.create_superuser('j3', 'j3@aremko.cl', 'x'))
+        self._comanda_de_hoy_con_comentario('Cumpleaños: velita en la tabla')
+        resp = self.client.get('/ventas/agenda-operativa/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Comentario reserva:')
+        self.assertContains(resp, 'Cumpleaños: velita en la tabla')
+
+    def test_sin_comentario_no_pinta_el_bloque(self):
+        self.client.force_login(User.objects.create_superuser('j4', 'j4@aremko.cl', 'x'))
+        self._comanda_de_hoy_con_comentario('')
+        resp = self.client.get('/ventas/agenda-operativa/api/comandas-pendientes/')
+        fila = resp.json()['comandas'][0]
+        self.assertEqual(fila['comentario_reserva'], '')

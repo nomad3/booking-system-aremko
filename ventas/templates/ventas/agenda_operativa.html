@@ -1064,6 +1064,9 @@
                             {{ item.cantidad }}x {{ item.nombre }}{% if not forloop.last %}, {% endif %}
                         {% endfor %}
                     </div>
+                    {% if c.comentario_reserva %}
+                    <div class="comanda-comentario-reserva" style="background: #FFF8E1; border-left: 4px solid #FB8C00; border-radius: 4px; padding: 6px 10px; margin: 6px 0; font-size: 13px; color: #5D4037; white-space: pre-line; line-height: 1.45;">📝 <strong style="color: #E65100;">Comentario reserva:</strong> {{ c.comentario_reserva }}</div>
+                    {% endif %}
                     <div class="comanda-card-meta">
                         <span class="comanda-tiempo {% if c.minutos_espera > 15 %}urgente{% endif %}">
                             ⏱️ {{ c.minutos_espera }} min
@@ -1683,6 +1686,14 @@ var conocidas = new Set();
 conocidas.add({{ c.id }});
 {% endfor %}
 
+function escapeHtmlComanda(s) {
+    // El comentario de la reserva es texto libre de Deborah/Luna: va escapado
+    // al armar HTML por concatenación (el template del servidor ya autoescapa).
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function renderComandas(comandas) {
     var container = document.getElementById('comandasContainer');
     container.innerHTML = '';
@@ -1690,6 +1701,12 @@ function renderComandas(comandas) {
     comandas.forEach(function(c) {
         var tiempoClass = c.minutos_espera > 15 ? 'urgente' : '';
         var itemsText = c.items.map(function(i) { return i.cantidad + 'x ' + i.nombre; }).join(', ');
+        var comentarioHtml = c.comentario_reserva
+            ? '<div class="comanda-comentario-reserva" style="background:#FFF8E1;border-left:4px solid #FB8C00;' +
+                  'border-radius:4px;padding:6px 10px;margin:6px 0;font-size:13px;color:#5D4037;' +
+                  'white-space:pre-line;line-height:1.45;">📝 <strong style="color:#E65100;">Comentario reserva:</strong> ' +
+                  escapeHtmlComanda(c.comentario_reserva) + '</div>'
+            : '';
 
         var actionsHtml = '';
         if (c.estado === 'pendiente') {
@@ -1736,6 +1753,7 @@ function renderComandas(comandas) {
                     '</div>' +
                     destinoBadge +
                     '<div class="comanda-card-items">' + itemsText + '</div>' +
+                    comentarioHtml +
                     '<div class="comanda-card-meta">' +
                         '<span class="comanda-tiempo ' + tiempoClass + '">⏱️ ' + c.minutos_espera + ' min</span>' +
                         '<a href="/admin/ventas/ventareserva/' + c.reserva_id + '/change/" target="_blank" ' +

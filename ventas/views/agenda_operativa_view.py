@@ -946,6 +946,11 @@ def agenda_operativa(request):
             'minutos_espera': minutos,
             'items': items,
             'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+            # Comentario de la reserva, leído EN VIVO (Jorge 2026-08-22: "muchas
+            # veces esa información ayuda a preparar la comanda"). En vivo y no
+            # desde notas_generales: la copia de la señal puede quedar vieja.
+            'comentario_reserva': ((c.venta_reserva.comentarios or '').strip()
+                                   if c.venta_reserva_id and c.venta_reserva else ''),
             # Destino sugerido para cocina/bar (regla tina/cabaña/masaje)
             'destino': destino['destino'],
             'destino_label': destino['label'],
@@ -1028,6 +1033,8 @@ def comandas_pendientes_api(request):
             'minutos_espera': minutos,
             'items': items,
             'usuario_procesa': c.usuario_procesa.get_short_name() if c.usuario_procesa else None,
+            'comentario_reserva': ((c.venta_reserva.comentarios or '').strip()
+                                   if c.venta_reserva_id and c.venta_reserva else ''),
             'destino': destino['destino'],
             'destino_label': destino['label'],
             'destino_icon': destino['icon'],
