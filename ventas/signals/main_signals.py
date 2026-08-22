@@ -420,6 +420,46 @@ def actualizar_total_al_guardar_servicio(sender, instance, created, raw, using, 
     except Exception as e:
             logger.error(f"Error updating total after ReservaServicio {instance.pk} save: {e}")
 
+@receiver(pre_save, sender=ReservaServicio)
+def guardar_horario_anterior_servicio(sender, instance, **kwargs):
+    """Guarda fecha/hora ANTERIORES del servicio para que, tras guardar,
+    `comandas_siguen_al_servicio` sepa si se movió y desde dónde."""
+    instance._fecha_anterior = None
+    instance._hora_anterior = None
+    if not instance.pk:
+        return
+    try:
+        ant = (ReservaServicio.objects.filter(pk=instance.pk)
+               .values('fecha_agendamiento', 'hora_inicio').first())
+        if ant:
+            instance._fecha_anterior = ant['fecha_agendamiento']
+            instance._hora_anterior = ant['hora_inicio']
+    except Exception as e:  # noqa: BLE001 — nunca romper el guardado por esto
+        logger.error(f"[guardar_horario_anterior_servicio] {instance.pk}: {e}")
+
+
+@receiver(post_save, sender=ReservaServicio)
+def comandas_siguen_al_servicio(sender, instance, created, raw, **kwargs):
+    """Caso 6586 (2026-08-22): al mover la fecha/hora de un servicio, las
+    comandas pendientes ancladas a ESE horario lo siguen. Ver
+    ventas/comandas_objetivo.py. Defensivo: nunca tumba el guardado."""
+    if raw or created:
+        return
+    fecha_ant = getattr(instance, '_fecha_anterior', None)
+    hora_ant = getattr(instance, '_hora_anterior', None)
+    if fecha_ant is None:
+        return
+    if (fecha_ant == instance.fecha_agendamiento
+            and (hora_ant or '') == (instance.hora_inicio or '')):
+        return
+    try:
+        from ventas.comandas_objetivo import reanclar_comandas
+        reanclar_comandas(instance.venta_reserva_id, fecha_ant, hora_ant,
+                          instance.fecha_agendamiento, instance.hora_inicio)
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[comandas_siguen_al_servicio] ReservaServicio {instance.pk}: {e}")
+
+
 @receiver(post_save, sender=ReservaServicio)
 def asegurar_bebida_ambientacion(sender, instance, created, raw, using, update_fields, **kwargs):
     """Fase 2: al agregar una ambientación a una reserva, asegurar su bebida incluida

@@ -255,9 +255,9 @@ def calcular_destino_comanda(venta_reserva, hoy=None):
         venta_reserva: instancia de VentaReserva (idealmente con
         reservaservicios__servicio prefetched)
         hoy: fecha de referencia (default = hoy local). Servicios cuya
-        fecha_agendamiento coincide con `hoy` muestran su HH:MM normal;
-        los de otro día (típico: alojamiento multi-día) muestran "(en curso)"
-        para no confundir con el horario de hoy.
+        fecha_agendamiento coincide con `hoy` muestran su HH:MM normal; los
+        que ya empezaron (alojamiento multi-día) muestran "(en curso)"; los
+        FUTUROS muestran "dd/mm HH:MM" para que cocina vea que no es hoy.
 
     Returns:
         {
@@ -290,12 +290,18 @@ def calcular_destino_comanda(venta_reserva, hoy=None):
         nombre = (rs.servicio.nombre or '').strip()
         if not nombre:
             continue
-        # Hora: si es hoy, mostrar HH:MM. Si es otro día (alojamiento multi-día),
-        # marcar "(en curso)" para no confundir con horario de hoy.
+        # Hora: si es hoy, HH:MM. Si ya empezó (alojamiento multi-día que
+        # sigue adentro), "(en curso)". Si es FUTURO, su fecha + hora: antes
+        # también decía "(en curso)" y una tina del 29/08 se leía como si el
+        # cliente ya estuviera en ella (caso 6586, 2026-08-22).
         if rs.fecha_agendamiento == hoy:
             hora_label = rs.hora_inicio or ''
-        else:
+        elif rs.fecha_agendamiento and rs.fecha_agendamiento < hoy:
             hora_label = '(en curso)'
+        elif rs.fecha_agendamiento:
+            hora_label = f"{rs.fecha_agendamiento:%d/%m} {rs.hora_inicio or ''}".strip()
+        else:
+            hora_label = ''
 
         item = (nombre, hora_label)
         if tipo == 'tina' and item not in tinas:
