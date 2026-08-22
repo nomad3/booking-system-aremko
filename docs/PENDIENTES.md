@@ -225,7 +225,11 @@ _Última revisión: 2026-08-20 (P-33 cerrado; P-34 carta EN PROD, revisar result
     "carta" en vez de "Gift Card" en `whatsapp_agent/giftcards.py`, y un `{# … #}` sin
     cerrar en el template de la agenda. Los otros dos son cambios de comportamiento de
     otra sesión — **no tocarlos sin preguntar**. Falta la decisión de Jorge sobre si
-    arreglar los dos primeros.
+    arreglar los dos primeros. **Addendum 2026-08-22:** `ventas.tests_checkout_agenda`
+    tiene 6 fallas + 1 error PREEXISTENTES bajo el shim sqlite de tests (verificado
+    con `git stash` en árbol limpio; 12-13 si se corre después de `whatsapp_agent`,
+    por interferencia entre suites). Probablemente verdes bajo Postgres, que es
+    contra lo que se escribieron — no atribuirlas a cambios nuevos.
 <!-- P-33 (recordatorios de Luna, H-109) CERRADO 2026-08-20: runner Go + migración +
      env + cron recordatorios_luna operativos; 2 recordatorios reales enviados y
      verificados E2E. Detalle en docs/HANDOFFS.md fila H-109. -->
