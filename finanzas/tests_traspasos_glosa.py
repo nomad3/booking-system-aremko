@@ -17,7 +17,8 @@ from django.test import TestCase
 from .models import CategoriaFinanciera, CuentaFinanciera, MovimientoFinanciero
 from .reglas import PLAN_CUENTAS
 from .services import (CLAVE_POR_CALZAR, candidatos_de_calce,
-                       clasificar_compra_tarjeta, destino_puente)
+                       clasificar_compra_tarjeta, destino_puente,
+                       marcar_traspaso_puente)
 
 
 class DestinoPuenteTest(TestCase):
@@ -146,3 +147,152 @@ class CuentaRutJubilacionesTest(TestCase):
         self.assertEqual(cat, 'personales_martin')
         _, _, cat, _ = self._clasificar('Pago Almapan', cargo=30580)
         self.assertEqual(cat, 'por_clasificar')
+
+
+class TraspasoHuerfanoTest(TestCase):
+    """22/08/2026 — el bug que dejó $809.331 en piernas sin par.
+
+    La vista previa de cartolas marcaba `f['clase'] = 'traspaso'` para mostrar
+    que un cargo hacia una cuenta puente no es retiro, pero ese mismo dict
+    viaja firmado al confirmar: `registrar_filas_cartola` decide si arma el
+    traspaso de dos piernas preguntando `if f['clase'] == 'gasto'`, y ya nunca
+    se cumplía. Quedaba una pierna «sale» huérfana y los traspasos dejaban de
+    cuadrar.
+    """
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+
+    def _fila(self, clase='gasto'):
+        return {
+            'fecha': '2026-08-06', 'descripcion': 'TEF A TOLOZA POBLETE ALDA ANGELICA',
+            'cargo': 500000, 'abono': 0, 'saldo': 0,
+            'clase': clase, 'sentido': 'sale', 'categoria': 'por_clasificar',
+            'referencia': 'be:huerfano-test',
+        }
+
+    def test_la_carga_arma_las_DOS_piernas_y_cuadran(self):
+        from .services import registrar_filas_cartola
+        registrar_filas_cartola([self._fila()], cuenta_clave='bancoestado')
+        piernas = MovimientoFinanciero.objects.filter(clase='traspaso')
+        self.assertEqual(piernas.count(), 2, 'deben ser dos piernas')
+        sale = piernas.get(sentido='sale')
+        entra = piernas.get(sentido='entra')
+        self.assertEqual(sale.traspaso_par_id, entra.id)
+        self.assertEqual(entra.traspaso_par_id, sale.id)
+        self.assertEqual(entra.cuenta.clave, 'scotiabank_alda')
+        # Un traspaso no lleva categoría: no es ingreso ni gasto.
+        self.assertIsNone(sale.categoria)
+        # Y el control global cuadra: lo que sale es igual a lo que entra.
+        self.assertEqual(sum(int(m.monto) for m in piernas.filter(sentido='sale')),
+                         sum(int(m.monto) for m in piernas.filter(sentido='entra')))
+
+    def test_no_queda_ninguna_pierna_sin_par(self):
+        from .services import registrar_filas_cartola
+        registrar_filas_cartola([self._fila()], cuenta_clave='bancoestado')
+        self.assertFalse(
+            MovimientoFinanciero.objects.filter(
+                clase='traspaso', traspaso_par__isnull=True).exists())
+
+
+class CalzarHuerfanoTest(TestCase):
+    """Los huérfanos que ya están en la base tienen que poder repararse."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.be = CuentaFinanciera.objects.get(clave='bancoestado')
+        self.alda = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+        self.por_calzar, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=CLAVE_POR_CALZAR,
+            defaults={'nombre': 'Abono desde Aremko por calzar',
+                      'clase': 'ingreso', 'grupo': 'otros'})
+
+    def _huerfano(self, monto=500000, fecha=date(2026, 8, 6)):
+        return MovimientoFinanciero.objects.create(
+            fecha=fecha, cuenta=self.be, clase='traspaso', sentido='sale',
+            monto=Decimal(monto),
+            categoria=CategoriaFinanciera.objects.get(clave='por_clasificar'),
+            fuente='captura', referencia=f'h:{monto}:{fecha}',
+            descripcion='Cartola bancoestado: TEF A TOLOZA POBLETE ALDA ANG')
+
+    def _abono(self, monto=500000, fecha=date(2026, 8, 5)):
+        return MovimientoFinanciero.objects.create(
+            fecha=fecha, cuenta=self.alda, clase='ingreso', sentido='entra',
+            monto=Decimal(monto), categoria=self.por_calzar, fuente='captura',
+            referencia=f'a:{monto}:{fecha}',
+            descripcion='Cartola scotiabank alda: TEF 76485192-7 AREMKO')
+
+    def test_el_huerfano_aparece_como_candidato(self):
+        h = self._huerfano()
+        self.assertIn(h.id, [c.id for c in candidatos_de_calce(self._abono())])
+
+    def test_una_pierna_YA_emparejada_no_se_ofrece(self):
+        # Solo las huérfanas: una pareja armada no se toca.
+        h = self._huerfano()
+        otra = self._huerfano(monto=500000, fecha=date(2026, 8, 7))
+        h.traspaso_par = otra
+        h.save(update_fields=['traspaso_par'])
+        self.assertNotIn(h.id, [c.id for c in candidatos_de_calce(self._abono())])
+
+    def test_calzarlo_deja_las_piernas_cuadradas(self):
+        from .services import calzar_abono_con_retiro
+        h, a = self._huerfano(), self._abono()
+        comun, resto_a, resto_r = calzar_abono_con_retiro(a, h)
+        self.assertEqual((comun, resto_a, resto_r), (500000, 0, 0))
+        h.refresh_from_db(); a.refresh_from_db()
+        self.assertEqual(h.traspaso_par_id, a.id)
+        self.assertEqual(a.clase, 'traspaso')
+        self.assertIsNone(a.categoria)
+
+    def test_calce_parcial_deja_el_resto_con_categoria(self):
+        # Un gasto sin categoría es un dato corrupto: el resto cae en
+        # «por clasificar», que es donde se ve.
+        from .services import calzar_abono_con_retiro
+        h = self._huerfano(monto=500000)
+        h.categoria = None
+        h.save(update_fields=['categoria'])
+        comun, resto_a, resto_r = calzar_abono_con_retiro(self._abono(monto=430000), h)
+        self.assertEqual((comun, resto_a, resto_r), (430000, 0, 70000))
+        resto = MovimientoFinanciero.objects.get(referencia__endswith=':resto')
+        self.assertEqual(resto.clase, 'gasto')
+        self.assertIsNotNone(resto.categoria)
+        self.assertEqual(resto.categoria.clave, 'por_clasificar')
+
+
+class MarcarTraspasoPuenteTest(TestCase):
+    """EL test que faltaba: la vista previa no puede tocar `clase`.
+
+    Es el invariante que se rompió el 22/08/2026 — el dict de la propuesta
+    viaja firmado hasta la escritura, y allá se decide por `clase == 'gasto'`
+    si se arman las dos piernas del traspaso. Marcar para la pantalla está
+    bien; mutar el dato, no.
+    """
+
+    def _fila(self):
+        return {'fecha': '2026-08-06', 'clase': 'gasto', 'sentido': 'sale',
+                'categoria': 'por_clasificar', 'cargo': 500000, 'abono': 0,
+                'descripcion': 'TEF A TOLOZA POBLETE ALDA ANGELICA'}
+
+    def test_marca_para_mostrar_pero_NO_toca_clase_ni_categoria(self):
+        f = marcar_traspaso_puente(self._fila(), 'bancoestado',
+                                   {'scotiabank_alda': 'Scotiabank Alda'})
+        self.assertTrue(f['es_traspaso_puente'])
+        self.assertEqual(f['destino_puente'], 'Scotiabank Alda')
+        # Lo que importa: la escritura sigue viendo un gasto y arma las dos piernas.
+        self.assertEqual(f['clase'], 'gasto')
+        self.assertEqual(f['categoria'], 'por_clasificar')
+
+    def test_una_glosa_que_no_es_puente_no_se_marca(self):
+        f = self._fila()
+        f['descripcion'] = 'COMPRA JUMBO PUERTO VARAS'
+        f = marcar_traspaso_puente(f, 'bancoestado', {})
+        self.assertNotIn('es_traspaso_puente', f)
+        self.assertEqual(f['clase'], 'gasto')
+
+    def test_un_abono_no_se_marca_aunque_diga_el_nombre(self):
+        f = self._fila()
+        f['clase'], f['sentido'] = 'ingreso', 'entra'
+        self.assertNotIn('es_traspaso_puente',
+                         marcar_traspaso_puente(f, 'bancoestado', {}))

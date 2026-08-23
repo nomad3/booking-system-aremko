@@ -903,6 +903,27 @@ def destino_puente(descripcion, cuenta_origen=None):
     return None
 
 
+def marcar_traspaso_puente(fila, cuenta_clave, nombres_cta=None):
+    """Marca una fila de cartola como «esto va a una cuenta puente», SOLO para
+    mostrarla en la propuesta.
+
+    REGLA DURA: no toca `clase` ni `categoria`. Ese mismo diccionario viaja
+    firmado en el payload hasta la confirmación, y `registrar_filas_cartola`
+    decide si arma el traspaso de DOS piernas preguntando
+    `if f['clase'] == 'gasto'`. El 22/08/2026 la vista previa ponía
+    `f['clase'] = 'traspaso'` para pintarlo bonito y esa condición dejaba de
+    cumplirse: el movimiento se guardaba como una pierna «sale» huérfana, sin
+    par, y los traspasos dejaban de cuadrar ($809.331 en tres filas).
+    """
+    if fila.get('clase') != 'gasto':
+        return fila
+    destino = destino_puente(fila.get('descripcion'), cuenta_clave)
+    if destino:
+        fila['es_traspaso_puente'] = True
+        fila['destino_puente'] = (nombres_cta or {}).get(destino, destino)
+    return fila
+
+
 def clasificar_fila_alda(descripcion, cargo, abono):
     """(clase, sentido, categoria_clave, propio) para una fila del BSA.dat.
 
@@ -1520,17 +1541,27 @@ def candidatos_de_calce(abono, dias=7):
     from .models import MovimientoFinanciero
     from .reglas import GRUPOS_FAMILIA
 
-    # También los «por clasificar»: un retiro que el banco glosó con el nombre
-    # a medias queda justo ahí, y era invisible para este calce (caso real
-    # 20/08/2026: la TEF a "AGUILERA GONZALEZ" no aparecía como candidata
-    # del abono de $300.000 en la CuentaRUT). Sigue siendo Jorge quien elige
-    # la pareja: acá solo se le muestra.
+    # Dos ampliaciones sobre «solo gastos del grupo familia», ambas de casos
+    # reales del 20-22/08/2026:
+    #
+    # 1. Los «por clasificar»: un retiro que el banco glosó con el nombre a
+    #    medias («TEF A AGUILERA GONZALEZ») queda justo ahí y era invisible.
+    # 2. Las piernas de traspaso HUÉRFANAS (`traspaso_par` nulo): son
+    #    literalmente la pareja perdida de un abono. Quedaron así por el bug de
+    #    la vista previa de cartolas —que mutaba `clase` antes de escribir— y
+    #    eran incalzables para siempre, porque acá solo se buscaba clase
+    #    'gasto'. Tres de ellas sumaban $809.331, el descuadre exacto entre las
+    #    piernas de traspaso.
+    #
+    # Sigue siendo Jorge quien elige la pareja: acá solo se le muestra.
     cercanos = (MovimientoFinanciero.objects
-                .filter(clase='gasto', sentido='sale',
+                .filter(sentido='sale',
                         fecha__range=(abono.fecha - timedelta(days=dias),
                                       abono.fecha + timedelta(days=dias)))
-                .filter(Q(categoria__grupo__in=GRUPOS_FAMILIA)
-                        | Q(categoria__clave='por_clasificar'))
+                .filter(Q(clase='gasto',
+                          categoria__grupo__in=GRUPOS_FAMILIA)
+                        | Q(clase='gasto', categoria__clave='por_clasificar')
+                        | Q(clase='traspaso', traspaso_par__isnull=True))
                 .exclude(cuenta=abono.cuenta)
                 .select_related('cuenta', 'categoria'))
     return sorted(cercanos,
@@ -1548,7 +1579,7 @@ def calzar_abono_con_retiro(abono, retiro):
     """
     from django.db import transaction
 
-    from .models import MovimientoFinanciero
+    from .models import CategoriaFinanciera, MovimientoFinanciero
 
     comun = min(int(abono.monto), int(retiro.monto))
     resto_abono = int(abono.monto) - comun
@@ -1563,9 +1594,15 @@ def calzar_abono_con_retiro(abono, retiro):
                 referencia=f'{abono.referencia}:resto'[:120],
                 descripcion=f'{abono.descripcion} (resto sin calzar)'[:255])
         if resto_retiro:
+            # Un gasto SIEMPRE lleva categoría (lo exige el modelo). Si el
+            # retiro venía de una pierna de traspaso huérfana, su categoría
+            # puede ser nula: el resto cae en «por clasificar», que es donde
+            # se ve y se resuelve, y nunca en un gasto sin categoría.
+            cat_resto = retiro.categoria or CategoriaFinanciera.objects.filter(
+                clave='por_clasificar').first()
             MovimientoFinanciero.objects.create(
                 fecha=retiro.fecha, cuenta=retiro.cuenta, clase='gasto',
-                sentido='sale', monto=resto_retiro, categoria=retiro.categoria,
+                sentido='sale', monto=resto_retiro, categoria=cat_resto,
                 fuente=retiro.fuente,
                 referencia=f'{retiro.referencia}:resto'[:120],
                 descripcion=f'{retiro.descripcion} (resto sin calzar)'[:255])

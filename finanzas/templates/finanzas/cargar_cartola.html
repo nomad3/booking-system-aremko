@@ -137,7 +137,7 @@
       <tr{% if f.estado != 'nuevo' %} class="ya"{% endif %}>
         <td>{{ f.fecha }}</td>
         <td class="izq">{{ f.descripcion }}</td>
-        <td class="izq">{{ f.clase }}{% if f.categoria %} · {{ f.categoria }}{% endif %}</td>
+        <td class="izq">{% if f.es_traspaso_puente %}traspaso · a {{ f.destino_puente }}{% else %}{{ f.clase }}{% if f.categoria %} · {{ f.categoria }}{% endif %}{% endif %}</td>
         <td class="{{ f.sentido }}">{% if f.sentido == 'entra' %}+{% else %}−{% endif %}{{ f.monto_fmt }}</td>
         <td>{{ f.saldo_fmt }}</td>
         <td class="izq">{% if f.estado == 'nuevo' %}nuevo{% elif f.estado == 'ya_existe' %}ya está{% elif f.estado == 'en_historico' %}en histórico{% elif f.estado == 'revisar' %}revisar a mano{% else %}fuera de cobertura{% endif %}{% if f.clase == 'personal' %} · abono personal{% endif %}</td>

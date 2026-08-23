@@ -848,17 +848,14 @@ def cargar_cartola(request):
                                                     'filas': nuevas})
                 return render(request, 'finanzas/cargar_cartola.html', ctx)
 
-            from .services import destino_puente
+            from .services import marcar_traspaso_puente
             nombres_cta = dict(CuentaFinanciera.objects.values_list(
                 'clave', 'nombre'))
             for f in datos['filas']:
                 f['estado'] = estado_fila_cartola(cuenta_clave, f)
-                destino = (destino_puente(f['descripcion'], cuenta_clave)
-                           if f['clase'] == 'gasto' else None)
-                if destino:
-                    # No es retiro: la plata cambia de bolsillo (Jorge).
-                    f['clase'] = 'traspaso'
-                    f['categoria'] = f'a {nombres_cta.get(destino, destino)}'
+                # Marca de presentación (no toca `clase` ni `categoria`: ese
+                # dict viaja firmado a la escritura — ver la función).
+                marcar_traspaso_puente(f, cuenta_clave, nombres_cta)
                 if date.fromisoformat(f['fecha']) < date(2026, 7, 1):
                     f['estado'] = 'fuera_cobertura'
                 f['monto_fmt'] = _clp(f['abono'] or f['cargo'])
@@ -1308,8 +1305,12 @@ def calzar_retiros(request):
             abono = MovimientoFinanciero.objects.get(
                 pk=request.POST.get('abono'), clase='ingreso',
                 categoria__clave='abono_aremko_por_calzar')
+            # `clase__in`: además del gasto, se acepta una pierna de traspaso
+            # HUÉRFANA (sin par) — es la pareja perdida de un abono, ver
+            # candidatos_de_calce. Sin esto el botón daba «ya lo calzaron».
             retiro = MovimientoFinanciero.objects.get(
-                pk=request.POST.get('retiro'), clase='gasto')
+                pk=request.POST.get('retiro'), sentido='sale',
+                clase__in=('gasto', 'traspaso'))
         except (MovimientoFinanciero.DoesNotExist, ValueError):
             ctx['error'] = ('No encontré ese par — quizá alguien ya lo calzó. '
                             'Recarga la página.')
