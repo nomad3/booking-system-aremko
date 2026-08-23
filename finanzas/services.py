@@ -877,6 +877,16 @@ DESTINO_PUENTE = [
     ('ALDA TOLOZA', 'scotiabank_alda'),
     ('JORGE ANTONIO AGUILERA', 'cuentarut_jorge'),
     ('JORGE AGUILERA', 'cuentarut_jorge'),
+    # BancoEstado escribe la TEF dentro del mismo banco con los apellidos a
+    # secas ("TEF BANCOESTADO A AGUILERA GONZALEZ"), sin el nombre — y con
+    # eso no calzaba con 'JORGE AGUILERA' y el retiro quedaba como gasto por
+    # clasificar (caso real 20/08/2026: $300.000 que Jorge se traspasó para
+    # pagar Google Ads desde su CuentaRUT). Jorge confirmó el 22/08 que nadie
+    # más «Aguilera González» recibe plata de Aremko en una cuenta BancoEstado,
+    # así que la variante INTRA-banco es inequívocamente su CuentaRUT. La
+    # interbancaria ("TRANSFERENCIA A AGUILERA GONZALEZ") NO se toca: ahí el
+    # apellido es ambiguo con Cristian (infraestructura) y Martín (retiro).
+    ('TEF BANCOESTADO A AGUILERA GONZALEZ', 'cuentarut_jorge'),
 ]
 
 
@@ -1294,6 +1304,15 @@ def clasificar_compra_tarjeta(descripcion):
     from .reglas_glosa import categoria_por_glosa
 
     d = (descripcion or '').upper()
+    # "TRASPASO DEUDA INTERNAC(IONAL)" la escribe el BANCO al pasar al estado
+    # nacional la deuda de las compras en dólares. No es un traspaso entre
+    # cuentas nuestras (pese al nombre) ni una compra identificable: es el
+    # gasto internacional del ciclo, agregado. Va a su propia categoría para
+    # que no se confunda con traspaso ni se pierda entre lo por clasificar —
+    # Jorge la reparte (publicidad / infraestructura / personal) mirando el
+    # detalle del portal. Decidido el 22/08/2026.
+    if 'TRASPASO DEUDA' in d:
+        return 'tarjeta_internacional'
     de_aremko = categoria_por_glosa(d)
     if de_aremko:
         return de_aremko
@@ -1476,14 +1495,22 @@ def candidatos_de_calce(abono, dias=7):
     """
     from datetime import timedelta
 
+    from django.db.models import Q
+
     from .models import MovimientoFinanciero
     from .reglas import GRUPOS_FAMILIA
 
+    # También los «por clasificar»: un retiro que el banco glosó con el nombre
+    # a medias queda justo ahí, y era invisible para este calce (caso real
+    # 20/08/2026: la TEF a "AGUILERA GONZALEZ" no aparecía como candidata
+    # del abono de $300.000 en la CuentaRUT). Sigue siendo Jorge quien elige
+    # la pareja: acá solo se le muestra.
     cercanos = (MovimientoFinanciero.objects
                 .filter(clase='gasto', sentido='sale',
-                        categoria__grupo__in=GRUPOS_FAMILIA,
                         fecha__range=(abono.fecha - timedelta(days=dias),
                                       abono.fecha + timedelta(days=dias)))
+                .filter(Q(categoria__grupo__in=GRUPOS_FAMILIA)
+                        | Q(categoria__clave='por_clasificar'))
                 .exclude(cuenta=abono.cuenta)
                 .select_related('cuenta', 'categoria'))
     return sorted(cercanos,

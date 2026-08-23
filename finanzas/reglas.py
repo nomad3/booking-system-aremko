@@ -49,6 +49,11 @@ PLAN_CUENTAS = {
     'personales_jorge': ('Retiros Jorge', 'gasto', 'personales_jorge'),
     # Cajón de espera
     'por_clasificar': ('Por clasificar', 'gasto', 'otros'),
+    # Línea "TRASPASO DEUDA INTERNAC" de las tarjetas Scotiabank: el gasto en
+    # dólares del ciclo, agregado por el banco. Gasto real, NO traspaso; se
+    # desglosa a mano cuando se sabe qué compras trae (22/08/2026).
+    'tarjeta_internacional': ('Compras internacionales tarjeta (por desglosar)',
+                              'gasto', 'otros'),
     # Ingresos
     'otros_ingresos': ('Otros ingresos', 'ingreso', 'ingresos'),
     'liquidacion_flow': ('Liquidación Flow', 'ingreso', 'ingresos'),
