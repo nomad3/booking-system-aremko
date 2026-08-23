@@ -3094,7 +3094,15 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         CategoriaFinanciera.objects.filter(clave='mantencion').update(
             presupuesto_mensual=50000)
 
-    def _fila(self, r, nombre):
+    def _fila(self, r, clave):
+        """La fila de esa categoría, buscada por CLAVE.
+
+        Antes se buscaba por el nombre visible y estos cuatro tests se cayeron
+        el 22/08/2026 al mejorar la etiqueta de `insumos` — el nombre es texto
+        de presentación y puede cambiar; la clave no.
+        """
+        from finanzas.reglas import PLAN_CUENTAS
+        nombre = PLAN_CUENTAS[clave][0]
         return [f for f in r.context['filas'] if f['nombre'] == nombre][0]
 
     # ── las ventas del mes ─────────────────────────────────────────────────
@@ -3128,7 +3136,7 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         self._gasto('insumos', 900000, date(2026, 7, 10))
         r = self.client.get(reverse('finanzas:gastos_mes'),
                             {'ano': 2026, 'mes': 7})
-        f = self._fila(r, 'Alimentos e insumos')
+        f = self._fila(r, 'insumos')
         self.assertEqual(f['presupuesto']['txt'], '$1.000.000')
         self.assertEqual(f['presupuesto']['dif'], '$100.000')
         self.assertFalse(f['presupuesto']['excedido'])
@@ -3143,7 +3151,7 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         self._gasto('insumos', 300000, date(2026, 7, 10))
         f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
                                        {'ano': 2026, 'mes': 7}),
-                       'Alimentos e insumos')
+                       'insumos')
         self.assertEqual(f['presupuesto']['txt'], '$200.000')
         self.assertTrue(f['presupuesto']['excedido'])
         self.assertEqual(f['presupuesto']['dif'], '−$100.000')
@@ -3153,7 +3161,7 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         self._gasto('insumos', 300000, date(2026, 7, 10))
         f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
                                        {'ano': 2026, 'mes': 7}),
-                       'Alimentos e insumos')
+                       'insumos')
         self.assertTrue(f['presupuesto']['sin'])
         self.assertEqual(f['presupuesto']['txt'], '—')
 
@@ -3167,7 +3175,7 @@ class PresupuestoPorcentajeVentasTest(TestCase):
         self._gasto('insumos', 500000, date(2026, 7, 10))
         self._gasto('insumos', 500000, date(2026, 8, 10))
         r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
-        f = self._fila(r, 'Alimentos e insumos')
+        f = self._fila(r, 'insumos')
         self.assertFalse(f['celdas'][0]['excede'])   # julio cumple
         self.assertTrue(f['celdas'][1]['excede'])    # agosto no
         self.assertIn('20% de ventas', f['presupuesto']['regla'])
@@ -3463,7 +3471,15 @@ class PresupuestoPorFamiliaTest(TestCase):
         CategoriaFinanciera.objects.filter(clave='remuneraciones').update(
             presupuesto_mensual=1000)
 
-    def _fila(self, r, nombre):
+    def _fila(self, r, clave):
+        """La fila de esa categoría, buscada por CLAVE.
+
+        Antes se buscaba por el nombre visible y estos cuatro tests se cayeron
+        el 22/08/2026 al mejorar la etiqueta de `insumos` — el nombre es texto
+        de presentación y puede cambiar; la clave no.
+        """
+        from finanzas.reglas import PLAN_CUENTAS
+        nombre = PLAN_CUENTAS[clave][0]
         return [f for f in r.context['filas'] if f['nombre'] == nombre][0]
 
     # ── el cálculo por familia ─────────────────────────────────────────────
@@ -3491,7 +3507,7 @@ class PresupuestoPorFamiliaTest(TestCase):
         self._gasto('honorarios_masajistas', 180000)
         r = self.client.get(reverse('finanzas:gastos_mes'),
                             {'ano': 2026, 'mes': 7})
-        f = self._fila(r, 'Honorarios masajistas')
+        f = self._fila(r, 'honorarios_masajistas')
         self.assertEqual(f['presupuesto']['txt'], '$200.000')   # 40% de 500.000
         self.assertEqual(f['presupuesto']['dif'], '$20.000')
         self.assertIn('40% de venta de Masajes', f['presupuesto']['regla'])
@@ -3507,7 +3523,7 @@ class PresupuestoPorFamiliaTest(TestCase):
         self._gasto('honorarios_masajistas', 180000)
         f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
                                        {'ano': 2026, 'mes': 7}),
-                       'Honorarios masajistas')
+                       'honorarios_masajistas')
         self.assertEqual(f['presupuesto']['txt'], '$200.000')
 
     def test_avisa_de_los_dos_relojes(self):
@@ -3526,7 +3542,7 @@ class PresupuestoPorFamiliaTest(TestCase):
         self._gasto('honorarios_masajistas', 180000)
         f = self._fila(self.client.get(reverse('finanzas:gastos_mes'),
                                        {'ano': 2026, 'mes': 7}),
-                       'Honorarios masajistas')
+                       'honorarios_masajistas')
         self.assertEqual(f['presupuesto']['txt'], '$1.000.000')
 
     def test_en_el_ano_cada_mes_usa_su_propia_venta_de_masajes(self):
@@ -3538,7 +3554,7 @@ class PresupuestoPorFamiliaTest(TestCase):
         self._gasto('honorarios_masajistas', 150000, dia=date(2026, 7, 10))
         self._gasto('honorarios_masajistas', 150000, dia=date(2026, 8, 10))
         r = self.client.get(reverse('finanzas:gastos_ano'), {'ano': 2026})
-        f = self._fila(r, 'Honorarios masajistas')
+        f = self._fila(r, 'honorarios_masajistas')
         self.assertFalse(f['celdas'][0]['excede'])    # julio cumple
         self.assertTrue(f['celdas'][1]['excede'])     # agosto no
 

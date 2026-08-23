@@ -18,21 +18,30 @@ manual. Decisiones clave suyas:
 
 # clave → (nombre, clase, grupo). El comando aplicar_plan_cuentas sincroniza
 # esto contra la BD (crea lo que falte, actualiza nombre/grupo de lo existente).
+#
+# OJO: ese comando PISA el nombre y el grupo que tenga la categoría en la base,
+# aunque alguien los haya editado a mano en el admin. El 22/08/2026 aparecieron
+# 10 categorías «desincronizadas» y al mirarlas eran solo etiquetas: los grupos
+# coincidían todos (ningún movimiento cambiaba de bolsillo). Cinco nombres del
+# admin eran MEJORES que los de acá y se subieron a este diccionario en vez de
+# perderlos. Si vuelve a pasar: comparar primero BD vs código, y si difiere el
+# GRUPO —no solo el nombre— pensarlo dos veces, porque ahí sí cambia el
+# resultado operacional.
 PLAN_CUENTAS = {
     # Personal y honorarios
-    'remuneraciones': ('Remuneraciones', 'gasto', 'personal'),
+    'remuneraciones': ('Remuneraciones y pagos a personas', 'gasto', 'personal'),
     'imposiciones': ('Imposiciones (vía Patricio Rubio → Previred)', 'gasto', 'personal'),
     'honorarios_masajistas': ('Honorarios masajistas', 'gasto', 'masajistas'),
     # Servicios
     'energia_electrica': ('Energía eléctrica (Crell)', 'gasto', 'energia'),
-    'publicidad': ('Publicidad', 'gasto', 'marketing'),
-    'infraestructura': ('Infraestructura web e IA', 'gasto', 'infra_web'),
+    'publicidad': ('Publicidad (Google/Meta/otros)', 'gasto', 'marketing'),
+    'infraestructura': ('Infraestructura web, software e IA', 'gasto', 'infra_web'),
     'comisiones': ('Comisiones de pasarelas y banco', 'gasto', 'admin_fin'),
     'contabilidad': ('Contabilidad (honorarios contador)', 'gasto', 'admin_fin'),
     'seguros': ('Seguros', 'gasto', 'admin_fin'),
     'servicios_basicos': ('Servicios básicos y telefonía', 'gasto', 'admin_fin'),
     # Operación
-    'insumos': ('Alimentos e insumos', 'gasto', 'operacion'),
+    'insumos': ('Alimentos, insumos y compras de operación', 'gasto', 'operacion'),
     'mantencion': ('Mantención y reparaciones', 'gasto', 'operacion'),
     'transporte_fletes': ('Transporte y fletes de insumos', 'gasto', 'operacion'),
     'combustible': ('Combustible generador y vehículos', 'gasto', 'combustibles'),
@@ -64,7 +73,7 @@ PLAN_CUENTAS = {
     'aporte_datamatic': ('Aporte a Datamatic (otra empresa)', 'gasto',
                          'personales_jorge'),
     # Ingresos
-    'otros_ingresos': ('Otros ingresos', 'ingreso', 'ingresos'),
+    'otros_ingresos': ('Otros ingresos (fuera de reservas)', 'ingreso', 'ingresos'),
     'liquidacion_flow': ('Liquidación Flow', 'ingreso', 'ingresos'),
     'liquidacion_sumup': ('Liquidación SumUp', 'ingreso', 'ingresos'),
     'transferencias_recibidas': ('Transferencias recibidas', 'ingreso', 'ingresos'),
