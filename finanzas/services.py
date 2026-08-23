@@ -1609,13 +1609,79 @@ def calzar_abono_con_retiro(abono, retiro):
 
         for mov, par in ((abono, retiro), (retiro, abono)):
             mov.monto = comun
+            # La categoría se guarda ANTES de vaciarla: es lo único que hace
+            # reversible el calce (ver descalzar_par). Un traspaso no lleva
+            # categoría, pero perderla al convertir dejaba el deshacer manco.
+            mov.categoria_previa = mov.categoria
             mov.clase = 'traspaso'
             mov.categoria = None
             mov.traspaso_par = par
             mov.save(update_fields=['monto', 'clase', 'categoria',
-                                    'traspaso_par'])
+                                    'categoria_previa', 'traspaso_par'])
 
     return comun, resto_abono, resto_retiro
+
+
+def pares_calzados(dias=60):
+    """Los calces hechos, uno por par (la pierna que SALE), del más nuevo al
+    más viejo. Para poder revisarlos y deshacer el que esté mal."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from .models import MovimientoFinanciero
+
+    desde = timezone.localdate() - timedelta(days=dias)
+    return (MovimientoFinanciero.objects
+            .filter(clase='traspaso', sentido='sale',
+                    traspaso_par__isnull=False, fecha__gte=desde)
+            .select_related('cuenta', 'traspaso_par', 'traspaso_par__cuenta',
+                            'categoria_previa',
+                            'traspaso_par__categoria_previa')
+            .order_by('-fecha', '-id'))
+
+
+def descalzar_par(movimiento):
+    """Rompe un calce y deja las DOS piernas como estaban. Devuelve la lista
+    de movimientos tocados.
+
+    Nace del 22/08/2026: se calzó por error un pago real a Previred contra un
+    abono de Alda —$567.500 los dos, a nueve días— y deshacerlo exigió un
+    comando escrito a mano. La herramienta sabía crear el par pero no romperlo,
+    y eso vuelve peligroso el botón de calzar.
+
+    Cada pierna vuelve a su clase por el SENTIDO, que nunca se tocó: lo que
+    entra era un ingreso, lo que sale un gasto. La categoría sale de
+    `categoria_previa`; si la fila es anterior a ese campo, cae en el default
+    honesto de su lado (por clasificar / abono por calzar) en vez de inventar.
+
+    NO deshace la partición de un calce parcial: los «restos» quedan como
+    filas propias y se resuelven a mano — juntarlos automáticamente sería
+    adivinar cuál resto era de cuál.
+    """
+    from django.db import transaction
+
+    from .models import CategoriaFinanciera, MovimientoFinanciero
+
+    if movimiento is None or movimiento.clase != 'traspaso':
+        return []
+    par = movimiento.traspaso_par
+    piernas = [p for p in (movimiento, par) if p is not None]
+
+    def _default(mov):
+        clave = (CLAVE_POR_CALZAR if mov.sentido == 'entra'
+                 else 'por_clasificar')
+        return CategoriaFinanciera.objects.filter(clave=clave).first()
+
+    with transaction.atomic():
+        for mov in piernas:
+            mov.clase = 'ingreso' if mov.sentido == 'entra' else 'gasto'
+            mov.categoria = mov.categoria_previa or _default(mov)
+            mov.categoria_previa = None
+            mov.traspaso_par = None
+            mov.save(update_fields=['clase', 'categoria', 'categoria_previa',
+                                    'traspaso_par'])
+    return piernas
 
 
 def estado_fila_cartola(cuenta_clave, fila):

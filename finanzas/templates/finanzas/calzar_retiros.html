@@ -52,6 +52,12 @@
 
   {% if error %}<div class="aviso mal">{{ error }}</div>{% endif %}
 
+  {% if deshecho %}
+  <div class="aviso ok">✓ Calce deshecho: <b>{{ deshecho.monto }}</b> entre
+    {{ deshecho.cuentas }}. Las dos piernas volvieron a como estaban — el gasto
+    a su categoría y el abono a la lista de por calzar.</div>
+  {% endif %}
+
   {% if resultado %}
   <div class="aviso ok">✓ Calzado en {{ resultado.cuenta }}: <b>{{ resultado.comun }}</b>
     pasaron de retiro a traspaso — esa plata deja de contarse dos veces.
@@ -64,10 +70,15 @@
 
   {% if pendientes %}
   <div class="aviso">Hay <b>{{ pendientes|length }}</b> abonos por calzar
-    ({{ total_pend }}). Mientras no se calcen, esa plata figura dos veces en el
-    resultado: una al salir de Aremko y otra al gastarse desde la cuenta.
-    Los candidatos van ordenados por parecido de monto — el primero suele ser
-    el correcto, pero mira la fecha antes de confirmar.</div>
+    ({{ total_pend }}). El saldo de la <a href="{% url 'finanzas:cuenta_corriente' %}">cuenta
+    corriente</a> ya los cuenta y no necesita el calce: lo que arregla calzarlos
+    es que el retiro deje de figurar como plata que salió a la familia cuando en
+    realidad era capital de trabajo. Y si el retiro quedó mal clasificado (fuera
+    de los grupos de familia), ahí sí la plata se cuenta dos veces en el resultado.
+    <br><b>Sin apuro y con calma:</b> los candidatos van por parecido de monto,
+    pero un monto igual puede ser pura coincidencia — mira la fecha y la glosa
+    antes de confirmar. Si los montos no calzan exacto se toma la parte común y
+    el resto queda visible. Y si te equivocas, abajo está Deshacer.</div>
 
   {% for p in pendientes %}
   <div class="fila">
@@ -99,6 +110,29 @@
   {% else %}
   <div class="aviso ok">✓ No hay abonos pendientes de calce.</div>
   <p><a class="boton sec" href="{% url 'finanzas:flujo_caja' %}">Ver el flujo de caja</a></p>
+  {% endif %}
+
+  {% if calzados %}
+  <h2 style="font-size:19px; margin:26px 0 2px;">Calces hechos</h2>
+  <p class="vacio" style="font-size:13.5px; margin:0 0 10px;">Últimos 60 días.
+    Revísalos: si alguno emparejó dos movimientos que no tenían nada que ver
+    —dos montos iguales por casualidad— deshacerlo deja todo como estaba.</p>
+  {% for c in calzados %}
+  <div class="fila">
+    <div class="cab">
+      <span class="monto">{{ c.monto }}</span>
+      <span class="meta">{{ c.fecha|date:"d-m-Y" }} · {{ c.sale_de }} → {{ c.entra_a }}</span>
+      <span class="meta">{{ c.glosa }}</span>
+    </div>
+    <form class="calce" method="post"
+          onsubmit="return confirm('¿Deshacer este calce de {{ c.monto }}? El gasto vuelve a «{{ c.volveria_a }}» y el abono queda de nuevo por calzar.');">
+      {% csrf_token %}
+      <input type="hidden" name="descalzar" value="{{ c.id }}">
+      <span class="meta">al deshacer, el gasto vuelve a: <b>{{ c.volveria_a }}</b></span>
+      <button class="boton sec" type="submit">Deshacer</button>
+    </form>
+  </div>
+  {% endfor %}
   {% endif %}
 </div>
 </body>

@@ -1296,11 +1296,28 @@ def calzar_retiros(request):
     exige monto idéntico y a veces no coincide.
     """
     from .services import (abonos_por_calzar, calzar_abono_con_retiro,
-                           candidatos_de_calce)
+                           candidatos_de_calce, descalzar_par, pares_calzados)
 
     ctx = {}
 
-    if request.method == 'POST':
+    # Deshacer un calce: la herramienta sabía armar el par pero no romperlo, y
+    # un error de un clic exigía un comando a mano (caso real 22/08/2026: un
+    # pago a Previred calzado contra un abono de Alda por coincidencia de
+    # monto). Va primero para no pisarse con el POST de calzar.
+    if request.method == 'POST' and request.POST.get('descalzar'):
+        mov = MovimientoFinanciero.objects.filter(
+            pk=request.POST.get('descalzar'), clase='traspaso').first()
+        piernas = descalzar_par(mov)
+        if piernas:
+            ctx['deshecho'] = {
+                'monto': _clp(piernas[0].monto),
+                'cuentas': ' ↔ '.join(p.cuenta.nombre for p in piernas),
+            }
+        else:
+            ctx['error'] = ('No encontré ese calce — quizá ya lo deshicieron. '
+                            'Recarga la página.')
+
+    elif request.method == 'POST':
         try:
             abono = MovimientoFinanciero.objects.get(
                 pk=request.POST.get('abono'), clase='ingreso',
@@ -1337,6 +1354,19 @@ def calzar_retiros(request):
         })
     ctx['pendientes'] = pendientes
     ctx['total_pend'] = _clp(sum(int(p['obj'].monto) for p in pendientes))
+
+    # Los calces ya hechos, para poder revisarlos y deshacer el que esté mal.
+    ctx['calzados'] = [{
+        'id': m.id,
+        'fecha': m.fecha,
+        'monto': _clp(m.monto),
+        'sale_de': NOMBRE_CORTO_CUENTA.get(m.cuenta.clave, m.cuenta.nombre),
+        'entra_a': NOMBRE_CORTO_CUENTA.get(m.traspaso_par.cuenta.clave,
+                                           m.traspaso_par.cuenta.nombre),
+        'glosa': (m.descripcion or '')[:70],
+        'volveria_a': (m.categoria_previa.nombre if m.categoria_previa
+                       else 'Por clasificar'),
+    } for m in pares_calzados()]
     return render(request, 'finanzas/calzar_retiros.html', ctx)
 
 

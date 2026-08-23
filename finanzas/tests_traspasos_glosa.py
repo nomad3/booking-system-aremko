@@ -296,3 +296,108 @@ class MarcarTraspasoPuenteTest(TestCase):
         f['clase'], f['sentido'] = 'ingreso', 'entra'
         self.assertNotIn('es_traspaso_puente',
                          marcar_traspaso_puente(f, 'bancoestado', {}))
+
+
+class DeshacerCalceTest(TestCase):
+    """El botón Deshacer (22/08/2026).
+
+    Nace de un error real: se calzó un pago a Previred contra un abono de Alda
+    —$567.500 los dos, a nueve días de distancia— y deshacerlo exigió un
+    comando escrito a mano. La herramienta sabía crear el par pero no romperlo.
+    """
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.scotia = CuentaFinanciera.objects.get(clave='scotiabank')
+        self.alda = CuentaFinanciera.objects.get(clave='scotiabank_alda')
+        self.imposiciones = CategoriaFinanciera.objects.get(clave='imposiciones')
+        self.por_calzar, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=CLAVE_POR_CALZAR,
+            defaults={'nombre': 'Abono desde Aremko por calzar',
+                      'clase': 'ingreso', 'grupo': 'otros'})
+
+    def _par(self, monto=567500):
+        """El caso real: un gasto de imposiciones y un abono, calzados."""
+        from .services import calzar_abono_con_retiro
+        gasto = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 1), cuenta=self.scotia, clase='gasto',
+            sentido='sale', monto=Decimal(monto), categoria=self.imposiciones,
+            fuente='captura', referencia='d:gasto',
+            descripcion='Cartola scotiabank: TEF PATRICIO RUBIO')
+        abono = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10), cuenta=self.alda, clase='ingreso',
+            sentido='entra', monto=Decimal(monto), categoria=self.por_calzar,
+            fuente='captura', referencia='d:abono',
+            descripcion='Cartola scotiabank alda: TEF 76485192-7 AREMKO')
+        calzar_abono_con_retiro(abono, gasto)
+        gasto.refresh_from_db(); abono.refresh_from_db()
+        return gasto, abono
+
+    def test_al_calzar_se_guarda_la_categoria_para_poder_volver(self):
+        gasto, abono = self._par()
+        self.assertEqual(gasto.clase, 'traspaso')
+        self.assertIsNone(gasto.categoria)
+        self.assertEqual(gasto.categoria_previa.clave, 'imposiciones')
+
+    def test_deshacer_devuelve_las_dos_piernas_a_como_estaban(self):
+        from .services import descalzar_par
+        gasto, abono = self._par()
+        descalzar_par(gasto)
+        gasto.refresh_from_db(); abono.refresh_from_db()
+        # El gasto vuelve a ser gasto, con SU categoría — no una genérica.
+        self.assertEqual(gasto.clase, 'gasto')
+        self.assertEqual(gasto.categoria.clave, 'imposiciones')
+        self.assertIsNone(gasto.traspaso_par)
+        self.assertIsNone(gasto.categoria_previa)
+        # Y el abono vuelve a la cola de por calzar.
+        self.assertEqual(abono.clase, 'ingreso')
+        self.assertEqual(abono.categoria.clave, CLAVE_POR_CALZAR)
+        self.assertIsNone(abono.traspaso_par)
+
+    def test_deshacer_desde_cualquiera_de_las_dos_piernas(self):
+        from .services import descalzar_par
+        gasto, abono = self._par()
+        descalzar_par(abono)          # se tira del otro lado
+        gasto.refresh_from_db()
+        self.assertEqual(gasto.categoria.clave, 'imposiciones')
+
+    def test_una_pierna_vieja_sin_categoria_previa_cae_en_el_default_honesto(self):
+        # Filas anteriores al campo: no se inventa una categoría, se usa el
+        # default de cada lado y Jorge la asigna.
+        from .services import descalzar_par
+        gasto, abono = self._par()
+        MovimientoFinanciero.objects.filter(
+            pk__in=(gasto.pk, abono.pk)).update(categoria_previa=None)
+        gasto.refresh_from_db()
+        descalzar_par(gasto)
+        gasto.refresh_from_db(); abono.refresh_from_db()
+        self.assertEqual(gasto.categoria.clave, 'por_clasificar')
+        self.assertEqual(abono.categoria.clave, CLAVE_POR_CALZAR)
+
+    def test_deshacer_algo_que_no_es_traspaso_no_hace_nada(self):
+        from .services import descalzar_par
+        suelto = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 1), cuenta=self.scotia, clase='gasto',
+            sentido='sale', monto=Decimal('1000'), categoria=self.imposiciones,
+            fuente='manual', referencia='d:suelto')
+        self.assertEqual(descalzar_par(suelto), [])
+        self.assertEqual(descalzar_par(None), [])
+        suelto.refresh_from_db()
+        self.assertEqual(suelto.clase, 'gasto')
+
+    def test_calzar_y_deshacer_deja_las_piernas_cuadradas(self):
+        # El invariante de siempre: entra == sale.
+        from django.db.models import Sum
+        from .services import descalzar_par
+        gasto, _ = self._par()
+        descalzar_par(gasto)
+        agg = {r['sentido']: int(r['t']) for r in
+               MovimientoFinanciero.objects.filter(clase='traspaso')
+               .values('sentido').annotate(t=Sum('monto'))}
+        self.assertEqual(agg.get('entra', 0), agg.get('sale', 0))
+
+    def test_el_par_aparece_en_la_lista_de_calzados(self):
+        from .services import pares_calzados
+        gasto, _ = self._par()
+        self.assertIn(gasto.id, [m.id for m in pares_calzados(dias=3650)])

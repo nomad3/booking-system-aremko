@@ -154,6 +154,15 @@ class MovimientoFinanciero(models.Model):
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
         help_text='La otra pierna del traspaso. Un traspaso son SIEMPRE dos líneas '
                   'que suman cero: sale de una cuenta y entra a la otra.')
+    # Un traspaso no lleva categoría, así que al calzar hay que vaciarla. Sin
+    # guardarla acá, deshacer el calce perdía el dato: el 22/08/2026 se calzó
+    # por error un pago real a Previred ($567.500, coincidencia de monto) y
+    # revertirlo a mano exigió acordarse de que era «imposiciones».
+    categoria_previa = models.ForeignKey(
+        CategoriaFinanciera, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+        help_text='Categoría que tenía antes de convertirse en traspaso. Solo '
+                  'la usa «deshacer el calce» para dejarlo como estaba.')
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
