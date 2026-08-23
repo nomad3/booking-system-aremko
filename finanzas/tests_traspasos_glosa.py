@@ -510,3 +510,64 @@ class ParesCalzadosSoloRetirosTest(TestCase):
         calce = self._par('bancoestado', 'cuentarut_jorge', 300000,
                           'Cartola bancoestado: TEF BANCOESTADO A AGUILERA GONZALEZ')
         self.assertIn(calce.id, [m.id for m in pares_calzados(dias=3650)])
+
+
+class ParesSospechososTest(TestCase):
+    """Los calces imposibles tienen que poder VERSE para deshacerlos.
+
+    Acotar la lista principal a «Aremko → cuenta puente» (correcto para lo que
+    corresponde a esa página) dejó escondidos los cuatro pares rotos de la
+    cascada del 22/08/2026, que salían de la tarjeta de Alda y de la CuentaRUT
+    de Jorge. Arreglar el filtro y esconder el destrozo no es arreglarlo.
+    """
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+
+    def _par(self, origen, destino, monto, glosa):
+        sale = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10),
+            cuenta=CuentaFinanciera.objects.get(clave=origen),
+            clase='traspaso', sentido='sale', monto=Decimal(monto),
+            fuente='captura', referencia=f's:{origen}:{monto}', descripcion=glosa)
+        entra = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10),
+            cuenta=CuentaFinanciera.objects.get(clave=destino),
+            clase='traspaso', sentido='entra', monto=Decimal(monto),
+            fuente='captura', referencia=f's:{destino}:{monto}:e',
+            traspaso_par=sale, descripcion=glosa)
+        sale.traspaso_par = entra
+        sale.save(update_fields=['traspaso_par'])
+        return sale
+
+    def _ids(self):
+        from .services import pares_sospechosos
+        return [m.id for m in pares_sospechosos(dias=3650)]
+
+    def test_la_tarjeta_de_alda_hacia_su_cuenta_es_sospechosa(self):
+        m = self._par('tarjeta_alda_1', 'scotiabank_alda', 109560,
+                      'Tarjeta: LA FORJA PARRILLA PUERTO VARAS')
+        self.assertIn(m.id, self._ids())
+
+    def test_de_una_cuenta_puente_a_otra_tambien(self):
+        m = self._par('cuentarut_jorge', 'scotiabank_alda', 20000,
+                      'Cartola cuentarut jorge: Tef A Martin Aguilera Toloza')
+        self.assertIn(m.id, self._ids())
+
+    def test_el_calce_legitimo_desde_aremko_NO_es_sospechoso(self):
+        m = self._par('bancoestado', 'scotiabank_alda', 248000,
+                      'Cartola bancoestado: TEF A TOLOZA POBLETE ALDA')
+        self.assertNotIn(m.id, self._ids())
+
+    def test_el_pago_de_tarjeta_en_su_sentido_normal_tampoco(self):
+        # Cuenta → tarjeta es un pago de tarjeta legítimo; el destino no es
+        # una cuenta puente, así que ni siquiera se mira.
+        m = self._par('scotiabank_alda', 'tarjeta_alda_1', 718000,
+                      'Cartola alda: PAGO TARJ.CRED. POR SWE')
+        self.assertNotIn(m.id, self._ids())
+
+    def test_el_barrido_entre_cuentas_de_aremko_tampoco(self):
+        m = self._par('mercado_pago', 'scotiabank', 1000000,
+                      'Barrido MP → Scotiabank')
+        self.assertNotIn(m.id, self._ids())

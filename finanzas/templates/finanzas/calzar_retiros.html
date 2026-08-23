@@ -112,6 +112,30 @@
   <p><a class="boton sec" href="{% url 'finanzas:flujo_caja' %}">Ver el flujo de caja</a></p>
   {% endif %}
 
+  {% if sospechosos %}
+  <h2 style="font-size:19px; margin:26px 0 2px;">⚠ Calces que no pueden ser correctos</h2>
+  <div class="aviso mal">Estos traspasos entran a una cuenta puente pero NO salen
+    de una cuenta de Aremko — una compra con tarjeta o una transferencia entre
+    cuentas personales jamás puede ser el origen de plata «que llegó desde
+    Aremko». Deshacerlos devuelve cada gasto a donde estaba.</div>
+  {% for c in sospechosos %}
+  <div class="fila">
+    <div class="cab">
+      <span class="monto">{{ c.monto }}</span>
+      <span class="meta">{{ c.fecha|date:"d-m-Y" }} · {{ c.sale_de }} → {{ c.entra_a }}</span>
+      <span class="meta">{{ c.glosa }}</span>
+    </div>
+    <form class="calce" method="post"
+          onsubmit="return confirm('¿Deshacer este calce de {{ c.monto }}? El gasto vuelve a «{{ c.volveria_a }}» y el abono queda de nuevo por calzar.');">
+      {% csrf_token %}
+      <input type="hidden" name="descalzar" value="{{ c.id }}">
+      <span class="meta">al deshacer, el gasto vuelve a: <b>{{ c.volveria_a }}</b></span>
+      <button class="boton" type="submit">Deshacer</button>
+    </form>
+  </div>
+  {% endfor %}
+  {% endif %}
+
   {% if calzados %}
   <h2 style="font-size:19px; margin:26px 0 2px;">Calces hechos</h2>
   <p class="vacio" style="font-size:13.5px; margin:0 0 10px;">Últimos 60 días.

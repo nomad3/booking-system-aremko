@@ -1679,6 +1679,35 @@ def pares_calzados(dias=60):
             .order_by('-fecha', '-id'))
 
 
+def pares_sospechosos(dias=90):
+    """Traspasos que ENTRAN a una cuenta puente sin salir de una cuenta de
+    Aremko. Por definición no pueden ser un calce de retiro: la plata que llega
+    «desde Aremko» tiene que salir de Aremko.
+
+    Salieron de la cascada del 22/08/2026 — un abono de $567.500 consumido en
+    seis calces parciales contra un consumo de restorán de la tarjeta de Alda,
+    un retiro a Martín desde la CuentaRUT de Jorge y compras con tarjeta. Las
+    guardas nuevas impiden que vuelva a pasar, pero los pares ya hechos siguen
+    en la base y hay que poder verlos para deshacerlos: acotar la lista
+    principal a lo que corresponde los dejaba escondidos.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from .models import MovimientoFinanciero
+
+    desde = timezone.localdate() - timedelta(days=dias)
+    return (MovimientoFinanciero.objects
+            .filter(clase='traspaso', sentido='sale',
+                    traspaso_par__isnull=False, fecha__gte=desde,
+                    traspaso_par__cuenta__clave__in=tuple(CUENTAS_PUENTE))
+            .exclude(cuenta__clave__in=CUENTAS_AREMKO)
+            .select_related('cuenta', 'traspaso_par', 'traspaso_par__cuenta',
+                            'categoria_previa')
+            .order_by('-fecha', '-id'))
+
+
 def descalzar_par(movimiento):
     """Rompe un calce y deja las DOS piernas como estaban. Devuelve la lista
     de movimientos tocados.

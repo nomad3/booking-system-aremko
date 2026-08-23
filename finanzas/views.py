@@ -1296,7 +1296,8 @@ def calzar_retiros(request):
     exige monto idéntico y a veces no coincide.
     """
     from .services import (abonos_por_calzar, calzar_abono_con_retiro,
-                           candidatos_de_calce, descalzar_par, pares_calzados)
+                           candidatos_de_calce, descalzar_par, pares_calzados,
+                           pares_sospechosos)
 
     ctx = {}
 
@@ -1367,6 +1368,20 @@ def calzar_retiros(request):
         'volveria_a': (m.categoria_previa.nombre if m.categoria_previa
                        else 'Por clasificar'),
     } for m in pares_calzados()]
+
+    # Los que no pueden ser un calce de retiro: entran a una cuenta puente sin
+    # salir de Aremko. Van aparte porque hay que DESHACERLOS, no revisarlos.
+    ctx['sospechosos'] = [{
+        'id': m.id,
+        'fecha': m.fecha,
+        'monto': _clp(m.monto),
+        'sale_de': NOMBRE_CORTO_CUENTA.get(m.cuenta.clave, m.cuenta.nombre),
+        'entra_a': NOMBRE_CORTO_CUENTA.get(m.traspaso_par.cuenta.clave,
+                                           m.traspaso_par.cuenta.nombre),
+        'glosa': (m.descripcion or '')[:70],
+        'volveria_a': (m.categoria_previa.nombre if m.categoria_previa
+                       else 'Por clasificar'),
+    } for m in pares_sospechosos()]
     return render(request, 'finanzas/calzar_retiros.html', ctx)
 
 
