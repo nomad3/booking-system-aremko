@@ -2599,10 +2599,30 @@ class ReglasGlosaTest(TestCase):
             'por_clasificar')
 
     def test_un_cargo_con_el_nombre_de_jorge_ya_no_se_marca_solo_como_retiro(self):
-        """Decisión suya: «es retiro lo que YO clasifico como retiro»."""
+        """Decisión suya: «es retiro lo que YO clasifico como retiro».
+
+        REFINADA el 22/08/2026 sin contradecirla: dejarlo en «por clasificar»
+        lo hacía sumar al resultado de Aremko como si el spa hubiera gastado
+        esa plata, y por esta cuenta pasan sus tres jubilaciones (entran y
+        salen casi íntegras hacia su otra cuenta). Ahora va a
+        `traslado_cuenta_propia`, que sigue SIN afirmar que fue un retiro pero
+        queda fuera del costo del negocio.
+
+        La regla vale para cualquier interpretación: plata que sale de SU
+        cuenta hacia sí mismo nunca es costo del spa, y tampoco puede ser un
+        retiro de Aremko (ese ya ocurrió aguas arriba, al salir de la cuenta
+        del negocio). Y si igual lo fuera, el número no cambia: las dos
+        categorías viven en el grupo `personales_jorge`.
+        """
+        from .reglas import GRUPOS_FAMILIA, PLAN_CUENTAS
         from .services import clasificar_fila_cuentarut
+        cat = clasificar_fila_cuentarut('Tef A Jorge Antonio Aguilera', 50000, 0)[2]
+        self.assertEqual(cat, 'traslado_cuenta_propia')
+        self.assertNotEqual(cat, 'personales_jorge')   # no lo llama «retiro»
+        self.assertIn(PLAN_CUENTAS[cat][2], GRUPOS_FAMILIA)  # fuera del operacional
+        # Lo ambiguo de verdad SIGUE por clasificar: él decide.
         self.assertEqual(
-            clasificar_fila_cuentarut('Tef A Jorge Antonio Aguilera', 50000, 0)[2],
+            clasificar_fila_cuentarut('Compra Jumbo Puerto Varas', 84300, 0)[2],
             'por_clasificar')
         # Martín es distinto y sigue automático: su cuenta no la seguimos.
         self.assertEqual(

@@ -96,3 +96,53 @@ class CandidatosDeCalceTest(TestCase):
             monto=Decimal('300000'), categoria=self.por_calzar, fuente='captura',
             referencia='t:rut2', descripcion='Cartola CuentaRUT: Tef De Aremko Hotel Spa')
         self.assertEqual(candidatos_de_calce(abono), [])
+
+
+class CuentaRutJubilacionesTest(TestCase):
+    """Las tres jubilaciones de Jorge (en UF: el monto cambia cada mes, la
+    glosa no) entran a su CuentaRUT y salen casi íntegras al día siguiente.
+    Nada de eso es plata de Aremko."""
+
+    def _clasificar(self, glosa, cargo=0, abono=0):
+        from .services import clasificar_fila_cuentarut
+        return clasificar_fila_cuentarut(glosa, cargo, abono)
+
+    def test_las_jubilaciones_que_entran_son_abono_personal(self):
+        # No dicen «Aremko» → plata suya: mueve su saldo, NO es ingreso del spa.
+        for glosa in ('Abono Convenio Pago Beneficios Ips',
+                      'Abono Convenio Pago Ips Reforma',
+                      'Abono Convenio Banco Santander-chil'):
+            clase, sentido, _, propio = self._clasificar(glosa, abono=263971)
+            self.assertEqual((clase, sentido, propio), ('personal', 'entra', False),
+                             f'falló con: {glosa}')
+
+    def test_el_abono_desde_aremko_sigue_siendo_traspaso(self):
+        clase, sentido, _, propio = self._clasificar(
+            'Tef De Aremko Hotel Spa', abono=300000)
+        self.assertEqual((clase, sentido, propio), ('traspaso', 'entra', True))
+
+    def test_traslado_a_su_otra_cuenta_no_es_gasto_de_aremko(self):
+        _, _, cat, _ = self._clasificar('Tef A Jorge Antonio Aguilera Gonzal',
+                                        cargo=263971)
+        self.assertEqual(cat, 'traslado_cuenta_propia')
+
+    def test_aporte_a_datamatic_no_es_gasto_de_aremko(self):
+        _, _, cat, _ = self._clasificar('Tef A Datamatic Software Limitada',
+                                        cargo=145868)
+        self.assertEqual(cat, 'aporte_datamatic')
+
+    def test_ambas_quedan_fuera_del_resultado_operacional(self):
+        # La prueba que importa: su GRUPO es el de la familia, que el tablero
+        # resta aparte y la cuenta corriente excluye.
+        from .reglas import GRUPOS_FAMILIA, PLAN_CUENTAS
+        for clave in ('traslado_cuenta_propia', 'aporte_datamatic'):
+            _, clase, grupo = PLAN_CUENTAS[clave]
+            self.assertEqual(clase, 'gasto')
+            self.assertIn(grupo, GRUPOS_FAMILIA, f'falló con: {clave}')
+
+    def test_martin_y_lo_ambiguo_no_cambiaron(self):
+        _, _, cat, _ = self._clasificar('Tef A Martin Aguilera Toloza 777021',
+                                        cargo=10000)
+        self.assertEqual(cat, 'personales_martin')
+        _, _, cat, _ = self._clasificar('Pago Almapan', cargo=30580)
+        self.assertEqual(cat, 'por_clasificar')

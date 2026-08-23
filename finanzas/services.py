@@ -1063,6 +1063,26 @@ def clasificar_fila_cuentarut(descripcion, cargo, abono):
     # clasificar: él decide si fue retiro o no (decisión suya 2026-08-10).
     if 'MARTIN AGUILERA' in d:
         return 'gasto', 'sale', 'personales_martin', False
+    # Las tres jubilaciones de Jorge entran acá («Abono Convenio …») y salen
+    # casi íntegras al día siguiente: parte a su otra cuenta y parte a
+    # Datamatic, su otra empresa (confirmado por él el 22/08/2026). Sin estas
+    # dos reglas caían como «gasto por clasificar» y sumaban ~$400.000
+    # mensuales de gasto fantasma al resultado de Aremko. Van por GLOSA y no
+    # por monto porque las jubilaciones están en UF: el monto cambia todos los
+    # meses, la glosa no.
+    #
+    # Esto es ESTRUCTURA, no criterio: plata que sale del bolsillo de Jorge
+    # hacia sí mismo o hacia otra empresa suya jamás es costo del spa. Y si
+    # alguna de esas transferencias fuera en realidad un retiro de plata de
+    # Aremko, el resultado no cambia: ambas categorías viven en el grupo
+    # `personales_jorge`, igual que «Retiros Jorge».
+    #
+    # Solo rige para ESTA cuenta: si Aremko le paga a Datamatic desde sus
+    # propias cuentas, eso sí es un gasto del spa y lo clasifica su cartola.
+    if 'JORGE ANTONIO AGUILERA' in d or 'JORGE AGUILERA' in d:
+        return 'gasto', 'sale', 'traslado_cuenta_propia', False
+    if 'DATAMATIC' in d:
+        return 'gasto', 'sale', 'aporte_datamatic', False
     de_aremko = categoria_por_glosa(d)
     if de_aremko:
         return 'gasto', 'sale', de_aremko, False

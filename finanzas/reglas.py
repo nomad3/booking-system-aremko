@@ -54,6 +54,15 @@ PLAN_CUENTAS = {
     # desglosa a mano cuando se sabe qué compras trae (22/08/2026).
     'tarjeta_internacional': ('Compras internacionales tarjeta (por desglosar)',
                               'gasto', 'otros'),
+    # Plata de Jorge que sale de su CuentaRUT y NO es de Aremko (22/08/2026).
+    # Van al grupo `personales_jorge` para quedar fuera del resultado
+    # operacional y de la cuenta corriente — no son costo del spa ni plata
+    # que él haya puesto por Aremko. Etiquetas separadas a propósito: así se
+    # ve cuánto está aportando a Datamatic sin confundirlo con un retiro.
+    'traslado_cuenta_propia': ('Traslado a cuenta propia de Jorge', 'gasto',
+                               'personales_jorge'),
+    'aporte_datamatic': ('Aporte a Datamatic (otra empresa)', 'gasto',
+                         'personales_jorge'),
     # Ingresos
     'otros_ingresos': ('Otros ingresos', 'ingreso', 'ingresos'),
     'liquidacion_flow': ('Liquidación Flow', 'ingreso', 'ingresos'),
