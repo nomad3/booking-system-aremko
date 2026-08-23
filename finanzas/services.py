@@ -1111,6 +1111,11 @@ def clasificar_fila_cuentarut(descripcion, cargo, abono):
 
 
 # cuenta → (función de clasificación, grupo del retiro que se convierte)
+# Las cuentas del NEGOCIO. Un abono que dice «llegó desde Aremko» solo puede
+# tener su origen acá: si sale de la tarjeta de Alda o de la CuentaRUT de
+# Jorge, no es plata de Aremko por definición (22/08/2026).
+CUENTAS_AREMKO = ('bancoestado', 'scotiabank', 'mercado_pago', 'efectivo')
+
 CUENTAS_PUENTE = {
     'scotiabank_alda': (clasificar_fila_alda, 'personales_alda'),
     'cuentarut_jorge': (clasificar_fila_cuentarut, 'personales_jorge'),
@@ -1554,8 +1559,19 @@ def candidatos_de_calce(abono, dias=7):
     #    piernas de traspaso.
     #
     # Sigue siendo Jorge quien elige la pareja: acá solo se le muestra.
+    #
+    # Y DOS GUARDAS, de un caso real que corrompió datos (22/08/2026): un
+    # abono de $567.500 que Aremko le mandó a Alda se consumió en seis calces
+    # parciales seguidos contra un consumo de restorán de SU tarjeta, un
+    # retiro a Martín desde la CuentaRUT de Jorge y compras con tarjeta. Nada
+    # de eso podía ser el origen, pero el filtro solo miraba monto y fecha.
+    #
+    # (a) El origen tiene que ser una cuenta del NEGOCIO. El abono declara en
+    #     su glosa que vino de Aremko; una tarjeta o la cuenta puente de otra
+    #     persona no pueden serlo.
     cercanos = (MovimientoFinanciero.objects
                 .filter(sentido='sale',
+                        cuenta__clave__in=CUENTAS_AREMKO,
                         fecha__range=(abono.fecha - timedelta(days=dias),
                                       abono.fecha + timedelta(days=dias)))
                 .filter(Q(clase='gasto',
@@ -1564,7 +1580,18 @@ def candidatos_de_calce(abono, dias=7):
                         | Q(clase='traspaso', traspaso_par__isnull=True))
                 .exclude(cuenta=abono.cuenta)
                 .select_related('cuenta', 'categoria'))
-    return sorted(cercanos,
+
+    # (b) Si la glosa del retiro dice a QUIÉN iba, tiene que ser el dueño de
+    #     esta cuenta. «TEF A AGUILERA GONZALEZ» (CuentaRUT de Jorge) no puede
+    #     ser el origen de un abono en la cuenta de Alda. Cuando la glosa no
+    #     identifica a nadie no se descarta: ahí decide Jorge, que es el
+    #     criterio de siempre.
+    def _va_a_otra_persona(mov):
+        destino = destino_puente(mov.descripcion, mov.cuenta.clave)
+        return destino is not None and destino != abono.cuenta.clave
+
+    candidatos = [m for m in cercanos if not _va_a_otra_persona(m)]
+    return sorted(candidatos,
                   key=lambda m: (abs(int(m.monto) - int(abono.monto)),
                                  abs((m.fecha - abono.fecha).days)))
 
@@ -1623,8 +1650,17 @@ def calzar_abono_con_retiro(abono, retiro):
 
 
 def pares_calzados(dias=60):
-    """Los calces hechos, uno por par (la pierna que SALE), del más nuevo al
-    más viejo. Para poder revisarlos y deshacer el que esté mal."""
+    """Los calces de RETIRO hechos, uno por par (la pierna que SALE), del más
+    nuevo al más viejo. Para revisarlos y deshacer el que esté mal.
+
+    Solo traspasos Aremko → cuenta puente, que es el dominio de esta página.
+    Los barridos entre cuentas del negocio (MP → Scotiabank) y los pagos de
+    tarjeta de Alda son traspasos automáticos y legítimos: NUNCA fueron un
+    calce, y ofrecer «Deshacer» sobre ellos es peligroso — romper un barrido
+    de $1.000.000 inventa un gasto y un ingreso que no existieron. La primera
+    versión los listaba a todos (37 filas donde solo ~12 correspondían) y
+    Jorge lo cazó antes de apretar nada (22/08/2026).
+    """
     from datetime import timedelta
 
     from django.utils import timezone
@@ -1634,7 +1670,9 @@ def pares_calzados(dias=60):
     desde = timezone.localdate() - timedelta(days=dias)
     return (MovimientoFinanciero.objects
             .filter(clase='traspaso', sentido='sale',
-                    traspaso_par__isnull=False, fecha__gte=desde)
+                    traspaso_par__isnull=False, fecha__gte=desde,
+                    cuenta__clave__in=CUENTAS_AREMKO,
+                    traspaso_par__cuenta__clave__in=tuple(CUENTAS_PUENTE))
             .select_related('cuenta', 'traspaso_par', 'traspaso_par__cuenta',
                             'categoria_previa',
                             'traspaso_par__categoria_previa')

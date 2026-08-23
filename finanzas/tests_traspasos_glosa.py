@@ -401,3 +401,112 @@ class DeshacerCalceTest(TestCase):
         from .services import pares_calzados
         gasto, _ = self._par()
         self.assertIn(gasto.id, [m.id for m in pares_calzados(dias=3650)])
+
+
+class GuardasDeCandidatosTest(TestCase):
+    """22/08/2026 — el caso que corrompió datos.
+
+    Un abono de $567.500 que Aremko le mandó a Alda se consumió en SEIS calces
+    parciales seguidos contra cosas que no podían ser su origen: un consumo de
+    restorán de la tarjeta de ella, un retiro a Martín desde la CuentaRUT de
+    Jorge, compras con tarjeta. El filtro solo miraba monto y fecha.
+    """
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+        self.por_calzar, _ = CategoriaFinanciera.objects.get_or_create(
+            clave=CLAVE_POR_CALZAR,
+            defaults={'nombre': 'Abono desde Aremko por calzar',
+                      'clase': 'ingreso', 'grupo': 'otros'})
+        self.abono_alda = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10),
+            cuenta=CuentaFinanciera.objects.get(clave='scotiabank_alda'),
+            clase='ingreso', sentido='entra', monto=Decimal('567500'),
+            categoria=self.por_calzar, fuente='captura', referencia='g:abono',
+            descripcion='Cartola scotiabank alda: TEF 76485192-7 AREMKO HOTEL SP')
+
+    def _salida(self, cuenta_clave, monto, glosa, cat='por_clasificar'):
+        return MovimientoFinanciero.objects.create(
+            fecha=date(2026, 7, 10),
+            cuenta=CuentaFinanciera.objects.get(clave=cuenta_clave),
+            clase='gasto', sentido='sale', monto=Decimal(monto),
+            categoria=CategoriaFinanciera.objects.get(clave=cat),
+            fuente='captura', referencia=f'g:{cuenta_clave}:{monto}',
+            descripcion=glosa)
+
+    def _ids(self):
+        return [m.id for m in candidatos_de_calce(self.abono_alda)]
+
+    def test_una_compra_de_la_tarjeta_de_alda_no_puede_ser_el_origen(self):
+        # $109.560 en LA FORJA PARRILLA: es un consumo de ella, no plata de Aremko.
+        m = self._salida('tarjeta_alda_1', 109560,
+                         'Tarjeta: LA FORJA PARRILLA PUERTO VARAS')
+        self.assertNotIn(m.id, self._ids())
+
+    def test_una_salida_de_la_cuentarut_de_jorge_tampoco(self):
+        m = self._salida('cuentarut_jorge', 20000,
+                         'Cartola cuentarut jorge: Tef A Martin Aguilera Toloza')
+        self.assertNotIn(m.id, self._ids())
+
+    def test_plata_que_iba_a_JORGE_no_calza_con_el_abono_de_ALDA(self):
+        # Sale de una cuenta de Aremko (pasa la guarda 1) pero la glosa dice
+        # a quién iba, y no es la dueña de esta cuenta.
+        m = self._salida('bancoestado', 200000,
+                         'Cartola bancoestado: TEF BANCOESTADO A AGUILERA GONZALEZ')
+        self.assertNotIn(m.id, self._ids())
+
+    def test_plata_de_aremko_que_SI_iba_a_alda_se_ofrece(self):
+        m = self._salida('bancoestado', 248000,
+                         'Cartola bancoestado: TEF A TOLOZA POBLETE ALDA ANGELICA')
+        self.assertIn(m.id, self._ids())
+
+    def test_una_glosa_que_no_dice_a_quien_sigue_ofreciendose(self):
+        # Sin destino identificable no se descarta: ahí decide Jorge.
+        m = self._salida('mercado_pago', 234000, 'Transferencia MP a Alda Bci')
+        self.assertIn(m.id, self._ids())
+
+
+class ParesCalzadosSoloRetirosTest(TestCase):
+    """La lista de «Calces hechos» no puede ofrecer Deshacer sobre traspasos
+    automáticos: romper un barrido MP → Scotiabank inventa un gasto y un
+    ingreso de $1.000.000 que nunca existieron."""
+
+    def setUp(self):
+        call_command('sembrar_finanzas')
+        call_command('aplicar_plan_cuentas', '--aplicar')
+
+    def _par(self, origen, destino, monto, glosa):
+        from .services import pares_calzados  # noqa: F401 (import de contexto)
+        sale = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 6),
+            cuenta=CuentaFinanciera.objects.get(clave=origen),
+            clase='traspaso', sentido='sale', monto=Decimal(monto),
+            fuente='captura', referencia=f'p:{origen}:{monto}', descripcion=glosa)
+        entra = MovimientoFinanciero.objects.create(
+            fecha=date(2026, 8, 6),
+            cuenta=CuentaFinanciera.objects.get(clave=destino),
+            clase='traspaso', sentido='entra', monto=Decimal(monto),
+            fuente='captura', referencia=f'p:{destino}:{monto}:e',
+            traspaso_par=sale, descripcion=glosa)
+        sale.traspaso_par = entra
+        sale.save(update_fields=['traspaso_par'])
+        return sale
+
+    def test_el_barrido_entre_cuentas_de_aremko_no_se_lista(self):
+        from .services import pares_calzados
+        barrido = self._par('mercado_pago', 'scotiabank', 1000000,
+                            'Barrido MP → Scotiabank')
+        self.assertNotIn(barrido.id, [m.id for m in pares_calzados(dias=3650)])
+
+    def test_el_pago_de_tarjeta_de_alda_tampoco(self):
+        from .services import pares_calzados
+        pago = self._par('scotiabank_alda', 'tarjeta_alda_1', 718000,
+                         'Cartola alda: PAGO TARJ.CRED.')
+        self.assertNotIn(pago.id, [m.id for m in pares_calzados(dias=3650)])
+
+    def test_el_calce_de_retiro_SI_se_lista(self):
+        from .services import pares_calzados
+        calce = self._par('bancoestado', 'cuentarut_jorge', 300000,
+                          'Cartola bancoestado: TEF BANCOESTADO A AGUILERA GONZALEZ')
+        self.assertIn(calce.id, [m.id for m in pares_calzados(dias=3650)])
