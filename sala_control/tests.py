@@ -257,3 +257,19 @@ class PrioridadesDeLaSemana(TestCase):
         self.assertEqual([p.texto for p in prioridades(lunes)],
                          ['Revisar la carta'])
         self.assertEqual(lunes_de(date(2026, 8, 19)), lunes)
+
+
+class DiaDeLaPresenciaWeb(SimpleTestCase):
+    """Las fotos de Analytics y Search Console se toman el lunes, DESPUÉS de
+    que este correo ya salió. Por eso el bloque va los martes: mostrarlo el
+    lunes sería enseñar la foto de la semana pasada con cara de recién tomada.
+    """
+
+    def test_el_dia_elegido_es_martes(self):
+        from sala_control.resumen import DIA_PRESENCIA_WEB
+        self.assertEqual(DIA_PRESENCIA_WEB, 1)
+        self.assertEqual(date(2026, 8, 25).weekday(), DIA_PRESENCIA_WEB)
+
+    def test_el_lunes_no_es_el_dia(self):
+        from sala_control.resumen import DIA_PRESENCIA_WEB
+        self.assertNotEqual(date(2026, 8, 24).weekday(), DIA_PRESENCIA_WEB)

@@ -9,6 +9,12 @@ from datetime import date
 
 from . import alertas, fuentes
 
+# El bloque de presencia web sale los MARTES, no los lunes: las fotos de
+# Analytics y Search Console se toman el lunes, después de que este correo
+# ya salió. Mostrarlas el lunes a las 8:00 sería enseñar la foto de la
+# semana pasada con cara de recién tomada.
+DIA_PRESENCIA_WEB = 1  # 0=lunes, 1=martes
+
 
 def _umbral_caja():
     crudo = os.environ.get('UMBRAL_CAJA_MINIMA', '').strip()
@@ -72,7 +78,6 @@ def construir(hoy=None):
     return {
         'fecha': hoy,
         'semana_inicio': lunes,
-        'es_lunes': hoy.weekday() == 0,
         'prioridades': pendientes,
         'sin_prioridades': not todas,
         'caja': caja,
@@ -86,6 +91,7 @@ def construir(hoy=None):
         'telar': telar,
         'publicaciones': publicaciones,
         'alertas': lista_alertas,
-        'presencia_web': fuentes.presencia_web() if hoy.weekday() == 0 else None,
+        'presencia_web': (fuentes.presencia_web()
+                          if hoy.weekday() == DIA_PRESENCIA_WEB else None),
         'notas': fuentes.notas_negocios(),
     }
