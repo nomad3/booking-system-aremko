@@ -41,6 +41,36 @@ def pct(valor):
     return f'{flecha} {signo}{valor:.0f}%'.replace('-', '−')
 
 
+# Palabras de enlace que, colgando al final de un recorte, se leen como un
+# error de tipeo: «…entra el banco, la…». Se sueltan junto con el corte.
+_PALABRAS_COLGANTES = {
+    'a', 'al', 'ante', 'con', 'contra', 'de', 'del', 'desde', 'e', 'el', 'en',
+    'entre', 'esa', 'ese', 'esta', 'este', 'hacia', 'hasta', 'la', 'las', 'lo',
+    'los', 'mi', 'o', 'para', 'por', 'que', 'se', 'si', 'sin', 'sobre', 'su',
+    'sus', 'tras', 'tu', 'un', 'una', 'unos', 'unas', 'y',
+}
+
+
+def recortar(texto, tope):
+    """Corta en la última palabra completa, no a la mitad de una.
+
+    «Catorce en tierra. En esos catorce entra el banco, la fa» se lee como un
+    error de tipeo; con puntos suspensivos se lee como lo que es: un texto más
+    largo. Y si al cortar queda colgando un artículo («…el banco, la…»),
+    también se suelta: es ruido que no aporta nada.
+    """
+    texto = (texto or '').strip()
+    if len(texto) <= tope:
+        return texto
+
+    palabras = texto[:tope].rsplit(' ', 1)[0].split()
+    while (len(palabras) > 1 and
+           palabras[-1].strip(',.;:—-').lower() in _PALABRAS_COLGANTES):
+        palabras.pop()
+    cortado = ' '.join(palabras).rstrip(' ,.;:—-')
+    return (cortado or texto[:tope].rstrip()) + '…'
+
+
 def fecha_larga(f):
     return f'{DIAS[f.weekday()]} {f.day} de {MESES[f.month - 1]}'
 
@@ -116,7 +146,7 @@ def a_texto(datos):
             estado = '✓' if p.get('estado') == 'publicada' else '·'
             hora = p.get('hora') or '--:--'
             L.append(f'  {estado} {hora} {p.get("canal", "")}: '
-                     f'{(p.get("titulo") or "")[:70]}')
+                     f'{recortar(p.get("titulo"), 70)}')
         sem = (datos.get('telar') or {}).get('semana') or {}
         if sem:
             L.append(f'  Semana: {sem.get("publicadas")}/{sem.get("total")} '
@@ -250,7 +280,7 @@ def a_html(datos):
                 f'<div style="padding:5px 0;color:{color};">'
                 f'{icono} <b>{_esc(p.get("hora") or "--:--")}</b> '
                 f'{_esc(p.get("canal", ""))} — '
-                f'{_esc((p.get("titulo") or "")[:80])}</div>')
+                f'{_esc(recortar(p.get("titulo"), 80))}</div>')
         sem = (datos.get('telar') or {}).get('semana') or {}
         if sem:
             h.append(f'<div style="font-size:13px;color:#8a8578;margin-top:6px;">'

@@ -83,9 +83,11 @@ def alerta_publicaciones_pendientes(publicaciones):
         f'{p.get("hora") or "sin hora"} {p.get("canal", "")}'.strip()
         for p in pendientes[:3])
     resto = f' y {len(pendientes) - 3} más' if len(pendientes) > 3 else ''
+    n = len(pendientes)
+    cuantas = '1 publicación' if n == 1 else f'{n} publicaciones'
     return _alerta(
         MEDIA,
-        f'{len(pendientes)} publicación(es) de hoy sin publicar: {detalle}{resto}',
+        f'{cuantas} de hoy sin publicar: {detalle}{resto}',
         'Ver la cola del día en el Telar.')
 
 

@@ -316,3 +316,68 @@ class EndpointDelCron(TestCase):
         # de que termine el test — lo que se prueba acá es que el endpoint
         # contesta al instante, no cuánto demora el hilo.
         self.assertLessEqual(corrio.call_count, 1)
+
+
+class TextoQueSeLee(SimpleTestCase):
+    """Detalles que no cambian ningún número pero se ven todos los días."""
+
+    def test_una_publicacion_no_dice_publicacion_es(self):
+        a = alertas.alerta_publicaciones_pendientes(
+            [{'estado': 'pendiente', 'hora': '19:00', 'canal': 'IG'}])
+        self.assertIn('1 publicación de hoy', a['texto'])
+        self.assertNotIn('(es)', a['texto'])
+
+    def test_varias_van_en_plural(self):
+        a = alertas.alerta_publicaciones_pendientes(
+            [{'estado': 'pendiente', 'hora': '19:00', 'canal': 'IG'},
+             {'estado': 'pendiente', 'hora': '20:00', 'canal': 'IG'}])
+        self.assertIn('2 publicaciones de hoy', a['texto'])
+
+    def test_recorta_en_palabra_completa(self):
+        """El caso real: cortar a 60 caracteres dejaba «la fa»."""
+        largo = ('Catorce días embarcado. Catorce en tierra. En esos '
+                 'catorce entra el banco, la familia, todo.')
+        corto = render.recortar(largo, 60)
+        self.assertTrue(corto.endswith('…'))
+        self.assertNotIn('la fa…', corto)
+        self.assertTrue(len(corto) <= 61)
+        # No corta a mitad de palabra: lo que queda antes de los puntos
+        # suspensivos es una palabra entera del original.
+        self.assertIn(corto[:-1].split()[-1], largo.split())
+
+    def test_texto_corto_queda_igual_y_sin_puntos(self):
+        self.assertEqual(render.recortar('Tina con vapor', 80),
+                         'Tina con vapor')
+
+    def test_sin_titulo_no_revienta(self):
+        self.assertEqual(render.recortar(None, 20), '')
+
+    def test_no_deja_coma_colgando_antes_de_los_puntos(self):
+        self.assertEqual(render.recortar('uno dos, tres cuatro', 10),
+                         'uno dos…')
+
+
+class RecorteSinPalabrasColgando(SimpleTestCase):
+    """Cortar en palabra completa no basta: deja artículos huérfanos que se
+    leen como un error («…entra el banco, la…»)."""
+
+    REAL = ('Catorce días embarcado. Catorce en tierra. En esos catorce entra '
+            'el banco, la familia, todo. Agua a 38. Dos horas.')
+
+    def test_suelta_el_articulo_del_final(self):
+        corto = render.recortar(self.REAL, 80)
+        self.assertTrue(corto.endswith('banco…'), corto)
+
+    def test_suelta_la_preposicion_del_final(self):
+        corto = render.recortar(
+            'Vienes al Medio Maratón. Estacionamiento, desayuno a la hora '
+            'que necesites. A minutos del recorrido.', 80)
+        self.assertTrue(corto.endswith('necesites…'), corto)
+
+    def test_no_se_come_el_texto_entero(self):
+        """Si TODO fueran palabras de enlace, igual queda algo."""
+        self.assertTrue(render.recortar('de la que en el por a la de', 12))
+
+    def test_conserva_palabras_con_contenido(self):
+        corto = render.recortar('Tina caliente junto al río Pescado azul', 22)
+        self.assertTrue(corto.endswith('junto…'), corto)
