@@ -808,3 +808,103 @@ def get_snapshot_safe(days: int = 28) -> Optional[dict]:
     except Exception as e:
         logger.exception(f"Meta snapshot failed: {e}")
         return None
+
+
+# ============================================================================
+# Resultado por campaña según SU objetivo
+#
+# Existe porque medir una campaña con la métrica equivocada da un veredicto
+# equivocado: las campañas de Ritual y Pausa son de MENSAJES y su resultado
+# son conversaciones iniciadas, no clics al enlace. Un informe que mira el CPC
+# de esas campañas concluye «pausar» mientras las ventas suben.
+# ============================================================================
+
+CONVERSACIONES_INICIADAS = "onsite_conversion.messaging_conversation_started_7d"
+
+# objetivo de Meta → (cómo se llama el resultado, tipos de action que lo miden)
+RESULTADO_POR_OBJETIVO = {
+    "MESSAGES": ("conversaciones", (CONVERSACIONES_INICIADAS,)),
+    "LEAD_GENERATION": ("leads", ("lead", "leadgen.other",
+                                  "offsite_conversion.fb_pixel_lead")),
+    "OUTCOME_LEADS": ("leads", ("lead", "leadgen.other",
+                                "offsite_conversion.fb_pixel_lead")),
+    "LINK_CLICKS": ("clics al enlace", ("link_click",)),
+    "OUTCOME_TRAFFIC": ("visitas a la página", ("landing_page_view", "link_click")),
+    "CONVERSIONS": ("conversiones", ("offsite_conversion.fb_pixel_purchase",
+                                     "purchase")),
+    "OUTCOME_SALES": ("conversiones", ("offsite_conversion.fb_pixel_purchase",
+                                       "purchase")),
+}
+
+
+def extraer_resultado_por_objetivo(objective: str, actions: list):
+    """(unidad, cantidad) del resultado de una campaña, según su objetivo.
+
+    Devuelve (None, None) cuando no se puede leer con confianza — y eso es una
+    respuesta legítima: quien llama debe OMITIR esa campaña en vez de inventar
+    un cero. Un cero inventado se lee igual que un cero real y lleva a apagar
+    una campaña que estaba funcionando.
+
+    OUTCOME_ENGAGEMENT es ambiguo (puede ser mensajes o interacción con la
+    publicación): solo se resuelve como conversaciones si el array de actions
+    efectivamente trae conversaciones iniciadas.
+    """
+    valores = {}
+    for a in actions or []:
+        try:
+            valores[a.get("action_type")] = int(a.get("value") or 0)
+        except (TypeError, ValueError):
+            continue
+
+    objetivo = (objective or "").upper()
+
+    if objetivo == "OUTCOME_ENGAGEMENT":
+        if CONVERSACIONES_INICIADAS in valores:
+            return "conversaciones", valores[CONVERSACIONES_INICIADAS]
+        return None, None
+
+    par = RESULTADO_POR_OBJETIVO.get(objetivo)
+    if not par:
+        return None, None
+    unidad, tipos = par
+    # max y no suma: Meta suele reportar el mismo evento por Pixel y por CAPI.
+    presentes = [valores[t] for t in tipos if t in valores]
+    if not presentes:
+        return None, None
+    return unidad, max(presentes)
+
+
+def get_campaign_results(account_id: str = AD_ACCOUNT_PRINCIPAL,
+                         days: int = 7) -> list:
+    """Gasto y resultado de cada campaña con actividad en la ventana.
+
+    Una sola llamada por cuenta (level=campaign). Cada elemento trae
+    `resultados`/`unidad` en None cuando su objetivo no se puede medir —
+    ver extraer_resultado_por_objetivo.
+    """
+    since = (date.today() - timedelta(days=days)).isoformat()
+    until = date.today().isoformat()
+
+    data = _get(f"/{account_id}/insights", {
+        "fields": "campaign_id,campaign_name,objective,spend,impressions,"
+                  "clicks,actions",
+        "time_range": f'{{"since":"{since}","until":"{until}"}}',
+        "level": "campaign",
+        "limit": 100,
+    })
+
+    salida = []
+    for row in data.get("data", []):
+        unidad, cantidad = extraer_resultado_por_objetivo(
+            row.get("objective"), row.get("actions"))
+        salida.append({
+            "campaign_id": row.get("campaign_id"),
+            "nombre": row.get("campaign_name"),
+            "objetivo": row.get("objective"),
+            "gasto": float(row.get("spend") or 0),
+            "impresiones": int(row.get("impressions") or 0),
+            "clics": int(row.get("clicks") or 0),
+            "unidad": unidad,
+            "resultados": cantidad,
+        })
+    return salida

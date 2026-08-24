@@ -1888,3 +1888,166 @@ def traer_comisiones_sumup(dias=7):
     if creados:
         logger.info('finanzas: %s comisiones SumUp registradas', creados)
     return creados, len(items)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Saldos de la caja: el «cuánto hay» y el «cuánto sale por día»
+#
+# Extraído de la vista de flujo de caja para que el resumen ejecutivo diario
+# no repita el cálculo. Una sola definición: si mañana cambia qué cuenta es
+# «la caja», cambia acá y cambian las dos pantallas.
+# ══════════════════════════════════════════════════════════════════════════
+
+# Las cuentas que SON la caja de Aremko. Las cuentas puente (CuentaRUT de
+# Jorge, Scotiabank de Alda) quedan fuera a propósito: esa plata no es de la
+# empresa y sumarla inflaría el colchón — justo el número que tiene que ser
+# pesimista para servir de alarma.
+CUENTAS_CAJA = ('mercado_pago', 'bancoestado', 'scotiabank', 'efectivo')
+
+# Solo estas se alimentan de cartolas que hay que cargar a mano; son las
+# únicas donde «hace días que no llega información» es una deuda de datos y
+# no simplemente un día sin movimientos.
+CUENTAS_CON_CARTOLA = ('bancoestado', 'scotiabank')
+
+# El ancla de los saldos es el cierre de julio 2026 (decisión de Jorge
+# 2026-08-08): antes de esa fecha no hay cartolas cargadas, así que un saldo
+# calculado hacia atrás sería inventado.
+PERIODO_ANCLA = date(2026, 7, 1)
+INICIO_SALDOS = date(2026, 8, 1)
+
+
+def saldos_actuales(hasta=None):
+    """Saldo de cada cuenta de la caja de Aremko y el total, a una fecha.
+
+    saldo(cuenta) = ancla (cierre de julio) + todo lo que entró y salió desde
+    el 1 de agosto.
+
+    Una cuenta SIN ancla devuelve saldo None y queda FUERA del total: un
+    número que no se puede verificar no se muestra. Cada cuenta viene además
+    con hasta cuándo llega su información (`dias_rezago`) — sin eso, un saldo
+    viejo se lee como si fuera de hoy.
+    """
+    from django.db.models import Max, Sum
+
+    from conciliacion.models import MOTIVO_NO_ES_COBRO, MovimientoMP
+    from ventas.models import Pago
+
+    from .models import CuentaFinanciera, MovimientoFinanciero, SaldoMensual
+
+    hasta = hasta or date.today()
+    cuentas = {c.clave: c for c in
+               CuentaFinanciera.objects.filter(clave__in=CUENTAS_CAJA)}
+    anclas = {s.cuenta.clave: int(s.saldo_cierre)
+              for s in SaldoMensual.objects.filter(
+                  periodo=PERIODO_ANCLA, cuenta__clave__in=CUENTAS_CAJA)}
+
+    neto = {c: 0 for c in CUENTAS_CAJA}
+    for r in (MovimientoFinanciero.objects
+              .filter(fecha__gte=INICIO_SALDOS, fecha__lte=hasta,
+                      cuenta__clave__in=CUENTAS_CAJA)
+              .values('cuenta__clave', 'sentido').annotate(t=Sum('monto'))):
+        signo = 1 if r['sentido'] == 'entra' else -1
+        neto[r['cuenta__clave']] += signo * int(r['t'] or 0)
+
+    # Los cobros de Mercado Pago viven en la API, no en MovimientoFinanciero.
+    mp_total = (MovimientoMP.objects
+                .filter(fecha__date__gte=INICIO_SALDOS, fecha__date__lte=hasta)
+                .exclude(sugerencia_motivo=MOTIVO_NO_ES_COBRO)
+                .aggregate(t=Sum('monto'))['t'])
+    neto['mercado_pago'] += int(mp_total or 0)
+
+    # El efectivo que entra son los pagos en efectivo del sistema.
+    ef_total = (Pago.objects
+                .filter(metodo_pago='efectivo',
+                        fecha_pago__date__gte=INICIO_SALDOS,
+                        fecha_pago__date__lte=hasta)
+                .aggregate(t=Sum('monto'))['t'])
+    neto['efectivo'] += int(ef_total or 0)
+
+    ultima_cartola = {
+        r['cuenta__clave']: r['m'] for r in
+        (MovimientoFinanciero.objects
+         .filter(cuenta__clave__in=CUENTAS_CON_CARTOLA, fuente='captura')
+         .values('cuenta__clave').annotate(m=Max('fecha')))
+    }
+
+    filas, total, hay_total, sin_ancla = [], 0, False, []
+    for clave in CUENTAS_CAJA:
+        if clave not in cuentas:
+            continue
+        ancla = anclas.get(clave)
+        saldo = None if ancla is None else ancla + neto[clave]
+        if saldo is None:
+            sin_ancla.append(cuentas[clave].nombre)
+        else:
+            total += saldo
+            hay_total = True
+
+        ult = ultima_cartola.get(clave)
+        filas.append({
+            'clave': clave,
+            'nombre': cuentas[clave].nombre,
+            'saldo': saldo,
+            'ultima_cartola': ult,
+            # Solo tiene sentido para las cuentas que se alimentan de cartola:
+            # en Mercado Pago y efectivo un día sin movimientos no es un vacío
+            # de información.
+            'dias_rezago': (hasta - ult).days if ult else (
+                None if clave not in CUENTAS_CON_CARTOLA else 9999),
+        })
+
+    return {
+        'fecha': hasta,
+        'cuentas': filas,
+        'total': total if hay_total else None,
+        'sin_ancla': sin_ancla,
+    }
+
+
+def gasto_diario_promedio(dias=28, hasta=None):
+    """Cuánto sale por día, en promedio, en gastos del negocio.
+
+    Es el denominador del colchón (cuántos días de aire da la caja). Se
+    cuentan los gastos paguen de la cuenta que paguen — un gasto de Aremko
+    pagado desde la CuentaRUT de Jorge igual es plata que la empresa va a
+    tener que poner. Quedan fuera los traspasos (mover plata entre cuentas
+    propias no es gasto), lo de la familia y las devoluciones a clientes
+    (contra-ingreso, no gasto).
+
+    Devuelve también el total y la ventana usada: el promedio de una ventana
+    con cartolas a medio cargar sale bajo, y quien lo muestre tiene que poder
+    declarar de qué está hecho.
+    """
+    from datetime import timedelta
+
+    from django.db.models import Sum
+
+    from .models import MovimientoFinanciero
+    from .reglas import GRUPO_DEVOLUCIONES, GRUPOS_FAMILIA
+
+    hasta = hasta or date.today()
+    desde = hasta - timedelta(days=dias - 1)
+
+    total = (MovimientoFinanciero.objects
+             .filter(clase='gasto', fecha__gte=desde, fecha__lte=hasta)
+             .exclude(categoria__grupo__in=GRUPOS_FAMILIA)
+             .exclude(categoria__grupo=GRUPO_DEVOLUCIONES)
+             .aggregate(t=Sum('monto'))['t'])
+    total = int(total or 0)
+    return {
+        'desde': desde, 'hasta': hasta, 'dias': dias,
+        'total': total,
+        'promedio_diario': total / dias if dias else 0,
+    }
+
+
+def colchon_dias(caja, gasto_diario):
+    """Cuántos días aguanta la caja al ritmo actual de gastos.
+
+    None cuando no se puede saber: sin caja verificable (falta un ancla) o
+    sin gastos en la ventana. Devolver un número inventado acá sería peor que
+    no mostrar nada — es el número que mira Jorge para dormir tranquilo.
+    """
+    if caja is None or not gasto_diario or gasto_diario <= 0:
+        return None
+    return int(caja / gasto_diario)

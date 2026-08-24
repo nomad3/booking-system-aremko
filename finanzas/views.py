@@ -1389,14 +1389,18 @@ def calzar_retiros(request):
 # propósito: es crédito (deuda), no caja — sus gastos igual están en el
 # tablero, y el pago de la tarjeta aparecerá como cargo en la cuenta que
 # la pague.
-CUENTAS_FLUJO = ('mercado_pago', 'bancoestado', 'scotiabank', 'efectivo')
+# Una sola definición, en services.CUENTAS_CAJA: el resumen ejecutivo diario
+# calcula el mismo saldo y dos listas que puedan divergir es cómo un tablero
+# empieza a contradecir al otro.
+from .services import CUENTAS_CAJA as CUENTAS_FLUJO  # noqa: E402
 # Cuentas puente: personales, pero con plata de Aremko adentro esperando
 # pagar cuentas. Van EN el flujo (si no, un traspaso Scotiabank→CuentaRUT
 # hacía desaparecer la plata del total sin ninguna fila que lo explicara —
 # lo pilló Jorge el 2026-08-09) pero suman a su propio subtotal.
 CUENTAS_PUENTE_FLUJO = ('cuentarut_jorge', 'scotiabank_alda')
 TODAS_FLUJO = CUENTAS_FLUJO + CUENTAS_PUENTE_FLUJO
-INICIO_FLUJO = date(2026, 8, 1)   # decisión de Jorge 2026-08-08
+from .services import INICIO_SALDOS as INICIO_FLUJO  # noqa: E402
+# (decisión de Jorge 2026-08-08; vive en services junto al ancla)
 
 
 @user_passes_test(puede_ver_finanzas)

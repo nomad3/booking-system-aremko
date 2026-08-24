@@ -1,0 +1,259 @@
+# -*- coding: utf-8 -*-
+"""Pruebas de la sala de control.
+
+Lo que se cuida acá son los umbrales y el silencio. Una alerta que se
+dispara cuando no corresponde enseña a ignorar el correo, y entonces el día
+que la alerta sea real tampoco se va a leer. Por eso hay tantas pruebas de
+«esto NO debe alertar» como de «esto sí».
+
+El otro cuidado es no inventar números: cuando falta un dato, el resultado
+tiene que ser None y no un cero — un cero se lee como un hecho.
+"""
+from datetime import date, timedelta
+
+from django.test import SimpleTestCase, TestCase
+
+from sala_control import alertas, render
+from sala_control.resumen import variacion
+
+
+def _cuenta(nombre, rezago, ultima=date(2026, 8, 16)):
+    return {'clave': 'x', 'nombre': nombre, 'saldo': 1,
+            'ultima_cartola': ultima, 'dias_rezago': rezago}
+
+
+class CajaBaja(SimpleTestCase):
+    def test_bajo_el_umbral_alerta(self):
+        a = alertas.alerta_caja_baja(9_000_000, 15_000_000)
+        self.assertIsNotNone(a)
+        self.assertEqual(a['nivel'], alertas.ALTA)
+        self.assertIn('6.000.000', a['texto'])   # lo que falta
+
+    def test_justo_en_el_umbral_no_alerta(self):
+        self.assertIsNone(alertas.alerta_caja_baja(15_000_000, 15_000_000))
+
+    def test_sobre_el_umbral_no_alerta(self):
+        self.assertIsNone(alertas.alerta_caja_baja(20_000_000, 15_000_000))
+
+    def test_sin_caja_verificable_no_alerta(self):
+        """Falta un ancla de saldo: no sabemos cuánto hay.
+
+        Alertar acá sería una alarma falsa por un dato faltante, que es la
+        forma más rápida de que se dejen de mirar las alarmas.
+        """
+        self.assertIsNone(alertas.alerta_caja_baja(None, 15_000_000))
+
+
+class CartolasAtrasadas(SimpleTestCase):
+    def test_al_dia_no_alerta(self):
+        self.assertEqual(alertas.alertas_cartola_atrasada(
+            [_cuenta('BancoEstado', 2)]), [])
+
+    def test_en_el_tope_no_alerta(self):
+        self.assertEqual(alertas.alertas_cartola_atrasada(
+            [_cuenta('BancoEstado', 7)]), [])
+
+    def test_pasado_el_tope_alerta(self):
+        a = alertas.alertas_cartola_atrasada([_cuenta('BancoEstado', 12)])
+        self.assertEqual(len(a), 1)
+        self.assertIn('12 días', a[0]['texto'])
+
+    def test_nunca_cargada_es_alta(self):
+        a = alertas.alertas_cartola_atrasada([_cuenta('Scotiabank', 9999)])
+        self.assertEqual(a[0]['nivel'], alertas.ALTA)
+        self.assertIn('nunca', a[0]['texto'])
+
+    def test_cuentas_sin_cartola_se_ignoran(self):
+        """Mercado Pago y efectivo no se alimentan de cartola: un día sin
+        movimientos no es un vacío de información."""
+        self.assertEqual(alertas.alertas_cartola_atrasada(
+            [{'nombre': 'Mercado Pago', 'dias_rezago': None,
+              'ultima_cartola': None}]), [])
+
+
+class PublicacionesPendientes(SimpleTestCase):
+    def test_todas_publicadas_no_alerta(self):
+        self.assertIsNone(alertas.alerta_publicaciones_pendientes(
+            [{'estado': 'publicada'}, {'estado': 'publicada'}]))
+
+    def test_dia_sin_publicaciones_no_alerta(self):
+        self.assertIsNone(alertas.alerta_publicaciones_pendientes([]))
+
+    def test_pendiente_alerta_con_detalle(self):
+        a = alertas.alerta_publicaciones_pendientes([
+            {'estado': 'publicada', 'hora': '09:00', 'canal': 'IG'},
+            {'estado': 'pendiente', 'hora': '19:00', 'canal': 'IG Stories'},
+        ])
+        self.assertIn('1 publicación', a['texto'])
+        self.assertIn('19:00', a['texto'])
+
+
+class VentasEnBaja(SimpleTestCase):
+    def _comp(self, pct):
+        return {'totales': {'facturado_pct_cambio': pct}}
+
+    def test_caida_fuerte_alerta(self):
+        a = alertas.alerta_ventas_en_baja(self._comp(-30), dia_del_mes=15)
+        self.assertIsNotNone(a)
+        self.assertEqual(a['nivel'], alertas.ALTA)
+
+    def test_caida_leve_no_alerta(self):
+        self.assertIsNone(
+            alertas.alerta_ventas_en_baja(self._comp(-5), dia_del_mes=15))
+
+    def test_temprano_en_el_mes_no_alerta(self):
+        """El día 3 dos jornadas flojas mueven el porcentaje entero: sería
+        una moneda al aire, no una señal."""
+        self.assertIsNone(
+            alertas.alerta_ventas_en_baja(self._comp(-40), dia_del_mes=3))
+
+    def test_texto_no_numerico_no_alerta(self):
+        """La comparativa devuelve 'NUEVO' o 'sin movimiento' cuando no hay
+        base: no es un porcentaje y no se puede comparar contra el umbral."""
+        self.assertIsNone(
+            alertas.alerta_ventas_en_baja(self._comp('NUEVO'), dia_del_mes=20))
+
+    def test_sin_comparativa_no_alerta(self):
+        self.assertIsNone(alertas.alerta_ventas_en_baja(None, dia_del_mes=20))
+
+
+class CampanasSinResultado(SimpleTestCase):
+    def test_gasto_sin_resultados_alerta(self):
+        a = alertas.alertas_campanas_sin_resultado([
+            {'plataforma': 'Meta', 'nombre': 'Pausa', 'gasto': 90_000,
+             'resultados': 0, 'unidad': 'conversaciones', 'dias': 22}])
+        self.assertEqual(len(a), 1)
+        self.assertIn('conversaciones', a[0]['texto'])
+
+    def test_con_resultados_no_alerta(self):
+        self.assertEqual(alertas.alertas_campanas_sin_resultado([
+            {'gasto': 90_000, 'resultados': 4}]), [])
+
+    def test_gasto_chico_no_alerta(self):
+        self.assertEqual(alertas.alertas_campanas_sin_resultado([
+            {'gasto': 900, 'resultados': 0}]), [])
+
+    def test_resultado_no_medible_se_omite(self):
+        """Google marca 0 conversiones porque el lead de WhatsApp no está
+        importado como conversión — no porque la campaña no funcione.
+        Alertar ahí llevaría a apagar campañas que están vendiendo."""
+        self.assertEqual(alertas.alertas_campanas_sin_resultado([
+            {'plataforma': 'Google', 'nombre': 'Ritual', 'gasto': 200_000,
+             'resultados': None}]), [])
+
+
+class ListaDeAlertas(SimpleTestCase):
+    def _sano(self, **cambios):
+        base = dict(caja_total=30_000_000, umbral_caja=15_000_000,
+                    cuentas=[_cuenta('BancoEstado', 1)],
+                    publicaciones=[{'estado': 'publicada'}],
+                    comparativa={'totales': {'facturado_pct_cambio': 8}},
+                    dia_del_mes=20, campanas=[])
+        base.update(cambios)
+        return base
+
+    def test_todo_en_rango_lista_vacia(self):
+        """El caso que hace creíble a la lista cuando NO está vacía."""
+        self.assertEqual(alertas.construir_alertas(**self._sano()), [])
+
+    def test_las_graves_van_primero(self):
+        lista = alertas.construir_alertas(**self._sano(
+            caja_total=1_000_000,                       # alta
+            publicaciones=[{'estado': 'pendiente'}]))   # media
+        self.assertEqual(len(lista), 2)
+        self.assertEqual(lista[0]['nivel'], alertas.ALTA)
+
+
+class Formato(SimpleTestCase):
+    def test_montos_en_pesos_chilenos(self):
+        self.assertEqual(render.clp(18_400_000), '$18.400.000')
+        self.assertEqual(render.clp(None), '—')
+
+    def test_compacto(self):
+        self.assertEqual(render.compacto(18_400_000), '$18,4M')
+        self.assertEqual(render.compacto(592_000), '$592k')
+
+    def test_variacion_sin_base_es_none(self):
+        """Si el mes anterior fue cero, el cambio no es 0% — no hay base."""
+        self.assertIsNone(variacion(100, 0))
+        self.assertIsNone(variacion(100, None))
+        self.assertAlmostEqual(variacion(110, 100), 10.0)
+
+    def test_pct_usa_menos_tipografico(self):
+        self.assertIn('▼', render.pct(-3))
+        self.assertIn('▲', render.pct(9))
+        self.assertEqual(render.pct(None), '—')
+
+
+class ResultadoSegunObjetivo(SimpleTestCase):
+    """Medir una campaña con la métrica de otro objetivo da un veredicto
+    equivocado: las de Ritual y Pausa son de MENSAJES."""
+
+    def _leer(self, objetivo, acciones):
+        from ventas.services.meta_reporter import extraer_resultado_por_objetivo
+        return extraer_resultado_por_objetivo(objetivo, acciones)
+
+    def test_mensajes_cuenta_conversaciones(self):
+        unidad, n = self._leer('MESSAGES', [
+            {'action_type': 'link_click', 'value': '80'},
+            {'action_type':
+             'onsite_conversion.messaging_conversation_started_7d',
+             'value': '7'}])
+        self.assertEqual((unidad, n), ('conversaciones', 7))
+
+    def test_leads_no_se_duplican(self):
+        """Meta reporta el mismo lead por Pixel y por CAPI: se toma el máximo,
+        no la suma."""
+        unidad, n = self._leer('OUTCOME_LEADS', [
+            {'action_type': 'lead', 'value': '5'},
+            {'action_type': 'offsite_conversion.fb_pixel_lead', 'value': '5'}])
+        self.assertEqual((unidad, n), ('leads', 5))
+
+    def test_engagement_ambiguo_sin_conversaciones_no_se_mide(self):
+        self.assertEqual(
+            self._leer('OUTCOME_ENGAGEMENT',
+                       [{'action_type': 'post_engagement', 'value': '40'}]),
+            (None, None))
+
+    def test_engagement_con_conversaciones_si_se_mide(self):
+        unidad, n = self._leer('OUTCOME_ENGAGEMENT', [
+            {'action_type':
+             'onsite_conversion.messaging_conversation_started_7d',
+             'value': '3'}])
+        self.assertEqual((unidad, n), ('conversaciones', 3))
+
+    def test_objetivo_desconocido_no_se_mide(self):
+        self.assertEqual(self._leer('ALGO_NUEVO', [
+            {'action_type': 'link_click', 'value': '9'}]), (None, None))
+
+    def test_sin_acciones_no_inventa_cero(self):
+        self.assertEqual(self._leer('MESSAGES', []), (None, None))
+
+
+class Colchon(SimpleTestCase):
+    def test_dias_de_aire(self):
+        from finanzas.services import colchon_dias
+        self.assertEqual(colchon_dias(3_000_000, 100_000), 30)
+
+    def test_sin_gastos_no_hay_colchon(self):
+        from finanzas.services import colchon_dias
+        self.assertIsNone(colchon_dias(3_000_000, 0))
+
+    def test_sin_caja_verificable_no_hay_colchon(self):
+        from finanzas.services import colchon_dias
+        self.assertIsNone(colchon_dias(None, 100_000))
+
+
+class PrioridadesDeLaSemana(TestCase):
+    def test_solo_las_de_la_semana_pedida(self):
+        from sala_control.fuentes import lunes_de, prioridades
+        from sala_control.models import PrioridadSemana
+
+        lunes = date(2026, 8, 17)
+        PrioridadSemana.objects.create(semana_inicio=lunes, orden=1,
+                                       texto='Revisar la carta')
+        PrioridadSemana.objects.create(semana_inicio=lunes - timedelta(days=7),
+                                       orden=1, texto='De la semana pasada')
+        self.assertEqual([p.texto for p in prioridades(lunes)],
+                         ['Revisar la carta'])
+        self.assertEqual(lunes_de(date(2026, 8, 19)), lunes)
