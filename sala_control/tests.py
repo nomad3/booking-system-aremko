@@ -273,3 +273,46 @@ class DiaDeLaPresenciaWeb(SimpleTestCase):
     def test_el_lunes_no_es_el_dia(self):
         from sala_control.resumen import DIA_PRESENCIA_WEB
         self.assertNotEqual(date(2026, 8, 24).weekday(), DIA_PRESENCIA_WEB)
+
+
+class EndpointDelCron(TestCase):
+    """El endpoint dispara un ENVÍO de correo a la lista de distribución.
+
+    Sin llave no entra nadie: un endpoint de cron abierto es un botón de
+    «mandar correo» que cualquiera en internet puede apretar.
+    """
+
+    URL = '/ventas/api/cron/resumen-ejecutivo/'
+
+    def test_sin_llave_no_entra(self):
+        self.assertEqual(self.client.post(self.URL).status_code, 401)
+
+    def test_llave_errada_no_entra(self):
+        r = self.client.post(self.URL, HTTP_X_API_KEY='no-es-la-llave')
+        self.assertEqual(r.status_code, 401)
+
+    def test_sin_llave_configurada_no_entra(self):
+        """Si la variable quedó vacía en el servidor, el endpoint se cierra en
+        vez de abrirse: fallar hacia el lado seguro."""
+        from django.test import override_settings
+        with override_settings(AUTOMATION_API_KEY=''):
+            r = self.client.post(self.URL, HTTP_X_API_KEY='')
+            self.assertEqual(r.status_code, 401)
+
+    def test_con_llave_dispara_y_responde_al_tiro(self):
+        """Responde sin esperar: cron-job.org corta a los 30 segundos y el
+        resumen demora más que eso en armarse."""
+        from unittest.mock import patch
+
+        from django.test import override_settings
+
+        with override_settings(AUTOMATION_API_KEY='llave-de-prueba'), \
+                patch('ventas.views.api_views.'
+                      '_run_resumen_ejecutivo_background') as corrio:
+            r = self.client.post(self.URL, HTTP_X_API_KEY='llave-de-prueba')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+        # El trabajo va en un hilo aparte; puede alcanzar a correr o no antes
+        # de que termine el test — lo que se prueba acá es que el endpoint
+        # contesta al instante, no cuánto demora el hilo.
+        self.assertLessEqual(corrio.call_count, 1)

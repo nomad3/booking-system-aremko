@@ -725,6 +725,57 @@ def cron_marketing_brief_weekly(request):
     })
 
 
+def _run_resumen_ejecutivo_background():
+    """Helper para correr enviar_resumen_ejecutivo en thread.
+
+    Mismo patrón que el brief: fire-and-forget para no bloquear el response
+    y respetar el timeout de 30s de cron-job.org plan free. El comando ya no
+    lanza hacia afuera (cada fuente degrada por su cuenta), pero el try queda
+    igual: un cron que revienta en silencio es peor que uno que deja rastro.
+    """
+    import logging
+    from io import StringIO
+    from django.core.management import call_command
+    log = logging.getLogger(__name__)
+
+    output = StringIO()
+    try:
+        call_command('enviar_resumen_ejecutivo', stdout=output, stderr=output)
+        log.info('Resumen ejecutivo diario enviado:\n%s', output.getvalue()[-3000:])
+    except Exception as e:
+        log.exception('Error en el resumen ejecutivo diario: %s', e)
+
+
+@csrf_exempt
+@api_view(['POST', 'GET'])
+@permission_classes([AllowAny])
+def cron_resumen_ejecutivo(request):
+    """
+    Endpoint para que cron-job.org dispare el resumen ejecutivo del dueño.
+
+    Schedule: todos los días a las 08:00 hora Chile. Corre acá dentro (y no
+    como Cron Job de Render) porque el resumen necesita muchísimas variables
+    de entorno —finanzas, Meta, Google Ads, SendGrid, el Telar— y un cron
+    aparte no las hereda: habría que copiarlas a mano y mantenerlas
+    sincronizadas para siempre.
+
+    Auth: header X-API-KEY con AUTOMATION_API_KEY.
+    """
+    if not is_valid_api_key(request):
+        return Response(
+            {"error": "Authentication required. Set X-API-KEY header."},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    from threading import Thread
+    Thread(target=_run_resumen_ejecutivo_background, daemon=True).start()
+
+    return Response({
+        "success": True,
+        "message": "Resumen ejecutivo iniciado en background. El email llegará en 30-60 seg.",
+    })
+
+
 def _run_snapshot_weekly_traffic_background():
     """Helper para correr snapshot_weekly_traffic en thread.
 

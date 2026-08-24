@@ -215,6 +215,11 @@ urlpatterns = [
     # Llamar cada lunes 10:00 hora Chile.
     path('api/cron/marketing-brief/', api_views.cron_marketing_brief_weekly, name='cron_marketing_brief'),
 
+    # === Cron endpoint para el resumen ejecutivo diario del dueño ===
+    # Llamar TODOS los días a las 08:00 hora Chile. Va antes de los informes
+    # de Ads (09:15/09:17) a propósito: es lo primero que se lee en el día.
+    path('api/cron/resumen-ejecutivo/', api_views.cron_resumen_ejecutivo, name='cron_resumen_ejecutivo'),
+
     # === Cron endpoint para snapshot semanal GA4 + Search Console ===
     # Llamar cada lunes 09:00 hora Chile (1h antes del brief).
     path('api/cron/snapshot-weekly-traffic/', api_views.cron_snapshot_weekly_traffic, name='cron_snapshot_weekly_traffic'),
