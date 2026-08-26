@@ -206,3 +206,125 @@ def dias_transcurridos_del_mes(hoy=None):
     """Cuántos días lleva el mes, mínimo 1 (para las ventanas de publicidad)."""
     hoy = hoy or date.today()
     return max(1, hoy.day - 1)
+
+
+# ── El pulso del día: lo que se vendió y lo que está esperando respuesta ──
+
+def ventas_del_dia(hoy=None):
+    """Reservas creadas hoy, contra el MISMO día de la semana pasada.
+
+    La comparación no es contra ayer a propósito: Aremko tiene una
+    estacionalidad brutal por día de la semana —el sábado concentra el 29% de
+    las visitas y el martes está cerrado—, así que un miércoles contra un
+    martes diría «caímos 100%» y sería mentira. Contra el miércoles pasado, el
+    número significa algo.
+
+    Se compara «hasta esta hora» contra «hasta esta hora», no día completo
+    contra día completo: a las 10 de la mañana un día entero de la semana
+    pasada siempre va a ganar, y esa comparación no sirve para nada.
+    """
+    def _leer():
+        from datetime import datetime, time, timedelta
+
+        from django.db.models import Count, Sum
+        from django.utils import timezone
+
+        from ventas.models import VentaReserva
+
+        ahora = timezone.localtime()
+        dia_hoy = hoy or ahora.date()
+
+        def _tramo(dia, hasta_hora):
+            inicio = timezone.make_aware(datetime.combine(dia, time.min))
+            fin = timezone.make_aware(datetime.combine(dia, hasta_hora))
+            r = (VentaReserva.objects
+                 .filter(fecha_creacion__gte=inicio, fecha_creacion__lte=fin)
+                 .aggregate(n=Count('id'), monto=Sum('total')))
+            return {'n': r['n'] or 0, 'monto': int(r['monto'] or 0)}
+
+        corte = ahora.time()
+        return {
+            'hoy': _tramo(dia_hoy, corte),
+            'semana_pasada': _tramo(dia_hoy - timedelta(days=7), corte),
+            'hasta_hora': ahora.strftime('%H:%M'),
+            'dia_comparado': dia_hoy - timedelta(days=7),
+        }
+    return _safe('ventas del día', _leer)
+
+
+def cotizaciones_del_dia(hoy=None):
+    """Cotizaciones enviadas hoy y cómo van.
+
+    `esperando` son las que siguen vivas sin respuesta: es la pila de trabajo
+    que quedó abierta, no un fracaso.
+    """
+    def _leer():
+        from django.utils import timezone
+
+        from whatsapp_agent.embudo import estado_efectivo
+        from whatsapp_agent.models import PropuestaReserva
+
+        ahora = timezone.now()
+        dia = hoy or timezone.localtime().date()
+        propuestas = list(PropuestaReserva.objects
+                          .filter(created_at__date=dia)
+                          .only('estado', 'expires_at', 'total'))
+        estados = [estado_efectivo(p.estado, p.expires_at, ahora)
+                   for p in propuestas]
+        return {
+            'enviadas': len(propuestas),
+            'creadas': sum(1 for e in estados if e == 'creada'),
+            'esperando': sum(1 for e in estados if e == 'pendiente'),
+            'monto': int(sum(p.total or 0 for p in propuestas)),
+        }
+    return _safe('cotizaciones del día', _leer)
+
+
+# Bajo este tiempo, un mensaje sin responder todavía no es un problema: es
+# alguien escribiendo o alguien a punto de contestar.
+MINUTOS_SIN_RESPONDER = 30
+
+
+def conversaciones_esperando(minutos=MINUTOS_SIN_RESPONDER, hoy=None):
+    """Quiénes escribieron y siguen sin respuesta.
+
+    Se mira el ÚLTIMO mensaje de cada teléfono: si es entrante, la pelota está
+    de nuestro lado. Es la señal que se mueve antes que las ventas — cuando el
+    equipo se atrasa, esto sube semanas antes de que caiga la facturación.
+    """
+    def _leer():
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from ventas.models import WhatsAppMessage
+
+        ahora = timezone.now()
+        dia = hoy or timezone.localtime().date()
+        # Solo la actividad del día: una conversación de hace un mes sin
+        # responder es otro problema (y ya lo cubre el embudo).
+        mensajes = (WhatsAppMessage.objects
+                    .filter(timestamp__date=dia)
+                    .order_by('phone', '-timestamp')
+                    .values('phone', 'direction', 'timestamp'))
+
+        ultimo_por_telefono = {}
+        entrantes = set()
+        for m in mensajes:
+            if m['direction'] == 'in':
+                entrantes.add(m['phone'])
+            if m['phone'] not in ultimo_por_telefono:
+                ultimo_por_telefono[m['phone']] = m
+
+        corte = ahora - timedelta(minutes=minutos)
+        esperando = [m for m in ultimo_por_telefono.values()
+                     if m['direction'] == 'in' and m['timestamp'] <= corte]
+        esperando.sort(key=lambda m: m['timestamp'])
+        return {
+            'conversaciones': len(entrantes),
+            'esperando': len(esperando),
+            'mas_antigua_min': (
+                int((ahora - esperando[0]['timestamp']).total_seconds() // 60)
+                if esperando else None),
+        }
+    return _safe('conversaciones esperando', _leer)

@@ -13,6 +13,10 @@ DIAS = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado',
 
 NEGOCIOS_SECUNDARIOS = (('datamatic', 'Datamatic'), ('torqueria', 'Torquería'))
 
+# El correo es la foto del amanecer; el panel es donde se vive el día. El
+# link va arriba porque abajo nadie llega.
+URL_PANEL = 'https://www.aremko.cl/sala/'
+
 
 def clp(n):
     if n is None:
@@ -110,6 +114,7 @@ def a_texto(datos):
     """Versión en texto plano (cuerpo del correo y salida del --dry-run)."""
     L = []
     L.append(f'AREMKO · {fecha_larga(datos["fecha"])}')
+    L.append(f'Panel del día: {URL_PANEL}')
     L.append('')
 
     L.append('TUS PRIORIDADES DE LA SEMANA')
@@ -215,6 +220,10 @@ def a_html(datos):
              f'Aremko</div>')
     h.append(f'<div style="{_CSS_TXT};color:#8a8578;font-size:14px;">'
              f'{_esc(fecha_larga(datos["fecha"]))}</div>')
+    h.append(f'<div style="{_CSS_TXT};margin-top:10px;"><a href="{URL_PANEL}" '
+             f'style="display:inline-block;padding:9px 16px;background:#2f2c26;'
+             f'color:#fbfaf7;text-decoration:none;border-radius:8px;'
+             f'font-size:14px;font-weight:600;">Abrir el panel del día →</a></div>')
 
     # Prioridades
     h.append(f'<div style="{_CSS_SEC}">Tus prioridades de la semana</div>')

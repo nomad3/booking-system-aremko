@@ -1,0 +1,225 @@
+{% load sala_formato %}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{# Se refresca sola: el panel se deja abierto en el teléfono durante el día. #}
+<meta http-equiv="refresh" content="90">
+<title>Sala de control · Aremko</title>
+<style>
+  :root{
+    --fondo:#fbfaf7; --papel:#fff; --tinta:#2f2c26; --suave:#8a8578;
+    --linea:#ece8e0; --alerta:#a33b2a; --aviso:#8a6d3b; --bien:#5b7a52;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --fondo:#171613; --papel:#201e1a; --tinta:#eae6dd; --suave:#948d7e;
+           --linea:#2e2b25; --alerta:#e08573; --aviso:#d6ab6a; --bien:#9dbd8f; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--tinta);
+       font:400 16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .hoja{max-width:640px;margin:0 auto;padding:18px 16px 60px}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--suave);font-size:14px;margin:2px 0 0}
+  h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+     color:var(--suave);margin:26px 0 8px;font-weight:600}
+  .tarjeta{background:var(--papel);border:1px solid var(--linea);
+           border-radius:10px;padding:12px 14px}
+  table{width:100%;border-collapse:collapse}
+  td{padding:7px 0;border-bottom:1px solid var(--linea)}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+  .nota{color:var(--suave);font-size:13px;text-align:right}
+  .fila{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
+        border-bottom:1px solid var(--linea)}
+  .fila:last-child{border-bottom:0}
+  .fila.lista .texto{color:var(--suave);text-decoration:line-through}
+  .texto{flex:1;min-width:0}
+  .meta{display:block;color:var(--suave);font-size:13px}
+  button.tick{background:none;border:1.5px solid var(--suave);border-radius:50%;
+        width:26px;height:26px;min-width:26px;cursor:pointer;color:var(--bien);
+        font-size:15px;line-height:1;padding:0}
+  button.tick.on{border-color:var(--bien);background:var(--bien);color:var(--papel)}
+  form.enlinea{display:inline;margin:0}
+  .aviso{border-left:3px solid var(--aviso);padding:9px 12px;margin:6px 0;
+         background:var(--papel)}
+  .aviso.grave{border-left-color:var(--alerta)}
+  .aviso b{color:var(--aviso)} .aviso.grave b{color:var(--alerta)}
+  .vacio{color:var(--suave)}
+  .agregar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .agregar input[type=text]{flex:1;min-width:180px;padding:9px 10px;font-size:15px;
+        border:1px solid var(--linea);border-radius:8px;background:var(--fondo);
+        color:var(--tinta)}
+  .agregar button{padding:9px 16px;font-size:15px;border:0;border-radius:8px;
+        background:var(--tinta);color:var(--fondo);cursor:pointer}
+  .pie{margin-top:28px;padding-top:12px;border-top:1px solid var(--linea);
+       color:var(--suave);font-size:12px}
+  a{color:inherit}
+</style>
+</head>
+<body>
+<div class="hoja">
+
+  <h1>Sala de control</h1>
+  <p class="sub">{{ hoy|date:"l j \d\e F" }} · actualizada {% now "H:i" %}</p>
+
+  {# ── Lo que se vendió hoy ─────────────────────────────────────────── #}
+  <h2>Hoy en ventas</h2>
+  <div class="tarjeta">
+    {% if ventas %}
+    <table>
+      <tr>
+        <td>Reservas creadas hoy</td>
+        <td class="num">{{ ventas.hoy.n }}</td>
+        <td class="num">{{ ventas.hoy.monto|clp }}</td>
+      </tr>
+      <tr>
+        <td>{{ ventas.dia_comparado|date:"l j" }}, a esta hora</td>
+        <td class="num">{{ ventas.semana_pasada.n }}</td>
+        <td class="num">{{ ventas.semana_pasada.monto|clp }}</td>
+      </tr>
+    </table>
+    {% else %}<span class="vacio">No se pudo leer.</span>{% endif %}
+  </div>
+
+  <h2>Conversaciones y cotizaciones</h2>
+  <div class="tarjeta">
+    <table>
+      {% if conversaciones %}
+      <tr><td>Conversaciones de hoy</td>
+          <td class="num">{{ conversaciones.conversaciones }}</td><td></td></tr>
+      <tr><td>Esperando respuesta</td>
+          <td class="num">{{ conversaciones.esperando }}</td>
+          <td class="nota">{% if conversaciones.mas_antigua_min %}la más antigua,
+              {{ conversaciones.mas_antigua_min }} min{% endif %}</td></tr>
+      {% endif %}
+      {% if cotizaciones %}
+      <tr><td>Cotizaciones enviadas</td>
+          <td class="num">{{ cotizaciones.enviadas }}</td>
+          <td class="nota">{{ cotizaciones.monto|clp }}</td></tr>
+      <tr><td>Convertidas en reserva</td>
+          <td class="num">{{ cotizaciones.creadas }}</td>
+          <td class="nota">{{ cotizaciones.esperando }} sin responder</td></tr>
+      {% endif %}
+    </table>
+  </div>
+
+  {# ── La lista del día ─────────────────────────────────────────────── #}
+  <h2>Publicaciones de hoy</h2>
+  <div class="tarjeta">
+    {% for p in publicaciones %}
+      <div class="fila {% if p.resuelta %}lista{% endif %}">
+        <form method="post" action="{% url 'sala_control:marcar_publicacion' %}"
+              class="enlinea">
+          {% csrf_token %}
+          <input type="hidden" name="publicacion_id" value="{{ p.id }}">
+          <input type="hidden" name="titulo" value="{{ p.titulo }}">
+          <button type="submit" class="tick {% if p.resuelta %}on{% endif %}"
+                  title="{% if p.por_telar %}Publicada en el Telar{% else %}Marcar{% endif %}"
+                  {% if p.por_telar %}disabled{% endif %}>
+            {% if p.resuelta %}✓{% endif %}</button>
+        </form>
+        <span class="texto">{{ p.titulo }}
+          <span class="meta">{{ p.hora|default:"sin hora" }} · {{ p.canal }}{% if p.por_telar %} · publicada en el Telar{% elif p.marcada_por_mi %} · marcada por ti{% endif %}</span>
+        </span>
+      </div>
+    {% empty %}
+      <span class="vacio">{% if publicaciones is None %}El Telar no respondió.{% else %}Nada programado para hoy.{% endif %}</span>
+    {% endfor %}
+    {% if semana_telar %}
+      <div class="meta" style="margin-top:8px">Semana:
+        {{ semana_telar.publicadas }}/{{ semana_telar.total }} publicadas ·
+        {{ semana_telar.por_publicar }} por publicar</div>
+    {% endif %}
+  </div>
+
+  <h2>Tus prioridades de la semana</h2>
+  <div class="tarjeta">
+    {% for p in prioridades %}
+      <div class="fila {% if p.hecha %}lista{% endif %}">
+        <form method="post" action="{% url 'sala_control:alternar_prioridad' %}"
+              class="enlinea">
+          {% csrf_token %}
+          <input type="hidden" name="prioridad_id" value="{{ p.id }}">
+          <button type="submit" class="tick {% if p.hecha %}on{% endif %}">
+            {% if p.hecha %}✓{% endif %}</button>
+        </form>
+        <span class="texto">{{ p.texto }}
+          {% if p.negocio != 'aremko' %}<span class="meta">{{ p.get_negocio_display }}</span>{% endif %}
+        </span>
+      </div>
+    {% empty %}
+      <span class="vacio">No fijaste prioridades esta semana.</span>
+    {% endfor %}
+  </div>
+
+  <h2>Lo que apareció hoy</h2>
+  <div class="tarjeta">
+    {% for n in notas %}
+      <div class="fila {% if n.hecha %}lista{% endif %}">
+        <form method="post" action="{% url 'sala_control:alternar_nota' %}"
+              class="enlinea">
+          {% csrf_token %}
+          <input type="hidden" name="nota_id" value="{{ n.id }}">
+          <button type="submit" class="tick {% if n.hecha %}on{% endif %}">
+            {% if n.hecha %}✓{% endif %}</button>
+        </form>
+        <span class="texto">
+          {% if n.link %}<a href="{{ n.link }}" target="_blank" rel="noopener">{{ n.texto }}</a>
+          {% else %}{{ n.texto }}{% endif %}
+          {% if n.negocio != 'aremko' %}<span class="meta">{{ n.get_negocio_display }}</span>{% endif %}
+        </span>
+      </div>
+    {% empty %}
+      <span class="vacio">Nada anotado todavía.</span>
+    {% endfor %}
+
+    <form method="post" action="{% url 'sala_control:agregar_nota' %}" class="agregar">
+      {% csrf_token %}
+      <input type="text" name="texto" placeholder="Qué pasó o qué hay que hacer"
+             maxlength="300" required>
+      <input type="text" name="link" placeholder="Link (opcional)" maxlength="200">
+      <select name="negocio" style="padding:9px;border-radius:8px;
+              border:1px solid var(--linea);background:var(--fondo);color:var(--tinta)">
+        <option value="aremko">Aremko</option>
+        <option value="datamatic">Datamatic</option>
+        <option value="torqueria">Torquería</option>
+      </select>
+      <button type="submit">Agregar</button>
+    </form>
+  </div>
+
+  {# ── La plata ─────────────────────────────────────────────────────── #}
+  <h2>Caja</h2>
+  <div class="tarjeta">
+    <table>
+      <tr><td>Caja Aremko</td>
+          <td class="num">{{ caja_total|clp }}</td>
+          <td class="nota">{% if caja_total and caja_total < umbral_caja %}bajo tu mínimo{% endif %}</td></tr>
+      <tr><td>Colchón</td>
+          <td class="num">{% if colchon %}{{ colchon }} días{% else %}—{% endif %}</td>
+          <td class="nota">al ritmo de los últimos 28 días</td></tr>
+      <tr><td>Gasto en Ads</td>
+          <td class="num">{% if corte_ads %}{{ corte_ads.total|clp }}{% else %}—{% endif %}</td>
+          <td class="nota">
+            {% if corte_ads %}al corte de las {{ corte_ads.calculado_en|date:"H:i" }}
+            {% else %}sin corte todavía{% endif %}</td></tr>
+    </table>
+    <form method="post" action="{% url 'sala_control:refrescar_ads' %}"
+          class="agregar">
+      {% csrf_token %}
+      <button type="submit">Actualizar publicidad ahora</button>
+    </form>
+  </div>
+
+  <div class="pie">
+    Cobertura de los datos:
+    {% for c in caja.cuentas %}{% if c.ultima_cartola %}{{ c.nombre }} al
+      {{ c.ultima_cartola|date:"d-m" }}{% if not forloop.last %} · {% endif %}
+    {% endif %}{% endfor %}
+    <br>Ventas y conversaciones, en vivo. Publicidad, del corte indicado.
+  </div>
+
+</div>
+</body>
+</html>

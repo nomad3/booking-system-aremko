@@ -381,3 +381,201 @@ class RecorteSinPalabrasColgando(SimpleTestCase):
     def test_conserva_palabras_con_contenido(self):
         corto = render.recortar('Tina caliente junto al río Pescado azul', 22)
         self.assertTrue(corto.endswith('junto…'), corto)
+
+
+class ElPanelPideClave(TestCase):
+    """El panel muestra caja, ventas y conversaciones de clientes. Nadie
+    entra sin sesión, y no basta con estar logueado."""
+
+    def test_sin_sesion_no_entra(self):
+        r = self.client.get('/sala/')
+        self.assertIn(r.status_code, (302, 403))
+
+    def test_usuario_comun_no_entra(self):
+        from django.contrib.auth.models import User
+        User.objects.create_user('pedro', password='x')
+        self.client.login(username='pedro', password='x')
+        r = self.client.get('/sala/')
+        self.assertIn(r.status_code, (302, 403))
+
+    def test_acciones_solo_por_post(self):
+        """Un GET no puede marcar nada: los buscadores y los precargadores de
+        enlaces siguen GETs, y despejarían la lista solos."""
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jorge', 'j@x.cl', 'x')
+        self.client.login(username='jorge', password='x')
+        for url in ('/sala/marcar-publicacion/', '/sala/agregar-nota/',
+                    '/sala/alternar-nota/', '/sala/alternar-prioridad/',
+                    '/sala/refrescar-ads/'):
+            self.assertEqual(self.client.get(url).status_code, 405, url)
+
+
+class MarcarPublicaciones(TestCase):
+    """Una fila se despeja si el Telar dice «publicada» O si Jorge la marcó:
+    son dos preguntas distintas y cualquiera de las dos la resuelve."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jorge', 'j@x.cl', 'x')
+        self.client.login(username='jorge', password='x')
+
+    def _estado(self, publicaciones, marcadas=()):
+        from unittest.mock import patch
+
+        from sala_control.models import MarcaPublicacion
+        from sala_control.panel import _pendientes_del_dia
+        hoy = date.today()
+        for pid in marcadas:
+            MarcaPublicacion.objects.create(fecha=hoy, publicacion_id=pid)
+        with patch('sala_control.fuentes.plan_del_dia',
+                   return_value={'publicaciones': publicaciones,
+                                 'semana': {'total': 1}}):
+            filas, _ = _pendientes_del_dia(hoy)
+        return filas
+
+    def test_publicada_en_el_telar_queda_resuelta(self):
+        filas = self._estado([{'id': 7, 'estado': 'publicada'}])
+        self.assertTrue(filas[0]['resuelta'])
+        self.assertTrue(filas[0]['por_telar'])
+
+    def test_marcada_por_jorge_queda_resuelta(self):
+        filas = self._estado([{'id': 7, 'estado': 'pendiente'}], marcadas=[7])
+        self.assertTrue(filas[0]['resuelta'])
+        self.assertTrue(filas[0]['marcada_por_mi'])
+        self.assertFalse(filas[0]['por_telar'])
+
+    def test_ni_una_ni_otra_queda_pendiente(self):
+        filas = self._estado([{'id': 7, 'estado': 'pendiente'}])
+        self.assertFalse(filas[0]['resuelta'])
+
+    def test_telar_caido_no_revienta_el_panel(self):
+        from unittest.mock import patch
+        from sala_control.panel import _pendientes_del_dia
+        with patch('sala_control.fuentes.plan_del_dia', return_value=None):
+            filas, semana = _pendientes_del_dia(date.today())
+        self.assertIsNone(filas)
+        self.assertIsNone(semana)
+
+    def test_marcar_es_un_interruptor(self):
+        """Desmarcar importa: equivocarse sin poder deshacer es lo que hace
+        que la gente deje de marcar."""
+        from sala_control.models import MarcaPublicacion
+        for _ in range(2):
+            self.client.post('/sala/marcar-publicacion/',
+                             {'publicacion_id': '42', 'titulo': 'Tina'})
+        self.assertEqual(MarcaPublicacion.objects.count(), 0)
+
+    def test_una_marca_no_pisa_a_la_otra(self):
+        from sala_control.models import MarcaPublicacion
+        self.client.post('/sala/marcar-publicacion/', {'publicacion_id': '42'})
+        self.client.post('/sala/marcar-publicacion/', {'publicacion_id': '43'})
+        self.assertEqual(MarcaPublicacion.objects.count(), 2)
+
+    def test_id_basura_no_crea_nada(self):
+        from sala_control.models import MarcaPublicacion
+        for malo in ('', 'abc', '0'):
+            self.client.post('/sala/marcar-publicacion/',
+                             {'publicacion_id': malo})
+        self.assertEqual(MarcaPublicacion.objects.count(), 0)
+
+
+class NotasDelDia(TestCase):
+    def setUp(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jorge', 'j@x.cl', 'x')
+        self.client.login(username='jorge', password='x')
+
+    def test_agregar_y_despejar(self):
+        from sala_control.models import NotaDelDia
+        self.client.post('/sala/agregar-nota/',
+                         {'texto': 'Llamar a Cristóbal',
+                          'link': 'https://ejemplo.cl/x',
+                          'negocio': 'datamatic'})
+        n = NotaDelDia.objects.get()
+        self.assertEqual(n.negocio, 'datamatic')
+        self.assertFalse(n.hecha)
+        self.client.post('/sala/alternar-nota/', {'nota_id': n.id})
+        n.refresh_from_db()
+        self.assertTrue(n.hecha)
+
+    def test_texto_vacio_no_crea_nota(self):
+        from sala_control.models import NotaDelDia
+        self.client.post('/sala/agregar-nota/', {'texto': '   '})
+        self.assertEqual(NotaDelDia.objects.count(), 0)
+
+
+class CorteDePublicidad(TestCase):
+    def test_guarda_y_declara_su_hora(self):
+        from sala_control.models import CorteAds
+        from sala_control.panel import guardar_corte_ads
+        c = guardar_corte_ads({'meta': 201000, 'google': 310000, 'dias': 22},
+                              date(2026, 8, 26))
+        self.assertEqual(c.total, 511000)
+        self.assertIsNotNone(c.calculado_en)
+
+    def test_no_leido_no_es_cero(self):
+        """Un fallo de red deja None. Guardarlo como cero se leería como
+        «no gastamos nada» y llevaría a subir presupuesto sin razón."""
+        from sala_control.panel import guardar_corte_ads
+        c = guardar_corte_ads({'meta': None, 'google': None, 'dias': 22},
+                              date(2026, 8, 26))
+        self.assertIsNone(c.total)
+
+    def test_el_del_dia_se_actualiza_no_se_duplica(self):
+        from sala_control.models import CorteAds
+        from sala_control.panel import guardar_corte_ads
+        guardar_corte_ads({'meta': 1, 'google': 1}, date(2026, 8, 26))
+        guardar_corte_ads({'meta': 2, 'google': 2}, date(2026, 8, 26))
+        self.assertEqual(CorteAds.objects.count(), 1)
+        self.assertEqual(CorteAds.objects.get().total, 4)
+
+
+class ElPanelSeDibuja(TestCase):
+    """La prueba que atrapa lo que ninguna otra ve: un error de plantilla.
+
+    Todo lo demás se puede probar sin renderizar, y por eso una llave mal
+    cerrada o un filtro mal escrito llegaría intacto a producción y el panel
+    daría error 500 justo cuando Jorge lo abre por primera vez.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jorge', 'j@x.cl', 'x')
+        self.client.login(username='jorge', password='x')
+
+    def test_carga_con_datos(self):
+        from sala_control.models import NotaDelDia, PrioridadSemana
+        from sala_control.panel import guardar_corte_ads
+        from sala_control.fuentes import lunes_de
+        hoy = date.today()
+        # La vista busca por el LUNES de la semana, no por hoy.
+        PrioridadSemana.objects.create(
+            semana_inicio=lunes_de(hoy), orden=1, texto='Revisar la carta')
+        NotaDelDia.objects.create(fecha=hoy, texto='Llamar a Cristóbal',
+                                  link='https://ejemplo.cl/x',
+                                  negocio='datamatic')
+        guardar_corte_ads({'meta': 201000, 'google': 310000, 'dias': 22}, hoy)
+
+        r = self.client.get('/sala/')
+        self.assertEqual(r.status_code, 200)
+        cuerpo = r.content.decode()
+        self.assertIn('Sala de control', cuerpo)
+        self.assertIn('Revisar la carta', cuerpo)
+        self.assertIn('Llamar a Cristóbal', cuerpo)
+        # Formato chileno: puntos de miles, no el espacio que ponía intcomma.
+        self.assertIn('$511.000', cuerpo)
+        self.assertNotIn('511\xa0000', cuerpo)
+
+    def test_carga_sin_nada_cargado(self):
+        """El día de estreno no hay prioridades, ni notas, ni corte de ads, y
+        el Telar puede no responder. Igual tiene que dibujarse."""
+        r = self.client.get('/sala/')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Sala de control', r.content.decode())
+
+    def test_la_fecha_sale_en_castellano(self):
+        r = self.client.get('/sala/')
+        cuerpo = r.content.decode()
+        self.assertIn(' de ', cuerpo)
+        # El escape del filtro de fecha no debe filtrarse crudo al HTML.
+        self.assertNotIn('\\d\\e', cuerpo)

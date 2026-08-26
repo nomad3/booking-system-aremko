@@ -42,6 +42,16 @@ class Command(BaseCommand):
         datos = resumen.construir()
         texto = render.a_texto(datos)
 
+        # El panel del día lee de acá el gasto en publicidad: son llamadas de
+        # red lentas y una página que se refresca sola no puede pedirlas cada
+        # vez. Se congela una vez al día, acá, y el panel lo muestra con su
+        # hora. Que falle no puede impedir el correo.
+        try:
+            from sala_control.panel import guardar_corte_ads
+            guardar_corte_ads(datos['ads'], datos['fecha'])
+        except Exception as exc:
+            logger.warning('sala_control: no se pudo guardar el corte de ads: %s', exc)
+
         if opts['dry_run']:
             self.stdout.write(texto)
             self.stdout.write(self.style.WARNING(
