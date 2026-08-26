@@ -44,9 +44,22 @@ logger = logging.getLogger(__name__)
 # API config
 # ============================================================================
 
-# Google retira cada versión de la API a ~1 año. Configurable por env var para
-# subirla sin redeploy cuando la actual quede obsoleta (síntoma: 404 HTML al llamar).
-GOOGLE_ADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v21")
+# Google retira cada versión de la API a ~1 año y el corte es abrupto: empieza a
+# devolver 404 HTML y los reportes quedan en cero sin ningún aviso. Ya pasó dos
+# veces (v17→v21 en julio 2026, v21→v25 en agosto 2026) y la segunda dejó el
+# bloque de Google del brief semanal vacío durante semanas sin que nadie lo notara.
+#
+# El default DEBE ser una versión viva: es lo que gobierna cuando no hay env var,
+# y un default muerto convierte «borrar una variable» en «apagar Google Ads».
+# Mismo valor y mismo nombre de env var que el backend Go de aremko-cli, para que
+# los dos servicios se muevan juntos.
+#
+# Para verificar cuál está viva (401 = viva, 404 = retirada):
+#   curl -o /dev/null -w "%{http_code}" -X POST \
+#     https://googleads.googleapis.com/vNN/customers/1/googleAds:search \
+#     -H "Content-Type: application/json" -d '{"query":"SELECT campaign.id FROM campaign"}'
+# Verificado 2026-08-24: v23, v24, v25 y v26 responden; v22 y anteriores, no.
+GOOGLE_ADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v25")
 GOOGLE_ADS_API_BASE = f"https://googleads.googleapis.com/{GOOGLE_ADS_API_VERSION}"
 OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 
