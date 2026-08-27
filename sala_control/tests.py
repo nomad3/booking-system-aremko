@@ -573,6 +573,16 @@ class ElPanelSeDibuja(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn('Sala de control', r.content.decode())
 
+    def test_no_se_filtra_sintaxis_de_plantilla(self):
+        """Un comentario {# #} de VARIAS líneas no es un comentario para
+        Django: se imprime tal cual en la página. Pasó, y Jorge lo vio en su
+        teléfono. Las demás pruebas no lo atraparon porque solo comprobaban
+        que ciertos textos estuvieran, no que no sobrara ninguno."""
+        cuerpo = self.client.get('/sala/').content.decode()
+        for resto in ('{#', '#}', '{%', '%}', '{{', '}}'):
+            self.assertNotIn(resto, cuerpo,
+                             f'quedó sintaxis de plantilla sin procesar: {resto}')
+
     def test_la_fecha_sale_en_castellano(self):
         r = self.client.get('/sala/')
         cuerpo = r.content.decode()

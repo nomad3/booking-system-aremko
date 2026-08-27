@@ -161,9 +161,14 @@
       <span class="vacio">No fijaste prioridades esta semana.</span>
     {% endfor %}
 
-    {# La semana la calcula el servidor: pedirle a alguien que averigüe qué
-       lunes es, para escribir algo que va a leer en esta misma página, es la
-       fricción que hacía que esto se cargara en el admin o no se cargara. #}
+    {% comment %}
+      La semana la calcula el servidor: pedirle a alguien que averigüe qué
+      lunes es, para escribir algo que va a leer en esta misma página, es la
+      fricción que hacía que esto se cargara en el admin o no se cargara.
+      Va en bloque de comentario y no con almohadilla: los de almohadilla son
+      de UNA sola línea, y uno multilínea se imprime tal cual en la página.
+      Pasó, y se vio en el teléfono.
+    {% endcomment %}
     <form method="post" action="{% url 'sala_control:agregar_prioridad' %}" class="agregar">
       {% csrf_token %}
       <input type="text" name="texto" placeholder="Qué es lo importante esta semana"
