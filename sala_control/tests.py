@@ -579,3 +579,78 @@ class ElPanelSeDibuja(TestCase):
         self.assertIn(' de ', cuerpo)
         # El escape del filtro de fecha no debe filtrarse crudo al HTML.
         self.assertNotIn('\\d\\e', cuerpo)
+
+
+class PrioridadesDesdeElPanel(TestCase):
+    """Cargarlas desde el panel existe para eliminar una fricción concreta: en
+    el admin había que escribir a mano «el lunes de la semana», y poner la fecha
+    de hoy las guardaba INVISIBLES —no salían ni en el correo ni en el panel—
+    sin ningún error que lo dijera."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        User.objects.create_superuser('jorge', 'j@x.cl', 'x')
+        self.client.login(username='jorge', password='x')
+
+    def test_la_semana_se_calcula_sola(self):
+        from sala_control.fuentes import lunes_de
+        from sala_control.models import PrioridadSemana
+        self.client.post('/sala/agregar-prioridad/',
+                         {'texto': 'Revisar la carta'})
+        p = PrioridadSemana.objects.get()
+        self.assertEqual(p.semana_inicio, lunes_de(date.today()))
+        self.assertEqual(p.semana_inicio.weekday(), 0)   # siempre un lunes
+
+    def test_recien_creada_aparece_en_el_panel(self):
+        """La prueba que de verdad importa: que se vea. Guardar con la semana
+        equivocada no daba error, simplemente no aparecía."""
+        self.client.post('/sala/agregar-prioridad/',
+                         {'texto': 'Conseguir dos prospectos'})
+        self.assertIn('Conseguir dos prospectos',
+                      self.client.get('/sala/').content.decode())
+
+    def test_el_orden_se_asigna_solo_y_no_se_repite(self):
+        from sala_control.models import PrioridadSemana
+        for t in ('una', 'dos', 'tres'):
+            self.client.post('/sala/agregar-prioridad/', {'texto': t})
+        ordenes = list(PrioridadSemana.objects.order_by('orden')
+                       .values_list('orden', flat=True))
+        self.assertEqual(ordenes, [1, 2, 3])
+
+    def test_cada_negocio_numera_aparte(self):
+        from sala_control.models import PrioridadSemana
+        self.client.post('/sala/agregar-prioridad/',
+                         {'texto': 'de aremko', 'negocio': 'aremko'})
+        self.client.post('/sala/agregar-prioridad/',
+                         {'texto': 'de datamatic', 'negocio': 'datamatic'})
+        self.assertEqual(
+            PrioridadSemana.objects.get(negocio='datamatic').orden, 1)
+
+    def test_texto_vacio_no_crea_nada(self):
+        from sala_control.models import PrioridadSemana
+        self.client.post('/sala/agregar-prioridad/', {'texto': '   '})
+        self.assertEqual(PrioridadSemana.objects.count(), 0)
+
+    def test_se_puede_quitar(self):
+        from sala_control.models import PrioridadSemana
+        self.client.post('/sala/agregar-prioridad/', {'texto': 'me equivoqué'})
+        pid = PrioridadSemana.objects.get().id
+        self.client.post('/sala/borrar-prioridad/', {'prioridad_id': pid})
+        self.assertEqual(PrioridadSemana.objects.count(), 0)
+
+    def test_no_borra_las_de_semanas_pasadas(self):
+        """El historial no se toca desde el panel: solo se despeja lo de esta
+        semana. Borrar hacia atrás sería perder el registro de lo decidido."""
+        from datetime import timedelta
+
+        from sala_control.fuentes import lunes_de
+        from sala_control.models import PrioridadSemana
+        vieja = PrioridadSemana.objects.create(
+            semana_inicio=lunes_de(date.today()) - timedelta(days=7),
+            orden=1, texto='de la semana pasada')
+        self.client.post('/sala/borrar-prioridad/', {'prioridad_id': vieja.id})
+        self.assertTrue(PrioridadSemana.objects.filter(id=vieja.id).exists())
+
+    def test_acciones_solo_por_post(self):
+        for url in ('/sala/agregar-prioridad/', '/sala/borrar-prioridad/'):
+            self.assertEqual(self.client.get(url).status_code, 405, url)
