@@ -45,6 +45,9 @@
          background:var(--papel)}
   .aviso.grave{border-left-color:var(--alerta)}
   .aviso b{color:var(--aviso)} .aviso.grave b{color:var(--alerta)}
+  button.quitar{background:none;border:0;color:var(--suave);font-size:20px;
+        line-height:1;cursor:pointer;padding:0 2px;opacity:.55}
+  button.quitar:hover{opacity:1;color:var(--alerta)}
   .vacio{color:var(--suave)}
   .agregar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .agregar input[type=text]{flex:1;min-width:180px;padding:9px 10px;font-size:15px;
@@ -147,10 +150,32 @@
         <span class="texto">{{ p.texto }}
           {% if p.negocio != 'aremko' %}<span class="meta">{{ p.get_negocio_display }}</span>{% endif %}
         </span>
+        <form method="post" action="{% url 'sala_control:borrar_prioridad' %}"
+              class="enlinea">
+          {% csrf_token %}
+          <input type="hidden" name="prioridad_id" value="{{ p.id }}">
+          <button type="submit" class="quitar" title="Quitar">×</button>
+        </form>
       </div>
     {% empty %}
       <span class="vacio">No fijaste prioridades esta semana.</span>
     {% endfor %}
+
+    {# La semana la calcula el servidor: pedirle a alguien que averigüe qué
+       lunes es, para escribir algo que va a leer en esta misma página, es la
+       fricción que hacía que esto se cargara en el admin o no se cargara. #}
+    <form method="post" action="{% url 'sala_control:agregar_prioridad' %}" class="agregar">
+      {% csrf_token %}
+      <input type="text" name="texto" placeholder="Qué es lo importante esta semana"
+             maxlength="200" required>
+      <select name="negocio" style="padding:9px;border-radius:8px;
+              border:1px solid var(--linea);background:var(--fondo);color:var(--tinta)">
+        <option value="aremko">Aremko</option>
+        <option value="datamatic">Datamatic</option>
+        <option value="torqueria">Torquería</option>
+      </select>
+      <button type="submit">Agregar</button>
+    </form>
   </div>
 
   <h2>Lo que apareció hoy</h2>

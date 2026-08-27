@@ -10,5 +10,7 @@ urlpatterns = [
     path('agregar-nota/', panel.agregar_nota, name='agregar_nota'),
     path('alternar-nota/', panel.alternar_nota, name='alternar_nota'),
     path('alternar-prioridad/', panel.alternar_prioridad, name='alternar_prioridad'),
+    path('agregar-prioridad/', panel.agregar_prioridad, name='agregar_prioridad'),
+    path('borrar-prioridad/', panel.borrar_prioridad, name='borrar_prioridad'),
     path('refrescar-ads/', panel.refrescar_ads, name='refrescar_ads'),
 ]

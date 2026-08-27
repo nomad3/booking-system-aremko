@@ -170,3 +170,42 @@ def refrescar_ads(request):
     """
     guardar_corte_ads(fuentes.publicidad(fuentes.dias_transcurridos_del_mes()))
     return _volver()
+
+
+@require_POST
+@user_passes_test(puede_ver_sala)
+def agregar_prioridad(request):
+    """Fijar una prioridad de la semana, desde el panel.
+
+    La semana se calcula sola. Antes había que crearlas en el admin poniendo a
+    mano «el lunes de la semana», y poner la fecha de hoy en vez del lunes las
+    guardaba invisibles: no aparecían ni en el correo ni acá. Pedirle a alguien
+    que calcule qué lunes es, para escribir algo que va a leer en esta misma
+    página, es la clase de fricción que hace que una función no se use nunca.
+    """
+    texto = (request.POST.get('texto') or '').strip()
+    if not texto:
+        return _volver()
+
+    lunes = fuentes.lunes_de(date.today())
+    negocio = request.POST.get('negocio') or 'aremko'
+    # El orden se asigna solo: es una lista corta y numerarla a mano no aporta.
+    ultimo = (PrioridadSemana.objects
+              .filter(semana_inicio=lunes, negocio=negocio)
+              .order_by('-orden').values_list('orden', flat=True).first())
+    PrioridadSemana.objects.create(
+        semana_inicio=lunes, negocio=negocio, orden=(ultimo or 0) + 1,
+        texto=texto[:200])
+    return _volver()
+
+
+@require_POST
+@user_passes_test(puede_ver_sala)
+def borrar_prioridad(request):
+    """Quitar una prioridad. Sin esto, un error de tipeo obliga a ir al admin —
+    y volver al admin es justo lo que este panel vino a evitar."""
+    (PrioridadSemana.objects
+     .filter(id=request.POST.get('prioridad_id'),
+             semana_inicio=fuentes.lunes_de(date.today()))
+     .delete())
+    return _volver()
