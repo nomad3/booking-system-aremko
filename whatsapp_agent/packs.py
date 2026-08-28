@@ -1123,7 +1123,14 @@ def disponibilidad_dia(fecha, preferir_premium=False):
 
     f = _parse_fecha(fecha) if fecha else None
     if f is None:
-        return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
+        # Una fecha que falta NO es una falla del sistema: es un dato que falta
+        # en la conversación. Devolverla como `error` hacía que el agente
+        # derivara a un humano cuando el cliente solo había preguntado «tienes
+        # para el día?» sin decir cuál — que es la forma más natural de
+        # preguntarlo. Se responde con la instrucción de preguntar.
+        return {'disponible': False, 'falta_fecha': True,
+                'nota': 'No dijo para qué día. Pregúntale cuál lunes, miércoles '
+                        'o jueves le acomoda y vuelve a consultar con esa fecha.'}
     personas = 2
 
     if _dia_semana_pack(f) not in DIA_DIAS_VALIDOS:

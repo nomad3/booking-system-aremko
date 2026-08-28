@@ -156,8 +156,28 @@ class ElPrecioYLaForma(SimpleTestCase):
     def test_precio_plano(self):
         self.assertEqual(packs.DIA_PRECIO_PLANO, 200000)
 
-    def test_fecha_invalida_avisa(self):
-        self.assertIn('error', packs.disponibilidad_dia('no-es-fecha'))
+    def test_sin_fecha_PREGUNTA_en_vez_de_derivar_a_un_humano(self):
+        """Pasó en vivo: el cliente preguntó «¿tienes para alojar por el día?»
+        —la forma más natural de preguntarlo— y el agente derivó a una persona.
+        Cualquier tool que devuelve `error` dispara la derivación, y una fecha
+        que falta NO es una falla del sistema: es un dato que falta en la
+        conversación. La respuesta correcta es preguntar cuál día."""
+        from whatsapp_agent import escalation
+        for entrada in ('por el día', 'no-es-fecha', '', None):
+            r = packs.disponibilidad_dia(entrada)
+            self.assertNotIn('error', r, f'«{entrada}» todavía deriva')
+            self.assertTrue(escalation.tool_result_ok(r), f'«{entrada}» escala')
+            self.assertTrue(r.get('falta_fecha'))
+            self.assertIn('Pregúntale', r['nota'])
+
+    def test_una_fecha_real_sigue_funcionando(self):
+        """La corrección no puede tragarse las fechas buenas."""
+        with patch('whatsapp_agent.availability.disponibilidad',
+                   side_effect=_mock(CAB, CAB)), \
+             patch('whatsapp_agent.packs._desayuno_de_cabana', return_value=None):
+            r = packs.disponibilidad_dia(LUNES.isoformat())
+        self.assertTrue(r['disponible'])
+        self.assertFalse(r.get('falta_fecha'))
 
     def test_las_cinco_combinaciones_y_el_orden(self):
         """Las tres primeras cierran a las 16:30 —las de ocho horas— y van
