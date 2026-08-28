@@ -124,3 +124,37 @@ class SeEncuentraDesdeTODO_EL_SITIO(TestCase):
         html = self.client.get(reverse('dia_landing')).content.decode()
         pie = html[html.index('Servicios Populares'):]
         self.assertIn(reverse('dia_landing'), pie)
+
+
+class NingunMenuSeQuedaAtras(TestCase):
+    """El menú está copiado en TRES plantillas y se descubrió de a una: primero
+    la home, después la base, después las páginas de categoría. Cada vez que
+    faltaba, un grupo entero de visitantes no podía encontrar la experiencia.
+
+    Esta prueba mira el código fuente en vez de una página concreta: si mañana
+    alguien crea una cuarta plantilla con su propio menú y la olvida, esto
+    falla. Es la única forma de no volver a descubrirlo por casualidad."""
+
+    def test_todos_los_menus_ofrecen_la_experiencia(self):
+        import glob
+        import os
+
+        from django.conf import settings
+
+        raiz = os.path.join(settings.BASE_DIR, 'ventas', 'templates')
+        con_menu, sin_enlace = [], []
+        for ruta in glob.glob(os.path.join(raiz, '**', '*.html'), recursive=True):
+            with open(ruta, encoding='utf-8') as f:
+                contenido = f.read()
+            if '{% block nav_items %}' not in contenido:
+                continue
+            con_menu.append(os.path.basename(ruta))
+            # Un menú que ofrece el Refugio es un menú de experiencias; si no
+            # lo ofrece, es otra cosa y no aplica.
+            if "'refugio_landing'" in contenido and "'dia_landing'" not in contenido:
+                sin_enlace.append(os.path.basename(ruta))
+
+        self.assertGreaterEqual(len(con_menu), 3,
+                                'se esperaban al menos 3 plantillas con menú')
+        self.assertEqual(sin_enlace, [],
+                         f'menús de experiencias sin «Cabaña y spa por el día»: {sin_enlace}')
