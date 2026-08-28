@@ -107,6 +107,20 @@ class PausaLandingSitemap(Sitemap):
         return reverse(item)
 
 
+class DiaLandingSitemap(Sitemap):
+    """Sitemap para «Cabaña y spa por el día». Indexable por diseño: responde a
+    una búsqueda que hoy no tiene destino —querer la experiencia completa sin
+    quedarse a dormir— y no depende de campaña paga."""
+    changefreq = 'weekly'
+    priority = 0.8
+
+    def items(self):
+        return ['dia_landing']
+
+    def location(self, item):
+        return reverse(item)
+
+
 class NocheAguasCalientesSitemap(Sitemap):
     """Sitemap para la landing 'Noche de Aguas Calientes' (H-055): cabaña 1 noche + tina,
     sin masaje. Indexable por diseño, igual que Pausa — no depende de campaña paga (a

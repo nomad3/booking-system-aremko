@@ -940,6 +940,50 @@ def pausa_landing_view(request):
     })
 
 
+def dia_landing_view(request):
+    """Landing INDEXABLE de «Cabaña y spa por el día»: la experiencia completa
+    —desayuno, masaje, tinas y la cabaña— en un solo día, SIN alojamiento.
+
+    Nació de un caso real: un cliente de Osorno que llegó en la mañana, lo hizo
+    todo y volvió a dormir a su casa. Lo que vende no es el día: es no tener que
+    organizar la noche —los niños, el perro, el trabajo de mañana—, que es la
+    fricción que deja «tenemos que ir algún día» en conversación durante meses.
+
+    Se vende lunes, miércoles y jueves: el martes se cierra por mantención y el
+    domingo las cabañas del sábado se desocupan a las 11:00, muy tarde para
+    recibir a las 10:00. CTA único → WhatsApp con medición (GA4
+    dia_whatsapp_click + Meta Lead). Reusa el molde y las fotos del Ritual.
+    """
+    try:
+        canonical_url = request.build_absolute_uri(request.path)
+    except Exception:
+        canonical_url = request.path
+    whatsapp_url = (
+        'https://wa.me/56957902525?text='
+        'Hola%2C%20quiero%20reservar%20la%20Caba%C3%B1a%20y%20spa%20por%20el%20d%C3%ADa'
+    )
+    try:
+        from ventas.models import RitualRioLandingConfig
+        config = RitualRioLandingConfig.get_solo()
+    except Exception:
+        config = None
+    # Reseñas REALES de TripAdvisor, curadas para este programa: una del lugar,
+    # una de las tinas y una del trato — las tres hablan de lo que se vive en el
+    # día, no de la noche.
+    resenas = [
+        (None, 'Maravillosas tinas de agua caliente, temperatura perfecta, al borde del río.', 'Vanessa · Santiago'),
+        (None, 'El lugar es hermoso, las tinas al aire libre rodeadas de naturaleza; ideal para relajarse.', 'Cristina · TripAdvisor'),
+        (None, 'Los masajes descontracturantes fueron increíbles, combinados con técnicas quiroprácticas.', 'Nicolás · TripAdvisor'),
+    ]
+    return render(request, 'ventas/dia_landing.html', {
+        'canonical_url': canonical_url,
+        'whatsapp_url': whatsapp_url,
+        'config': config,
+        'resenas': resenas,
+        'precio': '200.000',   # 2 personas, lun/mié/jue (Jorge 2026-08-28)
+    })
+
+
 def noche_aguas_calientes_landing_view(request):
     """Landing INDEXABLE de la "Noche de Aguas Calientes" (H-055): cabaña 1 noche + tina
     caliente, SIN masaje — para quien llega de tarde-noche (después del trabajo), duerme en
