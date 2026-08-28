@@ -2598,8 +2598,32 @@ PROGRAMA_LABELS = [
     ('refugio', '🌿 Refugio Aremko (2 noches)'),
     ('pausa', '🍃 Pausa junto al río'),
     ('aguas_calientes', '💧 Noche de Aguas Calientes'),
+    ('dia', '☀️ Cabaña y spa por el día'),
     ('otros', 'Otros'),
 ]
+
+
+# Hora a la que «Cabaña y spa por el día» reserva la cabaña. Es la señal que lo
+# distingue: ese programa recibe a las 10:00 de la mañana, mientras el Ritual y
+# el Refugio reservan la cabaña a las 16:00 (check-in). No es una convención
+# frágil — sale directo del diseño del producto, que existe justamente porque
+# el cliente llega temprano y no se queda a dormir.
+DIA_HORA_CABANA = '10:00'
+
+
+def _ventas_del_programa_dia(venta_reserva_ids):
+    """Ids de las ventas que son «Cabaña y spa por el día».
+
+    Sin esto se cuentan como Ritual del Río: mismos componentes (cabaña + tina
+    + masaje) y una sola fecha de cabaña. No solo quedaría sin medir lo nuevo
+    —el Ritual mostraría un crecimiento que no es suyo, y nadie podría saber
+    cuál de los dos se está vendiendo.
+    """
+    return set(ReservaServicio.objects
+               .filter(venta_reserva_id__in=list(venta_reserva_ids),
+                       servicio__tipo_servicio='cabana',
+                       hora_inicio=DIA_HORA_CABANA)
+               .values_list('venta_reserva_id', flat=True))
 
 
 def _programa_de_combo(combo, noches_cabana_count):
@@ -2706,6 +2730,7 @@ def calcular_reservas_por_programa_semanal(weeks=8):
         }
         for clave, nombre in PROGRAMA_LABELS
     }
+    ids_dia = _ventas_del_programa_dia(reservas_data.keys())
     for _vid, d in reservas_data.items():
         fc_date = d['fecha_creacion']
         idx_semana = next(
@@ -2715,7 +2740,10 @@ def calcular_reservas_por_programa_semanal(weeks=8):
         if idx_semana is None:
             continue  # no debería pasar: el filtro de la query ya acota al rango de semanas
         combo = _classify_family_combo(d['familias'])
-        programa = _programa_de_combo(combo, len(d['noches_cabana']))
+        # El día se decide ANTES del combo: sus componentes son idénticos a los
+        # del Ritual y caería ahí, inflándolo con ventas que no son suyas.
+        programa = ('dia' if _vid in ids_dia
+                    else _programa_de_combo(combo, len(d['noches_cabana'])))
         bucket = tabla[programa]
         bucket['semanas'][idx_semana]['count'] += 1
         bucket['semanas'][idx_semana]['revenue'] += d['revenue']
@@ -2771,8 +2799,11 @@ def clasificar_ventareservas_por_programa(venta_reserva_ids):
         if fam_plural == 'cabanas':
             reservas_data[vid]['noches_cabana'].add(row['fecha_agendamiento'])
 
+    ids_dia = _ventas_del_programa_dia(reservas_data.keys())
     return {
-        vid: _programa_de_combo(_classify_family_combo(d['familias']), len(d['noches_cabana']))
+        vid: ('dia' if vid in ids_dia
+              else _programa_de_combo(_classify_family_combo(d['familias']),
+                                      len(d['noches_cabana'])))
         for vid, d in reservas_data.items()
     }
 
