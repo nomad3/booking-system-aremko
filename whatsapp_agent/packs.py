@@ -1183,3 +1183,111 @@ def disponibilidad_dia(fecha, preferir_premium=False):
     return {'fecha': f.isoformat(), 'disponible': False,
             'nota': 'hay cabaña, pero no queda ninguna combinación de masaje y '
                     'tina que calce sin pisarse; ofrece otra fecha'}
+
+
+# Motivo con el que se marcan los bloqueos de la noche anterior. Se busca por
+# este texto para deshacerlos si la reserva se cancela, así que no cambiarlo a
+# la ligera.
+DIA_MOTIVO_BLOQUEO = 'Cabaña y spa por el día'
+
+
+def bloquear_noche_previa(cabana_id, fecha_dia, referencia=''):
+    """Bloquea la cabaña la noche ANTERIOR al día vendido.
+
+    Sin esto queda una ventana peligrosa: se vende el día, alguien reserva esa
+    noche después, y el cliente llega desde Osorno a las 10:00 a una cabaña
+    que recién se está desocupando. El motor de disponibilidad de Luna respeta
+    estos bloqueos, así que basta con crearlos para cerrar la puerta.
+
+    Es idempotente: llamarla dos veces por la misma reserva no duplica nada.
+    Devuelve la cantidad de slots efectivamente bloqueados.
+    """
+    from datetime import timedelta
+
+    from ventas.models import Servicio, ServicioSlotBloqueo
+
+    cabana = Servicio.objects.filter(id=cabana_id).first()
+    if cabana is None:
+        return 0
+
+    f_previa = fecha_dia - timedelta(days=1)
+    # Se bloquean TODOS los slots de la cabaña, no solo el de check-in: si
+    # mañana alguien le agrega un horario, la noche seguiría cerrada.
+    slots = list(cabana.slots_disponibles or []) or ['16:00']
+    creados = 0
+    for hora in slots:
+        _, nuevo = ServicioSlotBloqueo.objects.get_or_create(
+            servicio=cabana, fecha=f_previa, hora_slot=hora,
+            defaults={'motivo': DIA_MOTIVO_BLOQUEO, 'activo': True,
+                      'notas': referencia},
+        )
+        creados += 1 if nuevo else 0
+    return creados
+
+
+def construir_servicios_dia(fecha, preferir_premium=False):
+    """Arma la lista de servicios de «Cabaña y spa por el día» para
+    `preparar_reserva`, clavando el total en $200.000.
+
+    La cabaña va UNA sola vez (el día), no dos: el cliente no duerme, y meter
+    una noche fantasma en la agenda haría que Deborah y housekeeping preparen
+    una llegada que no existe. La noche anterior se protege con un bloqueo
+    (`bloquear_noche_previa`), que es lo que de verdad corresponde: no hay
+    huésped, hay una cabaña que tiene que estar lista.
+    """
+    from ventas.models import Servicio
+    from .availability import _parse_fecha
+
+    r = disponibilidad_dia(fecha, preferir_premium=preferir_premium)
+    if r.get('error'):
+        return {'error': r['error']}
+    if not r.get('disponible'):
+        return {'disponible': False, 'fecha': r.get('fecha'), 'nota': r.get('nota')}
+
+    it = r['itinerario']
+    f = _parse_fecha(r['fecha'])
+    personas = r.get('personas', 2)
+    cab, tina, masaje = it['cabana'], it['tina'], it['masaje']
+
+    def _pb(servicio_id):
+        s = Servicio.objects.filter(id=servicio_id).first()
+        return int(s.precio_base) if s else 0
+
+    servicios = [
+        {'servicio_id': cab['servicio_id'], 'fecha': f.isoformat(),
+         'hora': DIA_HORA_LLEGADA, 'cantidad_personas': personas},
+        {'servicio_id': tina['servicio_id'], 'fecha': f.isoformat(),
+         'hora': tina['hora'], 'cantidad_personas': personas},
+        {'servicio_id': masaje['servicio_id'], 'fecha': f.isoformat(),
+         'hora': masaje['hora'], 'cantidad_personas': personas},
+    ]
+    suma = sum(_pb(s['servicio_id']) * s['cantidad_personas'] for s in servicios)
+    descuento = max(0, suma - DIA_PRECIO_PLANO)
+
+    if descuento:
+        ds = _servicio_descuento()
+        if ds is None:
+            return {'error': 'no existe el servicio "Descuento de servicios" '
+                             'para clavar el total'}
+        pb = int(ds.precio_base)
+        if pb >= 0:
+            return {'error': f'el servicio de descuento tiene precio_base {pb} '
+                             f'(debería ser negativo)'}
+        servicios.append({'servicio_id': ds.id, 'fecha': f.isoformat(),
+                          'hora': DIA_HORA_LLEGADA,
+                          'cantidad_personas': round(descuento / abs(pb))})
+
+    return {
+        'disponible': True,
+        'fecha': r['fecha'],
+        'personas': personas,
+        'servicios': servicios,
+        'suma_componentes': suma,
+        'descuento': descuento,
+        'total': suma - descuento,           # = DIA_PRECIO_PLANO ($200.000)
+        'objetivo': DIA_PRECIO_PLANO,
+        'itinerario': it,
+        'cabana_id': cab['servicio_id'],     # para bloquear la noche anterior
+        'es_torre': r.get('es_torre'),
+        'es_hidromasaje': r.get('es_hidromasaje'),
+    }

@@ -14,7 +14,7 @@ medio día menos.
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from whatsapp_agent import packs
 
@@ -165,3 +165,100 @@ class ElPrecioYLaForma(SimpleTestCase):
         self.assertEqual(len(packs.DIA_COMBINACIONES), 5)
         self.assertTrue(all(t == '16:30' for _, t in packs.DIA_COMBINACIONES[:3]))
         self.assertTrue(all(t != '16:30' for _, t in packs.DIA_COMBINACIONES[3:]))
+
+
+class ElBloqueoDeLaNocheAnterior(TestCase):
+    """Sin este bloqueo queda una ventana peligrosa: se vende el día, alguien
+    reserva esa noche después, y el cliente llega desde Osorno a las 10:00 a
+    una cabaña que recién se está desocupando."""
+
+    def setUp(self):
+        from ventas.models import Servicio
+        self.cabana = Servicio.objects.create(
+            nombre='Cabaña Pucón', precio_base=100000, duracion=60,
+            slots_disponibles=['16:00'])
+
+    def test_bloquea_la_noche_ANTERIOR_no_la_del_dia(self):
+        from ventas.models import ServicioSlotBloqueo
+        packs.bloquear_noche_previa(self.cabana.id, LUNES)
+        fechas = list(ServicioSlotBloqueo.objects
+                      .filter(servicio=self.cabana).values_list('fecha', flat=True))
+        self.assertEqual(fechas, [LUNES - timedelta(days=1)])
+
+    def test_llamarla_dos_veces_no_duplica(self):
+        """La confirmación puede reintentarse; no puede dejar basura."""
+        from ventas.models import ServicioSlotBloqueo
+        packs.bloquear_noche_previa(self.cabana.id, LUNES)
+        packs.bloquear_noche_previa(self.cabana.id, LUNES)
+        self.assertEqual(ServicioSlotBloqueo.objects.count(), 1)
+
+    def test_bloquea_todos_los_slots_de_la_cabaña(self):
+        """Si mañana alguien le agrega un horario a la cabaña, la noche tiene
+        que seguir cerrada — no solo el check-in."""
+        from ventas.models import ServicioSlotBloqueo
+        self.cabana.slots_disponibles = ['16:00', '18:00']
+        self.cabana.save(update_fields=['slots_disponibles'])
+        packs.bloquear_noche_previa(self.cabana.id, LUNES)
+        self.assertEqual(ServicioSlotBloqueo.objects.count(), 2)
+
+    def test_queda_marcado_con_su_motivo(self):
+        """Se busca por el motivo para deshacerlo si la reserva se cancela."""
+        from ventas.models import ServicioSlotBloqueo
+        packs.bloquear_noche_previa(self.cabana.id, LUNES, referencia='reserva 123')
+        b = ServicioSlotBloqueo.objects.get()
+        self.assertEqual(b.motivo, packs.DIA_MOTIVO_BLOQUEO)
+        self.assertIn('123', b.notas or '')
+        self.assertTrue(b.activo)
+
+    def test_cabaña_inexistente_no_revienta(self):
+        self.assertEqual(packs.bloquear_noche_previa(999999, LUNES), 0)
+
+
+class ElArmadoDeLaReserva(TestCase):
+    """El total tiene que quedar clavado en $200.000, y la cabaña UNA sola vez
+    —el cliente no duerme, y una noche fantasma haría que housekeeping prepare
+    una llegada que no existe."""
+
+    def setUp(self):
+        from ventas.models import Servicio
+        self.cab = Servicio.objects.create(nombre='Cabaña Pucón', precio_base=120000,
+                                           duracion=60, slots_disponibles=['16:00'])
+        self.tina = Servicio.objects.create(nombre='Tina Llaima', precio_base=50000,
+                                            duracion=120, slots_disponibles=['16:30'])
+        self.mas = Servicio.objects.create(nombre='Masaje', precio_base=40000,
+                                           duracion=50, slots_disponibles=['11:45'])
+        self.desc = Servicio.objects.create(nombre='Descuento de servicios',
+                                            precio_base=-1000, duracion=1,
+                                            slots_disponibles=['16:00'])
+
+    def _armar(self):
+        cab = [_serv(self.cab.id, 'Cabaña Pucón', ['16:00'])]
+        with patch('whatsapp_agent.availability.disponibilidad',
+                   side_effect=lambda f, p, tipo, limite=None,
+                   incluir_slots_programa=False: {'servicios':
+                       cab if tipo == 'cabana'
+                       else ([_serv(self.mas.id, 'Masaje', ['11:45', '13:00', '14:15'])]
+                             if tipo == 'masaje'
+                             else [_serv(self.tina.id, 'Tina Llaima', ['16:30'])])}), \
+             patch('whatsapp_agent.packs._desayuno_de_cabana', return_value=None), \
+             patch('whatsapp_agent.packs._servicio_descuento', return_value=self.desc):
+            return packs.construir_servicios_dia(LUNES.isoformat())
+
+    def test_el_total_queda_en_200000(self):
+        r = self._armar()
+        self.assertTrue(r['disponible'], r.get('nota') or r.get('error'))
+        self.assertEqual(r['total'], packs.DIA_PRECIO_PLANO)
+
+    def test_la_cabaña_va_UNA_sola_vez(self):
+        servicios = self._armar()['servicios']
+        veces = [s for s in servicios if s['servicio_id'] == self.cab.id]
+        self.assertEqual(len(veces), 1)
+        self.assertEqual(veces[0]['fecha'], LUNES.isoformat())
+
+    def test_devuelve_la_cabaña_para_poder_bloquear_la_noche_previa(self):
+        self.assertEqual(self._armar()['cabana_id'], self.cab.id)
+
+    def test_todo_cae_el_mismo_dia(self):
+        """No hay noche: ningún servicio puede quedar en otra fecha."""
+        for s in self._armar()['servicios']:
+            self.assertEqual(s['fecha'], LUNES.isoformat())
