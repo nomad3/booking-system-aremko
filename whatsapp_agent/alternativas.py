@@ -296,8 +296,9 @@ def _dia(fecha, personas):
         texto = (f"Cabaña y spa por el día en {cab['nombre']}: llegada 10:00 con "
                  f"desayuno, masaje para dos a las {masaje_hora} hrs y "
                  f"{tina['nombre']} a las {tina_hora} hrs. La cabaña queda a su "
-                 f"disposición durante el día — sin alojamiento, vuelven a dormir "
-                 f"a su casa. {formatear_precio(precio)} para dos.")
+                 f"disposición durante todo el día. Es alojamiento diurno: no se "
+                 f"pernocta, vuelven a dormir a su casa. "
+                 f"{formatear_precio(precio)} para dos.")
         alts.append(_alt(
             titulo=f"Por el día · {primero} primero ({masaje_hora}/{tina_hora})",
             precio_total=precio, precio_con_descuento=precio, hay_descuento=False,

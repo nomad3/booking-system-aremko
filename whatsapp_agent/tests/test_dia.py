@@ -282,7 +282,7 @@ class LasHerramientasDeLuna(SimpleTestCase):
         from whatsapp_agent.agent import _TOOLS
         d = next(t['function']['description'] for t in _TOOLS
                  if t['function']['name'] == 'consultar_disponibilidad_dia')
-        for palabra in ('lunes', 'miércoles', 'jueves', 'SIN alojamiento', '200.000'):
+        for palabra in ('lunes', 'miércoles', 'jueves', 'alojamiento DIURNO', '200.000'):
             self.assertIn(palabra, d)
 
     def test_confirmar_dia_cierra_la_conversacion(self):
@@ -358,10 +358,13 @@ class LaInstruccionDeLuna(SimpleTestCase):
         self.assertIn('no puede quedarse a dormir', b)
         self.assertIn('niños', b)
 
-    def test_prohibe_prometer_alojamiento(self):
-        """Decir que se duerme cuando no se duerme genera un reclamo el día de
-        la llegada, con el cliente ya manejando desde Osorno."""
-        self.assertIn('NO se duerme', self._bloque())
+    def test_prohibe_prometer_la_noche_sin_negar_la_cabaña(self):
+        """Las dos mitades importan. Prometer la noche genera un reclamo el día
+        de la llegada; pero decir «sin alojamiento» suena a que no reciben
+        cabaña, y la cabaña es lo que los diferencia de cualquier spa."""
+        b = self._bloque()
+        self.assertIn('no se pernocta', b)
+        self.assertIn('NUNCA «sin alojamiento»', b)
 
     def test_prohibe_inventar_horarios(self):
         """Los itinerarios salen del motor, que ya descartó las combinaciones
@@ -407,12 +410,17 @@ class LaBandejaDeDeborah(SimpleTestCase):
         alts = self._alternativas()['alternativas']
         self.assertIn('16:30', alts[0]['titulo'])
 
-    def test_el_texto_dice_que_NO_hay_alojamiento(self):
-        """Es el texto que Deborah copia y pega al cliente. Si no lo dice, se
-        promete una noche que no existe."""
+    def test_el_texto_dice_que_la_cabaña_es_suya_pero_no_se_pernocta(self):
+        """Es el texto que Deborah copia y pega al cliente, y tiene que decir
+        las DOS cosas. «Sin alojamiento» a secas suena a que no reciben cabaña
+        —lo pilló Jorge probándolo en vivo— y la cabaña es justamente lo que
+        los diferencia de cualquier spa. Pero omitir que no se duerme genera
+        un reclamo el día de la llegada."""
         texto = self._alternativas()['alternativas'][0]['texto_sugerido']
-        self.assertIn('sin alojamiento', texto.lower())
-        self.assertIn('vuelven a dormir', texto)
+        self.assertNotIn('sin alojamiento', texto.lower())
+        self.assertIn('a su disposición durante todo el día', texto)
+        self.assertIn('no se pernocta', texto)
+        self.assertIn('vuelven a dormir a su casa', texto)
 
     def test_todas_valen_200000(self):
         for a in self._alternativas()['alternativas']:

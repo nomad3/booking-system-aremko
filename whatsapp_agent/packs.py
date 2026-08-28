@@ -1176,8 +1176,9 @@ def disponibilidad_dia(fecha, preferir_premium=False):
                 'desayuno': _desayuno_de_cabana(cabana['nombre']),
             },
             'nota': (f'Llegada {DIA_HORA_LLEGADA} con desayuno; masaje {masaje_hora} '
-                     f'y tina {tina_hora} en {cabana["nombre"]}. Sin alojamiento: '
-                     f'la cabaña queda a su disposición durante el día.'),
+                     f'y tina {tina_hora} en {cabana["nombre"]}. Alojamiento DIURNO: '
+                     f'la cabaña queda a su disposición durante todo el día; no se '
+                     f'pernocta, vuelven a dormir a su casa.'),
         }
 
     return {'fecha': f.isoformat(), 'disponible': False,

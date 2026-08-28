@@ -488,7 +488,7 @@ _TOOLS = [{
     'function': {
         'name': 'consultar_disponibilidad_dia',
         'description': (
-            'Disponibilidad de «Cabaña y spa por el día» (2 personas, $200.000, SIN alojamiento). '
+            'Disponibilidad de «Cabaña y spa por el día» (2 personas, $200.000, alojamiento DIURNO). '
             'Es la experiencia completa —desayuno, masaje, tina y la cabaña para ellos dos durante '
             'el día— y el cliente vuelve a dormir a su casa. Se vende SOLO lunes, miércoles y '
             'jueves. Úsala cuando el cliente quiera venir por el día, o cuando diga que le gustaría '
@@ -510,7 +510,7 @@ _TOOLS = [{
     'function': {
         'name': 'confirmar_dia',
         'description': (
-            'CIERRA «Cabaña y spa por el día» ($200.000, 2 personas, sin alojamiento). Llamá esto '
+            'CIERRA «Cabaña y spa por el día» ($200.000, 2 personas, alojamiento diurno). Llamá esto '
             'cuando el cliente CONFIRMA que lo quiere, después de haberle ofrecido el itinerario con '
             'consultar_disponibilidad_dia. NO uses el carrito: esta tool arma sola la cabaña del día '
             '+ tina + masaje + desayuno y el descuento para clavar el total en $200.000, y crea UNA '
