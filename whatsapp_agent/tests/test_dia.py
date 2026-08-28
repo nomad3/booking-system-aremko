@@ -435,3 +435,39 @@ class LaBandejaDeDeborah(SimpleTestCase):
             r = alternativas._dia(LUNES.isoformat(), 2)
         self.assertEqual(r['alternativas'], [])
         self.assertIn('dos noches', r['nota'])
+
+
+class LaCartaDePrecios(SimpleTestCase):
+    """La carta es lo primero que ve quien escribe «hola». Si el programa no
+    está ahí, para la mayoría de los clientes simplemente no existe: solo lo
+    verían los que ya saben preguntar por él."""
+
+    def _carta(self):
+        from whatsapp_agent.carta import construir_carta
+        return construir_carta(masaje=40000, tina_simple=50000,
+                               tina_hidro=60000, cabana=110000)
+
+    def test_aparece_en_la_carta(self):
+        self.assertIn('Cabaña y spa por el día', self._carta())
+
+    def test_va_ANTES_del_ritual_por_precio(self):
+        """La carta se ordena de menor a mayor: $200.000 va antes de los
+        $210.000 del Ritual. Verlos seguidos es lo que deja clara la elección
+        —lo mismo, con o sin la noche."""
+        c = self._carta()
+        self.assertLess(c.index('Cabaña y spa por el día'), c.index('Ritual del Río'))
+
+    def test_la_etiqueta_dice_los_dias_y_que_no_se_pernocta(self):
+        """Sin los días llegan consultas para el sábado; sin lo de pernoctar,
+        alguien cree que compró una noche a $200.000."""
+        linea = next(l for l in self._carta().split('\n')
+                     if 'Cabaña y spa por el día' in l)
+        self.assertIn('lun/mié/jue', linea)
+        self.assertIn('sin pernoctar', linea)
+
+    def test_su_precio_es_plano_sin_desde(self):
+        """No lleva «desde»: son $200.000 fijos, no un piso."""
+        linea = next(l for l in self._carta().split('\n')
+                     if 'Cabaña y spa por el día' in l)
+        self.assertNotIn('desde', linea)
+        self.assertIn('200.000', linea)

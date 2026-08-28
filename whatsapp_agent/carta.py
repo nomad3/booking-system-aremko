@@ -35,7 +35,7 @@ def construir_carta(masaje=None, tina_simple=None, tina_hidro=None, cabana=None)
     Recibe los «desde» de los servicios sueltos ya calculados (int o None si
     esa categoría no tiene servicios publicados hoy — la línea se omite).
     """
-    from .packs import REFUGIO_PRECIO_PLANO, RITUAL_PRECIO_DOMJUE
+    from .packs import DIA_PRECIO_PLANO, REFUGIO_PRECIO_PLANO, RITUAL_PRECIO_DOMJUE
 
     # (etiqueta, precio, lleva_desde) — «desde» cuando hay variantes por tina/
     # cabaña o por día de semana; el Refugio es plano y el masaje es un precio único.
@@ -56,6 +56,12 @@ def construir_carta(masaje=None, tina_simple=None, tina_hidro=None, cabana=None)
                   PAUSA_DESDE, True))
     items.append(('Noche de Aguas Calientes: cabaña + tina, para 2',
                   NOCHE_AGUAS_DESDE, True))
+    # «por el día» va antes del Ritual por precio, y la etiqueta tiene que
+    # decir las dos cosas: que la cabaña es suya durante el día (es lo que lo
+    # diferencia de la Pausa, que también es sin dormir) y que no se pernocta.
+    items.append(('Cabaña y spa por el día: cabaña, tina, masaje y desayuno, '
+                  'para 2 (lun/mié/jue, sin pernoctar)',
+                  DIA_PRECIO_PLANO, False))
     items.append(('Ritual del Río: cabaña + tina + masaje + desayuno, para 2',
                   RITUAL_PRECIO_DOMJUE, True))
     items.append(('Refugio Aremko: 2 noches en cabaña con tina y masaje, para 2',

@@ -27,7 +27,7 @@ class ConstruirCartaTest(TestCase):
         texto = construir_carta(masaje=40000, tina_simple=50000,
                                 tina_hidro=60000, cabana=110000)
         lineas = [l for l in texto.splitlines() if l.startswith('✓')]
-        self.assertEqual(len(lineas), 8)  # 4 sueltos + 4 experiencias
+        self.assertEqual(len(lineas), 9)  # 4 sueltos + 5 experiencias
         self.assertIn('Masaje', lineas[0])          # $40.000 primero
         self.assertIn('$40.000', lineas[0])
         self.assertIn('Refugio', lineas[-1])        # $290.000 último
