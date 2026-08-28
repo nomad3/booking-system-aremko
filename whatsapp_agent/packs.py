@@ -1030,3 +1030,156 @@ def ficha_experiencia(programa):
     clave = (programa or '').strip().lower()
     ficha = _FICHAS_EXPERIENCIA.get(clave)
     return dict(ficha) if ficha else None
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Cabaña y spa por el día — la experiencia completa sin dormir
+#
+# Nació de un caso real: un cliente salió de Osorno en la mañana, tuvo
+# desayuno, masaje y tinas, y volvió a dormir a su casa. Se le cobró como
+# arriendo normal de cabaña, así que en la base es indistinguible de quien sí
+# durmió — por eso este producto tiene identidad propia desde el primer día.
+#
+# Lo que vende no es el día: es no tener que organizar la noche. Esa fricción
+# —los niños, el perro, el trabajo de mañana— es la que deja «tenemos que ir
+# algún día» en conversación durante meses.
+# ══════════════════════════════════════════════════════════════════════════
+
+DIA_PRECIO_PLANO = 200000
+# Lun, Mié, Jue en el esquema de PackDescuento (0=Dom … 6=Sáb). El martes se
+# cierra por mantención; el domingo NO sirve porque las cabañas del sábado se
+# desocupan a las 11:00 y no alcanzan a prepararse para una llegada a las 10:00.
+DIA_DIAS_VALIDOS = (1, 3, 4)
+DIA_HORA_LLEGADA = '10:00'
+
+# (masaje, tina) en orden de preferencia. Las TRES primeras cierran el día en
+# el agua y entregan las ocho horas que promete el nombre; las dos últimas son
+# respaldo y dejan al cliente libre a media tarde —mismos servicios, mismo
+# precio, pero medio día menos, y eso se siente.
+#
+# Los horarios de masaje son a propósito los que NO están reservados al
+# Ritual/Refugio (15:30/18:00/20:30/21:45): este producto no le quita horas al
+# Ritual. Las otras 4 combinaciones posibles se pisan o dejan 10 min entre
+# servicios (masaje 50 min, tina 2 h).
+DIA_COMBINACIONES = (
+    ('11:45', '16:30'),
+    ('13:00', '16:30'),
+    ('14:15', '16:30'),
+    ('14:15', '11:30'),   # respaldo: tina primero, libres 15:05
+    ('11:45', '14:00'),   # respaldo: libres 16:00
+)
+
+
+def _dia_semana_pack(f):
+    """Día de la semana en el esquema de PackDescuento: 0=Dom … 6=Sáb.
+
+    Python cuenta desde el lunes; acá se convierte para no tener dos criterios
+    distintos de «qué día es» conviviendo en el mismo sistema.
+    """
+    return (f.weekday() + 1) % 7
+
+
+def _servicio_con_hora(servicios, hora):
+    """El primer servicio de la lista que tenga ESA hora libre, o None."""
+    for s in servicios:
+        if hora in (s.get('slots_libres') or []):
+            return s
+    return None
+
+
+def _tina_con_hora(tinas, hora, preferir_hidromasaje=False):
+    """Tina con esa hora libre, prefiriendo la ESTÁNDAR.
+
+    Misma razón que en el Ritual: la de hidromasaje cuesta más y comerse ese
+    margen sin necesidad no tiene sentido cuando el precio es plano.
+    """
+    estandar = [t for t in tinas if not _es_tina_hidromasaje(t.get('nombre', ''))]
+    hidro = [t for t in tinas if _es_tina_hidromasaje(t.get('nombre', ''))]
+    orden = ((hidro, True), (estandar, False)) if preferir_hidromasaje \
+        else ((estandar, False), (hidro, True))
+    for grupo, es_hidro in orden:
+        t = _servicio_con_hora(grupo, hora)
+        if t is not None:
+            return t, es_hidro
+    return None, False
+
+
+def disponibilidad_dia(fecha, preferir_premium=False):
+    """Itinerario de «Cabaña y spa por el día» para `fecha` (2 personas, sin noche).
+
+    La regla que lo hace distinto de todo lo demás: exige la cabaña libre la
+    noche ANTERIOR **y** la del día. La anterior porque si alguien durmió ahí
+    se va a las 11:00 y no alcanza a prepararse para una llegada a las 10:00;
+    la del día porque el cliente la ocupa hasta la tarde. Es un Refugio al
+    revés: dos noches, pero una hacia atrás.
+
+    Devuelve el primer itinerario disponible según DIA_COMBINACIONES, o
+    disponible=False con una nota que dice QUÉ faltó — para que Luna pueda
+    ofrecer otra fecha sin inventar la razón.
+    """
+    from datetime import timedelta
+
+    from .availability import disponibilidad, _parse_fecha
+
+    f = _parse_fecha(fecha) if fecha else None
+    if f is None:
+        return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
+    personas = 2
+
+    if _dia_semana_pack(f) not in DIA_DIAS_VALIDOS:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'este programa se vende lunes, miércoles y jueves; '
+                        'ofrece uno de esos días'}
+
+    # Cabaña libre la noche anterior Y la del día (la misma): intersección por id.
+    f_previa = f - timedelta(days=1)
+    cab_previa = disponibilidad(f_previa, personas, 'cabana',
+                                limite=None).get('servicios', [])
+    cab_dia = disponibilidad(f, personas, 'cabana', limite=None).get('servicios', [])
+    ids_previa = {c.get('servicio_id') for c in cab_previa}
+    ambas = [c for c in cab_dia if c.get('servicio_id') in ids_previa]
+    cabana, es_torre = _elegir_cabana_ritual(ambas, preferir_torre=preferir_premium)
+    if cabana is None:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'no hay cabaña libre la noche anterior y la del día '
+                        '(se necesitan ambas para recibir en la mañana); '
+                        'ofrece otra fecha'}
+
+    masajes = disponibilidad(f, personas, 'masaje', limite=None).get('servicios', [])
+    tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
+
+    for masaje_hora, tina_hora in DIA_COMBINACIONES:
+        masaje = _servicio_con_hora(masajes, masaje_hora)
+        if masaje is None:
+            continue
+        tina, es_hidro = _tina_con_hora(tinas, tina_hora,
+                                        preferir_hidromasaje=preferir_premium)
+        if tina is None:
+            continue
+        return {
+            'fecha': f.isoformat(),
+            'disponible': True,
+            'personas': personas,
+            'precio_total': DIA_PRECIO_PLANO,
+            'es_torre': es_torre,
+            'es_hidromasaje': es_hidro,
+            'itinerario': {
+                'llegada': DIA_HORA_LLEGADA,
+                'cabana': {'servicio_id': cabana.get('servicio_id'),
+                           'nombre': cabana['nombre'], 'es_torre': es_torre,
+                           'uso': 'diurno'},
+                'masaje': {'servicio_id': masaje.get('servicio_id'),
+                           'nombre': masaje['nombre'], 'hora': masaje_hora},
+                'tina': {'servicio_id': tina.get('servicio_id'),
+                         'nombre': tina['nombre'], 'hora': tina_hora,
+                         'es_hidromasaje': es_hidro},
+                'desayuno': _desayuno_de_cabana(cabana['nombre']),
+            },
+            'nota': (f'Llegada {DIA_HORA_LLEGADA} con desayuno; masaje {masaje_hora} '
+                     f'y tina {tina_hora} en {cabana["nombre"]}. Sin alojamiento: '
+                     f'la cabaña queda a su disposición durante el día.'),
+        }
+
+    return {'fecha': f.isoformat(), 'disponible': False,
+            'nota': 'hay cabaña, pero no queda ninguna combinación de masaje y '
+                    'tina que calce sin pisarse; ofrece otra fecha'}
