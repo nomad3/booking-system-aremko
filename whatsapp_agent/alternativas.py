@@ -38,7 +38,7 @@ from . import packs
 # Fase 1 (simples) + Fase 2 (ritual/refugio). Se conservan los subgrupos como
 # referencia histórica; TODOS pasan por _BUILDERS.
 TIPOS_FASE1 = ('pausa', 'tina_sola', 'masaje_solo', 'noche_aguas_calientes')
-TIPOS_FASE2 = ('ritual', 'refugio')
+TIPOS_FASE2 = ('ritual', 'refugio', 'dia')
 # Fase 3 (H-108): tipos SIN agenda — el endpoint no les exige `fecha`.
 TIPOS_SIN_FECHA = ('giftcard',)
 TIPOS_VALIDOS = TIPOS_FASE1 + TIPOS_FASE2 + TIPOS_SIN_FECHA
@@ -50,6 +50,7 @@ NOMBRES = {
     'noche_aguas_calientes': 'Noche de Aguas Calientes',
     'ritual': 'Ritual del Río',
     'refugio': 'Refugio Aremko',
+    'dia': 'Cabaña y spa por el día',
     'giftcard': 'Gift Card',
 }
 
@@ -260,6 +261,53 @@ def _refugio(fecha, personas):
     return {'fecha': base['fecha'], 'alternativas': alts}
 
 
+def _dia(fecha, personas):
+    """«Cabaña y spa por el día»: una alternativa por combinación vendible.
+
+    A diferencia del Ritual, acá no se varía el masaje sobre una base fija: el
+    motor ya decidió qué combinaciones de masaje y tina NO se pisan, y en qué
+    orden conviene ofrecerlas. Mostrar cada una como alternativa deja que
+    Deborah elija por el cliente ("¿prefieres partir con el masaje o con el
+    agua?") sin poder armar una que se pise.
+    """
+    base = packs.disponibilidad_dia(fecha)
+    if base.get('error'):
+        return {'error': base['error']}
+    if not base.get('disponible'):
+        return {'fecha': base.get('fecha'), 'alternativas': [],
+                'nota': base.get('nota')}
+
+    itin = base['itinerario']
+    cab = itin['cabana']
+    precio = int(base['precio_total'])
+    f = _parse_fecha(base['fecha'])
+
+    # Las combinaciones que de verdad están libres ese día, en el orden de
+    # preferencia del motor (primero las que dan las ocho horas).
+    masajes = disponibilidad(f, 2, 'masaje', limite=None).get('servicios', [])
+    tinas = disponibilidad(f, 2, 'tina', limite=None).get('servicios', [])
+    alts = []
+    for masaje_hora, tina_hora in packs.DIA_COMBINACIONES:
+        masaje = packs._servicio_con_hora(masajes, masaje_hora)
+        tina, _ = packs._tina_con_hora(tinas, tina_hora)
+        if masaje is None or tina is None:
+            continue
+        primero = 'masaje' if masaje_hora < tina_hora else 'tina'
+        texto = (f"Cabaña y spa por el día en {cab['nombre']}: llegada 10:00 con "
+                 f"desayuno, masaje para dos a las {masaje_hora} hrs y "
+                 f"{tina['nombre']} a las {tina_hora} hrs. La cabaña queda a su "
+                 f"disposición durante el día — sin alojamiento, vuelven a dormir "
+                 f"a su casa. {formatear_precio(precio)} para dos.")
+        alts.append(_alt(
+            titulo=f"Por el día · {primero} primero ({masaje_hora}/{tina_hora})",
+            precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
+            texto_sugerido=texto,
+            itinerario=[{'servicio': 'Llegada y desayuno', 'hora': '10:00'},
+                        {'servicio': masaje['nombre'], 'hora': masaje_hora},
+                        {'servicio': tina['nombre'], 'hora': tina_hora}]))
+    return {'fecha': base['fecha'], 'alternativas': alts}
+
+
 # ---------------------------------------------------------------------------
 # giftcard (H-108): el catálogo publicado, sin fecha ni horario
 # ---------------------------------------------------------------------------
@@ -319,6 +367,7 @@ _BUILDERS = {
     'noche_aguas_calientes': _noche_aguas_calientes,
     'ritual': _ritual,
     'refugio': _refugio,
+    'dia': _dia,
     'giftcard': _giftcard,
 }
 

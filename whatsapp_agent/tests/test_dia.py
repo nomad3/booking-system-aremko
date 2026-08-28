@@ -374,3 +374,56 @@ class LaInstruccionDeLuna(SimpleTestCase):
         b = self._bloque()
         self.assertIn('consultar_disponibilidad_dia', b)
         self.assertIn('confirmar_dia', b)
+
+
+class LaBandejaDeDeborah(SimpleTestCase):
+    """El botón del menú de la bandeja llama a este constructor. Si el tipo no
+    está registrado acá, el botón existe en la pantalla y no hace nada."""
+
+    def test_el_tipo_esta_registrado(self):
+        from whatsapp_agent import alternativas
+        self.assertIn('dia', alternativas.TIPOS_VALIDOS)
+        self.assertIn('dia', alternativas._BUILDERS)
+        self.assertEqual(alternativas.NOMBRES['dia'], 'Cabaña y spa por el día')
+
+    def _alternativas(self, masajes=None, tinas=None):
+        from whatsapp_agent import alternativas
+        base = {'disponible': True, 'fecha': LUNES.isoformat(), 'precio_total': 200000,
+                'itinerario': {'cabana': {'nombre': 'Cabaña Pucón'},
+                               'masaje': {'hora': '11:45'}, 'tina': {'hora': '16:30'}}}
+        with patch('whatsapp_agent.packs.disponibilidad_dia', return_value=base), \
+             patch('whatsapp_agent.alternativas.disponibilidad',
+                   side_effect=lambda f, p, tipo, limite=None: {
+                       'servicios': (MASAJES if masajes is None else masajes)
+                       if tipo == 'masaje' else (TINAS if tinas is None else tinas)}):
+            return alternativas._dia(LUNES.isoformat(), 2)
+
+    def test_ofrece_una_alternativa_por_combinacion_libre(self):
+        alts = self._alternativas()['alternativas']
+        self.assertEqual(len(alts), 5)
+
+    def test_las_de_ocho_horas_van_primero(self):
+        """El orden del menú es el orden en que Deborah las va a ofrecer."""
+        alts = self._alternativas()['alternativas']
+        self.assertIn('16:30', alts[0]['titulo'])
+
+    def test_el_texto_dice_que_NO_hay_alojamiento(self):
+        """Es el texto que Deborah copia y pega al cliente. Si no lo dice, se
+        promete una noche que no existe."""
+        texto = self._alternativas()['alternativas'][0]['texto_sugerido']
+        self.assertIn('sin alojamiento', texto.lower())
+        self.assertIn('vuelven a dormir', texto)
+
+    def test_todas_valen_200000(self):
+        for a in self._alternativas()['alternativas']:
+            self.assertEqual(a['precio_total'], 200000)
+            self.assertFalse(a['hay_descuento'])
+
+    def test_sin_disponibilidad_devuelve_lista_vacia_con_la_razon(self):
+        from whatsapp_agent import alternativas
+        with patch('whatsapp_agent.packs.disponibilidad_dia',
+                   return_value={'disponible': False, 'fecha': LUNES.isoformat(),
+                                 'nota': 'no hay cabaña libre las dos noches'}):
+            r = alternativas._dia(LUNES.isoformat(), 2)
+        self.assertEqual(r['alternativas'], [])
+        self.assertIn('dos noches', r['nota'])
