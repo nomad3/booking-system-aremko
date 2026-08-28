@@ -486,6 +486,54 @@ _TOOLS = [{
 }, {
     'type': 'function',
     'function': {
+        'name': 'consultar_disponibilidad_dia',
+        'description': (
+            'Disponibilidad de «Cabaña y spa por el día» (2 personas, $200.000, SIN alojamiento). '
+            'Es la experiencia completa —desayuno, masaje, tina y la cabaña para ellos dos durante '
+            'el día— y el cliente vuelve a dormir a su casa. Se vende SOLO lunes, miércoles y '
+            'jueves. Úsala cuando el cliente quiera venir por el día, o cuando diga que le gustaría '
+            'la experiencia pero NO puede quedarse a dormir (tiene niños, trabaja al otro día, no '
+            'quiere dejar la casa). Devuelve UN itinerario con horas exactas: ofrécelo tal cual, no '
+            'inventes horarios ni armes otra combinación. Si devuelve disponible=false, lee la nota '
+            'y ofrece otra fecha.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'Fecha en TEXTO LITERAL del cliente ("el próximo miércoles", "el 8"); NO la conviertas a YYYY-MM-DD.'},
+            },
+            'required': ['fecha'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
+        'name': 'confirmar_dia',
+        'description': (
+            'CIERRA «Cabaña y spa por el día» ($200.000, 2 personas, sin alojamiento). Llamá esto '
+            'cuando el cliente CONFIRMA que lo quiere, después de haberle ofrecido el itinerario con '
+            'consultar_disponibilidad_dia. NO uses el carrito: esta tool arma sola la cabaña del día '
+            '+ tina + masaje + desayuno y el descuento para clavar el total en $200.000, y crea UNA '
+            'propuesta para Deborah. Devuelve {success, propuesta_id, total}. Para cliente EXISTENTE '
+            'no repitas datos que ya están en su ficha. NO digas que quedó reservado hasta recibir '
+            'success=true.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'fecha': {'type': 'string', 'description': 'REQUERIDO. Día en TEXTO LITERAL del cliente; NO lo conviertas a YYYY-MM-DD.'},
+                'nombre': {'type': 'string', 'description': 'Nombre del cliente (omitir si ya está en su ficha)'},
+                'email': {'type': 'string', 'description': 'Email del cliente (omitir si ya está en su ficha)'},
+                'documento_identidad': {'type': 'string', 'description': 'RUT del cliente (omitir si ya está en su ficha)'},
+                'comuna': {'type': 'string', 'description': 'Comuna del cliente (omitir si ya está en su ficha)'},
+                'telefono': {'type': 'string', 'description': 'Teléfono del cliente. En WhatsApp OMÍTELO (se usa el de la conversación). En Instagram/Messenger SÍ pásalo.'},
+            },
+            'required': ['fecha'],
+        },
+    },
+}, {
+    'type': 'function',
+    'function': {
         'name': 'enviar_ficha_experiencia',
         'description': (
             'Devuelve el link de la landing (ficha completa con fotos, video y reseñas) de UNO de '
@@ -925,7 +973,7 @@ def _cierre_fallback_tras_tools(tool_calls_executed):
         if not escalation.tool_result_ok(res):
             continue
         if name in ('confirmar_reserva_carrito', 'confirmar_ritual',
-                    'confirmar_refugio', 'preparar_giftcard'):
+                    'confirmar_refugio', 'confirmar_dia', 'preparar_giftcard'):
             confirmo = True
         elif name in ('agregar_servicio_carrito', 'agregar_producto_carrito', 'quitar_item_carrito'):
             agrego = True
@@ -2398,6 +2446,129 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 logger.exception('Agente WA: tool confirmar_ritual falló: %s', exc)
                 return {'success': False, 'error': 'internal_error',
                         'mensaje': f'no se pudo confirmar el Ritual: {str(exc)[:100]}'}
+        if name == 'consultar_disponibilidad_dia':
+            from .packs import disponibilidad_dia
+            try:
+                args = args or {}
+                return dict(disponibilidad_dia(args.get('fecha')), rama='dia')
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool consultar_disponibilidad_dia falló: %s', exc)
+                return {'error': f'no se pudo consultar el programa del día: {str(exc)[:100]}'}
+        if name == 'confirmar_dia':
+            # Cabaña y spa por el día: cabaña del día + tina + masaje + desayuno,
+            # clavado en $200.000, SIN alojamiento. Mismo camino de cliente y
+            # propuesta que confirmar_refugio.
+            from .packs import bloquear_noche_previa, construir_servicios_dia
+            from .reserva_service import preparar_reserva as servicio_preparar_reserva
+            from carrito_reservas.services import CarritoService
+            try:
+                args = args or {}
+                external_id = phone if phone else '+56912345678'
+
+                fecha = (args.get('fecha') or '').strip()
+                if not fecha:
+                    return {'success': False, 'error': 'falta_fecha',
+                            'mensaje': 'Indicá el día que quiere venir.'}
+
+                productos_carrito = CarritoService.obtener_productos_pendientes(canal, external_id)
+
+                armado = construir_servicios_dia(fecha)
+                if armado.get('error'):
+                    return {'success': False, 'error': 'dia_error', 'mensaje': armado['error']}
+                if not armado.get('disponible'):
+                    return {'success': False, 'error': 'dia_no_disponible',
+                            'mensaje': (armado.get('nota')
+                                        or 'No hay disponibilidad para ese día; ofrecé otro.')}
+
+                ficha = datos_cliente or {}
+                nombre = (args.get('nombre') or ficha.get('nombre') or '').strip()
+                email = (args.get('email') or ficha.get('email') or '').strip()
+                documento = (args.get('documento_identidad') or ficha.get('documento_identidad') or '').strip()
+                comuna_nombre = (args.get('comuna') or ficha.get('comuna_nombre') or '').strip()
+                telefono = (args.get('telefono') or '').strip()
+                if not telefono and canal == 'whatsapp':
+                    telefono = external_id
+
+                region_id = None
+                comuna_id = ficha.get('comuna_id')
+                if comuna_nombre:
+                    from ventas.models import Comuna
+                    comuna = Comuna.objects.filter(nombre__icontains=comuna_nombre).first()
+                    if not comuna:
+                        return {'success': False, 'error': 'comuna_not_found',
+                                'mensaje': f'Comuna "{comuna_nombre}" no encontrada'}
+                    region_id = comuna.region_id
+                    comuna_id = comuna.id
+
+                faltan = [k for k, v in (('nombre', nombre), ('email', email),
+                                         ('documento_identidad', documento), ('comuna', comuna_nombre),
+                                         ('telefono', telefono)) if not v]
+                if faltan:
+                    return {'success': False, 'error': 'faltan_datos', 'faltan': faltan,
+                            'mensaje': f'Faltan datos del cliente: {", ".join(faltan)}'}
+
+                cliente_data = {
+                    'nombre': nombre, 'email': email, 'telefono': telefono,
+                    'documento_identidad': documento, 'region_id': region_id, 'comuna_id': comuna_id,
+                }
+                payload = {'cliente': cliente_data, 'servicios': armado['servicios'],
+                           'productos': productos_carrito,
+                           'metodo_pago': 'pendiente', 'es_dia': True}
+
+                resultado = servicio_preparar_reserva(
+                    canal=canal,
+                    external_id=external_id,
+                    payload=payload,
+                    idempotency_key=f'dia-{external_id}-{armado["fecha"]}',
+                )
+                if not resultado.get('success'):
+                    logger.error('[confirmar_dia] preparar_reserva falló: %s', resultado)
+                    return resultado
+
+                # La noche anterior se bloquea AQUÍ y no al cotizar: la cabaña
+                # tiene que estar lista a las 10:00 y nadie puede reservarla
+                # después. Se falla hacia el lado seguro — es peor que el
+                # cliente maneje hora y media hasta una puerta cerrada que
+                # tener una noche de baja demanda tomada de más.
+                propuesta_id = resultado.get('propuesta_id', '')
+                try:
+                    from datetime import date as _date
+                    bloquear_noche_previa(
+                        armado['cabana_id'],
+                        _date.fromisoformat(armado['fecha']),
+                        referencia=f'propuesta {propuesta_id}',
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    # Que falle el bloqueo no puede tumbar una reserva ya creada,
+                    # pero tiene que quedar gritando en el log: hay una noche sin
+                    # proteger y alguien la puede tomar.
+                    logger.error('[confirmar_dia] NO se pudo bloquear la noche previa '
+                                 'de la cabaña %s para el %s (propuesta %s): %s',
+                                 armado.get('cabana_id'), armado.get('fecha'),
+                                 propuesta_id[:8], exc)
+
+                if productos_carrito:
+                    CarritoService.limpiar_productos(canal, external_id)
+
+                total = resultado.get('total', 0)
+                logger.info('[confirmar_dia] propuesta %s creada para %s ($%s, descuento $%s)',
+                            propuesta_id[:8], external_id, total, armado.get('descuento'))
+                it = armado.get('itinerario') or {}
+                return {
+                    'success': True,
+                    'propuesta_id': propuesta_id,
+                    'total': total,
+                    'mensaje': (
+                        f'¡Perfecto! Te preparo la cotización de tu día en Aremko '
+                        f'(llegada 10:00 con desayuno, masaje {it.get("masaje", {}).get("hora", "")} '
+                        f'y tinas {it.get("tina", {}).get("hora", "")}, total ${total:,}) y te la '
+                        f'enviamos en un momento para que la revises. 🌿'
+                    ),
+                }
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool confirmar_dia falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': f'no se pudo confirmar el día: {str(exc)[:100]}'}
         if name == 'consultar_disponibilidad_refugio':
             from .packs import disponibilidad_refugio
             try:

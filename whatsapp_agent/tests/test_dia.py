@@ -262,3 +262,71 @@ class ElArmadoDeLaReserva(TestCase):
         """No hay noche: ningún servicio puede quedar en otra fecha."""
         for s in self._armar()['servicios']:
             self.assertEqual(s['fecha'], LUNES.isoformat())
+
+
+class LasHerramientasDeLuna(SimpleTestCase):
+    """Un nombre mal escrito acá no da error: simplemente Luna nunca usa la
+    herramienta, el producto no se vende, y nadie se entera de por qué."""
+
+    def _tools(self):
+        from whatsapp_agent.agent import _TOOLS
+        return {t['function']['name'] for t in _TOOLS}
+
+    def test_las_dos_estan_declaradas(self):
+        self.assertIn('consultar_disponibilidad_dia', self._tools())
+        self.assertIn('confirmar_dia', self._tools())
+
+    def test_la_descripcion_dice_los_dias_y_que_no_hay_alojamiento(self):
+        """Si Luna no sabe que es lunes/miércoles/jueves y sin dormir, va a
+        ofrecerlo cualquier día y prometer una noche que no existe."""
+        from whatsapp_agent.agent import _TOOLS
+        d = next(t['function']['description'] for t in _TOOLS
+                 if t['function']['name'] == 'consultar_disponibilidad_dia')
+        for palabra in ('lunes', 'miércoles', 'jueves', 'SIN alojamiento', '200.000'):
+            self.assertIn(palabra, d)
+
+    def test_confirmar_dia_cierra_la_conversacion(self):
+        """Sin estar en esa lista, una confirmación exitosa sin texto del
+        modelo escalaría a un humano sin necesidad."""
+        import inspect
+
+        from whatsapp_agent import agent
+        fuente = inspect.getsource(agent)
+        i = fuente.index("'confirmar_reserva_carrito', 'confirmar_ritual'")
+        self.assertIn('confirmar_dia', fuente[i:i + 200])
+
+
+class ElBloqueoQuedaCableado(SimpleTestCase):
+    """El despacho vive dentro de una función anidada del agente, así que no se
+    puede invocar directo. Esto es una comprobación de humo: verifica que la
+    rama de confirmación efectivamente llama al bloqueo y que no depende de que
+    el cliente tenga carrito o de que el bloqueo funcione para que la reserva
+    sobreviva. No reemplaza a una prueba de integración — la reemplaza el día
+    que el despacho se pueda llamar desde afuera."""
+
+    def _rama(self):
+        import inspect
+
+        from whatsapp_agent import agent
+        fuente = inspect.getsource(agent)
+        i = fuente.index("if name == 'confirmar_dia':")
+        return fuente[i:i + 6000]
+
+    def test_llama_al_bloqueo_de_la_noche_previa(self):
+        self.assertIn('bloquear_noche_previa(', self._rama())
+
+    def test_bloquea_DESPUES_de_crear_la_propuesta(self):
+        """Bloquear al cotizar dejaría noches tomadas por cotizaciones que
+        nunca se convierten."""
+        rama = self._rama()
+        self.assertLess(rama.index('preparar_reserva('),
+                        rama.index('bloquear_noche_previa('))
+
+    def test_si_el_bloqueo_falla_la_reserva_no_se_cae_pero_grita(self):
+        """Una reserva ya creada no se puede deshacer porque falló un bloqueo;
+        pero la noche queda sin proteger y eso tiene que verse en el log."""
+        rama = self._rama()
+        i = rama.index('bloquear_noche_previa(')
+        posterior = rama[i:i + 900]
+        self.assertIn('except', posterior)
+        self.assertIn('logger.error', posterior)
