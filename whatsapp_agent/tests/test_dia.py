@@ -330,3 +330,47 @@ class ElBloqueoQuedaCableado(SimpleTestCase):
         posterior = rama[i:i + 900]
         self.assertIn('except', posterior)
         self.assertIn('logger.error', posterior)
+
+
+class LaInstruccionDeLuna(SimpleTestCase):
+    """La herramienta puede existir y estar perfecta, y aun así el producto no
+    venderse nunca: si el prompt no le dice a Luna CUÁNDO ofrecerlo, no lo va a
+    ofrecer. Esa es la pieza que convierte código en ventas."""
+
+    def _bloque(self):
+        from whatsapp_agent import prompt
+        import inspect
+        fuente = inspect.getsource(prompt)
+        i = fuente.index('CABAÑA Y SPA POR EL DÍA')
+        return fuente[i:i + 2000]
+
+    def test_le_dice_el_precio_y_los_dias(self):
+        b = self._bloque()
+        self.assertIn('200.000', b)
+        for d in ('lunes', 'miércoles', 'jueves'):
+            self.assertIn(d, b)
+
+    def test_le_dice_el_gatillo(self):
+        """El «me encantaría pero no puedo quedarme a dormir» es exactamente lo
+        que este producto resuelve. Si Luna no lo reconoce, va a ofrecer una
+        tina suelta y perder la venta."""
+        b = self._bloque()
+        self.assertIn('no puede quedarse a dormir', b)
+        self.assertIn('niños', b)
+
+    def test_prohibe_prometer_alojamiento(self):
+        """Decir que se duerme cuando no se duerme genera un reclamo el día de
+        la llegada, con el cliente ya manejando desde Osorno."""
+        self.assertIn('NO se duerme', self._bloque())
+
+    def test_prohibe_inventar_horarios(self):
+        """Los itinerarios salen del motor, que ya descartó las combinaciones
+        que se pisan. Uno inventado manda a alguien a dos servicios a la vez."""
+        b = self._bloque()
+        self.assertIn('TAL CUAL', b)
+        self.assertIn('nunca armes otra combinación', b.lower().replace('NUNCA', 'nunca'))
+
+    def test_nombra_las_dos_herramientas(self):
+        b = self._bloque()
+        self.assertIn('consultar_disponibilidad_dia', b)
+        self.assertIn('confirmar_dia', b)
