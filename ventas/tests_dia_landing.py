@@ -98,3 +98,29 @@ class LaFotoDelDesayuno(TestCase):
         r = self.client.get(reverse('dia_landing'))
         self.assertEqual(r.status_code, 200)
         self.assertIn('Desayuno sureño al llegar', r.content.decode())
+
+
+class SeEncuentraDesdeTODO_EL_SITIO(TestCase):
+    """El menú vive en DOS plantillas: la home lo sobreescribe y el resto del
+    sitio usa la base. Se había agregado solo en la home, así que quien llegaba
+    por una landing, el blog o las tinas no tenía cómo encontrarlo."""
+
+    def test_esta_en_el_menu_de_la_home(self):
+        html = self.client.get('/').content.decode()
+        self.assertIn(reverse('dia_landing'), html)
+
+    def test_esta_en_el_menu_del_RESTO_del_sitio(self):
+        """Se prueba sobre la propia landing porque hereda de la plantilla
+        base sin sobreescribir el menú — o sea, muestra exactamente el mismo
+        menú que ven todas las páginas que NO son la home, que era donde
+        faltaba. Otras páginas del sitio dependen de datos y devuelven 404 en
+        pruebas, así que servirían de poco."""
+        html = self.client.get(reverse('dia_landing')).content.decode()
+        self.assertIn('Refugio Aremko', html)                # el menú se dibujó
+        self.assertIn(reverse('dia_landing'), html)
+
+    def test_esta_en_el_pie_de_pagina(self):
+        """El pie lista los servicios populares y lo ve Google en cada página."""
+        html = self.client.get(reverse('dia_landing')).content.decode()
+        pie = html[html.index('Servicios Populares'):]
+        self.assertIn(reverse('dia_landing'), pie)
