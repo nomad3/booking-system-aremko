@@ -149,7 +149,12 @@ def _venta_desde_token(token):
 def _lineas_servicios(venta):
     """Servicios + productos de la reserva como líneas para mostrar (solo lectura)."""
     lineas = []
-    for rs in venta.reservaservicios.select_related('servicio').all():
+    # Orden cronológico: el cliente lee esto como el plan de su día, no como
+    # una boleta. Antes salía en el orden en que se creó la reserva, que puede
+    # ser cualquiera —la cotización del día armaba cabaña, tina y masaje, así
+    # que la tina de las 16:30 aparecía antes del masaje de las 14:15.
+    for rs in (venta.reservaservicios.select_related('servicio')
+               .order_by('fecha_agendamiento', 'hora_inicio', 'id')):
         precio = rs.precio_unitario_venta if rs.precio_unitario_venta is not None else (rs.servicio.precio_base or 0)
         cant = rs.cantidad_personas or 1
         subtotal = int(precio) * cant
@@ -164,6 +169,10 @@ def _lineas_servicios(venta):
             'monto_str': _clp(subtotal),
             'es_descuento': es_descuento,
         })
+    # El descuento lleva fecha y hora de relleno, así que el orden cronológico
+    # lo subiría al principio. Un ajuste se lee al final, después de lo que
+    # ajusta.
+    lineas.sort(key=lambda l: 1 if l['es_descuento'] else 0)
     for rp in venta.reservaproductos.select_related('producto').all():
         precio = rp.precio_unitario_venta if rp.precio_unitario_venta is not None else (rp.producto.precio_base or 0)
         cant = rp.cantidad or 1
@@ -239,6 +248,10 @@ def ficha_reserva_cliente(request, token):
     tipos_venta = list(
         venta.reservaservicios.select_related('servicio')
         .values_list('servicio__tipo_servicio', flat=True))
+    # La hora de la cabaña distingue «por el día» (10:00) del Ritual (16:00).
+    hora_cabana_venta = (venta.reservaservicios
+                         .filter(servicio__tipo_servicio='cabana')
+                         .values_list('hora_inicio', flat=True).first())
 
     try:
         participantes_masaje = _participantes_masaje_ficha(venta, tipos_venta)
@@ -316,7 +329,8 @@ def ficha_reserva_cliente(request, token):
         'estado_cls': estado_cls,
         **context_qr,
         'experiencia_nombre': ('Gift Cards' if solo_giftcards
-                               else _experiencia_nombre(tipos_venta)),
+                               else _experiencia_nombre(tipos_venta,
+                                                        hora_cabana_venta)),
         'lineas': _lineas_servicios(venta),
         'giftcards': giftcards_venta,
         'solo_giftcards': solo_giftcards,
@@ -573,25 +587,55 @@ def _lineas_desde_payload(servicios_data):
     return lineas
 
 
-def _experiencia_nombre(tipos):
+# Hora de llegada de «Cabaña y spa por el día». Es la señal que lo separa
+# del Ritual, que reserva la cabaña a las 16:00 (check-in). Misma que
+# DIA_HORA_CABANA en ventas/api_aremko_cli.py.
+DIA_HORA_CABANA_FICHA = '10:00'
+
+
+def _experiencia_nombre(tipos, hora_cabana=None):
     """Nombre de la EXPERIENCIA según los tipos de servicio (lista, con duplicados), para que el
     cliente vea una experiencia identificable y no 'servicios sueltos':
     - tina + masaje (sin cabaña)            → 'Pausa junto al río'
+    - cabaña + tina + masaje, cabaña 10:00  → 'Cabaña y spa por el día'
     - cabaña + tina + masaje, 1 noche       → 'Ritual del Río'
     - cabaña + tina + masaje, 2+ noches     → 'Refugio Aremko'
     - cabaña + tina, SIN masaje, 1 noche    → 'Noche de Aguas Calientes' (H-057)
     Devuelve None si no calza un producto con nombre (ej. cabaña+tina de 2+ noches sin
-    masaje, o servicios sueltos que no arman ninguno de los 4 programas)."""
+    masaje, o servicios sueltos que no arman ninguno de los 4 programas).
+
+    `hora_cabana` distingue el programa del día del Ritual: tienen los MISMOS
+    componentes y una sola fecha de cabaña, y lo único que los separa es la
+    hora de llegada (10:00 contra el check-in de las 16:00). Sin esto, quien
+    compró el día ve «Ritual del Río» en su pase y cree que le vendieron una
+    noche."""
     tipos = list(tipos)
     presentes = set(tipos) & {'tina', 'masaje', 'cabana'}
     if presentes == {'tina', 'masaje'}:
         return 'Pausa junto al río'
     if presentes == {'cabana', 'tina', 'masaje'}:
         noches_cabana = sum(1 for t in tipos if t == 'cabana')
+        if noches_cabana == 1 and str(hora_cabana or '')[:5] == DIA_HORA_CABANA_FICHA:
+            return 'Cabaña y spa por el día'
         return 'Refugio Aremko' if noches_cabana >= 2 else 'Ritual del Río'
     if presentes == {'cabana', 'tina'}:
         noches_cabana = sum(1 for t in tipos if t == 'cabana')
         return 'Noche de Aguas Calientes' if noches_cabana == 1 else None
+    return None
+
+
+def _hora_cabana_del_payload(servicios_data):
+    """Hora de la cabaña en el payload de una cotización, para poder nombrar la
+    experiencia antes de que exista la reserva. La cotización tiene que decir lo
+    mismo que dirá el pase: si acá dijera «Ritual del Río», el cliente aprobaría
+    creyendo que compró una noche."""
+    from ..models import Servicio
+    ids = [sd.get('servicio_id') for sd in (servicios_data or []) if sd.get('servicio_id')]
+    cabanas = set(Servicio.objects.filter(id__in=ids, tipo_servicio='cabana')
+                  .values_list('id', flat=True))
+    for sd in (servicios_data or []):
+        if sd.get('servicio_id') in cabanas:
+            return sd.get('hora')
     return None
 
 
@@ -690,7 +734,8 @@ def cotizacion_cliente(request, token):
         'es_cotizacion': True,
         'cliente_nombre': (cliente_data.get('nombre') or '').split(' ')[0],
         'experiencia_nombre': ('Gift Cards' if solo_gc else _experiencia_nombre(
-            _tipos_desde_payload(payload.get('servicios', [])))),
+            _tipos_desde_payload(payload.get('servicios', [])),
+            _hora_cabana_del_payload(payload.get('servicios', [])))),
         'lineas': lineas,
         'total_str': total_str,
         'giftcards': giftcards_cot,

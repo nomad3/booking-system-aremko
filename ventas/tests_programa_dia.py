@@ -71,3 +71,71 @@ class ElDiaNoSeCuentaComoRitual(TestCase):
         ReservaServicio.objects.create(venta_reserva=v, servicio=self.tina,
                                        fecha_agendamiento=DIA, hora_inicio='10:00')
         self.assertNotEqual(clasificar_ventareservas_por_programa([v.id]).get(v.id), 'dia')
+
+
+class ElPaseDelCliente(TestCase):
+    """El pase es lo que el cliente lee el día que viene. Dos cosas fallaron
+    ahí y las dos las vio Jorge probando en vivo: los servicios salían en el
+    orden en que se creó la reserva (la tina de las 16:30 antes del masaje de
+    las 14:15) y el título decía «Ritual del Río», que es otro producto y sí
+    incluye la noche."""
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(nombre='Pedro', telefono='+56911111111')
+        self.cab = Servicio.objects.create(nombre='Cabaña Acantilado', precio_base=110000,
+                                           duracion=60, tipo_servicio='cabana')
+        self.tina = Servicio.objects.create(nombre='Tina Hidromasaje Llaima', precio_base=60000,
+                                            duracion=120, tipo_servicio='tina')
+        self.mas = Servicio.objects.create(nombre='Masaje Relajación', precio_base=80000,
+                                           duracion=50, tipo_servicio='masaje')
+
+    def _venta(self, hora_cabana='10:00'):
+        v = VentaReserva.objects.create(cliente=self.cliente)
+        # A propósito en el MISMO orden en que las crea la cotización del día:
+        # cabaña, tina, masaje. Si el pase no ordena, sale así.
+        for serv, hora in ((self.cab, hora_cabana), (self.tina, '16:30'), (self.mas, '14:15')):
+            ReservaServicio.objects.create(venta_reserva=v, servicio=serv,
+                                           fecha_agendamiento=DIA, hora_inicio=hora)
+        return v
+
+    def test_los_servicios_salen_en_orden_cronologico(self):
+        from ventas.views.ficha_reserva_view import _lineas_servicios
+        nombres = [l['nombre'] for l in _lineas_servicios(self._venta())]
+        self.assertEqual(nombres, ['Cabaña Acantilado', 'Masaje Relajación',
+                                   'Tina Hidromasaje Llaima'])
+
+    def test_el_descuento_va_al_final_aunque_tenga_hora_temprana(self):
+        """Lleva fecha y hora de relleno; ordenar por hora lo subiría arriba."""
+        from ventas.views.ficha_reserva_view import _lineas_servicios
+        v = self._venta()
+        desc = Servicio.objects.create(nombre='Descuento_Servicios', precio_base=-50000,
+                                       duracion=1, tipo_servicio='otro')
+        ReservaServicio.objects.create(venta_reserva=v, servicio=desc,
+                                       fecha_agendamiento=DIA, hora_inicio='10:00')
+        self.assertEqual(_lineas_servicios(v)[-1]['nombre'], 'Descuento')
+
+    def test_el_titulo_dice_el_programa_del_dia(self):
+        from ventas.views.ficha_reserva_view import _experiencia_nombre
+        self.assertEqual(
+            _experiencia_nombre(['cabana', 'tina', 'masaje'], '10:00'),
+            'Cabaña y spa por el día')
+
+    def test_el_titulo_del_ritual_no_cambia(self):
+        """La regla nueva no puede robarle el nombre al Ritual."""
+        from ventas.views.ficha_reserva_view import _experiencia_nombre
+        self.assertEqual(
+            _experiencia_nombre(['cabana', 'tina', 'masaje'], '16:00'),
+            'Ritual del Río')
+
+    def test_sin_hora_sigue_siendo_ritual(self):
+        """Las reservas viejas no traen la hora al llamador: no pueden cambiar
+        de nombre por este arreglo."""
+        from ventas.views.ficha_reserva_view import _experiencia_nombre
+        self.assertEqual(
+            _experiencia_nombre(['cabana', 'tina', 'masaje']), 'Ritual del Río')
+
+    def test_el_refugio_tampoco_cambia(self):
+        from ventas.views.ficha_reserva_view import _experiencia_nombre
+        self.assertEqual(
+            _experiencia_nombre(['cabana', 'cabana', 'tina', 'masaje'], '10:00'),
+            'Refugio Aremko')
