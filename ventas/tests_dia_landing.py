@@ -72,3 +72,29 @@ class EstaEnLaVitrina(TestCase):
     def test_esta_en_el_sitemap(self):
         xml = self.client.get('/sitemap.xml').content.decode()
         self.assertIn('cabana-y-spa-por-el-dia', xml)
+
+
+class LaFotoDelDesayuno(TestCase):
+    """El desayuno es el único acto de esta landing que el Ritual no tiene por
+    separado, así que necesita su propia foto. Sin ella la tarjeta queda como
+    un hueco en la grilla — lo vio Jorge en la página publicada."""
+
+    def test_el_campo_existe_y_es_opcional(self):
+        from ventas.models import RitualRioLandingConfig
+        campo = RitualRioLandingConfig._meta.get_field('foto_acto4')
+        self.assertTrue(campo.blank)
+        self.assertTrue(campo.null)
+
+    def test_se_puede_subir_desde_el_admin(self):
+        """Los campos del admin están listados uno por uno: si no está ahí, el
+        campo existe en la base pero no hay dónde subir la foto."""
+        from ventas.admin import RitualRioLandingConfigAdmin
+        campos = [c for _, opts in RitualRioLandingConfigAdmin.fieldsets
+                  for c in opts['fields']]
+        self.assertIn('foto_acto4', campos)
+
+    def test_sin_foto_la_pagina_igual_carga(self):
+        """Mientras no haya foto subida, la landing no puede romperse."""
+        r = self.client.get(reverse('dia_landing'))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Desayuno sureño al llegar', r.content.decode())

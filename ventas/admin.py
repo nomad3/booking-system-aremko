@@ -3971,6 +3971,13 @@ class RitualRioLandingConfigAdmin(SingletonModelAdmin):
         ('Las 3 escenas del ritual', {
             'fields': ('foto_acto1', 'foto_acto2', 'foto_acto3'),
         }),
+        ('Desayuno — solo para «Cabaña y spa por el día»', {
+            'fields': ('foto_acto4',),
+            'description': 'Foto del desayuno sureño de llegada. Se usa SOLO en la landing '
+                           '/cabana-y-spa-por-el-dia/, donde el desayuno es un acto propio '
+                           '(en el Ritual va junto con la cabaña). Si la dejas vacía, esa '
+                           'tarjeta se muestra solo con texto.'
+        }),
         ('Reseña 1', {
             'fields': ('resena1_foto', 'resena1_texto', 'resena1_autor'),
             'description': 'Si dejas el texto vacío, esta reseña no aparece en la landing.'

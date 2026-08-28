@@ -4633,6 +4633,13 @@ class RitualRioLandingConfig(SingletonModel):
         upload_to='ritual_rio/', blank=True, null=True,
         help_text="Acto 3 — Cabaña y desayuno al despertar."
     )
+    # Cuarta foto: la usa «Cabaña y spa por el día», que tiene un acto más que
+    # el Ritual (el desayuno de llegada es propio, no el del despertar).
+    foto_acto4 = models.ImageField(
+        upload_to='ritual_rio/', blank=True, null=True,
+        help_text="Desayuno sureño de llegada (landing «Cabaña y spa por el día»). "
+                  "Si queda vacía, esa tarjeta se muestra sin foto."
+    )
     # Reseñas con foto (3). Si texto vacío, la reseña no se muestra.
     resena1_foto = models.ImageField(
         upload_to='ritual_rio/resenas/', blank=True, null=True,
