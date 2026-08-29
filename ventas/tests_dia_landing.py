@@ -48,6 +48,15 @@ class LaPaginaSeDibuja(TestCase):
         self.assertIn('duermen en su cama', self.texto)
         self.assertIn('sin quedarse a dormir', self.texto.lower())
 
+    def test_el_titulo_nombra_la_ciudad(self):
+        """El título es lo que Google muestra en sus resultados. Las otras
+        páginas del sitio dicen «Puerto Varas» ahí («Tinas Calientes Puerto
+        Varas…»); esta nació sin la ciudad y competía en desventaja por
+        búsquedas como «spa por el día puerto varas», que es exactamente
+        para lo que existe."""
+        titulo = self.html.split('<title>')[1].split('</title>')[0]
+        self.assertIn('Puerto Varas', titulo)
+
     def test_el_boton_lleva_a_whatsapp(self):
         self.assertIn('wa.me/56957902525', self.html)
 
