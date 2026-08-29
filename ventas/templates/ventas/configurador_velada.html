@@ -243,7 +243,9 @@
 
       <p class="nota" style="text-align:center; margin-top:18px;">En el siguiente paso confirmas tus datos y pagas. Podrás sumar masaje o cabaña si quieres.</p>
 
-      <a class="cruce" href="{% url copy.cruce_url %}">{{ copy.cruce_txt|safe }}</a>
+      {% for c in copy.cruces %}
+      <a class="cruce" href="{% url c.url %}">{{ c.txt|safe }}</a>
+      {% endfor %}
     </div>
   </section>
 

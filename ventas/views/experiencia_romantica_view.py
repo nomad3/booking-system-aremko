@@ -159,8 +159,14 @@ COPY = {
             'Tú y Aremko saben todo. Tu pareja recibe <b>solo la invitación</b> —sin precios, '
             'sin ver la ambientación—. La sorpresa se revela al llegar.'),
         'cierre': '<b>San Valentín</b> es nuestra semana más pedida. Asegura tu fecha con tiempo.',
-        'cruce_url': 'celebraciones',
-        'cruce_txt': '¿Es su cumpleaños o una despedida? Míralo en <b>Celebraciones</b> →',
+        # Van al pie de la página: rescatan a quien bajó entera y no reservó.
+        # No compiten con la velada, la suceden.
+        'cruces': [
+            {'url': 'celebraciones',
+             'txt': '¿Es su cumpleaños o una despedida? Míralo en <b>Celebraciones</b> →'},
+            {'url': 'dia_landing',
+             'txt': '¿Prefieren de día y volver a dormir a su casa? Mira <b>Cabaña y spa por el día</b> →'},
+        ],
     },
     MODO_CELEBRACIONES: {
         'title': 'Cumpleaños y celebraciones junto al río · Tina caliente en Puerto Varas | Aremko',
@@ -193,8 +199,12 @@ COPY = {
             'Si quieres que sea sorpresa, nosotros guardamos el secreto: quien celebra recibe '
             '<b>solo la invitación</b> —sin precios, sin ver la ambientación—.'),
         'cierre': 'Los fines de semana se llenan primero. Asegura la fecha con tiempo.',
-        'cruce_url': 'experiencia_romantica',
-        'cruce_txt': '¿Quieres sorprender a tu pareja? Mira la <b>Experiencia Romántica</b> →',
+        'cruces': [
+            {'url': 'experiencia_romantica',
+             'txt': '¿Quieres sorprender a tu pareja? Mira la <b>Experiencia Romántica</b> →'},
+            {'url': 'dia_landing',
+             'txt': '¿Lo quieren de a dos y sin apuro? Mira <b>Cabaña y spa por el día</b> →'},
+        ],
     },
 }
 

@@ -221,3 +221,44 @@ class SitemapTest(_BasePuertas):
         xml = resp.content.decode()
         self.assertIn(reverse('experiencia_romantica'), xml)
         self.assertIn(reverse('celebraciones'), xml)
+
+
+class ElPieRescataAlQueNoReservo(TestCase):
+    """Las dos puertas son páginas de embudo: no tienen menú, a propósito, para
+    no darle al visitante una puerta de salida antes de reservar. El precio de
+    eso es que quien llega desde un anuncio, baja entera la página y NO reserva
+    quedaba sin ningún lado adonde ir salvo la otra puerta.
+
+    Desde el 2026-08-28 el pie ofrece además «Cabaña y spa por el día», que es
+    de a dos igual que la velada pero de día y más barato. Va al final, después
+    del configurador: rescata al que no convirtió, no compite con el que sí.
+    """
+
+    def _pie(self, nombre_url):
+        html = self.client.get(reverse(nombre_url)).content.decode()
+        # El cruce vive al final; basta con el HTML completo para verificarlo.
+        return html
+
+    def test_romantica_ofrece_las_dos_salidas(self):
+        html = self._pie('experiencia_romantica')
+        self.assertIn(reverse('celebraciones'), html)
+        self.assertIn(reverse('dia_landing'), html)
+
+    def test_celebraciones_ofrece_las_dos_salidas(self):
+        html = self._pie('celebraciones')
+        self.assertIn(reverse('experiencia_romantica'), html)
+        self.assertIn(reverse('dia_landing'), html)
+
+    def test_el_cruce_viejo_no_fue_reemplazado(self):
+        """Agregar una salida no debe costar la que ya existía: el cruce entre
+        las dos puertas es el que más convierte, porque ambas son veladas."""
+        from ventas.views.experiencia_romantica_view import (
+            COPY, MODO_CELEBRACIONES, MODO_ROMANTICA,
+        )
+        for modo, esperado in ((MODO_ROMANTICA, 'celebraciones'),
+                               (MODO_CELEBRACIONES, 'experiencia_romantica')):
+            urls = [c['url'] for c in COPY[modo]['cruces']]
+            self.assertIn(esperado, urls)
+            self.assertIn('dia_landing', urls)
+            self.assertEqual(urls[0], esperado,
+                             'la salida hermana debe ir primero: convierte más')
