@@ -163,6 +163,36 @@ def create_flow_payment(request):
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
 
 
+def _bloquear_noche_del_programa_dia(cart_data, venta):
+    """Bloquea la noche anterior cuando lo pagado fue «Cabaña y spa por el día».
+
+    La cabaña tiene que estar lista a las 10:00, así que la víspera no puede
+    venderse. El carrito trae `dia_bloqueo` sólo si la reserva se armó por ese
+    camino; cualquier otra compra pasa de largo.
+
+    Si el bloqueo falla NO se toca la reserva —ya está pagada—, pero queda
+    gritando en el log: hay una noche sin proteger y alguien la puede tomar.
+    """
+    marca = (cart_data or {}).get('dia_bloqueo')
+    if not marca:
+        return
+    try:
+        from datetime import date as _date
+
+        from whatsapp_agent.packs import bloquear_noche_previa
+
+        bloquear_noche_previa(
+            marca['cabana_id'],
+            _date.fromisoformat(marca['fecha']),
+            referencia=f'venta {venta.id} (pagada por la web)',
+        )
+        print(f"[dia] noche previa bloqueada para la venta {venta.id} ({marca['fecha']})")
+    except Exception as exc:  # noqa: BLE001
+        print(f"ALERTA [dia] NO se pudo bloquear la noche previa de la cabaña "
+              f"{marca.get('cabana_id')} para el {marca.get('fecha')} "
+              f"(venta {venta.id}): {exc}. LA NOCHE QUEDA VENDIBLE.")
+
+
 def _materializar_pending_si_pago_exitoso(pending, amount):
     """Materializa el PendingReservation a VentaReserva tras confirmacion de pago.
 
@@ -196,7 +226,10 @@ def _materializar_pending_si_pago_exitoso(pending, amount):
             )
             pending.marcar_confirmado(venta)
             venta.refresh_from_db()
-            return venta
+        # Fuera de la transacción y a propósito: la reserva ya está pagada y
+        # confirmada, así que un fallo del bloqueo no puede echarla atrás.
+        _bloquear_noche_del_programa_dia(cart_data, venta)
+        return venta
     except SlotUnavailableError as e:
         detalle = (
             f"Slot perdido al confirmar pago Flow ({timezone.now().isoformat()}): "

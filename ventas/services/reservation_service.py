@@ -70,6 +70,14 @@ def validar_disponibilidad_carrito(cart_data):
             )
             continue
 
+        # Un servicio de precio negativo es una línea de descuento, no un cupo:
+        # no tiene capacidad, ni pieza, ni masajista, y dos reservas pueden
+        # llevar descuento el mismo día a la misma hora sin estorbarse. Tratarlo
+        # como cupo hacía que la segunda venta del día fallara DESPUÉS del pago,
+        # obligando a un reembolso a mano.
+        if servicio_obj.precio_base is not None and servicio_obj.precio_base < 0:
+            continue
+
         if ReservaServicio.objects.filter(
             servicio=servicio_obj,
             fecha_agendamiento=fecha,

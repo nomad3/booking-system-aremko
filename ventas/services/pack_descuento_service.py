@@ -511,7 +511,11 @@ class PackDescuentoService:
         descuentos = []
         total_descuentos = Decimal('0')
 
-        if cart.get('servicios'):
+        # Un paquete cerrado trae el precio YA fijado por quien lo armó (el
+        # programa por el día vale $200.000 y su descuento viene dentro del
+        # carrito como un ítem). Detectar packs encima restaría dos veces y el
+        # cliente pagaría menos de lo que el producto vale.
+        if cart.get('servicios') and not cart.get('paquete_cerrado'):
             packs_aplicables = PackDescuentoService.detectar_packs_aplicables(
                 cart['servicios']
             )

@@ -975,12 +975,46 @@ def dia_landing_view(request):
         (None, 'El lugar es hermoso, las tinas al aire libre rodeadas de naturaleza; ideal para relajarse.', 'Cristina · TripAdvisor'),
         (None, 'Los masajes descontracturantes fueron increíbles, combinados con técnicas quiroprácticas.', 'Nicolás · TripAdvisor'),
     ]
+    # Fechas elegibles del formulario de reserva. Se usa LA MISMA función que
+    # valida el POST (`_dia_semana_pack`) en vez de recalcular el día de la
+    # semana acá: dos implementaciones del mismo criterio terminan discrepando,
+    # y la forma en que se notaría sería un sábado ofrecido y rechazado después.
+    fechas_vendibles = []
+    try:
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from whatsapp_agent.packs import DIA_DIAS_VALIDOS, _dia_semana_pack
+
+        DIAS = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
+        MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+                 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+        d = timezone.localdate() + timedelta(days=1)   # desde mañana
+        limite = d + timedelta(days=45)
+        while len(fechas_vendibles) < 8 and d < limite:
+            if _dia_semana_pack(d) in DIA_DIAS_VALIDOS:
+                fechas_vendibles.append({
+                    'valor': d.isoformat(),
+                    'texto': f'{DIAS[d.weekday()]} {d.day} de {MESES[d.month - 1]}',
+                })
+            d += timedelta(days=1)
+    except Exception:
+        # Sin lista de fechas la página sigue vendiendo por WhatsApp; es
+        # preferible eso a caerse entera.
+        fechas_vendibles = []
+
     return render(request, 'ventas/dia_landing.html', {
         'canonical_url': canonical_url,
         'whatsapp_url': whatsapp_url,
         'config': config,
         'resenas': resenas,
         'precio': '200.000',   # 2 personas, lun/mié/jue (Jorge 2026-08-28)
+        'fechas_vendibles': fechas_vendibles,
+        # Por qué volvió, si volvió: la base pública no dibuja los mensajes de
+        # Django, así que el motivo viaja en la dirección.
+        'motivo': request.GET.get('motivo', ''),
+        'motivo_fecha': request.GET.get('fecha', ''),
     })
 
 

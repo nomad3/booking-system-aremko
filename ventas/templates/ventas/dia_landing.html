@@ -36,6 +36,19 @@
     text-decoration:none;font-size:18px;font-weight:600;padding:15px 30px;border-radius:12px}
   .rr-cta:hover{background:#0c5b48;color:#fff}
   .rr-cta-note{font-size:14px;color:#8a7f6c;margin:12px 0 0}
+  .rr-form{display:flex;flex-direction:column;gap:12px;max-width:380px;margin:0 auto}
+  /* 16px a propósito: bajo ese tamaño iOS hace zoom solo al tocar el selector
+     y descuadra la página entera. */
+  .rr-select{padding:14px 16px;font-size:16px;border:1px solid #d8d2c4;border-radius:12px;
+    background:#fff;color:#3a352e;font-family:inherit;width:100%;}
+  .rr-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    background:#0f6e56;color:#eafaf3;border:0;padding:15px 26px;border-radius:999px;
+    font-size:17px;font-weight:600;cursor:pointer;font-family:inherit}
+  .rr-btn:hover{background:#0c5b48}
+  .rr-o{font-size:15px;color:#8a7f6c;margin:22px 0 0}
+  .rr-o a{color:#0f6e56;text-decoration:underline}
+  .rr-aviso{background:#fff4e5;border:1px solid #f0d9b5;color:#7a5c2e;border-radius:14px;
+    padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.55;text-align:left}
   .rr-h2{font-size:24px;text-align:center;margin:0 0 22px;font-weight:600}
   .rr-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
   .rr-card{background:#fff;border:1px solid #ece6dc;border-radius:14px;padding:22px;text-align:center}
@@ -164,9 +177,35 @@
 
   <section class="rr-section">
     <div class="rr-final">
-      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Aparta tu día por WhatsApp 👇</h2>
-      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Dinos qué lunes, miércoles o jueves te acomoda y lo coordinamos.</p>
-      <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+      {% if motivo %}
+      <div class="rr-aviso">
+        {% if motivo == 'no_disponible' %}
+          Ese día ya no está disponible. Elige otro de la lista — o escríbenos y buscamos alternativa.
+        {% elif motivo == 'sin_fecha' %}
+          Elige primero qué día te acomoda.
+        {% else %}
+          No pudimos armar tu día en este momento. Escríbenos por WhatsApp y lo resolvemos al tiro.
+        {% endif %}
+      </div>
+      {% endif %}
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Reserva tu día 👇</h2>
+      {% if fechas_vendibles %}
+        <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Elige el día que te acomoda y pagas al tiro. Queda confirmado.</p>
+        <form class="rr-form" method="post" action="{% url 'dia_reservar' %}">
+          {% csrf_token %}
+          <select class="rr-select" name="fecha" required aria-label="Elige tu día">
+            <option value="">Elige tu día…</option>
+            {% for f in fechas_vendibles %}
+              <option value="{{ f.valor }}"{% if f.valor == motivo_fecha %} disabled{% endif %}>{{ f.texto }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="rr-btn" id="btnReservarDia">Reservar y pagar ${{ precio }}</button>
+        </form>
+        <p class="rr-o">o <a class="rr-cta-wa" href="{{ whatsapp_url }}">escríbenos por WhatsApp</a> si prefieres coordinarlo conversando</p>
+      {% else %}
+        <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Dinos qué lunes, miércoles o jueves te acomoda y lo coordinamos.</p>
+        <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+      {% endif %}
       <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
     </div>
   </section>
@@ -198,11 +237,32 @@
     } catch (e) { /* nunca bloquear la navegación a WhatsApp */ }
     try { if (typeof fbq === 'function') { fbq('track', 'Lead', {content_name: 'Cabaña y spa por el día'}); } } catch (e) {}
   }
+  // Pagar con tarjeta NO es un Lead: es el inicio de una compra. Mezclarlos
+  // haría que el costo por lead de los anuncios se viera mejor de lo que es.
+  function trackPagar() {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'dia_reservar_web', {
+          send_to: 'G-T3K4CTD3HJ',
+          dia_campaign: utm.campaign,
+          dia_source: utm.source,
+          dia_medium: utm.medium
+        });
+      }
+    } catch (e) { /* nunca bloquear el envío del formulario */ }
+    try {
+      if (typeof fbq === 'function') {
+        fbq('track', 'InitiateCheckout', {content_name: 'Cabaña y spa por el día'});
+      }
+    } catch (e) {}
+  }
   document.addEventListener('DOMContentLoaded', function () {
-    var btns = document.querySelectorAll('a.rr-cta');
+    var btns = document.querySelectorAll('a.rr-cta, a.rr-cta-wa');
     for (var i = 0; i < btns.length; i++) {
       btns[i].addEventListener('click', track);
     }
+    var pagar = document.getElementById('btnReservarDia');
+    if (pagar) { pagar.addEventListener('click', trackPagar); }
   });
 })();
 </script>
