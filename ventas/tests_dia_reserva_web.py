@@ -259,3 +259,42 @@ class UnDescuentoNoOcupaUnCupo(TestCase):
             venta_reserva=self.venta, servicio=self.masaje,
             fecha_agendamiento='2026-08-31', hora_inicio='10:00')
         self.assertEqual(len(self._validar(self.masaje)), 1)
+
+
+class ElDescuentoNoSeLeMuestraComoPersonas(TestCase):
+    """El paquete clava el precio con una línea de precio negativo cuya
+    "cantidad de personas" es en realidad el mecanismo del cálculo
+    (monto ÷ precio unitario). En el checkout eso se leía como
+    «Descuento_Servicios (50000 persona(s))» — cincuenta mil personas— justo
+    en la pantalla donde el cliente pone su tarjeta.
+    """
+
+    def setUp(self):
+        self.masaje = Servicio.objects.create(nombre='Masaje', precio_base=40000,
+                                              duracion=50, tipo_servicio='masaje')
+        s = self.client.session
+        s['cart'] = {'servicios': [
+            {'id': self.masaje.id, 'nombre': 'Masaje', 'precio': 40000.0,
+             'fecha': '2026-09-03', 'hora': '14:15', 'cantidad_personas': 2,
+             'tipo_servicio': 'masaje', 'subtotal': 80000.0},
+            {'id': 999, 'nombre': 'Descuento_Servicios', 'precio': -1.0,
+             'fecha': '2026-09-03', 'hora': '10:00', 'cantidad_personas': 50000,
+             'tipo_servicio': 'otro', 'subtotal': -50000.0},
+        ], 'giftcards': [], 'total': 30000.0}
+        s.save()
+        self.html = self.client.get(reverse('ventas:checkout')).content.decode()
+
+    def test_no_dice_cincuenta_mil_personas(self):
+        self.assertNotIn('50000 persona', self.html)
+
+    def test_no_muestra_el_nombre_interno(self):
+        self.assertNotIn('Descuento_Servicios', self.html)
+
+    def test_pero_sigue_diciendo_que_hay_un_descuento(self):
+        """Ocultar el mecanismo no puede esconder la rebaja: el cliente tiene
+        derecho a ver de dónde sale el precio."""
+        self.assertIn('Descuento', self.html)
+        self.assertIn('-50', self.html.replace('.', '').replace(' ', ''))
+
+    def test_los_servicios_de_verdad_siguen_mostrando_las_personas(self):
+        self.assertIn('2 persona(s)', self.html)
