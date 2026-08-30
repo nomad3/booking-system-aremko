@@ -51,6 +51,7 @@ urlpatterns = [
     path('reserva/<int:venta_id>/tarjeta/producto/', tarjeta_reserva_view.tarjeta_agregar_producto, name='tarjeta_agregar_producto'),
     path('reserva/<int:venta_id>/tarjeta/datos/', tarjeta_reserva_view.tarjeta_editar_datos, name='tarjeta_editar_datos'),
     path('reserva/<int:venta_id>/tarjeta/servicio/', tarjeta_reserva_view.tarjeta_editar_servicio, name='tarjeta_editar_servicio'),
+    path('reservas/', tarjeta_reserva_view.tarjetas_lista, name='tarjetas_lista'),
     path('reservas/nueva/', tarjeta_reserva_view.nueva_reserva, name='nueva_reserva'),
     path('manual-recepcion/', agenda_operativa_view.manual_recepcion, name='manual_recepcion'),
     path('agenda-masajes/', agenda_masajes_view.agenda_masajes, name='agenda_masajes'),

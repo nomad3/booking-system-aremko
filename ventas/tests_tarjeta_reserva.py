@@ -850,3 +850,80 @@ class LaAgendaAbreLaTarjetaNoElAdmin(TestCase):
         self.assertIn(f'/ventas/reserva/{self.venta.pk}/tarjeta/', html)
         self.assertNotIn(f'/admin/ventas/ventareserva/{self.venta.pk}/change/',
                          html)
+
+
+class ListaMovilDeReservas(TestCase):
+    """La lista para encontrar una reserva desde el celular (Jorge, 30-08):
+    número, fecha y cliente — nada más — con UN buscador que entiende id,
+    nombre, teléfono o fecha. Cada fila abre la tarjeta.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from datetime import timedelta
+
+        from django.utils import timezone as tz
+
+        cls.staff = get_user_model().objects.create_superuser(
+            username='lista_test', email='li@test.cl', password='x')
+        c1 = Cliente.objects.create(nombre='Liliana Oportus',
+                                    telefono='+56966090345')
+        c2 = Cliente.objects.create(nombre='Amy Prueba', telefono='+56954503703')
+        cls.v1 = VentaReserva.objects.create(cliente=c1, fecha_reserva=tz.now())
+        cls.v2 = VentaReserva.objects.create(
+            cliente=c2, fecha_reserva=tz.now() - timedelta(days=3))
+        cls.url = reverse('ventas:tarjetas_lista')
+
+    def _html(self, q=''):
+        self.client.force_login(self.staff)
+        return self.client.get(self.url, {'q': q} if q else None).content.decode()
+
+    def test_solo_staff(self):
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('login', r.url)
+
+    def test_muestra_lo_minimo_y_cada_fila_abre_la_tarjeta(self):
+        html = self._html()
+        self.assertIn('Liliana Oportus', html)
+        self.assertIn(f'#{self.v1.pk}', html)
+        self.assertIn(reverse('ventas:tarjeta_reserva', args=[self.v1.pk]), html)
+
+    def test_busca_por_numero_de_reserva(self):
+        html = self._html(str(self.v1.pk))
+        self.assertIn('Liliana Oportus', html)
+        self.assertNotIn('Amy Prueba', html)
+
+    def test_busca_por_nombre_parcial(self):
+        html = self._html('oport')
+        self.assertIn('Liliana Oportus', html)
+        self.assertNotIn('Amy Prueba', html)
+
+    def test_busca_por_telefono_como_lo_escribe_deborah(self):
+        """«66090345» sin el +569: tiene que encontrarla igual."""
+        html = self._html('66090345')
+        self.assertIn('Liliana Oportus', html)
+        self.assertNotIn('Amy Prueba', html)
+
+    def test_busca_por_fecha(self):
+        from django.utils import timezone as tz
+
+        html = self._html(tz.localdate().strftime('%d/%m/%Y'))
+        self.assertIn('Liliana Oportus', html)
+        self.assertNotIn('Amy Prueba', html)
+
+    def test_sin_resultados_explica_en_vez_de_quedar_en_blanco(self):
+        self.assertIn('Nada para', self._html('zzzz'))
+
+    def test_las_entradas_existen(self):
+        """La lección de los tres menús, otra vez: agenda, tarjeta y el
+        listado del admin ofrecen el camino."""
+        self.client.force_login(self.staff)
+        agenda = self.client.get(reverse('ventas:agenda_operativa')).content.decode()
+        self.assertIn(self.url, agenda)
+        tarjeta = self.client.get(reverse('ventas:tarjeta_reserva',
+                                          args=[self.v1.pk])).content.decode()
+        self.assertIn(self.url, tarjeta)
+        changelist = self.client.get(
+            reverse('admin:ventas_ventareserva_changelist')).content.decode()
+        self.assertIn(self.url, changelist)

@@ -226,6 +226,51 @@ def tarjeta_agregar_producto(request, venta_id):
 
 
 @staff_required
+def tarjetas_lista(request):
+    """Lista móvil de reservas: lo mínimo para ENCONTRAR una y abrir su tarjeta.
+
+    Jorge (2026-08-30): el listado del admin en el celular es una tabla de
+    diez columnas con scroll horizontal. Acá va lo que pidió y nada más:
+    número, fecha y cliente, con un buscador — y cada fila abre la tarjeta.
+
+    El buscador entiende lo que Deborah escribiría: un número corto es el id
+    de la reserva; un número largo, un teléfono; texto, el nombre; y una fecha
+    (02/09/2026 o 2026-09-02) trae las reservas de ese día. Todo en UN campo:
+    en el celular, elegir "buscar por..." es un paso de más.
+    """
+    from datetime import datetime as _dt
+
+    from django.db.models import Q
+
+    q = (request.GET.get('q') or '').strip()
+    reservas = VentaReserva.objects.select_related('cliente')
+
+    if q:
+        cond = Q(cliente__nombre__icontains=q)
+        solo_digitos = ''.join(ch for ch in q if ch.isdigit())
+        if solo_digitos:
+            if len(solo_digitos) <= 7:
+                cond |= Q(id=int(solo_digitos))
+            cond |= Q(cliente__telefono__icontains=solo_digitos)
+        for formato in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+            try:
+                f = _dt.strptime(q, formato).date()
+                cond |= Q(fecha_reserva__date=f)
+                cond |= Q(reservaservicios__fecha_agendamiento=f)
+                break
+            except ValueError:
+                continue
+        reservas = reservas.filter(cond).distinct()
+
+    reservas = list(reservas.order_by('-id')[:50])
+    return render(request, 'ventas/tarjetas_lista.html', {
+        'reservas': reservas,
+        'q': q,
+        'hay_mas': len(reservas) == 50,
+    })
+
+
+@staff_required
 def nueva_reserva(request):
     """Crear una reserva con lo mínimo: teléfono y nombre. Nada más.
 

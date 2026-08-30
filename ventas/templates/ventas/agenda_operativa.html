@@ -876,6 +876,10 @@
                style="background:#BC5630;color:#fff;font-weight:700;">
                 ➕ Nueva reserva
             </a>
+            <a href="{% url 'ventas:tarjetas_lista' %}" class="btn-filter"
+               style="background:#456990;color:#fff;font-weight:700;">
+                📋 Reservas
+            </a>
             <!-- Filtros de Vista -->
             <div class="filter-group">
                 <a href="?filtro=actual{% if debug_mode %}&debug=true{% endif %}"

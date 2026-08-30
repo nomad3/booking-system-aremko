@@ -1,0 +1,91 @@
+{% comment %}
+Lista móvil de reservas: lo mínimo para ENCONTRAR una — número, fecha,
+cliente — y un buscador. Cada fila abre la Tarjeta. La edición fina sigue
+viviendo en el admin, a un toque desde la tarjeta.
+{% endcomment %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Reservas · Aremko</title>
+<style>
+  :root{
+    --bg:#F5EFE3; --card:#FFFDF8; --ink:#2E2A24; --hint:#8A8175;
+    --line:#EADFCD; --brand:#BC5630; --ok:#2E7D32; --debe:#C62828;
+    --parcial:#B26A00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       padding:14px;font-size:16px;line-height:1.45}
+  .wrap{max-width:520px;margin:0 auto}
+  h1{margin:0 0 10px;font-size:21px}
+  .busca{display:flex;gap:8px;margin-bottom:12px}
+  /* 16px: bajo eso iOS hace zoom al tocar el campo */
+  .busca input{flex:1;padding:13px;font-size:16px;border:1px solid var(--line);
+               border-radius:12px;background:#fff;font-family:inherit;color:var(--ink)}
+  .busca button{border:0;background:var(--brand);color:#fff;border-radius:12px;
+                padding:0 18px;font-size:16px;font-weight:600;font-family:inherit;
+                cursor:pointer}
+  .fila-res{display:flex;justify-content:space-between;align-items:center;gap:10px;
+            background:var(--card);border:1px solid var(--line);border-radius:12px;
+            padding:12px 14px;margin-bottom:8px;text-decoration:none;color:inherit}
+  .fila-res .quien{min-width:0}
+  .fila-res .nom{font-weight:600;white-space:nowrap;overflow:hidden;
+                 text-overflow:ellipsis}
+  .fila-res .sub{color:var(--hint);font-size:13px}
+  .lado{text-align:right;white-space:nowrap}
+  .chip{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;
+        padding:2px 9px}
+  .chip.pagado{background:#E6F2E8;color:var(--ok)}
+  .chip.parcial{background:#FFF3E0;color:var(--parcial)}
+  .chip.pendiente{background:#FDECEA;color:var(--debe)}
+  .vacio{color:var(--hint);text-align:center;padding:26px 0}
+  .nota{color:var(--hint);font-size:13px;text-align:center;margin-top:10px}
+  .acciones{display:flex;gap:8px;margin-top:14px}
+  .btn{flex:1;text-align:center;padding:13px;border-radius:12px;font-size:15px;
+       font-weight:600;text-decoration:none}
+  .btn-nueva{background:var(--brand);color:#fff}
+  .btn-agenda{background:transparent;color:var(--hint);border:1px dashed var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📋 Reservas</h1>
+
+  <form class="busca" method="get">
+    <input name="q" value="{{ q }}" placeholder="N°, cliente, teléfono o fecha…"
+           autocomplete="off" {% if not q %}autofocus{% endif %}>
+    <button type="submit">Buscar</button>
+  </form>
+
+  {% for v in reservas %}
+  <a class="fila-res" href="{% url 'ventas:tarjeta_reserva' v.pk %}">
+    <div class="quien">
+      <div class="nom">{{ v.cliente.nombre|default:"Sin cliente" }}</div>
+      <div class="sub">#{{ v.pk }} · {{ v.fecha_reserva|date:"d/m/Y"|default:"sin fecha" }}</div>
+    </div>
+    <div class="lado">
+      <span class="chip {{ v.estado_pago }}">{{ v.get_estado_pago_display|default:v.estado_pago }}</span>
+    </div>
+  </a>
+  {% empty %}
+  <div class="vacio">
+    {% if q %}Nada para «{{ q }}». Prueba con el número, parte del nombre o el teléfono.
+    {% else %}Todavía no hay reservas.{% endif %}
+  </div>
+  {% endfor %}
+
+  {% if hay_mas %}
+  <div class="nota">Se muestran las últimas 50 — busca para encontrar más antiguas.</div>
+  {% endif %}
+
+  <div class="acciones">
+    <a class="btn btn-nueva" href="{% url 'ventas:nueva_reserva' %}">➕ Nueva reserva</a>
+    <a class="btn btn-agenda" href="{% url 'ventas:agenda_operativa' %}">Agenda del día</a>
+  </div>
+</div>
+</body>
+</html>
