@@ -13,7 +13,11 @@ Fase 4 (2026-08-30): agregar servicio — SIN código nuevo de disponibilidad: l
 tarjeta abre calendario_seleccion (el mismo del admin) en un overlay y define
 window.servicioAgregado, el protocolo que ese calendario ya habla. Todo vive
 en la plantilla.
-Falta: creación con datos mínimos.
+Fase 5 (2026-08-30): crear reserva con datos mínimos (nueva_reserva) — el
+teléfono manda: se normaliza con Cliente.normalize_phone y si el cliente ya
+existe se usa SU ficha, sin pisarle el nombre. Y datos complementarios
+(comentarios + documento fiscal) colapsados, con guardado chico
+(tarjeta_editar_datos). Las cinco fases del boceto de Jorge quedan completas.
 
 La vista es deliberadamente liviana: tres queries con select_related y ningún
 cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
@@ -23,12 +27,13 @@ from __future__ import annotations
 import logging
 
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from ventas.models import Pago, Producto, ReservaProducto, VentaReserva
+from ventas.models import Cliente, Pago, Producto, ReservaProducto, VentaReserva
 from ventas.views.ficha_reserva_view import mensaje_pase
 
 logger = logging.getLogger(__name__)
@@ -191,3 +196,67 @@ def tarjeta_agregar_producto(request, venta_id):
             'subtotal': int(linea.precio_unitario_venta * cantidad),
         },
     })
+
+
+@staff_required
+def nueva_reserva(request):
+    """Crear una reserva con lo mínimo: teléfono y nombre. Nada más.
+
+    El teléfono manda. Se normaliza con Cliente.normalize_phone (el mismo
+    normalizador que usa Cliente.save) y se busca ANTES de crear: si el
+    cliente ya existe se usa su ficha tal cual, sin pisarle el nombre — los
+    clientes duplicados por formato de teléfono ya costaron una limpieza
+    masiva (normalize_and_merge_clients).
+
+    Al crear, directo a la tarjeta: ahí están los botones para armar el resto.
+    """
+    contexto = {'telefono': '', 'nombre': ''}
+    if request.method != 'POST':
+        return render(request, 'ventas/nueva_reserva.html', contexto)
+
+    crudo = (request.POST.get('telefono') or '').strip()
+    nombre = (request.POST.get('nombre') or '').strip()
+    contexto.update(telefono=crudo, nombre=nombre)
+
+    telefono = Cliente.normalize_phone(crudo) if crudo else None
+    if not telefono:
+        contexto['error'] = 'Ese teléfono no se entiende. Ej: 912345678.'
+        return render(request, 'ventas/nueva_reserva.html', contexto)
+
+    cliente = Cliente.objects.filter(telefono=telefono).first()
+    if cliente is None:
+        if not nombre:
+            contexto['error'] = 'Es un cliente nuevo: falta el nombre.'
+            return render(request, 'ventas/nueva_reserva.html', contexto)
+        try:
+            cliente = Cliente.objects.create(nombre=nombre, telefono=telefono)
+        except (ValidationError, Exception) as exc:  # noqa: BLE001
+            logger.exception('[tarjeta] no se pudo crear el cliente %s: %s',
+                             telefono, exc)
+            contexto['error'] = 'No se pudo crear el cliente. Revisa el teléfono.'
+            return render(request, 'ventas/nueva_reserva.html', contexto)
+
+    # fecha_reserva admite NULL, pero un nulo esconde la venta de los reportes
+    # que filtran por fecha. Se estampa el momento de la creación.
+    venta = VentaReserva.objects.create(cliente=cliente,
+                                        fecha_reserva=timezone.now())
+    logger.info('[tarjeta] reserva %s creada para %s por %s',
+                venta.pk, cliente.telefono, request.user.username)
+    return redirect('ventas:tarjeta_reserva', venta_id=venta.pk)
+
+
+@staff_required
+@require_POST
+def tarjeta_editar_datos(request, venta_id):
+    """Guarda SOLO los datos complementarios: comentarios y documento fiscal.
+
+    update_fields a propósito: este endpoint no puede tocar totales, estados
+    ni nada que no sea suyo — un guardado parcial que pisa campos ajenos es el
+    mismo tipo de bug que la vista previa que mutaba datos.
+    """
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+    venta.comentarios = (request.POST.get('comentarios') or '').strip()
+    venta.numero_documento_fiscal = (request.POST.get('numero_documento_fiscal')
+                                     or '').strip()
+    venta.save(update_fields=['comentarios', 'numero_documento_fiscal'])
+    return JsonResponse({'ok': True})

@@ -60,6 +60,8 @@ internas y se reconocen entre sí.
   .err{color:var(--debe);font-size:14px;margin-bottom:8px;display:none}
   .btn-prod{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .btn-serv{background:#456990;color:#fff;margin-bottom:10px}
+  .btn-datos{background:transparent;color:var(--hint);border:1px dashed var(--line);
+             margin-bottom:10px;font-size:15px}
   .cal-overlay{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);
                flex-direction:column}
   .cal-overlay.abierto{display:flex}
@@ -193,8 +195,25 @@ internas y se reconocen entre sí.
     </div>
     <iframe id="calFrame" src="" title="Calendario de disponibilidad"></iframe>
   </div>
+  <button type="button" class="btn btn-datos" id="btnAbrirDatos">✎ Datos complementarios ▾</button>
+
+  <div class="card oculto" id="formDatos">
+    <h2>Datos complementarios</h2>
+    <form id="fDatos">{% csrf_token %}
+      <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">Comentarios</label>
+      <textarea class="campo" name="comentarios" rows="4">{{ venta.comentarios|default:"" }}</textarea>
+      <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">N° documento fiscal</label>
+      <input class="campo" name="numero_documento_fiscal" type="text" autocomplete="off"
+             value="{{ venta.numero_documento_fiscal|default:"" }}">
+      <div class="err" id="datosError"></div>
+      <button type="submit" class="btn btn-pago">Guardar datos</button>
+      <button type="button" class="btn btn-admin" id="datosCancelar">Cancelar</button>
+    </form>
+  </div>
+
   <a class="btn btn-admin" href="/admin/ventas/ventareserva/{{ venta.pk }}/change/">
     Abrir en el admin (edición completa)</a>
+  <a class="btn btn-admin" href="{% url 'ventas:nueva_reserva' %}">➕ Nueva reserva</a>
 
 </div>
 <script>
@@ -372,6 +391,50 @@ internas y se reconocen entre sí.
       sessionStorage.removeItem('tarjetaFlash');
       abrir.textContent = flash;
       setTimeout(function () { abrir.textContent = '📅 Agregar servicio'; }, 2600);
+    }
+  } catch (e) {}
+})();
+
+(function () {
+  // Fase 5: datos complementarios. Guarda SOLO comentarios y documento fiscal
+  // (el endpoint usa update_fields); al guardar recarga, para que lo que se ve
+  // sea siempre lo que quedó en el servidor.
+  var abrir = document.getElementById('btnAbrirDatos');
+  var caja = document.getElementById('formDatos');
+  var form = document.getElementById('fDatos');
+  var error = document.getElementById('datosError');
+
+  abrir.addEventListener('click', function () { caja.classList.toggle('oculto'); });
+  document.getElementById('datosCancelar').addEventListener('click', function () {
+    caja.classList.add('oculto'); error.style.display = 'none';
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error.style.display = 'none';
+    fetch("{% url 'ventas:tarjeta_editar_datos' venta.pk %}",
+          {method: 'POST', body: new FormData(form)})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          error.textContent = d.mensaje || 'No se pudo guardar.';
+          error.style.display = 'block';
+          return;
+        }
+        try { sessionStorage.setItem('tarjetaFlashDatos', '1'); } catch (e) {}
+        window.location.reload();
+      })
+      .catch(function () {
+        error.textContent = 'Sin conexión. Inténtalo de nuevo.';
+        error.style.display = 'block';
+      });
+  });
+
+  try {
+    if (sessionStorage.getItem('tarjetaFlashDatos')) {
+      sessionStorage.removeItem('tarjetaFlashDatos');
+      abrir.textContent = '✓ Datos guardados';
+      setTimeout(function () { abrir.textContent = '✎ Datos complementarios ▾'; }, 2600);
     }
   } catch (e) {}
 })();

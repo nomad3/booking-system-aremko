@@ -872,6 +872,10 @@
         </div>
 
         <div class="header-buttons">
+            <a href="{% url 'ventas:nueva_reserva' %}" class="btn-filter"
+               style="background:#BC5630;color:#fff;font-weight:700;">
+                ➕ Nueva reserva
+            </a>
             <!-- Filtros de Vista -->
             <div class="filter-group">
                 <a href="?filtro=actual{% if debug_mode %}&debug=true{% endif %}"

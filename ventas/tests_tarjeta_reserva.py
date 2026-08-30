@@ -459,3 +459,127 @@ class ApiDelCalendario(TestCase):
                              content_type='application/json')
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.venta.reservaservicios.count(), 0)
+
+
+class CrearReservaFase5(TestCase):
+    """Fase 5: crear una reserva con lo mínimo — teléfono y nombre.
+
+    Lo que más protege esta clase son los CLIENTES DUPLICADOS: el mismo
+    teléfono escrito distinto («9 1234 5678» vs «+56912345678») ya obligó una
+    vez a una limpieza masiva (normalize_and_merge_clients). Crear siempre
+    pasa por el normalizador y busca antes de crear.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='crear_test', email='cr@test.cl', password='x')
+        cls.url = reverse('ventas:nueva_reserva')
+
+    def _post(self, **datos):
+        self.client.force_login(self.staff)
+        return self.client.post(self.url, datos)
+
+    def test_telefono_nuevo_crea_cliente_normalizado_y_abre_la_tarjeta(self):
+        r = self._post(telefono='912345678', nombre='Marta Llanquihue')
+        cliente = Cliente.objects.get(nombre='Marta Llanquihue')
+        self.assertEqual(cliente.telefono, '+56912345678',
+                         'el teléfono no pasó por el normalizador')
+        venta = VentaReserva.objects.get(cliente=cliente)
+        self.assertIsNotNone(venta.fecha_reserva,
+                             'sin fecha, la venta se esconde de los reportes')
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.url, reverse('ventas:tarjeta_reserva', args=[venta.pk]))
+
+    def test_el_mismo_telefono_escrito_distinto_NO_duplica_al_cliente(self):
+        """El camino de la segunda vez, que es el que duele: el cliente ya
+        existe con +56 y Deborah escribe el número a la chilena."""
+        existente = Cliente.objects.create(nombre='Marta Llanquihue',
+                                           telefono='+56912345678')
+        r = self._post(telefono='9 1234 5678', nombre='Marta L.')
+        self.assertEqual(Cliente.objects.count(), 1, 'creó un cliente duplicado')
+        existente.refresh_from_db()
+        self.assertEqual(existente.nombre, 'Marta Llanquihue',
+                         'le pisó el nombre al cliente existente')
+        venta = VentaReserva.objects.get()
+        self.assertEqual(venta.cliente, existente)
+        self.assertEqual(r.status_code, 302)
+
+    def test_telefono_invalido_explica_y_no_crea_nada(self):
+        r = self._post(telefono='123', nombre='Alguien')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('no se entiende', r.content.decode())
+        self.assertEqual(Cliente.objects.count(), 0)
+        self.assertEqual(VentaReserva.objects.count(), 0)
+
+    def test_cliente_nuevo_sin_nombre_explica_y_no_crea_nada(self):
+        r = self._post(telefono='987654321', nombre='')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('falta el nombre', r.content.decode())
+        self.assertEqual(VentaReserva.objects.count(), 0)
+
+    def test_solo_staff(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        r = self.client.post(self.url, {'telefono': '912345678', 'nombre': 'X'})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('login', r.url)
+        self.assertEqual(VentaReserva.objects.count(), 0)
+
+    def test_la_agenda_y_la_tarjeta_ofrecen_la_entrada(self):
+        """La lección de los tres menús: sin entrada visible, la pantalla
+        existe pero nadie la usa."""
+        self.client.force_login(self.staff)
+        agenda = self.client.get(reverse('ventas:agenda_operativa')).content.decode()
+        self.assertIn(self.url, agenda)
+
+        cliente = Cliente.objects.create(nombre='Eva', telefono='+56900001111')
+        venta = VentaReserva.objects.create(cliente=cliente)
+        tarjeta = self.client.get(reverse('ventas:tarjeta_reserva',
+                                          args=[venta.pk])).content.decode()
+        self.assertIn(self.url, tarjeta)
+
+
+class DatosComplementariosFase5(TestCase):
+    """El bloque colapsado de datos complementarios: guarda SOLO lo suyo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='datos_test', email='d@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Iván Frutillar',
+                                         telefono='+56900002222')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        tina = Servicio.objects.create(nombre='Tina Petrohué', precio_base=30000,
+                                       duracion=120, tipo_servicio='tina')
+        ReservaServicio.objects.create(venta_reserva=cls.venta, servicio=tina,
+                                       fecha_agendamiento='2026-09-12',
+                                       hora_inicio='19:00', cantidad_personas=2)
+        cls.venta.refresh_from_db()
+        cls.url = reverse('ventas:tarjeta_editar_datos', args=[cls.venta.pk])
+
+    def test_guarda_comentarios_y_documento_sin_tocar_la_plata(self):
+        total_antes = int(self.venta.total or 0)
+        self.client.force_login(self.staff)
+        r = self.client.post(self.url, {'comentarios': 'Llega 30 min antes',
+                                        'numero_documento_fiscal': 'BOL-778'})
+        self.assertTrue(r.json()['ok'])
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.comentarios, 'Llega 30 min antes')
+        self.assertEqual(self.venta.numero_documento_fiscal, 'BOL-778')
+        self.assertEqual(int(self.venta.total), total_antes,
+                         'guardar datos complementarios movió la plata')
+
+    def test_la_tarjeta_trae_el_formulario_prellenado(self):
+        self.venta.comentarios = '[Luna] Propuesta aprobada'
+        self.venta.save(update_fields=['comentarios'])
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn('Datos complementarios', html)
+        self.assertIn('[Luna] Propuesta aprobada', html)
+
+    def test_solo_staff_y_solo_POST(self):
+        r = self.client.post(self.url, {'comentarios': 'x'})
+        self.assertEqual(r.status_code, 302)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
