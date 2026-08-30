@@ -352,3 +352,110 @@ class AgregarProductoFase3(TestCase):
     def test_por_GET_no_se_agrega(self):
         self.client.force_login(self.staff)
         self.assertEqual(self.client.get(self.url).status_code, 405)
+
+
+class AgregarServicioFase4(TestCase):
+    """Fase 4: agregar servicio desde el calendario del admin, reutilizado.
+
+    La tarjeta NO reimplementa disponibilidad: abre calendario_seleccion en un
+    overlay y define window.servicioAgregado — el mismo protocolo que usa el
+    modal del admin. Lo que se prueba acá son las dos puntas de ese cable.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='cal_test', email='c@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Rosa Frutillar',
+                                         telefono='+56955556666')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+
+    def test_la_tarjeta_abre_el_calendario_de_SU_reserva(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn(f'calendario-seleccion/?reserva_id={self.venta.pk}', html)
+        self.assertIn('servicioAgregado', html,
+                      'sin el callback, el calendario agrega pero la tarjeta '
+                      'nunca se entera')
+
+    def test_el_calendario_que_abre_el_overlay_responde(self):
+        """Si el calendario se rompe, el botón de la tarjeta abre una pantalla
+        muerta. Esta prueba es el canario de esa dependencia."""
+        self.client.force_login(self.staff)
+        r = self.client.get(reverse('ventas:calendario_seleccion') +
+                            f'?reserva_id={self.venta.pk}')
+        self.assertEqual(r.status_code, 200)
+
+    def test_el_calendario_sigue_siendo_solo_staff(self):
+        r = self.client.get(reverse('ventas:calendario_seleccion'))
+        self.assertEqual(r.status_code, 302)
+
+
+class ApiDelCalendario(TestCase):
+    """La API agregar_servicio_a_reserva existía SIN ninguna prueba, y desde la
+    fase 4 la tarjeta depende de ella. Estas pruebas cubren lo que la tarjeta
+    necesita que siga siendo cierto: que agrega con precio congelado y total
+    recalculado, y que los candados (bloqueo, cupo) siguen puestos.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='api_cal_test', email='ac@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Elena Osorno',
+                                         telefono='+56977778888')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        cls.tina = Servicio.objects.create(
+            nombre='Tina Osorno', precio_base=25000, duracion=120,
+            tipo_servicio='tina', activo=True, max_servicios_simultaneos=2)
+        cls.url = reverse('ventas:agregar_servicio_reserva')
+
+    def _post(self, **datos):
+        import json as _json
+
+        self.client.force_login(self.staff)
+        base = {'reserva_id': self.venta.pk, 'servicio_nombre': 'Tina Osorno',
+                'fecha': '2026-09-10', 'hora': '19:00', 'cantidad': 1}
+        base.update(datos)
+        return self.client.post(self.url, _json.dumps(base),
+                                content_type='application/json')
+
+    def test_agrega_con_precio_congelado_y_total_recalculado(self):
+        r = self._post()
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['success'])
+
+        linea = self.venta.reservaservicios.get()
+        self.assertEqual(int(linea.precio_unitario_venta), 25000)
+        self.venta.refresh_from_db()
+        self.assertEqual(int(self.venta.total),
+                         25000 * linea.cantidad_personas)
+
+    def test_un_slot_bloqueado_se_rechaza(self):
+        """El candado del propio endpoint: cubre pestañas desactualizadas y
+        llamadas directas, como dice su comentario. Que siga vivo."""
+        from ventas.models import ServicioSlotBloqueo
+
+        ServicioSlotBloqueo.objects.create(servicio=self.tina, activo=True,
+                                           fecha='2026-09-10', hora_slot='19:00',
+                                           motivo='mantención')
+        r = self._post()
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(self.venta.reservaservicios.count(), 0)
+
+    def test_sin_cupo_simultaneo_se_rechaza(self):
+        self._post()
+        self._post()          # llena los 2 cupos simultáneos
+        r = self._post()
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('espacio', r.json()['error'])
+        self.assertEqual(self.venta.reservaservicios.count(), 2)
+
+    def test_sin_login_no_agrega(self):
+        import json as _json
+
+        r = self.client.post(self.url, _json.dumps({'reserva_id': self.venta.pk}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.venta.reservaservicios.count(), 0)

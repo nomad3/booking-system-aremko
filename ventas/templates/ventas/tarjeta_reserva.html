@@ -59,6 +59,16 @@ internas y se reconocen entre sí.
          color:var(--ink)}
   .err{color:var(--debe);font-size:14px;margin-bottom:8px;display:none}
   .btn-prod{background:#8a6d3b;color:#fff;margin-bottom:10px}
+  .btn-serv{background:#456990;color:#fff;margin-bottom:10px}
+  .cal-overlay{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);
+               flex-direction:column}
+  .cal-overlay.abierto{display:flex}
+  .cal-top{display:flex;justify-content:space-between;align-items:center;
+           padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line)}
+  .cal-top b{font-size:15px}
+  .cal-cerrar{border:0;background:transparent;font-size:16px;color:var(--brand);
+              font-weight:600;cursor:pointer;padding:6px 8px;font-family:inherit}
+  .cal-overlay iframe{flex:1;width:100%;border:0}
 </style>
 </head>
 <body>
@@ -127,6 +137,8 @@ internas y se reconocen entre sí.
     <div class="coment">{{ venta.comentarios }}</div></div>
   {% endif %}
 
+  <button type="button" class="btn btn-serv" id="btnAbrirCalendario">📅 Agregar servicio</button>
+
   <button type="button" class="btn btn-prod" id="btnAbrirProducto">🛒 Agregar producto</button>
 
   <div class="card oculto" id="formProducto">
@@ -165,6 +177,22 @@ internas y se reconocen entre sí.
   </div>
 
   <button type="button" class="btn btn-pase" id="btnCopiarPase">🔑 Copiar el Pase</button>
+
+  {% comment %}
+  El calendario NO se reimplementa: se abre el mismo que usa el admin
+  (calendario_seleccion), que ya sabe de bloqueos, cupos simultáneos y precios
+  congelados. Ese calendario avisa a su padre con servicioAgregado(ok, msj) —
+  el mismo protocolo del modal del admin—, así que la tarjeta solo define esa
+  función y recarga. El src se pone recién al abrir: el calendario es pesado y
+  no tiene por qué cargarse si Deborah solo vino a copiar el Pase.
+  {% endcomment %}
+  <div class="cal-overlay" id="calOverlay">
+    <div class="cal-top">
+      <b>📅 Elige servicio, día y hora</b>
+      <button type="button" class="cal-cerrar" id="calCerrar">✕ Cerrar</button>
+    </div>
+    <iframe id="calFrame" src="" title="Calendario de disponibilidad"></iframe>
+  </div>
   <a class="btn btn-admin" href="/admin/ventas/ventareserva/{{ venta.pk }}/change/">
     Abrir en el admin (edición completa)</a>
 
@@ -311,6 +339,41 @@ internas y se reconocen entre sí.
         error.style.display = 'block';
       });
   });
+})();
+
+(function () {
+  // Fase 4: agregar servicio. La disponibilidad vive en el calendario del
+  // admin; acá solo se abre en un overlay y se escucha su aviso.
+  var overlay = document.getElementById('calOverlay');
+  var frame = document.getElementById('calFrame');
+  var abrir = document.getElementById('btnAbrirCalendario');
+  var URL_CAL = "{% url 'ventas:calendario_seleccion' %}?reserva_id={{ venta.pk }}";
+
+  abrir.addEventListener('click', function () {
+    if (!frame.src) { frame.src = URL_CAL; }
+    overlay.classList.add('abierto');
+  });
+  document.getElementById('calCerrar').addEventListener('click', function () {
+    overlay.classList.remove('abierto');
+  });
+
+  // El calendario llama esto en window.parent al agregar (mismo protocolo que
+  // el modal del admin). Recargar es a propósito: las filas y los totales
+  // nuevos vienen del servidor, la tarjeta nunca los arma por su cuenta.
+  window.servicioAgregado = function (ok) {
+    if (!ok) { return; }
+    try { sessionStorage.setItem('tarjetaFlash', '✓ Servicio agregado'); } catch (e) {}
+    window.location.reload();
+  };
+
+  try {
+    var flash = sessionStorage.getItem('tarjetaFlash');
+    if (flash) {
+      sessionStorage.removeItem('tarjetaFlash');
+      abrir.textContent = flash;
+      setTimeout(function () { abrir.textContent = '📅 Agregar servicio'; }, 2600);
+    }
+  } catch (e) {}
 })();
 </script>
 </body>

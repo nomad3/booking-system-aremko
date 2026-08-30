@@ -9,7 +9,11 @@ Fase 1 (Jorge, 2026-08-30): lectura + botón que COPIA el mensaje del Pase sin
 mostrarlo — Deborah lo pega en el cajón de la bandeja omnicanal.
 Fase 2 (2026-08-30): agregar pago con guardado chico (tarjeta_agregar_pago).
 Fase 3 (2026-08-30): agregar producto (tarjeta_agregar_producto).
-Faltan: servicio desde calendario y creación con datos mínimos.
+Fase 4 (2026-08-30): agregar servicio — SIN código nuevo de disponibilidad: la
+tarjeta abre calendario_seleccion (el mismo del admin) en un overlay y define
+window.servicioAgregado, el protocolo que ese calendario ya habla. Todo vive
+en la plantilla.
+Falta: creación con datos mínimos.
 
 La vista es deliberadamente liviana: tres queries con select_related y ningún
 cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
