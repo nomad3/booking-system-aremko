@@ -379,6 +379,18 @@ class AgregarServicioFase4(TestCase):
                       'sin el callback, el calendario agrega pero la tarjeta '
                       'nunca se entera')
 
+    def test_el_iframe_del_calendario_carga_con_bandera_no_con_src(self):
+        """Bug real (Jorge, 30-08): el iframe nacía con src="" y la carga floja
+        preguntaba `if (!frame.src)`. Leer .src en un iframe sin cargar devuelve
+        la URL de la página —truthy—, así que el calendario nunca se asignaba y
+        el overlay quedaba en blanco. La guardia correcta es una bandera."""
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertNotIn('id="calFrame" src=', html,
+                         'el iframe volvió a nacer con src: la carga floja se rompe')
+        self.assertIn('calCargado', html)
+
     def test_el_calendario_que_abre_el_overlay_responde(self):
         """Si el calendario se rompe, el botón de la tarjeta abre una pantalla
         muerta. Esta prueba es el canario de esa dependencia."""

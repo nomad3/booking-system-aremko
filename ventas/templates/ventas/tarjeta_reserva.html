@@ -193,7 +193,7 @@ internas y se reconocen entre sí.
       <b>📅 Elige servicio, día y hora</b>
       <button type="button" class="cal-cerrar" id="calCerrar">✕ Cerrar</button>
     </div>
-    <iframe id="calFrame" src="" title="Calendario de disponibilidad"></iframe>
+    <iframe id="calFrame" title="Calendario de disponibilidad"></iframe>
   </div>
   <button type="button" class="btn btn-datos" id="btnAbrirDatos">✎ Datos complementarios ▾</button>
 
@@ -368,8 +368,12 @@ internas y se reconocen entre sí.
   var abrir = document.getElementById('btnAbrirCalendario');
   var URL_CAL = "{% url 'ventas:calendario_seleccion' %}?reserva_id={{ venta.pk }}";
 
+  // Bandera propia y NO `if (!frame.src)`: en un iframe sin cargar, leer
+  // .src devuelve la URL de la página (truthy), así que esa guardia nunca
+  // asignaba el calendario y el overlay quedaba en blanco — Jorge lo vio.
+  var calCargado = false;
   abrir.addEventListener('click', function () {
-    if (!frame.src) { frame.src = URL_CAL; }
+    if (!calCargado) { frame.src = URL_CAL; calCargado = true; }
     overlay.classList.add('abierto');
   });
   document.getElementById('calCerrar').addEventListener('click', function () {
