@@ -265,9 +265,15 @@ class AgregarProductoFase3(TestCase):
                                          telefono='+56933334444')
         cls.venta = VentaReserva.objects.create(cliente=cliente)
         cls.jugo = Producto.objects.create(nombre='Jugo Natural de Frambuesa',
-                                           precio_base=3500, cantidad_disponible=10)
+                                           precio_base=3500, cantidad_disponible=10,
+                                           venta_meson=True)
         cls.agotado = Producto.objects.create(nombre='Chocolate Agotado',
-                                              precio_base=5000, cantidad_disponible=0)
+                                              precio_base=5000, cantidad_disponible=0,
+                                              venta_meson=True)
+        # Interno con stock: lo que NO debe aparecer ni aceptarse.
+        cls.interno = Producto.objects.create(nombre='Artesanías Inventario',
+                                              precio_base=0, cantidad_disponible=50,
+                                              venta_meson=False)
         cls.url = reverse('ventas:tarjeta_agregar_producto', args=[cls.venta.pk])
 
     def _post(self, **datos):
@@ -324,6 +330,23 @@ class AgregarProductoFase3(TestCase):
                                        args=[self.venta.pk])).content.decode()
         self.assertIn('Jugo Natural de Frambuesa', html)
         self.assertNotIn('Chocolate Agotado', html)
+
+    def test_lo_que_no_es_venta_en_meson_no_aparece(self):
+        """Jorge lo cazó probando: el selector le ofrecía «Artesanías
+        Inventario · $0» y «Artículos Eléctricos · $0». El campo venta_meson
+        existe exactamente para esto."""
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertNotIn('Artesanías Inventario', html)
+
+    def test_ni_se_acepta_por_POST_directo(self):
+        """El candado del endpoint: una pestaña desactualizada o una llamada
+        directa tampoco pueden colar un producto interno."""
+        r = self._post(producto_id=self.interno.pk, cantidad='1')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('mesón', r.json()['mensaje'])
+        self.assertEqual(self.venta.reservaproductos.count(), 0)
 
     def test_la_segunda_linea_acumula(self):
         self._post(producto_id=self.jugo.pk, cantidad='1')

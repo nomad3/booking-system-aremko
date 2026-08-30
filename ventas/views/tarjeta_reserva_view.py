@@ -80,9 +80,12 @@ def tarjeta_reserva(request, venta_id):
     productos = venta.reservaproductos.select_related('producto')
     pagos = venta.pagos.order_by('fecha_pago')
 
-    # Catálogo para el selector: solo lo que HAY. Ofrecer un producto sin
-    # stock es prometerle al cliente algo que no se le puede entregar.
-    catalogo = (Producto.objects.filter(cantidad_disponible__gt=0)
+    # Catálogo para el selector: solo venta en mesón Y con stock. venta_meson
+    # es el campo hecho para esto («el personal puede agregar este producto a
+    # una reserva»); sin él, a Deborah le aparecían productos internos y de $0
+    # (Artesanías Inventario, Artículos Eléctricos) — lo cazó Jorge probando.
+    catalogo = (Producto.objects.filter(venta_meson=True,
+                                        cantidad_disponible__gt=0)
                 .select_related('categoria')
                 .order_by('categoria__nombre', 'nombre'))
 
@@ -175,6 +178,15 @@ def tarjeta_agregar_producto(request, venta_id):
     except (Producto.DoesNotExist, ValueError, TypeError):
         return JsonResponse({'ok': False, 'mensaje': 'Elige un producto de la lista.'},
                             status=400)
+
+    # El mismo candado que el selector: lo que no es venta en mesón no entra
+    # por la tarjeta, ni siquiera desde una pestaña desactualizada. Esos
+    # productos se manejan en el admin.
+    if not producto.venta_meson:
+        return JsonResponse(
+            {'ok': False, 'mensaje': f'{producto.nombre} no es de venta en '
+                                     'mesón: se agrega desde el admin.'},
+            status=400)
 
     crudo = (request.POST.get('cantidad') or '').strip()
     if not crudo.isdigit() or int(crudo) < 1:
