@@ -979,8 +979,15 @@
                    class="checkout-btn {% if c.debe %}checkout-btn-cobrar{% endif %}">
                     {% if c.debe %}💰 Cobrar{% else %}Ver{% endif %} · Reserva #{{ c.reserva_id }}
                 </a>
-                {# Cerrar la estadía sin pasar por el admin. El id deja que el
-                   botón se transforme en confirmación sin recargar la agenda. #}
+                {% comment %}
+                Cerrar la estadía sin pasar por el admin. El id deja que el
+                botón se transforme en confirmación sin recargar la agenda.
+
+                Va con etiqueta comment y no con almohadilla: los comentarios de
+                almohadilla son de UNA línea. Si abren en una y cierran en otra,
+                Django no los reconoce y los imprime en la página — acá salían
+                encima del botón de check-out, una vez por cada huésped que sale.
+                {% endcomment %}
                 <div class="checkout-cierre" id="cierre-{{ c.reserva_id }}">
                     {% if c.cerrada %}
                     <span class="checkout-cerrado">✓ Check-out hecho</span>

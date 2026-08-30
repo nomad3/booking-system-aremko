@@ -556,10 +556,13 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                         and _dijo_que_si(mensaje)):
                     return _falta(
                         'falta_confirmar_experiencia', confirmacion,
+                        # «gift card» y no «carta»: Luna copia las palabras del
+                        # prompt, así que lo que se escriba acá termina saliendo
+                        # por su boca. En Aremko una gift card nunca se llama carta.
                         detalle=('El cliente nunca nombró esta gift card. '
-                                 'Si lo que pide lleva algo más que la carta '
-                                 '(una tabla, jugos), NO busques otra carta que '
-                                 'sume ese valor: cotizá la carta que él pidió y '
+                                 'Si lo que pide lleva algo más que la gift card '
+                                 '(una tabla, jugos), NO busques otra gift card que '
+                                 'sume ese valor: cotizá la gift card que él pidió y '
                                  'agregá el producto aparte, que viaja dentro '
                                  'del regalo. '),
                         historial=historial)
