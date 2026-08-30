@@ -1,6 +1,41 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
 
+{% comment %}
+Reordenamiento de bloques (Jorge, 2026-08-30).
+
+Al abrir una reserva lo primero que se mira es el dinero: qué se vendió, qué se
+pagó, qué falta. El Pase y las comandas se usan DESPUÉS de que la plata está
+cuadrada, así que arriba del todo empujaban hacia abajo justamente lo que se
+consulta primero.
+
+Django dibuja TODOS los fieldsets antes de TODOS los inlines y no ofrece forma
+de intercalarlos, así que hay que rehacer los dos bloques. Qué se mueve y dónde
+se declara en VentaReservaAdmin (FIELDSETS_BAJO_PAGOS + pos_ancla_pagos), no
+acá: reconocer los bloques por su título escrito a mano se rompería en silencio
+la primera vez que alguien le cambie una palabra.
+{% endcomment %}
+{% block field_sets %}
+{% for fieldset in adminform %}
+  {% if fieldset.name not in fieldsets_bajo_pagos %}
+    {% include "admin/includes/fieldset.html" %}
+  {% endif %}
+{% endfor %}
+{% endblock %}
+
+{% block inline_field_sets %}
+{% for inline_admin_formset in inline_admin_formsets %}
+    {% include inline_admin_formset.opts.template %}
+    {% if forloop.counter == pos_ancla_pagos %}
+      {% for fieldset in adminform %}
+        {% if fieldset.name in fieldsets_bajo_pagos %}
+          {% include "admin/includes/fieldset.html" %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+{% endfor %}
+{% endblock %}
+
 {% block object-tools-items %}
     {% if original %}
     <li><a href="{% url 'artesanias:catalogo' %}?reserva={{ original.pk }}"

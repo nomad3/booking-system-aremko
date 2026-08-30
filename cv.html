@@ -1,0 +1,2033 @@
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://res.cloudinary.com">
+    
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://connect.facebook.net">
+
+    <title>Aremko - Finalizar Reserva</title>
+    
+    
+
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.aremko.cl/ventas/checkout/">
+    <meta property="og:title"
+        content="Aremko Spa Puerto Varas - Masajes, Tinajas y Alojamiento">
+    <meta property="og:description"
+        content="Spa boutique en Puerto Varas. Masajes relajantes, tinajas calientes junto al Río Pescado y alojamiento. Tu escapada perfecta en la Región de Los Lagos.">
+    <meta property="og:image"
+        content="https://www.aremko.cl/static/images/aremko-og-image.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Aremko Spa Puerto Varas">
+    <meta property="og:site_name" content="Aremko Spa">
+    <meta property="og:locale" content="es_CL">
+    
+
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://www.aremko.cl/ventas/checkout/">
+    <meta name="twitter:title"
+        content="Aremko Spa Puerto Varas - Masajes, Tinajas y Alojamiento">
+    <meta name="twitter:description"
+        content="Spa boutique en Puerto Varas. Masajes relajantes, tinajas calientes junto al Río Pescado y alojamiento. Tu escapada perfecta en la Región de Los Lagos.">
+    <meta name="twitter:image"
+        content="https://www.aremko.cl/static/images/aremko-twitter-image.jpg">
+    <meta name="twitter:image:alt" content="Aremko Spa Puerto Varas">
+    
+
+    
+
+    <!-- Google tag (gtag.js) - Google Ads + GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-1015703959"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'AW-1015703959');
+        gtag('config', 'AW-1767221019'); // Campaña de Masajes
+        gtag('config', 'G-T3K4CTD3HJ');   // GA4 Aremko web
+        gtag('config', 'AW-18196625156'); // Refugio Junio 2026 - cuenta ecolonco1@gmail.com
+    </script>
+
+    <!-- Aremko - Eventos custom de GA4 (Tarea 2.2 plan maestro) -->
+    <script src="/static/ventas/js/aremko-events.fcc9c71a9f48.js" defer></script>
+
+    <!-- Meta Pixel Code -->
+    
+    <script>
+        !function (f, b, e, v, n, t, s) {
+            if (f.fbq) return; n = f.fbq = function () {
+                n.callMethod ?
+                    n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+            };
+            if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+            n.queue = []; t = b.createElement(e); t.async = !0;
+            t.src = v; s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s)
+        }(window, document, 'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '478226496113915');
+        fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=478226496113915&ev=PageView&noscript=1" /></noscript>
+    
+    <!-- End Meta Pixel Code -->
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Flatpickr for date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Link to your custom modern CSS -->
+    <link rel="stylesheet" href="/static/css/modern.f0abc88bc32b.css">
+
+    <!-- Boutique: tipografía de marca + menú limpio (todo el sitio) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+      .navbar{box-shadow:0 1px 0 #eadfce !important}
+      .navbar-brand span{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;font-weight:700;color:#a85a32;letter-spacing:.01em}
+      .navbar .nav-link{color:#2c2a27;font-weight:500;font-size:15px}
+      .navbar .nav-link:hover,.navbar .nav-link:focus{color:#0f6e56}
+      .navbar .dropdown-menu{border:1px solid #e8ddca;border-radius:10px;box-shadow:0 8px 24px rgba(40,30,15,.12);padding:6px}
+      .navbar .dropdown-item{border-radius:7px;padding:8px 12px;font-size:14.5px}
+      .navbar .dropdown-item:hover{background:#f3ede3}
+      .ar-nav-cta{background:#0f6e56;color:#fff !important;font-weight:600;border-radius:9px;padding:9px 20px}
+      .ar-nav-cta:hover{background:#0c5b48;color:#fff !important}
+    </style>
+
+    <!-- Custom CSS (Inline styles - consider moving more to modern.css) -->
+    <style>
+        :root {
+            /* Wooden/Coffee Theme */
+            --primary-color: #A0522D;
+            /* Sienna (Reddish-Brown) */
+            --secondary-color: #D2B48C;
+            /* Tan */
+            --dark-gray: #5C4033;
+            /* Dark Brown */
+            --light-gray: #A9A9A9;
+            /* Dark Gray (for text) */
+            --background: #FAF0E6;
+            /* Linen (Off-white/Beige) */
+            --white: #ffffff;
+            /* White (Keep for high contrast) */
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--background);
+            color: var(--dark-gray);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .whatsapp-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #25D366;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 1050;
+            text-decoration: none;
+        }
+
+        .whatsapp-fab:hover {
+            opacity: 0.9;
+        }
+
+        main {
+            flex: 1;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 40px;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .card {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 30px;
+            border: none;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-img-top {
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .card-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .card-text {
+            color: var(--light-gray);
+            margin-bottom: 15px;
+        }
+
+        .price {
+            font-weight: 700;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 20px;
+        }
+
+        .btn-primary:hover {
+            background-color: #ff3a40;
+            border-color: #ff3a40;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 20px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #008f86;
+            border-color: #008f86;
+        }
+
+        .btn-outline-secondary {
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .btn-outline-secondary:hover {
+            background-color: var(--secondary-color);
+            color: var(--white);
+        }
+
+        .footer {
+            background-color: var(--dark-gray);
+            color: white;
+            padding: 50px 0 20px;
+            margin-top: auto;
+            /* Push footer to bottom */
+        }
+
+        .footer h5 {
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .footer ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .footer ul li {
+            margin-bottom: 10px;
+        }
+
+        .footer ul li a {
+            color: #ddd;
+            text-decoration: none;
+        }
+
+        .footer ul li a:hover {
+            color: white;
+        }
+
+        .social-icons {
+            font-size: 1.5rem;
+            margin-right: 15px;
+        }
+
+        .copyright {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #666;
+            text-align: center;
+        }
+
+        /* AR-021: bloque Cómo llegar */
+        .como-llegar-block {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 24px 28px;
+            margin-bottom: 30px;
+        }
+        .como-llegar-block h5 { margin-bottom: 16px; }
+        .como-llegar-steps {
+            padding-left: 22px;
+            margin-bottom: 16px;
+            color: #ddd;
+        }
+        .como-llegar-steps li { margin-bottom: 8px; line-height: 1.5; }
+        .como-llegar-steps strong { color: #fff; }
+
+        /* Shopping Cart Styles */
+        .cart-icon {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cart-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .cart-dropdown {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            width: 350px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            z-index: 1000;
+            display: none;
+            /* Hidden by default, shown via JS */
+        }
+
+        .cart-dropdown.show {
+            display: block;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cart-item-details {
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .cart-item-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .cart-item-info {
+            font-size: 0.8rem;
+            color: var(--light-gray);
+        }
+
+        .cart-item-price {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .cart-item-remove {
+            color: var(--light-gray);
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .cart-item-remove:hover {
+            color: var(--primary-color);
+        }
+
+        .cart-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .booking-form label {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .booking-form .form-control,
+        .booking-form .form-select {
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .cart-dropdown {
+                width: 300px;
+            }
+        }
+    </style>
+    
+<style>
+    .checkout-section {
+        padding: 50px 0;
+    }
+
+    .checkout-title {
+        font-weight: 700;
+        margin-bottom: 30px;
+        color: var(--dark-gray);
+    }
+
+    .checkout-form {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 30px; /* Keep margin for spacing between rows */
+    }
+
+    .checkout-form label {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .checkout-form .form-control {
+        border-radius: 8px;
+        padding: 10px 15px;
+        margin-bottom: 20px;
+    }
+
+    /* Reusing cart item styles from base */
+    .cart-item {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .cart-item-title {
+        font-weight: 700;
+        font-size: 1.1rem; /* Slightly smaller for summary */
+        margin-bottom: 5px;
+    }
+    .cart-item-info {
+        color: var(--light-gray);
+        font-size: 0.9rem;
+    }
+    .cart-item-price {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1.1rem; /* Slightly smaller for summary */
+    }
+
+    .cart-summary { /* Added from cart.html */
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 25px;
+        margin-bottom: 30px; /* Match checkout-form margin */
+    }
+    .cart-summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px; /* Match cart.html */
+    }
+    .cart-summary-total {
+        font-weight: 700; /* Match cart.html */
+        font-size: 1.3rem; /* Match cart.html */
+        color: var(--primary-color); /* Match cart.html */
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    .cart-actions { /* Added from cart.html */
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+    }
+
+    .empty-cart {
+        text-align: center;
+        padding: 50px 0;
+    }
+
+    .empty-cart-icon {
+        font-size: 5rem;
+        color: var(--light-gray);
+        margin-bottom: 20px;
+    }
+
+    /* Processing button styles */
+    .btn-processing {
+        position: relative;
+        pointer-events: none;
+        background-color: var(--secondary-color) !important;
+    }
+
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+    }
+
+    .processing-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        text-align: center;
+    }
+
+    .processing-spinner {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+
+    /* Stepper de progreso */
+    .checkout-steps {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+    }
+    .checkout-step {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--light-gray);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .checkout-step .step-num {
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+    .checkout-step.active { color: var(--primary-color); }
+    .checkout-step.active .step-num { background: var(--primary-color); color: #fff; }
+    .checkout-step.done .step-num { background: #28a745; color: #fff; }
+    .checkout-step-sep { color: #ced4da; align-self: center; }
+
+    /* Alerta inline (reemplaza alert() nativo) */
+    .checkout-alert {
+        display: none;
+        background: #fff3f3;
+        border: 1px solid #f5c2c7;
+        color: #842029;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 22px;
+        font-weight: 500;
+    }
+    .checkout-alert.show { display: block; }
+
+    /* Bloque de confianza / seguridad */
+    .trust-block {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid #eee;
+    }
+    .trust-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--dark-gray);
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    .trust-line i { color: #28a745; }
+    .cancellation-note {
+        background: #f0f7ff;
+        border: 1px solid #cfe2ff;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-size: 0.85rem;
+        color: #0a4275;
+        margin-top: 10px;
+    }
+    .reassurance {
+        text-align: center;
+        color: var(--light-gray);
+        font-size: 0.95rem;
+        margin-bottom: 26px;
+    }
+
+    /* Aviso de autocompletado para clientes que vuelven */
+    .returning-hint {
+        background: #eafaf1;
+        border: 1px solid #b7e4c7;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 0.88rem;
+        color: #1b5e3f;
+        margin-bottom: 18px;
+    }
+    .returning-hint i { color: #28a745; }
+
+</style>
+ 
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white py-3 sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand d-flex flex-column lh-1" href="/">
+                <span>AREMKO</span>
+                <small style="font-size:.6rem;letter-spacing:.24em;font-weight:500;color:#8a7f6c;margin-top:2px;">SPA BOUTIQUE</small>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    
+                    
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navExp" role="button" data-bs-toggle="dropdown" aria-expanded="false">Experiencias</a>
+                        <ul class="dropdown-menu" aria-labelledby="navExp">
+                            <li><a class="dropdown-item" href="/pausa-junto-al-rio/">Pausa junto al río</a></li>
+                            <li><a class="dropdown-item" href="/noche-de-aguas-calientes/">Noche de Aguas Calientes</a></li>
+                            <li><a class="dropdown-item" href="/ritual-del-rio/">Ritual del Río</a></li>
+                            <li><a class="dropdown-item" href="/refugio/">Refugio Aremko</a></li>
+                            <li><a class="dropdown-item" href="/cabana-y-spa-por-el-dia/">Cabaña y spa por el día</a></li>
+                            <li><a class="dropdown-item" href="/experiencia-romantica/">Experiencia Romántica</a></li>
+                            <li><a class="dropdown-item" href="/celebraciones/">Celebraciones</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item"><a class="nav-link" href="/tinas/">Tinajas</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/masajes/">Masajes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/alojamientos/">Cabañas</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/ventas/giftcards/">Gift Cards</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navMas" role="button" data-bs-toggle="dropdown" aria-expanded="false">Más</a>
+                        <ul class="dropdown-menu" aria-labelledby="navMas">
+                            <li><a class="dropdown-item" href="/productos/">Productos</a></li>
+                            <li><a class="dropdown-item" href="/blog/">Blog</a></li>
+                            <li><a class="dropdown-item" href="/empresas/">Empresas</a></li>
+                            <li><a class="dropdown-item" href="/empresas/presentacion/">Convenio Empresarial</a></li>
+                            <li><a class="dropdown-item" href="/#contacto">Contacto</a></li>
+                        </ul>
+                    </li>
+                    
+                </ul>
+                <div class="d-flex align-items-center">
+                    
+                    <a class="btn ar-nav-cta me-3" href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20en%20Aremko">Reservar</a>
+                    <div class="cart-icon me-3" id="cartIconWrapper">
+                        <a href="/ventas/cart/" class="text-decoration-none text-dark">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span class="cart-count" id="cartCount">4</span>
+                        </a>
+                    </div>
+                    
+                    
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="py-4">
+        
+<!-- Processing Overlay -->
+<div id="processingOverlay" class="processing-overlay">
+    <div class="processing-content">
+        <div class="processing-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+        </div>
+        <h4>Procesando</h4>
+        <p>Estamos procesando tu reserva...</p>
+    </div>
+</div>
+
+<!-- Checkout Section -->
+<section class="checkout-section">
+    <div class="container">
+        <h1 class="checkout-title">Finalizar Reserva</h1>
+
+        
+            <!-- Stepper de progreso -->
+            <div class="checkout-steps">
+                <div class="checkout-step done"><span class="step-num"><i class="fas fa-check"></i></span> Carrito</div>
+                <span class="checkout-step-sep"><i class="fas fa-chevron-right"></i></span>
+                <div class="checkout-step active"><span class="step-num">2</span> Tus datos</div>
+                <span class="checkout-step-sep"><i class="fas fa-chevron-right"></i></span>
+                <div class="checkout-step"><span class="step-num">3</span> Pago</div>
+            </div>
+            <p class="reassurance"><i class="far fa-clock me-1"></i>Estás a un paso. Completa tus datos y confirma tu reserva — guardamos tu horario mientras finalizas el pago.</p>
+
+            <!-- Alerta inline (errores de validación/checkout) -->
+            <div id="checkoutAlert" class="checkout-alert"></div>
+
+            <!-- Row 1: Contact Info & Order Summary -->
+            <div class="row mb-4">
+                <div class="col-lg-7"> 
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Información de Contacto</h4>
+                        <div class="returning-hint">
+                            <i class="fas fa-bolt me-1"></i><strong>¿Ya nos visitaste?</strong> Escribe tu teléfono y completamos tus datos automáticamente.
+                        </div>
+                        <form id="checkoutForm">
+                            <div class="mb-3">
+                                <label for="checkoutTelefono" class="form-label">Teléfono *</label>
+                                <input type="tel"
+                                       class="form-control"
+                                       id="checkoutTelefono"
+                                       name="telefono"
+                                       required
+                                       autocomplete="tel"
+                                       placeholder="+569 1234 5678">
+                                <div id="phoneValidationMessage" class="form-text"></div>
+                                <div id="phoneErrorMessage" class="invalid-feedback"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutNombre" class="form-label">Nombre Completo *</label>
+                                <input type="text" class="form-control" id="checkoutNombre" name="nombre" required autocomplete="name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutEmail" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="checkoutEmail" name="email" required autocomplete="email">
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutDocumento" class="form-label">RUT o pasaporte (opcional)</label>
+                                <input type="text" class="form-control" id="checkoutDocumento" name="documento_identidad" autocomplete="off">
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutRegion" class="form-label">Región / País *</label>
+                                <select class="form-select" id="checkoutRegion" name="region" required>
+                                    <option value="">Seleccione una región</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="checkoutComuna" class="form-label">Comuna *</label>
+                                <select class="form-select" id="checkoutComuna" name="comuna" disabled>
+                                    <option value="">Primero seleccione una región</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-5"> 
+                    <div class="cart-summary">
+                        <h3 class="cart-summary-title">Resumen del Pedido</h3>
+
+                        <!-- Servicios -->
+                        
+                            <div class="cart-summary-row">
+                                
+                                
+                                <span>Cabaña Acantilado (2 persona(s))</span>
+                                
+                                <span>$110 000</span>
+                            </div>
+                        
+                            <div class="cart-summary-row">
+                                
+                                
+                                <span>Tina Hidromasaje Llaima (2 persona(s))</span>
+                                
+                                <span>$60 000</span>
+                            </div>
+                        
+                            <div class="cart-summary-row">
+                                
+                                
+                                <span>Masaje Relajación o Descontracturante (2 persona(s))</span>
+                                
+                                <span>$80 000</span>
+                            </div>
+                        
+                            <div class="cart-summary-row">
+                                
+                                
+                                <span>Descuento</span>
+                                
+                                <span>$-50 000</span>
+                            </div>
+                        
+
+                        <!-- GiftCards -->
+                        
+
+                        <div class="cart-summary-row cart-summary-total">
+                            <span>Total: <small class="text-muted" style="font-size:0.7rem; font-weight:normal;">(IVA incluido)</small></span>
+                            <span>$200 000</span>
+                        </div>
+                        <div class="cart-actions">
+                            <a href="/ventas/cart/" class="btn btn-outline-secondary">Volver al Carrito</a>
+                            <button type="button" class="btn btn-primary" id="completeCheckoutBtn">
+                                <i class="fas fa-lock me-1"></i> Pagar y reservar
+                            </button>
+                        </div>
+                        <p class="text-center mt-3 mb-0" style="font-size:0.82rem;color:#6c757d;">
+                            <i class="fas fa-lock me-1 text-success"></i> Pago seguro · Cancela y recupera el 100% hasta 48h antes
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Reservation Details (Left) & Payment Method (Right) -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <!-- Reservation Details -->
+                    <div class="checkout-form"> 
+                        <h4 class="mb-3">Detalles del Pedido</h4>
+
+                        <!-- Servicios -->
+                        
+                        <div class="cart-item mb-3"> 
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    
+                                    <h5 class="cart-item-title mb-1">Cabaña Acantilado</h5>
+                                    <p class="cart-item-info mb-0">
+                                        <i class="far fa-calendar-alt me-1"></i>2026-09-03 |
+                                        <i class="far fa-clock ms-2 me-1"></i>10:00 |
+                                        <i class="fas fa-user ms-2 me-1"></i>2 persona(s)
+                                    </p>
+                                    
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">$110 000</p> 
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="cart-item mb-3"> 
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    
+                                    <h5 class="cart-item-title mb-1">Tina Hidromasaje Llaima</h5>
+                                    <p class="cart-item-info mb-0">
+                                        <i class="far fa-calendar-alt me-1"></i>2026-09-03 |
+                                        <i class="far fa-clock ms-2 me-1"></i>16:30 |
+                                        <i class="fas fa-user ms-2 me-1"></i>2 persona(s)
+                                    </p>
+                                    
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">$60 000</p> 
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="cart-item mb-3"> 
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    
+                                    <h5 class="cart-item-title mb-1">Masaje Relajación o Descontracturante</h5>
+                                    <p class="cart-item-info mb-0">
+                                        <i class="far fa-calendar-alt me-1"></i>2026-09-03 |
+                                        <i class="far fa-clock ms-2 me-1"></i>14:15 |
+                                        <i class="fas fa-user ms-2 me-1"></i>2 persona(s)
+                                    </p>
+                                    
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">$80 000</p> 
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="cart-item mb-3"> 
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    
+                                    <h5 class="cart-item-title mb-1">Descuento</h5>
+                                    <p class="cart-item-info mb-0">Ya aplicado al total</p>
+                                    
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="cart-item-price mb-0">$-50 000</p> 
+                                </div>
+                            </div>
+                        </div>
+                        
+
+                        <!-- GiftCards -->
+                        
+                    </div>
+                    <!-- End Reservation Details -->
+                </div>
+                <div class="col-lg-6">
+                    <!-- Payment Method Selection -->
+                    <div class="checkout-form">
+                        <h4 class="mb-4">Método de Pago</h4>
+                        
+                            
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="paymentMethod"
+                                           id="payment_transferencia"
+                                           value="transferencia"
+                                           
+                                           >
+                                    <label class="form-check-label" for="payment_transferencia">
+                                        Transferencia Bancaria
+                                        
+                                    </label>
+                                    
+                                        <div class="form-text mt-1">
+                                            Tu reserva quedará pendiente hasta que recibamos el comprobante por correo.
+                                        </div>
+                                    
+                                    
+                                </div>
+                            
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="paymentMethod"
+                                           id="payment_flow"
+                                           value="flow"
+                                           checked
+                                           >
+                                    <label class="form-check-label" for="payment_flow">
+                                        FLOW
+                                        
+                                            <span class="badge bg-success">⚡ Pago inmediato</span>
+                                        
+                                    </label>
+                                    
+                                    
+                                        <div class="form-text mt-1">
+                                            Paga con tarjeta de crédito, débito o WebPay. Aprobación al instante y reserva confirmada de inmediato.
+                                        </div>
+                                    
+                                </div>
+                            
+                            <div id="bankDetailsSection" class="alert alert-info mt-3" style="display: none;">
+                                <h5>Instrucciones para Transferencia Bancaria</h5>
+                                <p>Para confirmar tu reserva (que se creará en estado pendiente), por favor realiza la transferencia a la siguiente cuenta:</p>
+                                <pre>Titular: Aremko Hotel Spa
+RUT: 76.485.192-7
+Banco: Mercado Pago
+Tipo de Cuenta: Cuenta Vista
+Número de Cuenta: 1016006859
+Email para comprobante: ventas@aremko.cl</pre>
+                                <p><strong>Importante:</strong> Tu reserva se mantendrá como pendiente hasta que confirmemos la recepción del pago.</p>
+                            </div>
+                        
+
+                        <!-- Señales de confianza -->
+                        <div class="trust-block">
+                            <div class="trust-line"><i class="fas fa-lock"></i> Pago seguro y encriptado</div>
+                            <div class="trust-line"><i class="fas fa-credit-card"></i> Tarjetas de crédito, débito y WebPay vía Flow</div>
+                            <div class="trust-line"><i class="fas fa-shield-alt"></i> Tus datos están protegidos</div>
+                            <div class="cancellation-note">
+                                <strong><i class="far fa-calendar-check me-1"></i>Política de cancelación:</strong>
+                                Cancela hasta <strong>48 horas antes</strong> y te devolvemos el <strong>100%</strong>.
+                                Con menos de 48 horas no hay reembolso, pero puedes <strong>reagendar</strong> tu visita.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- End Payment Method Selection -->
+                </div>
+            </div>
+        
+    </div>
+</section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer" id="contacto">
+        <div class="container">
+            
+            <div class="row como-llegar-block">
+                <div class="col-12">
+                    <h5><i class="fas fa-route me-2"></i>Cómo Llegar</h5>
+                    <ol class="como-llegar-steps">
+                        <li>Desde el centro de <strong>Puerto Varas</strong>, toma la <strong>Ruta 225</strong> hacia Ensenada.</li>
+                        <li>En el <strong>km 19</strong> toma el <strong>desvío señalizado a Río Pescado</strong> (gira a la derecha).</li>
+                        <li>Continúa <strong>4 km</strong> por el camino rural. Aremko está a la izquierda, junto al Río Pescado.</li>
+                    </ol>
+                    <a href="https://www.google.com/maps/?q=-41.277611,-72.768611"
+                       target="_blank" rel="noopener" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-map-marker-alt me-1"></i> Abrir en Google Maps
+                    </a>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h5>Aremko</h5>
+                    <p>Ofrecemos los mejores servicios para tu bienestar y comodidad. Reserva ahora y disfruta de una
+                        experiencia única.</p>
+                    <div class="mt-3 mb-4">
+                        <a href="#" class="text-white social-icons"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="text-white social-icons"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-white social-icons"><i class="fab fa-twitter"></i></a>
+                    </div>
+
+                    <!-- Formulario de Suscripción Newsletter -->
+                    <h6 class="text-white mb-2" style="font-size: 0.9rem;">Suscríbete a nuestro Newsletter</h6>
+                    <form action="/ventas/subscribe/" method="POST" class="d-flex">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="W7cpcSXoZZJRFV72trtijiqr3aZ7z9XV7tTudO4PmYgnJeTG5KlwGG7KKU5rutsK">
+                        <input type="email" name="email" class="form-control form-control-sm me-2"
+                            placeholder="Tu correo" required>
+                        <button type="submit" class="btn btn-primary btn-sm">OK</button>
+                    </form>
+                </div>
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Enlaces</h5>
+                    <ul>
+                        <li><a href="/#servicios">Servicios</a></li>
+                        <li><a href="/#caracteristicas">Características</a></li>
+                        <li><a href="/#testimonios">Testimonios</a></li>
+                        <li><a href="/blog/">Blog</a></li>
+                        <li><a href="/garantia/">Garantía Aremko</a></li>
+                        <li><a href="#contacto">Contacto</a></li>
+                        <li><a href="/privacidad/">Política de Privacidad</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Servicios Populares</h5>
+                    <ul>
+                        <li><a href="/tinas/">Tinajas</a></li>
+                        <li><a href="/masajes/">Masajes</a></li>
+                        <li><a href="/alojamientos/">Alojamientos</a></li>
+                        <li><a href="/pausa-junto-al-rio/">Pausa junto al río</a></li>
+                        <li><a href="/refugio/">Refugio Aremko</a></li>
+                        <li><a href="/cabana-y-spa-por-el-dia/">Cabaña y spa por el día</a></li>
+                        <li><a href="/experiencia-romantica/">Experiencia Romántica</a></li>
+                        <li><a href="/celebraciones/">Celebraciones</a></li>
+                        <li><a href="/ventas/giftcards/">GiftCards</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h5>Contacto</h5>
+                    <ul>
+                        <li><i class="fas fa-map-marker-alt me-2"></i> Rio Pescado - Camino a Ensenada km 19, km 4, Puerto Varas, Los Lagos, Chile</li>
+                        <li><i class="fas fa-phone me-2"></i> +56 9 5790 2525</li>
+                        <li><i class="fas fa-envelope me-2"></i> ventas@aremko.cl</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                <p class="mb-1" style="font-size:0.8rem; opacity:0.85;">Todos los precios publicados incluyen IVA (19%).</p>
+                <p>&copy; 2026 Aremko. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals defined globally -->
+    
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">¡Reserva Exitosa!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+                </div>
+                <p class="text-center">Tu reserva ha sido creada exitosamente.</p>
+                <p class="text-center">Hemos enviado un correo electrónico con los detalles de tu reserva.</p>
+                <p class="text-center" id="reservaIdText">ID de Reserva: <span id="reservaId"></span></p>
+            </div>
+            <div class="modal-footer justify-content-between"> 
+                
+                <div id="detailButtonPlaceholder"></div> 
+                <a href="/ventas/" class="btn btn-primary">Volver al Inicio</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <a href="https://wa.me/56957902525?text=Hola%20Aremko%2C%20quisiera%20informaci%C3%B3n%20y%20reservar"
+        class="whatsapp-fab" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp">
+        <i class="fab fa-whatsapp" style="font-size: 28px;"></i>
+    </a>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script> <!-- Spanish locale -->
+
+    <!-- Custom JS -->
+    <script>
+        // Global helper function
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Function to complete checkout (now global)
+        function completeCheckout() {
+            console.log("Attempting checkout...");
+            const nombre = document.getElementById('checkoutNombre').value; // Use updated ID
+            const email = document.getElementById('checkoutEmail').value;   // Use updated ID
+            const telefono = document.getElementById('checkoutTelefono').value; // Use updated ID
+            const documento_identidad = document.getElementById('checkoutDocumento').value; // Use updated ID
+            const csrfToken = getCookie('csrftoken');
+            console.log("CSRF Token for checkout:", csrfToken);
+
+            if (!csrfToken) {
+                console.error("CSRF Token not found!");
+                alert("Error de seguridad. Intenta recargar la página.");
+                return;
+            }
+            // Validar campos
+            if (!nombre || !email || !telefono) {
+                alert('Por favor, completa todos los campos obligatorios.');
+                return;
+            }
+
+            // Crear FormData para enviar
+            const formData = new FormData();
+            formData.append('nombre', nombre);
+            formData.append('email', email);
+            formData.append('telefono', telefono);
+            formData.append('documento_identidad', documento_identidad);
+
+            console.log("Sending checkout request to:", '/ventas/complete-checkout/');
+            // Enviar petición AJAX
+            fetch('/ventas/complete-checkout/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+                .then(response => {
+                    console.log("Checkout response status:", response.status);
+                    if (!response.ok) {
+                        // Log error response text
+                        return response.text().then(text => {
+                            throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Checkout response data:", data);
+                    if (data && data.success) { // Check if data and data.success exist
+                        // Cerrar modal de checkout
+                        const checkoutModalEl = document.getElementById('checkoutModal');
+                        if (checkoutModalEl) {
+                            const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
+                            // Check if instance exists before hiding
+                            if (checkoutModalInstance) {
+                                checkoutModalInstance.hide();
+                                console.log("Checkout modal hidden.");
+                            } else {
+                                console.warn("Checkout modal instance not found to hide.");
+                            }
+                        } else {
+                            console.error("Checkout modal element not found.");
+                        }
+
+                        // Actualizar ID de reserva en el modal de éxito
+                        const reservaIdSpan = document.getElementById('reservaId');
+                        if (reservaIdSpan) {
+                            // Check if reserva_id exists in data
+                            reservaIdSpan.textContent = data.reserva_id ? data.reserva_id : 'N/A';
+                            console.log("Reserva ID set in success modal:", data.reserva_id);
+                        } else {
+                            console.error("Reserva ID span element not found in success modal.");
+                        }
+
+                        // Mostrar modal de éxito
+                        const successModalEl = document.getElementById('successModal');
+                        if (successModalEl) {
+                            // Ensure we get or create an instance correctly
+                            let successModalInstance = bootstrap.Modal.getInstance(successModalEl);
+                            if (!successModalInstance) {
+                                successModalInstance = new bootstrap.Modal(successModalEl);
+                                console.log("New success modal instance created.");
+                            }
+                            successModalInstance.show();
+                            console.log("Success modal shown.");
+                        } else {
+                            console.error("Success modal element not found.");
+                        }
+                        // Optionally clear cart display if needed here
+                        const cartCount = document.getElementById('cartCount');
+                        if (cartCount) cartCount.textContent = '0';
+
+                    } else {
+                        alert('Error al procesar la reserva: ' + (data ? data.error : 'Respuesta inválida del servidor')); // Improved error message
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al procesar la reserva:', error);
+                    alert(`Error al procesar la reserva: ${error.message}. Por favor, intenta nuevamente.`);
+                });
+        }
+
+        // Function to remove from cart (now global)
+        function removeFromCart(index) {
+            console.log("Attempting to remove item at index:", index);
+            const csrfToken = getCookie('csrftoken');
+            console.log("CSRF Token for remove:", csrfToken);
+            if (!csrfToken) {
+                console.error("CSRF Token not found!");
+                alert("Error de seguridad. Intenta recargar la página.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('index', index);
+
+            console.log("Sending remove request to:", '/ventas/remove-from-cart/');
+            fetch('/ventas/remove-from-cart/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            })
+                .then(response => {
+                    console.log("Remove response status:", response.status);
+                    if (!response.ok) {
+                        // Log error response text
+                        return response.text().then(text => {
+                            throw new Error(`Server responded with ${response.status}: ${text || 'No additional error info'}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Remove response data:", data);
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Error al eliminar del carrito: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al eliminar del carrito:', error);
+                    alert('Error al eliminar del carrito. Por favor, intenta nuevamente.');
+                });
+        }
+
+        // Listener legacy ELIMINADO: el modal #checkoutModal no tiene trigger
+        // desde ningun boton del sitio. La logica activa de checkout esta en
+        // checkout.html con switch para Flow/Transferencia. Si en el futuro se
+        // reactiva el modal global, agregar listener al boton id="legacyCompleteCheckoutBtn".
+    </script>
+
+    
+    <script>
+    (function () {
+        var MARGEN = 300;   // px antes de entrar en pantalla: llega reproduciendo
+        var pendientes = function () { return document.querySelectorAll('video source[data-src]'); };
+        if (!pendientes().length) return;
+
+        function cargar(video) {
+            if (!video) return;
+            var fuentes = video.querySelectorAll('source[data-src]');
+            for (var i = 0; i < fuentes.length; i++) {
+                fuentes[i].src = fuentes[i].getAttribute('data-src');
+                fuentes[i].removeAttribute('data-src');
+            }
+            video.load();
+            // Cambiar la fuente en caliente no siempre vuelve a disparar el
+            // autoplay, asi que lo pedimos explicito. Si el navegador lo niega
+            // (politica de reproduccion), queda el poster y no rompe nada.
+            var p = video.play();
+            if (p && p['catch']) { p['catch'](function () {}); }
+        }
+
+        function aLaVista(el) {
+            var r = el.getBoundingClientRect();
+            var alto = window.innerHeight || document.documentElement.clientHeight;
+            return r.bottom > -MARGEN && r.top < alto + MARGEN;
+        }
+
+        // Se usa scroll + getBoundingClientRect en vez de IntersectionObserver a
+        // proposito: el observer depende del compositor y hay entornos donde no
+        // entrega callbacks nunca. Si eso pasara, el video no cargaria jamas y la
+        // seccion quedaria con el poster congelado — una falla muda. Esto es mas
+        // simple, funciona en todos lados y se puede probar.
+        var pedido = false;
+        function revisar() {
+            pedido = false;
+            var lista = pendientes();
+            for (var i = 0; i < lista.length; i++) {
+                if (aLaVista(lista[i].parentElement)) cargar(lista[i].parentElement);
+            }
+            if (!pendientes().length) {
+                window.removeEventListener('scroll', agendar);
+                window.removeEventListener('resize', agendar);
+            }
+        }
+        function agendar() {
+            if (pedido) return;
+            pedido = true;
+            window.requestAnimationFrame ? requestAnimationFrame(revisar) : setTimeout(revisar, 100);
+        }
+
+        window.addEventListener('scroll', agendar, { passive: true });
+        window.addEventListener('resize', agendar, { passive: true });
+        revisar();   // por si algun video ya esta a la vista al cargar la pagina
+    })();
+    </script>
+
+    
+    
+<script>
+    // Meta Pixel: InitiateCheckout al cargar la página de checkout
+    
+    if (typeof fbq !== 'undefined') {
+        fbq('track', 'InitiateCheckout', {
+            value: 200000.0,
+            currency: 'CLP'
+        });
+    }
+    
+
+    // --- Global Variables ---
+    let isProcessingCheckout = false; // Flag to prevent double submission
+
+    // --- Inline alert helper (reemplaza alert() nativo) ---
+    function showCheckoutError(message) {
+        const box = document.getElementById('checkoutAlert');
+        if (box) {
+            box.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>' + message;
+            box.classList.add('show');
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            alert(message); // Fallback si el contenedor no existe
+        }
+    }
+    function clearCheckoutError() {
+        const box = document.getElementById('checkoutAlert');
+        if (box) { box.classList.remove('show'); box.innerHTML = ''; }
+    }
+
+    // --- Region/Comuna Functions ---
+    // Extrae el array sin importar si DRF devuelve [] o {count, results: []}
+    function normalizeListResponse(data) {
+        if (Array.isArray(data)) return data;
+        if (data && Array.isArray(data.results)) return data.results;
+        return [];
+    }
+
+    async function loadRegiones() {
+        const select = document.getElementById('checkoutRegion');
+        if (!select) {
+            // Carrito vacío u otro estado sin form — nada que hacer.
+            return;
+        }
+        try {
+            const response = await fetch('/ventas/api/regiones/', {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            const data = await response.json();
+            const regiones = normalizeListResponse(data);
+            console.log('loadRegiones: ' + regiones.length + ' regiones recibidas');
+
+            if (regiones.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No hay regiones disponibles';
+                opt.disabled = true;
+                select.appendChild(opt);
+                return;
+            }
+
+            regiones.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region.id;
+                option.textContent = region.nombre;
+                select.appendChild(option);
+            });
+
+            // Plan Geo E2: opción para clientes fuera de Chile.
+            const extOpt = document.createElement('option');
+            extOpt.value = 'extranjero';
+            extOpt.textContent = '🌎 Vivo fuera de Chile';
+            select.appendChild(extOpt);
+        } catch (error) {
+            console.error('Error loading regiones:', error);
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error al cargar regiones';
+            opt.disabled = true;
+            select.appendChild(opt);
+        }
+    }
+
+    async function loadComunas(regionId) {
+        const select = document.getElementById('checkoutComuna');
+        if (!select) return;
+        try {
+            const response = await fetch('/ventas/api/comunas/?region=' + regionId, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            const data = await response.json();
+            const comunas = normalizeListResponse(data);
+
+            // Clear previous options
+            select.innerHTML = '<option value="">Seleccione una comuna</option>';
+            select.disabled = false;
+
+            comunas.forEach(comuna => {
+                const option = document.createElement('option');
+                option.value = comuna.id;
+                option.textContent = comuna.nombre;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading comunas:', error);
+        }
+    }
+
+    // --- Helper Functions ---
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    async function fetchClientData(telefono) {
+        console.log('[VALIDANDO] "' + telefono + '"');
+
+        const phoneInput = document.getElementById('checkoutTelefono');
+        const validationMsg = document.getElementById('phoneValidationMessage');
+        const errorMsg = document.getElementById('phoneErrorMessage');
+
+        try {
+            // PRIMERO: Limpiar el teléfono INMEDIATAMENTE al inicio
+            const cleanedTelefono = telefono.replace(/[\s\-]/g, '');
+
+            // Reset messages and styles - FORZAR limpieza completa
+            validationMsg.textContent = '';
+            validationMsg.className = 'form-text';
+            errorMsg.textContent = '';
+            errorMsg.style.display = 'none';
+            phoneInput.classList.remove('is-invalid', 'is-valid');
+
+            // FORZAR reflow para asegurar que los cambios se apliquen
+            phoneInput.offsetHeight;
+
+            // Validar que no contenga letras (usando teléfono limpio)
+            const hasInvalidChars = /[a-zA-Z]/.test(cleanedTelefono);
+            if (hasInvalidChars) {
+                phoneInput.classList.add('is-invalid');
+                errorMsg.textContent = 'El teléfono solo puede contener números (ej: +569 1234 5678).';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            // DEBUG: Mostrar limpieza de teléfono
+            console.log('[DEBUG] Telefono:');
+            console.log(`   Original: "${telefono}"`);
+            console.log(`   Limpio: "${cleanedTelefono}"`);
+
+            // Validar longitud mínima (contar solo dígitos)
+            const digitCount = cleanedTelefono.replace(/[^0-9]/g, '').length;
+            console.log('   Digitos: ' + digitCount);
+
+            if (digitCount < 9) {
+                validationMsg.textContent = 'Ingresa al menos 9 dígitos.';
+                validationMsg.className = 'form-text text-muted';
+                return;
+            }
+
+            console.log('[BACKEND] Enviando: ' + cleanedTelefono);
+            console.log('[BACKEND] URL encoded: ' + encodeURIComponent(cleanedTelefono));
+            const lookupUrl = `/ventas/api/cliente-por-telefono/?telefono=${encodeURIComponent(cleanedTelefono)}`;
+            const response = await fetch(lookupUrl);
+
+            if (response.ok) {
+                const data = await response.json();
+
+                // DEBUG: Mostrar respuesta completa del backend
+                console.log("🔍 RESPUESTA COMPLETA del backend:", JSON.stringify(data, null, 2));
+
+                if (!data.valid) {
+                    // Teléfono inválido
+                    phoneInput.classList.add('is-invalid');
+                    errorMsg.textContent = data.error || 'Formato de teléfono inválido';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+
+                // Actualizar campo con teléfono normalizado
+                if (data.telefono_normalizado) {
+                    phoneInput.value = data.telefono_normalizado;
+                }
+
+                if (data.found) {
+                    // Cliente encontrado - auto-fill con datos completos
+                    phoneInput.classList.add('is-valid');
+                    const primerNombre = (data.nombre || '').trim().split(' ')[0];
+                    validationMsg.textContent = primerNombre
+                        ? `👋 ¡Hola de nuevo, ${primerNombre}! Cargamos tus datos automáticamente.`
+                        : '✓ Cliente encontrado. Datos cargados automáticamente.';
+                    validationMsg.className = 'form-text text-success';
+
+                    console.log("Cliente encontrado (datos completos):", data);
+
+                    // Llenar campos básicos
+                    document.getElementById('checkoutNombre').value = data.nombre || '';
+                    document.getElementById('checkoutEmail').value = data.email || '';
+                    document.getElementById('checkoutDocumento').value = data.documento_identidad || '';
+
+                    // Auto-completar región si existe
+                    if (data.region_id) {
+                        const regionSelect = document.getElementById('checkoutRegion');
+                        regionSelect.value = data.region_id;
+
+                        // Activar comuna y cargar sus opciones
+                        await loadComunas(data.region_id);
+                        if (data.comuna_id) {
+                            document.getElementById('checkoutComuna').value = data.comuna_id;
+                        }
+
+                        console.log('[OK] Region y comuna cargadas: ' + data.region_nombre + ' - ' + data.comuna_nombre);
+                    }
+
+                    // Mostrar información adicional del cliente en consola
+                    if (data.numero_visitas > 0) {
+                        console.log('[INFO] Cliente fidelizado: ' + data.numero_visitas + ' visitas, gasto total: $' + data.gasto_total.toLocaleString('es-CL'));
+                    }
+                } else {
+                    // Cliente nuevo pero teléfono válido
+                    phoneInput.classList.add('is-valid');
+                    validationMsg.textContent = '✓ Teléfono válido. Por favor completa tus datos.';
+                    validationMsg.className = 'form-text text-primary';
+                }
+            } else {
+                console.error(`Error fetching client data: ${response.status} ${response.statusText}`);
+                errorMsg.textContent = 'Error al validar el teléfono. Intenta nuevamente.';
+                errorMsg.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error durante fetchClientData:', error);
+            errorMsg.textContent = 'Error de conexión. Verifica tu internet.';
+            errorMsg.style.display = 'block';
+        }
+    }
+
+    function showProcessing(overlay, button) {
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        }
+        if (overlay) overlay.style.display = 'flex';
+    }
+
+    function hideProcessing(overlay, button) {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-lock me-1"></i> Pagar y reservar';
+        }
+        if (overlay) overlay.style.display = 'none';
+        isProcessingCheckout = false;
+        console.log("Checkout processing finished/reset.");
+    }
+
+    async function handleApiResponse(response) {
+        if (!response.ok) {
+            let errorData = { error: `Error del servidor (${response.status})` };
+            try {
+                const text = await response.text();
+                console.error("Error response text:", text);
+                errorData = JSON.parse(text);
+            } catch (e) {
+                console.error("Failed to parse error response as JSON:", e);
+            }
+            throw new Error(errorData.error || errorData.details || `Error del servidor (${response.status})`);
+        }
+        return response.json();
+    }
+
+    function displaySuccessModal(data, paymentMethod) {
+        const reservaIdSpan = document.getElementById('reservaId');
+        const successModalEl = document.getElementById('successModal');
+        const successModalBody = successModalEl ? successModalEl.querySelector('.modal-body') : null;
+        const modalFooter = successModalEl ? successModalEl.querySelector('.modal-footer') : null;
+        const detailButtonPlaceholder = document.getElementById('detailButtonPlaceholder');
+
+        // Set Reserva ID
+        if (reservaIdSpan && data.reserva_id) {
+            reservaIdSpan.textContent = data.reserva_id;
+        }
+
+        // Add "Ver Detalle" button if URL exists and placeholder is found
+        if (data.redirect_url && detailButtonPlaceholder) {
+            // Remove any existing detail button first
+            const existingDetailBtn = detailButtonPlaceholder.querySelector('.btn-view-detail');
+            if (existingDetailBtn) {
+                existingDetailBtn.remove();
+            }
+
+            // Create new detail button
+            const detailBtn = document.createElement('a');
+            detailBtn.href = data.redirect_url;
+            detailBtn.textContent = 'Ver Detalle de Reserva';
+            detailBtn.className = 'btn btn-secondary btn-view-detail'; // Add specific class
+            detailButtonPlaceholder.appendChild(detailBtn); // Add the button
+        } else if (detailButtonPlaceholder) {
+             // Clear placeholder if no URL
+             detailButtonPlaceholder.innerHTML = '';
+        }
+
+        // Invitación sorpresa (experiencia romántica / upsell con ambientación)
+        if (data.invitacion_url && successModalBody) {
+            const prev = successModalBody.querySelector('.invitacion-sorpresa-box');
+            if (prev) prev.remove();
+            const box = document.createElement('div');
+            box.className = 'invitacion-sorpresa-box';
+            box.style.cssText = 'border:2px solid #D4537E; border-radius:14px; background:#fdf2f5; padding:16px; margin-top:16px; text-align:center;';
+            box.innerHTML = '<div style="font-size:15px; color:#993556; margin-bottom:4px;">🤫 Tu sorpresa está lista</div>'
+              + '<div style="font-size:13px; color:#7a5560; margin-bottom:12px;">Envíale esta invitación a tu pareja — sin precios ni spoiler de la ambientación.</div>'
+              + '<a href="' + data.invitacion_url + '" target="_blank" rel="noopener" class="btn" style="background:#D4537E; color:#fff;">Ver la invitación</a>';
+            successModalBody.appendChild(box);
+        }
+
+        console.log("About to show success modal. Data received:", data);
+
+        if (successModalBody) {
+            const existingBankInfo = successModalBody.querySelector('.bank-transfer-instructions');
+            if (existingBankInfo) {
+                existingBankInfo.remove();
+            }
+
+            // Bank details are shown on the page now, not needed in the modal.
+            // if (paymentMethod === 'transferencia' && data.bank_details) { ... } // Ensure this logic is removed or commented out if present
+
+        }
+
+        if (successModalEl) {
+            const successModal = new bootstrap.Modal(successModalEl);
+            successModal.show();
+
+            // GA4 — disparar reservation_completed cada vez que la reserva se crea exitosamente
+            if (typeof window.aremkoTrack === 'function') {
+                window.aremkoTrack('reservation_completed', {
+                    reserva_id: data.reserva_id || '',
+                    value: data.total_reserva || 0,
+                    currency: 'CLP',
+                    tiene_masaje: !!data.tiene_masaje,
+                    tiene_tina: !!data.tiene_tina,
+                    tiene_alojamiento: !!data.tiene_alojamiento,
+                });
+            }
+
+            // Google Ads: Disparar evento de conversión si la reserva contiene masajes
+            if (data.tiene_masaje && typeof gtag !== 'undefined') {
+                console.log('🎯 Disparando conversión de Google Ads para masaje');
+                gtag('event', 'conversion', {
+                    'send_to': 'AW-1767221019/pHtIcLCV2rEbENO74upB',
+                    'value': data.total_reserva || 1.0,
+                    'currency': 'CLP',
+                    'transaction_id': data.reserva_id ? String(data.reserva_id) : ''
+                });
+            }
+
+            // Meta Pixel: Schedule cuando la reserva se creó exitosamente (aún no pagada).
+            // (Antes era 'Lead'; se cambió a 'Schedule' para dejar 'Lead' EXCLUSIVO del
+            // formulario Refugio. Schedule = reserva/cita agendada en la taxonomía de Meta.)
+            // event_id deterministico para deduplicar con CAPI server-side.
+            // Para metodo='flow' viene data.pending_id; para metodos directos viene data.reserva_id.
+            if (typeof fbq !== 'undefined') {
+                var scheduleIdSource = data.pending_id ? ('schedule_' + data.pending_id)
+                                   : (data.reserva_id ? ('schedule_v_' + data.reserva_id) : null);
+                var schedulePayload = {
+                    value: data.total_reserva || 0,
+                    currency: 'CLP',
+                    content_ids: data.pending_id ? [String(data.pending_id)]
+                                 : (data.reserva_id ? [String(data.reserva_id)] : [])
+                };
+                if (scheduleIdSource) {
+                    fbq('track', 'Schedule', schedulePayload, { eventID: scheduleIdSource });
+                } else {
+                    fbq('track', 'Schedule', schedulePayload);
+                }
+            }
+        } else {
+            console.error("Success modal element not found");
+            alert("¡Reserva creada exitosamente!"); // Fallback alert
+            // Consider redirecting only if modal fails completely
+            // window.location.href = "/";
+        }
+    }
+
+    function handleCheckoutError(error, overlay, button) {
+        console.error('Error durante el checkout:', error);
+        showCheckoutError(`No pudimos procesar tu reserva: ${error.message}. Por favor, intenta nuevamente o escríbenos por WhatsApp.`);
+        hideProcessing(overlay, button); // Hide overlay and reset button on error
+    }
+
+    // --- Checkout Logic Functions ---
+
+    async function handleBankTransferCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            const response = await fetch('/ventas/complete-checkout/', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const data = await handleApiResponse(response); // Handles ok check and JSON parsing
+            console.log("Bank Transfer Checkout Success:", data);
+
+            // <<< INICIO CÓDIGO NUEVO >>>
+            // Ocultar secciones del checkout antes de mostrar el modal
+            const checkoutRows = document.querySelectorAll('.checkout-section .container > .row');
+            checkoutRows.forEach(row => {
+                row.style.display = 'none';
+            });
+            // <<< FIN CÓDIGO NUEVO >>>
+
+            // Show success modal instead of redirecting
+            displaySuccessModal(data, 'transferencia'); 
+            // Hide processing overlay after showing modal
+            hideProcessing(overlay, button); 
+        } catch (error) {
+            // Handle errors and ensure processing is hidden
+            handleCheckoutError(error, overlay, button); 
+        } 
+        // Removed the finally block here, hideProcessing is called within catch or fallback else
+    }
+
+    async function handleFlowCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Crear PendingReservation (no crea VentaReserva todavia)
+            console.log("Creating pending reservation before Flow payment...");
+            const checkoutResponse = await fetch('/ventas/complete-checkout/', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.pending_id) {
+                throw new Error(checkoutData.error || 'Error al iniciar el pago con Flow.');
+            }
+            const pendingId = checkoutData.pending_id;
+            console.log("Pending reservation created for Flow, ID:", pendingId);
+
+            // 2. Iniciar pago Flow usando pending_id
+            console.log("Initiating Flow payment for pending_id:", pendingId);
+            const flowResponse = await fetch('/ventas/api/flow/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ pending_id: pendingId })
+            });
+            const flowData = await handleApiResponse(flowResponse);
+
+            // 3. Redirigir a Flow
+            if (flowData.url) {
+                console.log("Redirecting to Flow:", flowData.url);
+                window.location.href = flowData.url;
+            } else {
+                throw new Error(flowData.error || 'No se recibió URL de Flow.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button);
+        }
+    }
+
+    async function handleMercadoPagoCheckout(formData, overlay, button) {
+        const csrfToken = getCookie('csrftoken');
+        try {
+            // 1. Create Reservation (Pending)
+            console.log("Creating reservation before Mercado Pago payment...");
+            const checkoutResponse = await fetch('/ventas/complete-checkout/', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const checkoutData = await handleApiResponse(checkoutResponse);
+            if (!checkoutData.success || !checkoutData.reserva_id) {
+                throw new Error(checkoutData.error || 'Error al crear la reserva antes del pago con Mercado Pago.');
+            }
+            const reservaId = checkoutData.reserva_id;
+            console.log("Reservation created for Mercado Pago, ID:", reservaId);
+
+            // 2. Create Mercado Pago Payment Link
+            console.log("Creating Mercado Pago payment link for reserva_id:", reservaId);
+            const mpResponse = await fetch('/ventas/api/mercadopago/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ reserva_id: reservaId })
+            });
+            const mpData = await handleApiResponse(mpResponse);
+
+            // 3. Redirect to Mercado Pago
+            if (mpData.payment_link) {
+                console.log("Redirecting to Mercado Pago:", mpData.payment_link);
+                window.location.href = mpData.payment_link;
+                // Don't hide processing here, redirection handles it.
+            } else {
+                throw new Error(mpData.error || 'No se recibió link de pago de Mercado Pago.');
+            }
+        } catch (error) {
+            handleCheckoutError(error, overlay, button);
+        }
+    }
+
+    // --- Event Listeners ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const completeCheckoutBtn = document.getElementById('completeCheckoutBtn');
+        const processingOverlay = document.getElementById('processingOverlay');
+        const telefonoInput = document.getElementById('checkoutTelefono');
+
+        // Load regiones on page load
+        loadRegiones();
+
+        // Add event listener for region change to load comunas
+        const regionSelect = document.getElementById('checkoutRegion');
+        if (regionSelect) {
+            regionSelect.addEventListener('change', function(e) {
+                const regionId = e.target.value;
+                const comunaSelect = document.getElementById('checkoutComuna');
+
+                if (regionId === 'extranjero') {
+                    comunaSelect.innerHTML = '<option value="">No aplica (extranjero)</option>';
+                    comunaSelect.value = '';
+                    comunaSelect.disabled = true;
+                } else if (regionId) {
+                    loadComunas(regionId);
+                } else {
+                    comunaSelect.innerHTML = '<option value="">Primero seleccione una región</option>';
+                    comunaSelect.disabled = true;
+                }
+            });
+        }
+
+        if (completeCheckoutBtn) {
+            completeCheckoutBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                if (isProcessingCheckout) return;
+                isProcessingCheckout = true;
+                clearCheckoutError();
+
+                // --- Form Validation ---
+                const nombre = document.getElementById('checkoutNombre').value;
+                const email = document.getElementById('checkoutEmail').value;
+                const telefono = document.getElementById('checkoutTelefono').value;
+                const documento = document.getElementById('checkoutDocumento').value;
+                const region = document.getElementById('checkoutRegion').value;
+                const comuna = document.getElementById('checkoutComuna').value;
+                const paymentMethodInput = document.querySelector('input[name="paymentMethod"]:checked');
+
+                if (!nombre || !email || !telefono) {
+                    showCheckoutError('Por favor completa tu nombre, email y teléfono para continuar.');
+                    hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
+                    return;
+                }
+                if (!region) {
+                    showCheckoutError('Por favor selecciona tu región (o “Vivo fuera de Chile”).');
+                    hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
+                    return;
+                }
+                if (region !== 'extranjero' && !comuna) {
+                    showCheckoutError('Por favor selecciona tu comuna.');
+                    hideProcessing(null, completeCheckoutBtn);
+                    isProcessingCheckout = false;
+                    return;
+                }
+                if (!paymentMethodInput) {
+                    showCheckoutError('Por favor selecciona un método de pago.');
+                     hideProcessing(null, completeCheckoutBtn);
+                    return;
+                }
+                const paymentMethod = paymentMethodInput.value;
+
+
+                const csrfToken = getCookie('csrftoken');
+                if (!csrfToken) {
+                    showCheckoutError('Hubo un problema de seguridad. Por favor recarga la página e intenta de nuevo.');
+                    hideProcessing(null, completeCheckoutBtn);
+                    return;
+                }
+
+                // --- Show Processing ---
+                showProcessing(processingOverlay, completeCheckoutBtn);
+
+                // --- Prepare Form Data ---
+                const formData = new FormData();
+                formData.append('nombre', nombre);
+                formData.append('email', email);
+                formData.append('telefono', telefono);
+                formData.append('documento_identidad', documento);
+                formData.append('region', region);
+                formData.append('comuna', comuna);
+                formData.append('metodo_pago', paymentMethod);
+
+                // --- Call Appropriate Handler ---
+                if (paymentMethod === 'transferencia') {
+                    handleBankTransferCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'flow') {
+                    handleFlowCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else if (paymentMethod === 'mercadopago_link') {
+                    handleMercadoPagoCheckout(formData, processingOverlay, completeCheckoutBtn);
+                } else {
+                    showCheckoutError('Método de pago no soportado. Por favor elige otra opción.');
+                    hideProcessing(processingOverlay, completeCheckoutBtn);
+                }
+            });
+        } else {
+            console.error("Complete checkout button not found");
+        }
+
+        // Variable para debounce
+        let phoneValidationTimeout;
+
+        if (telefonoInput) {
+            // SOLUCIÓN SIMPLE: Solo validar en blur, NO en input
+            // Esto elimina completamente los race conditions
+            telefonoInput.addEventListener('blur', function() {
+                fetchClientData(telefonoInput.value);
+            });
+        } else {
+            console.error("Telefono input not found");
+        }
+
+        // --- Add listener for payment method change ---
+        const paymentMethodRadios = document.querySelectorAll('input[name="paymentMethod"]');
+        const bankDetailsSection = document.getElementById('bankDetailsSection');
+
+        function toggleBankDetails() {
+            const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
+            if (selectedPaymentMethod && selectedPaymentMethod.value === 'transferencia' && bankDetailsSection) {
+                bankDetailsSection.style.display = 'block';
+            } else if (bankDetailsSection) {
+                bankDetailsSection.style.display = 'none';
+            }
+        }
+
+        paymentMethodRadios.forEach(radio => {
+            radio.addEventListener('change', toggleBankDetails);
+        });
+
+        // Initial check in case 'transferencia' is pre-selected on page load
+        toggleBankDetails();
+        // --- End listener for payment method change ---
+
+    });
+</script>
+
+</body>
+
+</html>

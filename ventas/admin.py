@@ -663,9 +663,38 @@ class VentaReservaAdmin(admin.ModelAdmin):
         }),
         ('Gestión de Comandas (Personal)', {
             'fields': ('agregar_comanda_button',),
-            'description': 'Las comandas creadas por el personal se muestran más abajo en la sección "COMANDAS".'
+            'description': 'Las comandas creadas por el personal se muestran justo abajo, en "COMANDAS".'
         }),
     )
+
+    # Bloques que se dibujan DESPUÉS de Pagos, no arriba del todo (Jorge,
+    # 2026-08-30). Al abrir una reserva lo primero es el dinero: qué se vendió,
+    # qué se pagó, qué falta. El Pase y las comandas se usan DESPUÉS de que la
+    # plata está cuadrada, así que empujaban hacia abajo lo que se mira primero.
+    #
+    # Django dibuja TODOS los fieldsets antes de TODOS los inlines y no permite
+    # intercalarlos, así que el reordenamiento vive en la plantilla
+    # (templates/admin/ventas/ventareserva/change_form.html). Acá se declara qué
+    # se mueve, para que la plantilla no tenga que reconocerlos por su título.
+    FIELDSETS_BAJO_PAGOS = (
+        '🔑 El Pase del cliente',
+        '📱 Comanda del Cliente (WhatsApp)',
+        'Gestión de Comandas (Personal)',
+    )
+
+    def render_change_form(self, request, context, add=False, change=False,
+                           form_url='', obj=None):
+        context['fieldsets_bajo_pagos'] = self.FIELDSETS_BAJO_PAGOS
+        # El ancla se ubica por la CLASE del inline, no por su título ni por una
+        # posición escrita a mano: si mañana se reordenan los inlines, el ancla
+        # se mueve sola en vez de dejar los bloques en el lugar equivocado.
+        try:
+            context['pos_ancla_pagos'] = self.inlines.index(PagoInline) + 1
+        except ValueError:
+            context['pos_ancla_pagos'] = 0   # sin ancla, quedan donde estaban
+        return super().render_change_form(request, context, add=add, change=change,
+                                          form_url=form_url, obj=obj)
+
     def changelist_view(self, request, extra_context=None):
         return super().changelist_view(request, extra_context=extra_context)
 
