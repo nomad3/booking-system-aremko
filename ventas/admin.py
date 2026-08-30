@@ -1142,28 +1142,17 @@ class VentaReservaAdmin(admin.ModelAdmin):
         from django.utils.safestring import mark_safe
         from urllib.parse import quote
 
-        from ventas.views.ficha_reserva_view import url_ficha_reserva
+        from ventas.views.ficha_reserva_view import mensaje_pase
 
         if not obj or not obj.pk:
             return 'Guarda la reserva primero y aparecerá acá.'
 
-        url = url_ficha_reserva(obj.pk)
-        nombre = ((obj.cliente.nombre if obj.cliente else '') or '').split(' ')[0]
+        # El texto vive en mensaje_pase(), compartido con la Tarjeta móvil:
+        # dos copias del mismo mensaje terminan diciendo cosas distintas.
+        mensaje = mensaje_pase(obj)
 
         tiene_masaje = obj.reservaservicios.filter(
             servicio__tipo_servicio='masaje').exists()
-
-        # Mensaje de apertura, listo para pegar. El anterior DESCRIBÍA un
-        # documento ("ahí está el link de su ficha y encontrará los detalles");
-        # éste le da un trabajo: guárdalo, lo vas a necesitar al llegar.
-        saludo = f"Hola {nombre}, " if nombre else "Hola, "
-        mensaje = (
-            f"{saludo}acá está tu Pase para Aremko 🔑\n\n"
-            f"{url}\n\n"
-            "Adentro está el QR que muestras al llegar, las claves de wifi, "
-            "cómo llegar y la comanda para pedir desde tu tina.\n\n"
-            "Guárdalo, lo vas a necesitar."
-        )
 
         pasos = [
             ('Mándale el Pase',

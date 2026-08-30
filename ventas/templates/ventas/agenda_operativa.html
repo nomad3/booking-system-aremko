@@ -979,6 +979,8 @@
                    class="checkout-btn {% if c.debe %}checkout-btn-cobrar{% endif %}">
                     {% if c.debe %}💰 Cobrar{% else %}Ver{% endif %} · Reserva #{{ c.reserva_id }}
                 </a>
+                <a href="{% url 'ventas:tarjeta_reserva' c.reserva_id %}" target="_blank"
+                   class="checkout-btn">📱 Tarjeta</a>
                 {% comment %}
                 Cerrar la estadía sin pasar por el admin. El id deja que el
                 botón se transforme en confirmación sin recargar la agenda.

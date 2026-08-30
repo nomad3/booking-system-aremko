@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     api_views, availability_views, checkout_views, crud_views,
     flow_views, import_export_views, misc_views, public_views, reporting_views,
-    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views, ical_views, embudo_luna_view
+    admin_views, mercadopago_views, giftcard_campaign_views, campaign_views, crm_views, premio_views, cron_views, giftcard_views, pack_descuento_views, analytics_views, email_campaign_views, visual_campaign_views, calendario_matriz_view, calendario_seleccion_view, resumen_reserva_view, tips_reserva_view, cotizacion_reserva_view, cotizacion_view, eliminar_reservas_no_pagadas_view, pagos_masajistas_views, diagnostico_views, diagnostico_test, diagnostico_simple, inventario_view, agenda_operativa_view, tarjeta_reserva_view, luna_api_views, agenda_masajes_view, ficha_masajista_view, ficha_reserva_view, recon_api_views, ical_views, embudo_luna_view
 )
 from . import api # Keep api module import as is
 from . import views_comandas_cliente # Import comandas de clientes views
@@ -46,6 +46,7 @@ urlpatterns = [
     path('inventario/ajustar/<int:producto_id>/', inventario_view.ajustar_inventario, name='ajustar_inventario'),
     # Agenda Operativa del Día
     path('agenda-operativa/', agenda_operativa_view.agenda_operativa, name='agenda_operativa'),
+    path('reserva/<int:venta_id>/tarjeta/', tarjeta_reserva_view.tarjeta_reserva, name='tarjeta_reserva'),
     path('manual-recepcion/', agenda_operativa_view.manual_recepcion, name='manual_recepcion'),
     path('agenda-masajes/', agenda_masajes_view.agenda_masajes, name='agenda_masajes'),
     path('masaje/ficha-terapeuta/<int:ficha_id>/', ficha_masajista_view.ficha_masajista, name='ficha_masajista'),

@@ -1,0 +1,151 @@
+{% comment %}
+Tarjeta de Reserva (móvil) — Fase 1: lectura + copiar Pase.
+
+Pensada para el pulgar de Deborah: la plata primero (total, pagado y saldo por
+separado — una inconsistencia salta a la vista), lo contratado compacto, y UN
+botón que copia el mensaje del Pase sin mostrarlo. El texto viaja en una
+variable de JS, no en el cuerpo: mostrarlo entero era media pantalla perdida.
+
+Misma paleta que llegada_recepcion.html: son la misma familia de herramientas
+internas y se reconocen entre sí.
+{% endcomment %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Reserva #{{ venta.pk }} · {{ venta.cliente.nombre|default:"Sin cliente" }} · Aremko</title>
+<style>
+  :root{
+    --bg:#F5EFE3; --card:#FFFDF8; --ink:#2E2A24; --hint:#8A8175;
+    --line:#EADFCD; --brand:#BC5630; --ok:#2E7D32; --debe:#C62828;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       padding:14px;font-size:16px;line-height:1.45}
+  .wrap{max-width:520px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:14px 16px;margin-bottom:12px}
+  h1{margin:0;font-size:21px}
+  .sub{color:var(--hint);font-size:14px;margin-top:2px}
+  h2{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;
+     color:var(--hint);font-weight:600}
+  .dinero{display:flex;gap:8px;text-align:center}
+  .dinero>div{flex:1;padding:8px 4px;border-radius:10px;background:var(--bg)}
+  .dinero .rot{font-size:12px;color:var(--hint)}
+  .dinero .val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .dinero .saldo-debe .val{color:var(--debe)}
+  .dinero .saldo-ok .val{color:var(--ok)}
+  .fila{display:flex;justify-content:space-between;gap:10px;
+        padding:8px 0;border-bottom:1px solid var(--line)}
+  .fila:last-child{border-bottom:none}
+  .fila .cuando{color:var(--hint);font-size:13px;white-space:nowrap}
+  .vacio{color:var(--hint);font-size:14px}
+  .btn{display:block;width:100%;text-align:center;padding:15px;border:0;
+       border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;
+       font-family:inherit;text-decoration:none}
+  .btn-pase{background:var(--brand);color:#fff}
+  .btn-admin{background:transparent;color:var(--hint);font-size:14px;
+             font-weight:400;padding:10px;margin-top:2px}
+  .coment{white-space:pre-line;font-size:14px;color:#5D4037;
+          background:#FFF8E1;border-left:4px solid #FB8C00;border-radius:6px;
+          padding:8px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>{{ venta.cliente.nombre|default:"Sin cliente" }}</h1>
+    <div class="sub">Reserva #{{ venta.pk }}
+      {% if venta.cliente.telefono %} · {{ venta.cliente.telefono }}{% endif %}
+      · {{ venta.fecha_reserva|date:"d/m/Y" }}</div>
+  </div>
+
+  {# La plata primero, y los tres números por separado a propósito: #}
+  {# saldo_pendiente es un campo almacenado (H-060) y una inconsistencia #}
+  {# entre los tres salta a la vista en vez de esconderse en uno. #}
+  <div class="card" id="dinero">
+    <div class="dinero">
+      <div><div class="rot">Total</div>
+        <div class="val">${{ venta.total|floatformat:"0g" }}</div></div>
+      <div><div class="rot">Pagado</div>
+        <div class="val">${{ venta.pagado|floatformat:"0g" }}</div></div>
+      <div class="{% if debe %}saldo-debe{% else %}saldo-ok{% endif %}">
+        <div class="rot">Saldo</div>
+        <div class="val">{% if debe %}${{ venta.saldo_pendiente|floatformat:"0g" }}{% else %}✓ 0{% endif %}</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="servicios">
+    <h2>Servicios</h2>
+    {% for r in servicios %}
+      <div class="fila">
+        <span>{{ r.servicio.nombre }}</span>
+        <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
+      </div>
+    {% empty %}<div class="vacio">Sin servicios todavía.</div>{% endfor %}
+  </div>
+
+  <div class="card" id="productos">
+    <h2>Productos</h2>
+    {% for r in productos %}
+      <div class="fila">
+        <span>{{ r.cantidad }}× {{ r.producto.nombre }}</span>
+      </div>
+    {% empty %}<div class="vacio">Sin productos.</div>{% endfor %}
+  </div>
+
+  <div class="card" id="pagos">
+    <h2>Pagos</h2>
+    {% for p in pagos %}
+      <div class="fila">
+        <span>${{ p.monto|floatformat:"0g" }} · {{ p.get_metodo_pago_display|default:p.metodo_pago }}</span>
+        <span class="cuando">{{ p.fecha_pago|date:"d/m H:i" }}</span>
+      </div>
+    {% empty %}<div class="vacio">Sin pagos registrados.</div>{% endfor %}
+  </div>
+
+  {% if venta.comentarios %}
+  <div class="card"><h2>Comentarios</h2>
+    <div class="coment">{{ venta.comentarios }}</div></div>
+  {% endif %}
+
+  <button type="button" class="btn btn-pase" id="btnCopiarPase">🔑 Copiar el Pase</button>
+  <a class="btn btn-admin" href="/admin/ventas/ventareserva/{{ venta.pk }}/change/">
+    Abrir en el admin (edición completa)</a>
+
+</div>
+<script>
+(function () {
+  // El mensaje NO se muestra: al tocar el botón se copia y listo. Deborah lo
+  // pega en el cajón de la bandeja omnicanal.
+  var MENSAJE = "{{ mensaje_pase|escapejs }}";
+  var btn = document.getElementById('btnCopiarPase');
+
+  function listo() {
+    btn.textContent = '✓ Copiado — pégalo en la bandeja';
+    setTimeout(function () { btn.textContent = '🔑 Copiar el Pase'; }, 2600);
+  }
+  function aLaAntigua() {
+    // Respaldo para navegadores sin clipboard API (o sin HTTPS).
+    var t = document.createElement('textarea');
+    t.value = MENSAJE;
+    t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.focus(); t.select();
+    try { document.execCommand('copy'); listo(); }
+    catch (e) { alert('No se pudo copiar. Ábrelo en el admin.'); }
+    document.body.removeChild(t);
+  }
+  btn.addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(MENSAJE).then(listo, aLaAntigua);
+    } else { aLaAntigua(); }
+  });
+})();
+</script>
+</body>
+</html>

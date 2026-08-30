@@ -63,6 +63,28 @@ def url_ficha_reserva(venta_id):
     return f"{base}{reverse('ventas:ficha_reserva_cliente', kwargs={'token': token_para_reserva(venta_id)})}"
 
 
+def mensaje_pase(venta):
+    """El mensaje de WhatsApp que acompaña El Pase, listo para pegar.
+
+    Vive acá y no en el admin porque lo usan DOS pantallas: el formulario de
+    la reserva y la Tarjeta móvil. Dos copias del mismo texto terminan diciendo
+    cosas distintas; una función compartida no puede.
+
+    El mensaje no DESCRIBE un documento ("ahí está el link de su ficha"): le da
+    un trabajo al cliente — guárdalo, lo vas a necesitar al llegar.
+    """
+    url = url_ficha_reserva(venta.pk)
+    nombre = ((venta.cliente.nombre if venta.cliente else '') or '').split(' ')[0]
+    saludo = f"Hola {nombre}, " if nombre else "Hola, "
+    return (
+        f"{saludo}acá está tu Pase para Aremko 🔑\n\n"
+        f"{url}\n\n"
+        "Adentro está el QR que muestras al llegar, las claves de wifi, "
+        "cómo llegar y la comanda para pedir desde tu tina.\n\n"
+        "Guárdalo, lo vas a necesitar."
+    )
+
+
 def url_llegada(token):
     """Lo que lleva codificado el QR de El Pase.
 

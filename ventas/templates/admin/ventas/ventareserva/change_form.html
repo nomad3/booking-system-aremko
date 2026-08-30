@@ -40,6 +40,8 @@ la primera vez que alguien le cambie una palabra.
     {% if original %}
     <li><a href="{% url 'artesanias:catalogo' %}?reserva={{ original.pk }}"
            style="background:#8a6d3b;">🪵 Vender artesanía</a></li>
+    <li><a href="{% url 'ventas:tarjeta_reserva' original.pk %}"
+           style="background:#BC5630;">📱 Tarjeta móvil</a></li>
     {% endif %}
     {{ block.super }}
 {% endblock %}
