@@ -52,6 +52,12 @@ internas y se reconocen entre sí.
   .coment{white-space:pre-line;font-size:14px;color:#5D4037;
           background:#FFF8E1;border-left:4px solid #FB8C00;border-radius:6px;
           padding:8px 10px}
+  .btn-pago{background:var(--ok);color:#fff;margin-bottom:10px}
+  .oculto{display:none}
+  .campo{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);
+         border-radius:10px;margin-bottom:10px;background:#fff;font-family:inherit;
+         color:var(--ink)}
+  .err{color:var(--debe);font-size:14px;margin-bottom:8px;display:none}
 </style>
 </head>
 <body>
@@ -70,12 +76,12 @@ internas y se reconocen entre sí.
   <div class="card" id="dinero">
     <div class="dinero">
       <div><div class="rot">Total</div>
-        <div class="val">${{ venta.total|floatformat:"0g" }}</div></div>
+        <div class="val" id="valTotal">${{ venta.total|floatformat:"0g" }}</div></div>
       <div><div class="rot">Pagado</div>
-        <div class="val">${{ venta.pagado|floatformat:"0g" }}</div></div>
-      <div class="{% if debe %}saldo-debe{% else %}saldo-ok{% endif %}">
+        <div class="val" id="valPagado">${{ venta.pagado|floatformat:"0g" }}</div></div>
+      <div id="cajaSaldo" class="{% if debe %}saldo-debe{% else %}saldo-ok{% endif %}">
         <div class="rot">Saldo</div>
-        <div class="val">{% if debe %}${{ venta.saldo_pendiente|floatformat:"0g" }}{% else %}✓ 0{% endif %}</div></div>
+        <div class="val" id="valSaldo">{% if debe %}${{ venta.saldo_pendiente|floatformat:"0g" }}{% else %}✓ 0{% endif %}</div></div>
     </div>
   </div>
 
@@ -100,18 +106,39 @@ internas y se reconocen entre sí.
 
   <div class="card" id="pagos">
     <h2>Pagos</h2>
+    <div id="listaPagos">
     {% for p in pagos %}
       <div class="fila">
         <span>${{ p.monto|floatformat:"0g" }} · {{ p.get_metodo_pago_display|default:p.metodo_pago }}</span>
         <span class="cuando">{{ p.fecha_pago|date:"d/m H:i" }}</span>
       </div>
-    {% empty %}<div class="vacio">Sin pagos registrados.</div>{% endfor %}
+    {% endfor %}
+    </div>
+    {% if not pagos %}<div class="vacio" id="pagosVacio">Sin pagos registrados.</div>{% endif %}
   </div>
 
   {% if venta.comentarios %}
   <div class="card"><h2>Comentarios</h2>
     <div class="coment">{{ venta.comentarios }}</div></div>
   {% endif %}
+
+  <button type="button" class="btn btn-pago" id="btnAbrirPago">💰 Agregar pago</button>
+
+  <div class="card oculto" id="formPago">
+    <h2>Nuevo pago</h2>
+    <form id="fPago">{% csrf_token %}
+      <input class="campo" name="monto" id="pagoMonto" type="text" inputmode="numeric"
+             placeholder="Monto (ej: 30000)" autocomplete="off">
+      <select class="campo" name="metodo_pago" id="pagoMetodo">
+        {% for codigo, nombre in metodos_pago %}
+        <option value="{{ codigo }}">{{ nombre }}</option>
+        {% endfor %}
+      </select>
+      <div class="err" id="pagoError"></div>
+      <button type="submit" class="btn btn-pago">Guardar pago</button>
+      <button type="button" class="btn btn-admin" id="pagoCancelar">Cancelar</button>
+    </form>
+  </div>
 
   <button type="button" class="btn btn-pase" id="btnCopiarPase">🔑 Copiar el Pase</button>
   <a class="btn btn-admin" href="/admin/ventas/ventareserva/{{ venta.pk }}/change/">
@@ -144,6 +171,66 @@ internas y se reconocen entre sí.
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(MENSAJE).then(listo, aLaAntigua);
     } else { aLaAntigua(); }
+  });
+})();
+
+(function () {
+  // Fase 2: agregar pago. UN POST chico; la respuesta trae los totales frescos
+  // y la tarjeta se actualiza sin recargar. Nada del formulario gigante.
+  var abrir = document.getElementById('btnAbrirPago');
+  var caja = document.getElementById('formPago');
+  var form = document.getElementById('fPago');
+  var monto = document.getElementById('pagoMonto');
+  var error = document.getElementById('pagoError');
+
+  function fmt(n) { return '$' + Number(n).toLocaleString('es-CL'); }
+
+  abrir.addEventListener('click', function () {
+    caja.classList.toggle('oculto');
+    if (!caja.classList.contains('oculto')) { monto.focus(); }
+  });
+  document.getElementById('pagoCancelar').addEventListener('click', function () {
+    caja.classList.add('oculto'); error.style.display = 'none';
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error.style.display = 'none';
+    fetch("{% url 'ventas:tarjeta_agregar_pago' venta.pk %}",
+          {method: 'POST', body: new FormData(form)})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          error.textContent = d.mensaje || 'No se pudo guardar.';
+          error.style.display = 'block';
+          return;
+        }
+        // Totales frescos, del servidor — la tarjeta nunca suma por su cuenta.
+        document.getElementById('valTotal').textContent = fmt(d.total);
+        document.getElementById('valPagado').textContent = fmt(d.pagado);
+        var cajaSaldo = document.getElementById('cajaSaldo');
+        var valSaldo = document.getElementById('valSaldo');
+        if (d.saldo > 0) { cajaSaldo.className = 'saldo-debe'; valSaldo.textContent = fmt(d.saldo); }
+        else { cajaSaldo.className = 'saldo-ok'; valSaldo.textContent = '✓ 0'; }
+        // La fila nueva, con textContent (nunca innerHTML con datos)
+        var fila = document.createElement('div'); fila.className = 'fila';
+        var s1 = document.createElement('span');
+        s1.textContent = fmt(d.pago.monto) + ' · ' + d.pago.metodo;
+        var s2 = document.createElement('span'); s2.className = 'cuando';
+        s2.textContent = d.pago.hora;
+        fila.appendChild(s1); fila.appendChild(s2);
+        document.getElementById('listaPagos').appendChild(fila);
+        var vacio = document.getElementById('pagosVacio');
+        if (vacio) { vacio.remove(); }
+        form.reset();
+        caja.classList.add('oculto');
+        abrir.textContent = '✓ Pago guardado';
+        setTimeout(function () { abrir.textContent = '💰 Agregar pago'; }, 2600);
+      })
+      .catch(function () {
+        error.textContent = 'Sin conexión. Inténtalo de nuevo.';
+        error.style.display = 'block';
+      });
   });
 })();
 </script>

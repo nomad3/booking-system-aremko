@@ -121,3 +121,123 @@ class SeLlegaDesdeElAdmin(TarjetaBase):
         html = self.client.get(reverse('admin:ventas_ventareserva_change',
                                        args=[self.venta.pk])).content.decode()
         self.assertIn(self.url, html)
+
+
+class AgregarPagoFase2(TestCase):
+    """Fase 2: registrar un pago desde la tarjeta, con guardado chico.
+
+    Lo que se protege acá es plata: que el pago quede con su monto, su método
+    y QUIÉN lo registró, y que los totales de la reserva se recalculen de
+    verdad (Pago.save() llama a calcular_total(); si alguien rompe esa cadena,
+    el saldo miente y se cobra mal o dos veces).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='pago_test', email='p@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Pedro Osorno',
+                                         telefono='+56911112222')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        tina = Servicio.objects.create(nombre='Tina Llaima', precio_base=30000,
+                                       duracion=120, tipo_servicio='tina')
+        ReservaServicio.objects.create(venta_reserva=cls.venta, servicio=tina,
+                                       fecha_agendamiento='2026-09-07',
+                                       hora_inicio='16:30', cantidad_personas=2)
+        cls.venta.refresh_from_db()
+        cls.url = reverse('ventas:tarjeta_agregar_pago', args=[cls.venta.pk])
+
+    def _post(self, **datos):
+        self.client.force_login(self.staff)
+        return self.client.post(self.url, datos)
+
+    def test_un_pago_queda_completo_y_los_totales_se_recalculan(self):
+        total_antes = int(self.venta.total or 0)
+        self.assertGreater(total_antes, 0, 'el escenario necesita una venta con total')
+
+        r = self._post(monto='10000', metodo_pago='efectivo')
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertEqual(d['pagado'], 10000)
+        self.assertEqual(d['saldo'], total_antes - 10000)
+
+        pago = self.venta.pagos.latest('id')
+        self.assertEqual(int(pago.monto), 10000)
+        self.assertEqual(pago.metodo_pago, 'efectivo')
+        self.assertEqual(pago.usuario, self.staff,
+                         'sin usuario no se sabe quién recibió la plata')
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_pago, 'parcial')
+
+    def test_el_segundo_pago_completa_y_el_estado_pasa_a_pagado(self):
+        """El camino de la segunda vez: el primer pago siempre funciona en las
+        demos; el que revienta es el segundo."""
+        total = int(self.venta.total or 0)
+        self._post(monto='10000', metodo_pago='efectivo')
+        r = self._post(monto=str(total - 10000), metodo_pago='transferencia')
+        d = r.json()
+        self.assertEqual(d['saldo'], 0)
+        self.venta.refresh_from_db()
+        self.assertEqual(self.venta.estado_pago, 'pagado')
+        self.assertEqual(self.venta.pagos.count(), 2)
+
+    def test_acepta_el_monto_como_lo_escribe_deborah(self):
+        """«$60.000» y «60000» son el mismo número."""
+        r = self._post(monto='$10.000', metodo_pago='efectivo')
+        self.assertEqual(r.json()['pagado'], 10000)
+
+    def test_monto_invalido_no_crea_nada(self):
+        for malo in ('', '0', '-5000', 'abc', '10.5x'):
+            r = self._post(monto=malo, metodo_pago='efectivo')
+            self.assertEqual(r.status_code, 400, f'aceptó monto {malo!r}')
+        self.assertEqual(self.venta.pagos.count(), 0)
+
+    def test_metodo_desconocido_no_crea_nada(self):
+        r = self._post(monto='10000', metodo_pago='criptomoneda')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.venta.pagos.count(), 0)
+
+    def test_giftcard_y_descuento_no_se_ofrecen_ni_se_aceptan(self):
+        """giftcard exige el objeto GiftCard y descuento no es plata que entró:
+        los dos tienen su lugar en el admin, no en el celular."""
+        for especial in ('giftcard', 'descuento'):
+            r = self._post(monto='10000', metodo_pago=especial)
+            self.assertEqual(r.status_code, 400, f'aceptó {especial}')
+        self.assertEqual(self.venta.pagos.count(), 0)
+
+    def test_los_metodos_salen_del_modelo_no_de_una_sexta_copia(self):
+        from ventas.models import Pago as PagoModel
+        from ventas.views.tarjeta_reserva_view import METODOS_PAGO_TARJETA
+
+        codigos_modelo = {c for c, _ in PagoModel.METODOS_PAGO}
+        codigos_tarjeta = {c for c, _ in METODOS_PAGO_TARJETA}
+        self.assertTrue(codigos_tarjeta <= codigos_modelo)
+        self.assertEqual(codigos_modelo - codigos_tarjeta,
+                         {'giftcard', 'descuento'})
+
+    def test_sin_login_no_hay_pago(self):
+        r = self.client.post(self.url, {'monto': '10000', 'metodo_pago': 'efectivo'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.venta.pagos.count(), 0)
+
+    def test_por_GET_no_se_paga(self):
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_la_tarjeta_ofrece_el_formulario(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn('Agregar pago', html)
+        self.assertIn('value="efectivo"', html)
+        self.assertNotIn('value="giftcard"', html)
+        self.assertNotIn('value="descuento"', html)
+
+    def test_el_pago_nuevo_aparece_al_recargar(self):
+        """El JS actualiza al vuelo, pero la verdad vive en el servidor: al
+        recargar, el pago tiene que estar."""
+        self._post(monto='10000', metodo_pago='efectivo')
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn('Efectivo', html)
