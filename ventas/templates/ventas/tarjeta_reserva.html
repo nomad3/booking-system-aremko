@@ -58,6 +58,7 @@ internas y se reconocen entre sí.
          border-radius:10px;margin-bottom:10px;background:#fff;font-family:inherit;
          color:var(--ink)}
   .err{color:var(--debe);font-size:14px;margin-bottom:8px;display:none}
+  .btn-prod{background:#8a6d3b;color:#fff;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -97,11 +98,15 @@ internas y se reconocen entre sí.
 
   <div class="card" id="productos">
     <h2>Productos</h2>
+    <div id="listaProductos">
     {% for r in productos %}
       <div class="fila">
         <span>{{ r.cantidad }}× {{ r.producto.nombre }}</span>
+        <span class="cuando">{{ r.mostrar_valor_total }}</span>
       </div>
-    {% empty %}<div class="vacio">Sin productos.</div>{% endfor %}
+    {% endfor %}
+    </div>
+    {% if not productos %}<div class="vacio" id="productosVacio">Sin productos.</div>{% endif %}
   </div>
 
   <div class="card" id="pagos">
@@ -121,6 +126,25 @@ internas y se reconocen entre sí.
   <div class="card"><h2>Comentarios</h2>
     <div class="coment">{{ venta.comentarios }}</div></div>
   {% endif %}
+
+  <button type="button" class="btn btn-prod" id="btnAbrirProducto">🛒 Agregar producto</button>
+
+  <div class="card oculto" id="formProducto">
+    <h2>Nuevo producto</h2>
+    <form id="fProducto">{% csrf_token %}
+      <select class="campo" name="producto_id" id="prodSelect">
+        <option value="">Elige un producto…</option>
+        {% for prod in catalogo %}
+        <option value="{{ prod.pk }}">{{ prod.nombre }} · ${{ prod.precio_base|floatformat:"0g" }}</option>
+        {% endfor %}
+      </select>
+      <input class="campo" name="cantidad" id="prodCantidad" type="text" inputmode="numeric"
+             value="1" autocomplete="off">
+      <div class="err" id="prodError"></div>
+      <button type="submit" class="btn btn-prod">Agregar producto</button>
+      <button type="button" class="btn btn-admin" id="prodCancelar">Cancelar</button>
+    </form>
+  </div>
 
   <button type="button" class="btn btn-pago" id="btnAbrirPago">💰 Agregar pago</button>
 
@@ -226,6 +250,61 @@ internas y se reconocen entre sí.
         caja.classList.add('oculto');
         abrir.textContent = '✓ Pago guardado';
         setTimeout(function () { abrir.textContent = '💰 Agregar pago'; }, 2600);
+      })
+      .catch(function () {
+        error.textContent = 'Sin conexión. Inténtalo de nuevo.';
+        error.style.display = 'block';
+      });
+  });
+})();
+
+(function () {
+  // Fase 3: agregar producto. Mismo patrón que el pago: UN POST chico y los
+  // totales frescos vienen del servidor. El stock NO se descuenta acá — se
+  // descuenta al entregar (regla del negocio); el servidor valida que haya.
+  var abrir = document.getElementById('btnAbrirProducto');
+  var caja = document.getElementById('formProducto');
+  var form = document.getElementById('fProducto');
+  var error = document.getElementById('prodError');
+
+  function fmt(n) { return '$' + Number(n).toLocaleString('es-CL'); }
+
+  abrir.addEventListener('click', function () { caja.classList.toggle('oculto'); });
+  document.getElementById('prodCancelar').addEventListener('click', function () {
+    caja.classList.add('oculto'); error.style.display = 'none';
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error.style.display = 'none';
+    fetch("{% url 'ventas:tarjeta_agregar_producto' venta.pk %}",
+          {method: 'POST', body: new FormData(form)})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          error.textContent = d.mensaje || 'No se pudo agregar.';
+          error.style.display = 'block';
+          return;
+        }
+        document.getElementById('valTotal').textContent = fmt(d.total);
+        document.getElementById('valPagado').textContent = fmt(d.pagado);
+        var cajaSaldo = document.getElementById('cajaSaldo');
+        var valSaldo = document.getElementById('valSaldo');
+        if (d.saldo > 0) { cajaSaldo.className = 'saldo-debe'; valSaldo.textContent = fmt(d.saldo); }
+        else { cajaSaldo.className = 'saldo-ok'; valSaldo.textContent = '✓ 0'; }
+        var fila = document.createElement('div'); fila.className = 'fila';
+        var s1 = document.createElement('span');
+        s1.textContent = d.producto.cantidad + '× ' + d.producto.nombre;
+        var s2 = document.createElement('span'); s2.className = 'cuando';
+        s2.textContent = fmt(d.producto.subtotal);
+        fila.appendChild(s1); fila.appendChild(s2);
+        document.getElementById('listaProductos').appendChild(fila);
+        var vacio = document.getElementById('productosVacio');
+        if (vacio) { vacio.remove(); }
+        form.reset();
+        caja.classList.add('oculto');
+        abrir.textContent = '✓ Producto agregado';
+        setTimeout(function () { abrir.textContent = '🛒 Agregar producto'; }, 2600);
       })
       .catch(function () {
         error.textContent = 'Sin conexión. Inténtalo de nuevo.';

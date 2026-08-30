@@ -8,7 +8,8 @@ plata primero, y botones que hacen UNA cosa cada uno.
 Fase 1 (Jorge, 2026-08-30): lectura + botón que COPIA el mensaje del Pase sin
 mostrarlo — Deborah lo pega en el cajón de la bandeja omnicanal.
 Fase 2 (2026-08-30): agregar pago con guardado chico (tarjeta_agregar_pago).
-Faltan: producto, servicio desde calendario y creación con datos mínimos.
+Fase 3 (2026-08-30): agregar producto (tarjeta_agregar_producto).
+Faltan: servicio desde calendario y creación con datos mínimos.
 
 La vista es deliberadamente liviana: tres queries con select_related y ningún
 cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
@@ -23,7 +24,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from ventas.models import Pago, VentaReserva
+from ventas.models import Pago, Producto, ReservaProducto, VentaReserva
 from ventas.views.ficha_reserva_view import mensaje_pase
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,12 @@ def tarjeta_reserva(request, venta_id):
     productos = venta.reservaproductos.select_related('producto')
     pagos = venta.pagos.order_by('fecha_pago')
 
+    # Catálogo para el selector: solo lo que HAY. Ofrecer un producto sin
+    # stock es prometerle al cliente algo que no se le puede entregar.
+    catalogo = (Producto.objects.filter(cantidad_disponible__gt=0)
+                .select_related('categoria')
+                .order_by('categoria__nombre', 'nombre'))
+
     return render(request, 'ventas/tarjeta_reserva.html', {
         'venta': venta,
         'servicios': servicios,
@@ -64,6 +71,7 @@ def tarjeta_reserva(request, venta_id):
         'mensaje_pase': mensaje_pase(venta),
         'debe': int(venta.saldo_pendiente or 0) > 0,
         'metodos_pago': METODOS_PAGO_TARJETA,
+        'catalogo': catalogo,
     })
 
 
@@ -116,5 +124,66 @@ def tarjeta_agregar_pago(request, venta_id):
             'monto': int(pago.monto),
             'metodo': pago.get_metodo_pago_display(),
             'hora': timezone.localtime(pago.fecha_pago).strftime('%d/%m %H:%M'),
+        },
+    })
+
+
+@staff_required
+@require_POST
+def tarjeta_agregar_producto(request, venta_id):
+    """Agrega UN producto a la reserva y devuelve los totales frescos.
+
+    Dos reglas del negocio que este endpoint respeta y no reinventa:
+
+    · El stock se descuenta al ENTREGAR, no al vender: la señal
+      actualizar_inventario solo toca inventario cuando la línea tiene
+      fecha_entrega. Acá se crea SIN fecha (vendido, no entregado) — igual
+      que el admin. La validación de stock de más abajo es la misma guarda
+      que agregar_producto(): no vender lo que no hay.
+
+    · El precio se CONGELA al momento de la venta (precio_unitario_venta):
+      si mañana el catálogo sube, lo ya vendido no cambia. Es el propósito
+      documentado del campo.
+    """
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+
+    try:
+        producto = Producto.objects.get(pk=request.POST.get('producto_id'))
+    except (Producto.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({'ok': False, 'mensaje': 'Elige un producto de la lista.'},
+                            status=400)
+
+    crudo = (request.POST.get('cantidad') or '').strip()
+    if not crudo.isdigit() or int(crudo) < 1:
+        return JsonResponse({'ok': False, 'mensaje': 'Cantidad inválida.'}, status=400)
+    cantidad = int(crudo)
+
+    if cantidad > producto.cantidad_disponible:
+        return JsonResponse(
+            {'ok': False, 'mensaje': f'Queda(n) {producto.cantidad_disponible} '
+                                     f'de {producto.nombre}.'},
+            status=400)
+
+    try:
+        linea = ReservaProducto.objects.create(
+            venta_reserva=venta, producto=producto, cantidad=cantidad,
+            precio_unitario_venta=producto.precio_base)
+        venta.calcular_total()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] no se pudo agregar %sx producto %s a la '
+                         'reserva %s: %s', cantidad, producto.pk, venta_id, exc)
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo agregar el producto. '
+                             'Inténtalo desde el admin.'}, status=400)
+
+    venta.refresh_from_db()
+    return JsonResponse({
+        'ok': True,
+        'total': int(venta.total or 0),
+        'pagado': int(venta.pagado or 0),
+        'saldo': int(venta.saldo_pendiente or 0),
+        'producto': {
+            'nombre': producto.nombre,
+            'cantidad': cantidad,
+            'subtotal': int(linea.precio_unitario_venta * cantidad),
         },
     })

@@ -241,3 +241,114 @@ class AgregarPagoFase2(TestCase):
         html = self.client.get(reverse('ventas:tarjeta_reserva',
                                        args=[self.venta.pk])).content.decode()
         self.assertIn('Efectivo', html)
+
+
+class AgregarProductoFase3(TestCase):
+    """Fase 3: agregar un producto desde la tarjeta.
+
+    Las dos reglas del negocio que se protegen:
+
+    · El stock se descuenta al ENTREGAR, no al vender (la señal
+      actualizar_inventario solo actúa con fecha_entrega). Vender NO puede
+      tocar inventario — ya hubo un bug de descuento doble por no respetarlo.
+    · El precio se congela al momento de la venta: si el catálogo sube
+      mañana, lo ya vendido no cambia.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from ventas.models import Producto
+
+        cls.staff = get_user_model().objects.create_superuser(
+            username='prod_test', email='pr@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Carmen Puerto Montt',
+                                         telefono='+56933334444')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        cls.jugo = Producto.objects.create(nombre='Jugo Natural de Frambuesa',
+                                           precio_base=3500, cantidad_disponible=10)
+        cls.agotado = Producto.objects.create(nombre='Chocolate Agotado',
+                                              precio_base=5000, cantidad_disponible=0)
+        cls.url = reverse('ventas:tarjeta_agregar_producto', args=[cls.venta.pk])
+
+    def _post(self, **datos):
+        self.client.force_login(self.staff)
+        return self.client.post(self.url, datos)
+
+    def test_agrega_congela_el_precio_y_sube_el_total(self):
+        r = self._post(producto_id=self.jugo.pk, cantidad='2')
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertEqual(d['producto']['subtotal'], 7000)
+        self.assertEqual(d['total'], 7000)
+        self.assertEqual(d['saldo'], 7000)
+
+        linea = self.venta.reservaproductos.get()
+        self.assertEqual(int(linea.precio_unitario_venta), 3500)
+
+        # El congelamiento de verdad: sube el catálogo, lo vendido no cambia.
+        self.jugo.precio_base = 9999
+        self.jugo.save()
+        self.venta.calcular_total()
+        self.venta.refresh_from_db()
+        self.assertEqual(int(self.venta.total), 7000,
+                         'el precio no quedó congelado: lo vendido cambió con el catálogo')
+
+    def test_vender_NO_descuenta_stock(self):
+        """El stock se descuenta al ENTREGAR. Si vender también descontara,
+        cada producto se descontaría dos veces — ese bug ya existió."""
+        self._post(producto_id=self.jugo.pk, cantidad='2')
+        self.jugo.refresh_from_db()
+        self.assertEqual(self.jugo.cantidad_disponible, 10)
+
+    def test_entregar_SI_descuenta_y_una_sola_vez(self):
+        """La otra mitad de la regla: al poner fecha_entrega, la señal
+        descuenta exactamente la cantidad, desde este camino también."""
+        from django.utils import timezone as tz
+
+        self._post(producto_id=self.jugo.pk, cantidad='2')
+        linea = self.venta.reservaproductos.get()
+        linea.fecha_entrega = tz.localdate()
+        linea.save()
+        self.jugo.refresh_from_db()
+        self.assertEqual(self.jugo.cantidad_disponible, 8)
+
+    def test_no_se_vende_lo_que_no_hay(self):
+        r = self._post(producto_id=self.jugo.pk, cantidad='11')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('Queda(n) 10', r.json()['mensaje'])
+        self.assertEqual(self.venta.reservaproductos.count(), 0)
+
+    def test_el_agotado_no_aparece_en_el_selector(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn('Jugo Natural de Frambuesa', html)
+        self.assertNotIn('Chocolate Agotado', html)
+
+    def test_la_segunda_linea_acumula(self):
+        self._post(producto_id=self.jugo.pk, cantidad='1')
+        r = self._post(producto_id=self.jugo.pk, cantidad='3')
+        self.assertEqual(r.json()['total'], 3500 * 4)
+        self.assertEqual(self.venta.reservaproductos.count(), 2)
+
+    def test_entradas_invalidas_no_crean_nada(self):
+        casos = (
+            {'producto_id': '', 'cantidad': '1'},
+            {'producto_id': '999999', 'cantidad': '1'},
+            {'producto_id': str(self.jugo.pk), 'cantidad': '0'},
+            {'producto_id': str(self.jugo.pk), 'cantidad': 'abc'},
+            {'producto_id': str(self.jugo.pk), 'cantidad': '-2'},
+        )
+        for datos in casos:
+            r = self._post(**datos)
+            self.assertEqual(r.status_code, 400, f'aceptó {datos}')
+        self.assertEqual(self.venta.reservaproductos.count(), 0)
+
+    def test_sin_login_no_hay_producto(self):
+        r = self.client.post(self.url, {'producto_id': self.jugo.pk, 'cantidad': '1'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.venta.reservaproductos.count(), 0)
+
+    def test_por_GET_no_se_agrega(self):
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
