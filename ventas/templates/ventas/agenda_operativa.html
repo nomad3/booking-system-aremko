@@ -979,12 +979,10 @@
                 {% else %}
                 <div class="checkout-pagado">✓ Pagado</div>
                 {% endif %}
-                <a href="/admin/ventas/ventareserva/{{ c.reserva_id }}/change/" target="_blank"
+                <a href="{% url 'ventas:tarjeta_reserva' c.reserva_id %}" target="_blank"
                    class="checkout-btn {% if c.debe %}checkout-btn-cobrar{% endif %}">
                     {% if c.debe %}💰 Cobrar{% else %}Ver{% endif %} · Reserva #{{ c.reserva_id }}
                 </a>
-                <a href="{% url 'ventas:tarjeta_reserva' c.reserva_id %}" target="_blank"
-                   class="checkout-btn">📱 Tarjeta</a>
                 {% comment %}
                 Cerrar la estadía sin pasar por el admin. El id deja que el
                 botón se transforme en confirmación sin recargar la agenda.
@@ -1084,7 +1082,7 @@
                         <span class="comanda-tiempo {% if c.minutos_espera > 15 %}urgente{% endif %}">
                             ⏱️ {{ c.minutos_espera }} min
                         </span>
-                        <a href="/admin/ventas/ventareserva/{{ c.reserva_id }}/change/" target="_blank"
+                        <a href="{% url 'ventas:tarjeta_reserva' c.reserva_id %}" target="_blank"
                            style="color: #667eea; text-decoration: none; font-weight: 600;">
                             Reserva #{{ c.reserva_id }}
                         </a>
@@ -1222,7 +1220,7 @@
                                             <small style="color: #666;">Servicio a las {{ desayuno.hora_servicio }} hrs</small>
                                         </div>
                                         <div>
-                                            <a href="/admin/ventas/ventareserva/{{ desayuno.reserva_id }}/change/"
+                                            <a href="{% url 'ventas:tarjeta_reserva' desayuno.reserva_id %}"
                                                target="_blank"
                                                style="color: #1976d2; text-decoration: none;">
                                                 Reserva #{{ desayuno.reserva_id }}
@@ -1265,7 +1263,7 @@
                         </div>
                         <div class="detalle-item">
                             <span>📋</span>
-                            <a href="/admin/ventas/ventareserva/{{ item.reserva_id }}/change/"
+                            <a href="{% url 'ventas:tarjeta_reserva' item.reserva_id %}"
                                target="_blank"
                                class="reserva-badge-link"
                                title="Editar reserva #{{ item.reserva_id }}">
@@ -1769,7 +1767,7 @@ function renderComandas(comandas) {
                     comentarioHtml +
                     '<div class="comanda-card-meta">' +
                         '<span class="comanda-tiempo ' + tiempoClass + '">⏱️ ' + c.minutos_espera + ' min</span>' +
-                        '<a href="/admin/ventas/ventareserva/' + c.reserva_id + '/change/" target="_blank" ' +
+                        '<a href="/ventas/reserva/' + c.reserva_id + '/tarjeta/" target="_blank" ' +
                            'style="color:#667eea;text-decoration:none;font-weight:600;">Reserva #' + c.reserva_id + '</a>' +
                         userHtml +
                     '</div>' +

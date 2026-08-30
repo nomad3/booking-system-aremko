@@ -800,3 +800,53 @@ class EditarPersonasFase6(TestCase):
         self.assertIn(f'data-linea="{self.linea_tina.pk}"', html)
         self.assertNotIn(f'data-linea="{self.linea_cabana.pk}"', html,
                          'la cabaña de precio plano quedó tocable')
+
+
+class LaAgendaAbreLaTarjetaNoElAdmin(TestCase):
+    """Jorge (2026-08-30): al abrir una reserva desde la agenda en el celular
+    se abría el admin antiguo. Ahora TODOS los enlaces de reserva de la agenda
+    van a la tarjeta móvil; el camino al admin vive DENTRO de la tarjeta
+    («Abrir en el admin»), a un toque para quien lo necesite.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from datetime import timedelta
+
+        from django.utils import timezone as tz
+
+        cls.staff = get_user_model().objects.create_superuser(
+            username='agenda_tarjeta_test', email='at@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Norma Osorno',
+                                         telefono='+56944445555')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        cabana = Servicio.objects.create(nombre='Cabaña Coihue', precio_base=90000,
+                                         duracion=60, tipo_servicio='cabana',
+                                         capacidad_maxima=2)
+        # Estadía que terminó ayer: dibuja la tarjeta de check-out, el enlace
+        # más usado de la agenda.
+        ReservaServicio.objects.create(
+            venta_reserva=cls.venta, servicio=cabana,
+            fecha_agendamiento=tz.localdate() - timedelta(days=1),
+            hora_inicio='16:00', cantidad_personas=2)
+
+    def test_en_el_codigo_no_queda_NINGUN_enlace_al_admin_viejo(self):
+        """Guarda de fuente, como la de los tres menús: si alguien reintroduce
+        un enlace al admin en cualquiera de las cinco zonas de la agenda, esto
+        cae sin depender de qué sección se dibujó en la prueba."""
+        import os
+
+        from django.conf import settings
+
+        src = open(os.path.join(settings.BASE_DIR, 'ventas', 'templates',
+                                'ventas', 'agenda_operativa.html'),
+                   encoding='utf-8').read()
+        self.assertNotIn('/admin/ventas/ventareserva/', src)
+
+    def test_la_tarjeta_de_checkout_abre_la_tarjeta_movil(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:agenda_operativa') +
+                               '?filtro=checkout').content.decode()
+        self.assertIn(f'/ventas/reserva/{self.venta.pk}/tarjeta/', html)
+        self.assertNotIn(f'/admin/ventas/ventareserva/{self.venta.pk}/change/',
+                         html)
