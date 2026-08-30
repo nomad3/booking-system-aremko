@@ -595,3 +595,172 @@ class DatosComplementariosFase5(TestCase):
         self.assertEqual(r.status_code, 302)
         self.client.force_login(self.staff)
         self.assertEqual(self.client.get(self.url).status_code, 405)
+
+
+class CandadoFechasPasadas(TestCase):
+    """El calendario dejó agendar para el 05/08 estando a 30/08 (lo cazó Jorge
+    en su iPhone). Una reserva hacia atrás no aparece en la agenda del día:
+    nadie la prepara y el cliente llega a una puerta cerrada.
+
+    El candado vive en la API —no solo en lo que el calendario pinta— por la
+    misma razón que el de los bloqueos: cubre pestañas desactualizadas.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='pasado_test', email='pa@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Laura Ancud',
+                                         telefono='+56966667777')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        Servicio.objects.create(nombre='Tina Rupanco', precio_base=25000,
+                                duracion=120, tipo_servicio='tina', activo=True,
+                                max_servicios_simultaneos=3)
+        cls.url = reverse('ventas:agregar_servicio_reserva')
+
+    def _post(self, fecha):
+        import json as _json
+
+        self.client.force_login(self.staff)
+        return self.client.post(self.url, _json.dumps({
+            'reserva_id': self.venta.pk, 'servicio_nombre': 'Tina Rupanco',
+            'fecha': fecha, 'hora': '19:00', 'cantidad': 1,
+        }), content_type='application/json')
+
+    def test_ayer_se_rechaza_explicando(self):
+        from datetime import timedelta
+
+        from django.utils import timezone as tz
+
+        ayer = (tz.localdate() - timedelta(days=1)).isoformat()
+        r = self._post(ayer)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('ya pasó', r.json()['error'])
+        self.assertEqual(self.venta.reservaservicios.count(), 0)
+
+    def test_HOY_se_permite(self):
+        """El 29,6% de las reservas son para el mismo día: bloquear hoy sería
+        matar la venta más común por proteger de la más rara."""
+        from django.utils import timezone as tz
+
+        r = self._post(tz.localdate().isoformat())
+        self.assertTrue(r.json()['success'])
+        self.assertEqual(self.venta.reservaservicios.count(), 1)
+
+
+class EditarPersonasFase6(TestCase):
+    """Fase 6: cambiar la cantidad de personas tocando la línea del servicio.
+
+    La guarda es el contrato del admin: en una CABAÑA la cantidad son cabañas
+    (siempre 1) y tocarla multiplica el precio completo — bloqueada. En tinas
+    y masajes el valor unitario ES por persona — editables. La tina del
+    escenario se llama a propósito como la REAL que Jorge tocó primero
+    (Puyehue): está en TINAS_PRECIO_PLANO del checkout, y usar esa lista como
+    vara la habría dejado no editable — la fase inútil en su primer uso.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='pers_test', email='pe@test.cl', password='x')
+        cliente = Cliente.objects.create(nombre='Sofía Castro',
+                                         telefono='+56988889999')
+        cls.venta = VentaReserva.objects.create(cliente=cliente)
+        cls.tina = Servicio.objects.create(
+            nombre='Tina Hidromasaje Puyehue', precio_base=30000, duracion=120,
+            tipo_servicio='tina', capacidad_minima=2, capacidad_maxima=6)
+        cls.cabana = Servicio.objects.create(
+            nombre='Cabaña Alerce', precio_base=90000, duracion=60,
+            tipo_servicio='cabana', capacidad_maxima=4)
+        cls.linea_tina = ReservaServicio.objects.create(
+            venta_reserva=cls.venta, servicio=cls.tina,
+            fecha_agendamiento='2026-09-14', hora_inicio='19:00',
+            cantidad_personas=2)
+        cls.linea_cabana = ReservaServicio.objects.create(
+            venta_reserva=cls.venta, servicio=cls.cabana,
+            fecha_agendamiento='2026-09-14', hora_inicio='16:00',
+            cantidad_personas=2)
+        cls.venta.refresh_from_db()
+        cls.url = reverse('ventas:tarjeta_editar_servicio', args=[cls.venta.pk])
+
+
+    def _post(self, **datos):
+        self.client.force_login(self.staff)
+        return self.client.post(self.url, datos)
+
+    def test_cambia_las_personas_y_la_plata_sigue_al_grupo(self):
+        r = self._post(linea_id=self.linea_tina.pk, cantidad='4')
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertEqual(d['linea'], {'personas': 4, 'subtotal': 120000})
+        # 30.000×4 (tina) + 90.000×2 (cabaña intacta)
+        self.assertEqual(d['total'], 120000 + 180000)
+        self.linea_tina.refresh_from_db()
+        self.assertEqual(self.linea_tina.cantidad_personas, 4)
+
+    def test_la_cabaña_NO_se_toca_desde_la_tarjeta(self):
+        """En una cabaña, cantidad × precio = precio de la cabaña multiplicado:
+        editar «personas» ahí cobraría 2 o 4 cabañas."""
+        r = self._post(linea_id=self.linea_cabana.pk, cantidad='4')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('cabaña', r.json()['mensaje'])
+        self.linea_cabana.refresh_from_db()
+        self.assertEqual(self.linea_cabana.cantidad_personas, 2)
+
+    def test_la_tina_REAL_de_jorge_SI_es_editable(self):
+        """Puyehue está en TINAS_PRECIO_PLANO (la lista de la vitrina web).
+        Si alguien vuelve a usar esa lista como guarda, esta prueba cae: la
+        primera tina que Jorge quiso editar quedaría bloqueada otra vez."""
+        r = self._post(linea_id=self.linea_tina.pk, cantidad='3')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(r.json()['linea']['personas'], 3)
+
+    def test_no_se_pasa_de_la_capacidad(self):
+        r = self._post(linea_id=self.linea_tina.pk, cantidad='7')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('hasta 6', r.json()['mensaje'])
+
+    def test_tampoco_se_baja_del_minimo(self):
+        """El piso importa tanto como el techo: una tina con mínimo 2 editada
+        a 1 persona se cobraría bajo tarifa."""
+        r = self._post(linea_id=self.linea_tina.pk, cantidad='1')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('mínimo 2', r.json()['mensaje'])
+        self.linea_tina.refresh_from_db()
+        self.assertEqual(self.linea_tina.cantidad_personas, 2)
+
+    def test_una_linea_de_OTRA_reserva_no_se_alcanza(self):
+        """IDOR: el id de línea viaja en el POST; sin este candado, cambiando
+        el número se editaría la reserva de otro cliente."""
+        otro = Cliente.objects.create(nombre='Otro', telefono='+56900003333')
+        otra_venta = VentaReserva.objects.create(cliente=otro)
+        linea_ajena = ReservaServicio.objects.create(
+            venta_reserva=otra_venta, servicio=self.tina,
+            fecha_agendamiento='2026-09-15', hora_inicio='19:00',
+            cantidad_personas=2)
+        r = self._post(linea_id=linea_ajena.pk, cantidad='6')
+        self.assertEqual(r.status_code, 404)
+        linea_ajena.refresh_from_db()
+        self.assertEqual(linea_ajena.cantidad_personas, 2)
+
+    def test_entradas_invalidas(self):
+        for malo in ('0', 'abc', '', '-3'):
+            r = self._post(linea_id=self.linea_tina.pk, cantidad=malo)
+            self.assertEqual(r.status_code, 400, f'aceptó {malo!r}')
+        self.linea_tina.refresh_from_db()
+        self.assertEqual(self.linea_tina.cantidad_personas, 2)
+
+    def test_solo_staff_y_solo_POST(self):
+        r = self.client.post(self.url, {'linea_id': self.linea_tina.pk,
+                                        'cantidad': '4'})
+        self.assertEqual(r.status_code, 302)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_la_tarjeta_marca_solo_las_lineas_editables(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('ventas:tarjeta_reserva',
+                                       args=[self.venta.pk])).content.decode()
+        self.assertIn(f'data-linea="{self.linea_tina.pk}"', html)
+        self.assertNotIn(f'data-linea="{self.linea_cabana.pk}"', html,
+                         'la cabaña de precio plano quedó tocable')

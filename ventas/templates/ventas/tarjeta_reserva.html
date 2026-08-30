@@ -62,6 +62,11 @@ internas y se reconocen entre sí.
   .btn-serv{background:#456990;color:#fff;margin-bottom:10px}
   .btn-datos{background:transparent;color:var(--hint);border:1px dashed var(--line);
              margin-bottom:10px;font-size:15px}
+  .fila-tap{width:100%;background:none;border:0;border-bottom:1px solid var(--line);
+            font:inherit;color:inherit;text-align:left;cursor:pointer;
+            display:flex;justify-content:space-between;gap:10px;padding:8px 0}
+  .fila-tap:last-child{border-bottom:none}
+  .fila-tap .edit{color:#456990;font-weight:600}
   .cal-overlay{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);
                flex-direction:column}
   .cal-overlay.abierto{display:flex}
@@ -101,10 +106,21 @@ internas y se reconocen entre sí.
   <div class="card" id="servicios">
     <h2>Servicios</h2>
     {% for r in servicios %}
+      {% if r.editable %}
+      <button type="button" class="fila-tap" data-linea="{{ r.pk }}"
+              data-nombre="{{ r.servicio.nombre }}"
+              data-personas="{{ r.cantidad_personas }}"
+              data-min="{{ r.servicio.capacidad_minima }}"
+              data-max="{{ r.servicio.capacidad_maxima }}">
+        <span>{{ r.servicio.nombre }} <span class="edit">· {{ r.cantidad_personas }} pers. ✎</span></span>
+        <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
+      </button>
+      {% else %}
       <div class="fila">
-        <span>{{ r.servicio.nombre }}</span>
+        <span>{{ r.servicio.nombre }} · {{ r.cantidad_personas }} pers.</span>
         <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
       </div>
+      {% endif %}
     {% empty %}<div class="vacio">Sin servicios todavía.</div>{% endfor %}
   </div>
 
@@ -138,6 +154,19 @@ internas y se reconocen entre sí.
   <div class="card"><h2>Comentarios</h2>
     <div class="coment">{{ venta.comentarios }}</div></div>
   {% endif %}
+
+  <div class="card oculto" id="formPersonas">
+    <h2 id="personasTitulo">Personas</h2>
+    <form id="fPersonas">{% csrf_token %}
+      <input type="hidden" name="linea_id" id="personasLinea">
+      <input class="campo" name="cantidad" id="personasCantidad" type="text"
+             inputmode="numeric" autocomplete="off">
+      <div class="pista" id="personasTope" style="font-size:14px;color:var(--hint);margin:-6px 0 10px"></div>
+      <div class="err" id="personasError"></div>
+      <button type="submit" class="btn btn-pago">Guardar</button>
+      <button type="button" class="btn btn-admin" id="personasCancelar">Cancelar</button>
+    </form>
+  </div>
 
   <button type="button" class="btn btn-serv" id="btnAbrirCalendario">📅 Agregar servicio</button>
 
@@ -441,6 +470,56 @@ internas y se reconocen entre sí.
       setTimeout(function () { abrir.textContent = '✎ Datos complementarios ▾'; }, 2600);
     }
   } catch (e) {}
+})();
+
+(function () {
+  // Fase 6: tocar la línea de un servicio (solo los de precio por persona;
+  // el servidor lo re-verifica) para cambiar cuántas personas van.
+  var caja = document.getElementById('formPersonas');
+  var form = document.getElementById('fPersonas');
+  var error = document.getElementById('personasError');
+
+  document.querySelectorAll('.fila-tap').forEach(function (fila) {
+    fila.addEventListener('click', function () {
+      document.getElementById('personasLinea').value = fila.dataset.linea;
+      document.getElementById('personasCantidad').value = fila.dataset.personas;
+      document.getElementById('personasTitulo').textContent =
+        '¿Cuántas personas? · ' + fila.dataset.nombre;
+      var min = parseInt(fila.dataset.min, 10) || 0;
+      var max = parseInt(fila.dataset.max, 10) || 0;
+      var pista = '';
+      if (min > 1 && max) { pista = 'Entre ' + min + ' y ' + max + ' personas.'; }
+      else if (max) { pista = 'Admite hasta ' + max + '.'; }
+      document.getElementById('personasTope').textContent = pista;
+      caja.classList.remove('oculto');
+      caja.scrollIntoView({behavior: 'smooth', block: 'center'});
+    });
+  });
+
+  document.getElementById('personasCancelar').addEventListener('click', function () {
+    caja.classList.add('oculto'); error.style.display = 'none';
+  });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error.style.display = 'none';
+    fetch("{% url 'ventas:tarjeta_editar_servicio' venta.pk %}",
+          {method: 'POST', body: new FormData(form)})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          error.textContent = d.mensaje || 'No se pudo guardar.';
+          error.style.display = 'block';
+          return;
+        }
+        // Recargar: la fila y los totales nuevos vienen del servidor.
+        window.location.reload();
+      })
+      .catch(function () {
+        error.textContent = 'Sin conexión. Inténtalo de nuevo.';
+        error.style.display = 'block';
+      });
+  });
 })();
 </script>
 </body>

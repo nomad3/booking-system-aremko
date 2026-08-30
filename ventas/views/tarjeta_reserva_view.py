@@ -18,6 +18,14 @@ teléfono manda: se normaliza con Cliente.normalize_phone y si el cliente ya
 existe se usa SU ficha, sin pisarle el nombre. Y datos complementarios
 (comentarios + documento fiscal) colapsados, con guardado chico
 (tarjeta_editar_datos). Las cinco fases del boceto de Jorge quedan completas.
+Fase 6 (2026-08-30): editar la cantidad de personas tocando la línea del
+servicio. La guarda es el contrato del propio admin («Para cabañas: cantidad
+de cabañas (siempre 1). Para tinas: cantidad de personas»): las CABAÑAS se
+bloquean —ahí cantidad multiplica el precio completo de la cabaña— y tinas y
+masajes se editan, porque su valor unitario ES por persona. OJO: la lista
+TINAS_PRECIO_PLANO del checkout NO sirve de vara acá — nombra a todas las
+tinas reales (puyehue, villarrica…) porque gobierna el precio de la VITRINA
+web, y usarla dejaría la fase inútil para su primer caso de uso.
 
 La vista es deliberadamente liviana: tres queries con select_related y ningún
 cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
@@ -61,8 +69,14 @@ def tarjeta_reserva(request, venta_id):
     venta = get_object_or_404(
         VentaReserva.objects.select_related('cliente'), pk=venta_id)
 
-    servicios = venta.reservaservicios.select_related('servicio').order_by(
-        'fecha_agendamiento', 'hora_inicio', 'id')
+    servicios = list(venta.reservaservicios.select_related('servicio').order_by(
+        'fecha_agendamiento', 'hora_inicio', 'id'))
+    # Qué líneas pueden editar personas desde la tarjeta: todas menos las
+    # cabañas. En una cabaña, "cantidad" son cabañas (siempre 1) y tocarla
+    # multiplica el precio completo; en tinas y masajes el valor unitario ES
+    # por persona, así que editar personas es exactamente lo que corresponde.
+    for r in servicios:
+        r.editable = r.servicio.tipo_servicio != 'cabana'
     productos = venta.reservaproductos.select_related('producto')
     pagos = venta.pagos.order_by('fecha_pago')
 
@@ -260,3 +274,65 @@ def tarjeta_editar_datos(request, venta_id):
                                      or '').strip()
     venta.save(update_fields=['comentarios', 'numero_documento_fiscal'])
     return JsonResponse({'ok': True})
+
+
+@staff_required
+@require_POST
+def tarjeta_editar_servicio(request, venta_id):
+    """Cambia SOLO la cantidad de personas de UNA línea de servicio.
+
+    La guarda que importa: esto se permite únicamente donde el precio es por
+    persona. En cabañas y tinas de precio plano, cantidad_personas es el
+    mecanismo del precio (AR-014: precio × capacidad_maxima), no un dato del
+    grupo — cambiarla cobraría mal. Esas líneas se editan en el admin, con
+    ojos de quien sabe lo que toca.
+    """
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+    try:
+        linea = (venta.reservaservicios.select_related('servicio')
+                 .get(pk=request.POST.get('linea_id')))
+    except Exception:  # noqa: BLE001 — pk inválido o de OTRA reserva: mismo trato
+        return JsonResponse({'ok': False, 'mensaje': 'Línea no encontrada.'},
+                            status=404)
+
+    if linea.servicio.tipo_servicio == 'cabana':
+        return JsonResponse(
+            {'ok': False, 'mensaje': 'En una cabaña la cantidad no son '
+                                     'personas: se edita en el admin.'},
+            status=400)
+
+    crudo = (request.POST.get('cantidad') or '').strip()
+    if not crudo.isdigit() or int(crudo) < 1:
+        return JsonResponse({'ok': False, 'mensaje': 'Cantidad inválida.'}, status=400)
+    cantidad = int(crudo)
+
+    # Piso Y techo del catálogo. El piso importa tanto como el techo: una
+    # tina con mínimo 2 editada a 1 persona se cobraría bajo tarifa.
+    piso = int(linea.servicio.capacidad_minima or 0)
+    if piso and cantidad < piso:
+        return JsonResponse(
+            {'ok': False, 'mensaje': f'{linea.servicio.nombre} pide mínimo '
+                                     f'{piso} persona(s).'},
+            status=400)
+    tope = int(linea.servicio.capacidad_maxima or 0)
+    if tope and cantidad > tope:
+        return JsonResponse(
+            {'ok': False, 'mensaje': f'{linea.servicio.nombre} admite hasta '
+                                     f'{tope} persona(s).'},
+            status=400)
+
+    linea.cantidad_personas = cantidad
+    linea.save(update_fields=['cantidad_personas'])
+    venta.calcular_total()
+    venta.refresh_from_db()
+
+    precio = linea.precio_unitario_venta
+    if precio is None:
+        precio = linea.servicio.precio_base
+    return JsonResponse({
+        'ok': True,
+        'total': int(venta.total or 0),
+        'pagado': int(venta.pagado or 0),
+        'saldo': int(venta.saldo_pendiente or 0),
+        'linea': {'personas': cantidad, 'subtotal': int(precio * cantidad)},
+    })

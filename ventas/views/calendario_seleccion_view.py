@@ -266,6 +266,19 @@ def agregar_servicio_a_reserva(request):
                 'error': 'Formato de fecha inválido'
             }, status=400)
 
+        # Candado de fechas pasadas (Jorge lo cazó en su iPhone, 30-08: el
+        # calendario le dejó agendar para el 05/08). Una reserva agendada hacia
+        # atrás no aparece en la agenda del día: nadie prepara nada y el
+        # cliente llega a una puerta cerrada. El registro histórico deliberado
+        # tiene su lugar, y es el admin — no este flujo de venta.
+        from django.utils import timezone as _tz
+        if fecha < _tz.localdate():
+            return JsonResponse({
+                'success': False,
+                'error': f'Esa fecha ({fecha.strftime("%d/%m")}) ya pasó. '
+                         'Para registrar algo histórico, usa el admin.'
+            }, status=400)
+
         # Rechazar slots fuera de servicio (misma fuente de verdad que pinta el
         # calendario). El template ya no permite clickearlos, pero este candado
         # cubre pestañas desactualizadas y llamadas directas al endpoint.
