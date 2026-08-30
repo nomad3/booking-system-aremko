@@ -1138,13 +1138,15 @@ def disponibilidad_dia(fecha, preferir_premium=False):
                 'nota': 'este programa se vende lunes, miércoles y jueves; '
                         'ofrece uno de esos días'}
 
-    # Cabaña libre la noche anterior Y la del día (la misma): intersección por id.
+    # Cabaña libre la noche anterior Y la del día (la misma). La víspera se
+    # mide por OCUPACIÓN, no por vendibilidad — ver _noche_previa_libre: medirla
+    # con disponibilidad() mató TODOS los miércoles, porque la víspera del
+    # miércoles es el martes cerrado (sin slots → nada "vendible" → nada
+    # "libre"). Un martes cerrado es una cabaña vacía: lo ideal para las 10:00.
     f_previa = f - timedelta(days=1)
-    cab_previa = disponibilidad(f_previa, personas, 'cabana',
-                                limite=None).get('servicios', [])
     cab_dia = disponibilidad(f, personas, 'cabana', limite=None).get('servicios', [])
-    ids_previa = {c.get('servicio_id') for c in cab_previa}
-    ambas = [c for c in cab_dia if c.get('servicio_id') in ids_previa]
+    ambas = [c for c in cab_dia
+             if _noche_previa_libre(c.get('servicio_id'), f_previa)]
     cabana, es_torre = _elegir_cabana_ritual(ambas, preferir_torre=preferir_premium)
     if cabana is None:
         return {'fecha': f.isoformat(), 'disponible': False,
@@ -1197,6 +1199,38 @@ def disponibilidad_dia(fecha, preferir_premium=False):
 # este texto para deshacerlos si la reserva se cancela, así que no cambiarlo a
 # la ligera.
 DIA_MOTIVO_BLOQUEO = 'Cabaña y spa por el día'
+
+
+def _noche_previa_libre(cabana_id, f_previa):
+    """¿La cabaña está DESOCUPADA la noche anterior? Ocupación, no vendibilidad.
+
+    Bug real (Jorge, 2026-08-30): ningún miércoles se podía vender. La víspera
+    se medía con disponibilidad(), que exige slots vendibles ese día — y el
+    martes está cerrado (sin slots), así que ninguna cabaña aparecía "libre" un
+    martes y la intersección mataba todos los miércoles. Cerrado significa
+    vacía, que es justo lo que el programa necesita.
+
+    Lo que SÍ ocupa la noche (y se respeta):
+      · ServicioBloqueo — así espeja el iCal las noches de Booking/Airbnb, y
+        así se marcan mantenciones;
+      · ServicioSlotBloqueo activo esa fecha — así protege sus noches este
+        mismo programa (bloquear_noche_previa) y los bloqueos manuales;
+      · ReservaServicio esa fecha — un huésped durmiendo (sale a las 11:00,
+        choca con la llegada de las 10:00). Se EXCLUYE la fila de las 10:00
+        (DIA_HORA_LLEGADA): es el uso diurno de otro programa del día, que
+        termina a las 18:00 y deja la noche y la mañana libres.
+    """
+    from ventas.models import ReservaServicio, ServicioBloqueo, ServicioSlotBloqueo
+
+    if ServicioBloqueo.servicio_bloqueado_en_fecha(cabana_id, f_previa):
+        return False
+    if ServicioSlotBloqueo.objects.filter(servicio_id=cabana_id, fecha=f_previa,
+                                          activo=True).exists():
+        return False
+    return not (ReservaServicio.objects
+                .filter(servicio_id=cabana_id, fecha_agendamiento=f_previa)
+                .exclude(hora_inicio=DIA_HORA_LLEGADA)
+                .exists())
 
 
 def bloquear_noche_previa(cabana_id, fecha_dia, referencia=''):

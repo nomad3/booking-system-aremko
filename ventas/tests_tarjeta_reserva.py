@@ -264,16 +264,23 @@ class AgregarProductoFase3(TestCase):
         cliente = Cliente.objects.create(nombre='Carmen Puerto Montt',
                                          telefono='+56933334444')
         cls.venta = VentaReserva.objects.create(cliente=cliente)
+        # Del menú de comanda del CLIENTE, sin venta_meson: el caso que el
+        # primer filtro (solo venta_meson) dejaba fuera por error.
         cls.jugo = Producto.objects.create(nombre='Jugo Natural de Frambuesa',
                                            precio_base=3500, cantidad_disponible=10,
-                                           venta_meson=True)
+                                           comanda_cliente=True, venta_meson=False)
+        # Venta en mesón sin menú del cliente (espumante: cara a cara, pero no
+        # a la vista en el link público).
+        cls.espumante = Producto.objects.create(nombre='Espumante Valdivieso',
+                                                precio_base=12000, cantidad_disponible=6,
+                                                venta_meson=True, comanda_cliente=False)
         cls.agotado = Producto.objects.create(nombre='Chocolate Agotado',
                                               precio_base=5000, cantidad_disponible=0,
                                               venta_meson=True)
         # Interno con stock: lo que NO debe aparecer ni aceptarse.
         cls.interno = Producto.objects.create(nombre='Artesanías Inventario',
                                               precio_base=0, cantidad_disponible=50,
-                                              venta_meson=False)
+                                              venta_meson=False, comanda_cliente=False)
         cls.url = reverse('ventas:tarjeta_agregar_producto', args=[cls.venta.pk])
 
     def _post(self, **datos):
@@ -331,22 +338,28 @@ class AgregarProductoFase3(TestCase):
         self.assertIn('Jugo Natural de Frambuesa', html)
         self.assertNotIn('Chocolate Agotado', html)
 
-    def test_lo_que_no_es_venta_en_meson_no_aparece(self):
-        """Jorge lo cazó probando: el selector le ofrecía «Artesanías
-        Inventario · $0» y «Artículos Eléctricos · $0». El campo venta_meson
-        existe exactamente para esto."""
+    def test_ofrece_LO_MISMO_que_el_admin(self):
+        """La pregunta de Jorge que destapó el error: ¿son los mismos
+        productos que el admin? Deben serlo — el criterio es UNO
+        (productos_vendibles): menú del cliente + venta en mesón, con stock.
+        El primer filtro (solo mesón) habría escondido los jugos."""
         self.client.force_login(self.staff)
         html = self.client.get(reverse('ventas:tarjeta_reserva',
                                        args=[self.venta.pk])).content.decode()
-        self.assertNotIn('Artesanías Inventario', html)
+        self.assertIn('Jugo Natural de Frambuesa', html)   # menú del cliente
+        self.assertIn('Espumante Valdivieso', html)        # venta en mesón
+        self.assertNotIn('Artesanías Inventario', html)    # interno: fuera
 
-    def test_ni_se_acepta_por_POST_directo(self):
+    def test_el_interno_ni_se_acepta_por_POST_directo(self):
         """El candado del endpoint: una pestaña desactualizada o una llamada
         directa tampoco pueden colar un producto interno."""
         r = self._post(producto_id=self.interno.pk, cantidad='1')
         self.assertEqual(r.status_code, 400)
-        self.assertIn('mesón', r.json()['mensaje'])
         self.assertEqual(self.venta.reservaproductos.count(), 0)
+
+    def test_el_de_meson_puro_SI_se_acepta(self):
+        r = self._post(producto_id=self.espumante.pk, cantidad='1')
+        self.assertTrue(r.json()['ok'])
 
     def test_la_segunda_linea_acumula(self):
         self._post(producto_id=self.jugo.pk, cantidad='1')

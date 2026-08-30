@@ -80,14 +80,15 @@ def tarjeta_reserva(request, venta_id):
     productos = venta.reservaproductos.select_related('producto')
     pagos = venta.pagos.order_by('fecha_pago')
 
-    # Catálogo para el selector: solo venta en mesón Y con stock. venta_meson
-    # es el campo hecho para esto («el personal puede agregar este producto a
-    # una reserva»); sin él, a Deborah le aparecían productos internos y de $0
-    # (Artesanías Inventario, Artículos Eléctricos) — lo cazó Jorge probando.
-    catalogo = (Producto.objects.filter(venta_meson=True,
-                                        cantidad_disponible__gt=0)
-                .select_related('categoria')
-                .order_by('categoria__nombre', 'nombre'))
+    # Catálogo para el selector: LA MISMA función que usa el admin al agregar
+    # productos a una reserva (productos_vendibles: menú de comanda del
+    # cliente + venta en mesón, con stock). La primera versión filtró solo
+    # venta_meson y era estrecha por el otro lado: los productos del menú del
+    # cliente (jugos) habrían desaparecido de la tarjeta — lo destapó Jorge
+    # preguntando si eran los mismos productos que en el admin.
+    from ventas.admin import productos_vendibles
+
+    catalogo = productos_vendibles()
 
     return render(request, 'ventas/tarjeta_reserva.html', {
         'venta': venta,
@@ -179,13 +180,13 @@ def tarjeta_agregar_producto(request, venta_id):
         return JsonResponse({'ok': False, 'mensaje': 'Elige un producto de la lista.'},
                             status=400)
 
-    # El mismo candado que el selector: lo que no es venta en mesón no entra
-    # por la tarjeta, ni siquiera desde una pestaña desactualizada. Esos
-    # productos se manejan en el admin.
-    if not producto.venta_meson:
+    # El mismo criterio que el selector (productos_vendibles del admin): lo
+    # que no es vendible por el personal no entra ni desde una pestaña
+    # desactualizada. Esos productos se manejan en el admin.
+    if not (producto.venta_meson or producto.comanda_cliente):
         return JsonResponse(
-            {'ok': False, 'mensaje': f'{producto.nombre} no es de venta en '
-                                     'mesón: se agrega desde el admin.'},
+            {'ok': False, 'mensaje': f'{producto.nombre} no es de venta al '
+                                     'cliente: se agrega desde el admin.'},
             status=400)
 
     crudo = (request.POST.get('cantidad') or '').strip()
