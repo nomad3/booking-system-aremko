@@ -61,6 +61,8 @@
     {% if boleta %}
       <p class="ok" style="font-family:Arial,sans-serif;font-size:15px">✔ Boleta encontrada</p>
       <table>
+        <tr><td>Emisor</td><td>{{ config.razon_social|default:"Aremko Hotel Spa" }}</td></tr>
+        <tr><td>RUT emisor</td><td>{{ config.rut_emisor }}</td></tr>
         <tr><td>Tipo de documento</td><td>Boleta electrónica ({{ boleta.tipo_dte }})</td></tr>
         <tr><td>Folio</td><td>{{ boleta.folio|default:"— (en proceso)" }}</td></tr>
         <tr><td>Fecha de emisión</td><td>{{ boleta.emitida_at|date:"d/m/Y H:i"|default:"—" }}</td></tr>
@@ -78,10 +80,18 @@
           {% endif %}
         </td></tr>
       </table>
+      <p class="lead" style="margin-top:16px;font-size:13px">
+        Puedes contrastar estos datos en el
+        <a href="https://www4.sii.cl/bolcoreinternetui/#!/home" target="_blank"
+           rel="noopener" style="color:#1e4438">sitio del Servicio de Impuestos
+        Internos</a>, con el RUT del emisor, el folio y el monto.
+      </p>
     {% else %}
       <p class="no" style="font-family:Arial,sans-serif;font-size:15px">✖ No encontramos una boleta con esos datos.</p>
       <p class="lead" style="margin-top:8px">Revisa el folio y el monto exacto (sin puntos).
-         Si la duda persiste, escríbenos a reservas — con gusto la verificamos por ti.</p>
+         Si la duda persiste, escríbenos por WhatsApp al
+         <a href="https://wa.me/56957902525" style="color:#1e4438">+56 9 5790 2525</a>
+         y la verificamos contigo.</p>
     {% endif %}
   </div>
   {% endif %}

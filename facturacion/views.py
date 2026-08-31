@@ -8,7 +8,20 @@ pueda verificar su boleta. Dos entradas:
 """
 from django.shortcuts import render
 
-from .models import BoletaElectronica
+from .models import BoletaElectronica, ConfiguracionFacturacion
+
+
+def _publicables():
+    """Solo boletas REALES.
+
+    La página es pública: una boleta de certificación («SET SII CASO-1») o una
+    simulada mostrada como «✔ Boleta encontrada» le miente al cliente que la
+    consulta, y el SII revisa este enlace antes de autorizar. Solo el ambiente
+    de producción tiene valor tributario.
+    """
+    return (BoletaElectronica.objects
+            .filter(ambiente='produccion')
+            .exclude(estado__in=('pendiente', 'error', 'simulada')))
 
 
 def _contexto_boleta(boleta):
@@ -24,25 +37,22 @@ def consulta_boleta(request):
     boleta = None
     buscado = bool(folio and monto)
     if buscado and folio.isdigit() and monto.isdigit():
-        boleta = (BoletaElectronica.objects
-                  .filter(folio=int(folio), monto_total=int(monto))
-                  .exclude(estado__in=('pendiente', 'error'))
-                  .first())
+        boleta = _publicables().filter(folio=int(folio),
+                                       monto_total=int(monto)).first()
     return render(request, 'facturacion/consulta_boleta.html', {
         'boleta': boleta,
         'buscado': buscado,
         'folio': folio,
         'monto': monto,
+        'config': ConfiguracionFacturacion.get(),
     })
 
 
 def boleta_por_token(request, token):
-    boleta = (BoletaElectronica.objects
-              .filter(token_consulta=token)
-              .exclude(estado__in=('pendiente', 'error'))
-              .first())
+    boleta = _publicables().filter(token_consulta=token).first()
     return render(request, 'facturacion/consulta_boleta.html', {
         'boleta': boleta,
         'buscado': True,
         'por_token': True,
+        'config': ConfiguracionFacturacion.get(),
     })

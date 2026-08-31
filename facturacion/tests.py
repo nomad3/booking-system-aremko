@@ -181,3 +181,49 @@ class ComparacionDeRutDelCertificado(TestCase):
         self.assertEqual(_solo_digitos('07604892-4'), _solo_digitos('7604892-4'))
         self.assertEqual(_solo_digitos('7.604.892-4'), _solo_digitos('7604892-4'))
         self.assertNotEqual(_solo_digitos('76485192-7'), _solo_digitos('7604892-4'))
+
+
+class PaginaPublicaDeConsulta(TestCase):
+    """La página que el SII exige y revisa antes de autorizar. Es pública: lo
+    que muestre se lo está afirmando a un cliente."""
+
+    def setUp(self):
+        config = ConfiguracionFacturacion.get()
+        config.rut_emisor = '76485192-7'
+        config.razon_social = 'AREMKO HOTEL SPA'
+        config.save()
+        self.real = BoletaElectronica.objects.create(
+            tipo_dte=39, ambiente='produccion', folio=1024, estado='aceptada',
+            monto_neto=92437, monto_iva=17563, monto_total=110000,
+            glosa='Pausa junto al río')
+        self.del_set = BoletaElectronica.objects.create(
+            tipo_dte=39, ambiente='certificacion', folio=19, estado='enviada',
+            monto_neto=25042, monto_iva=4758, monto_total=29800,
+            glosa='SET SII CASO-1', caso_set='CASO-1')
+
+    def test_una_boleta_real_se_encuentra_con_folio_y_monto(self):
+        r = self.client.get('/boletas/consulta/', {'folio': '1024', 'monto': '110000'})
+        self.assertContains(r, 'Boleta encontrada')
+        self.assertContains(r, 'Pausa junto al río')
+        self.assertContains(r, '76485192-7')  # el emisor, para que el cliente confirme
+
+    def test_la_boleta_de_certificacion_NO_es_publica(self):
+        # Es un documento de prueba: mostrarlo como «✔ Boleta encontrada» le
+        # miente al cliente, y el SII revisa este enlace.
+        r = self.client.get('/boletas/consulta/', {'folio': '19', 'monto': '29800'})
+        self.assertNotContains(r, 'Boleta encontrada')
+        self.assertNotContains(r, 'CASO-1')
+        self.assertContains(r, 'No encontramos')
+
+    def test_el_monto_equivocado_no_abre_la_boleta(self):
+        r = self.client.get('/boletas/consulta/', {'folio': '1024', 'monto': '1'})
+        self.assertNotContains(r, 'Boleta encontrada')
+
+    def test_el_enlace_directo_del_cliente_funciona(self):
+        r = self.client.get(f'/boletas/b/{self.real.token_consulta}/')
+        self.assertContains(r, 'Boleta encontrada')
+        self.assertContains(r, 'Pausa junto al río')
+
+    def test_el_enlace_directo_de_una_de_prueba_no_muestra_nada(self):
+        r = self.client.get(f'/boletas/b/{self.del_set.token_consulta}/')
+        self.assertNotContains(r, 'Boleta encontrada')
