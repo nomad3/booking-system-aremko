@@ -36,6 +36,11 @@ def _constructor_refugio(fecha):
     return construir_servicios_refugio(fecha)
 
 
+def _constructor_pausa(fecha):
+    from whatsapp_agent.packs import construir_servicios_pausa
+    return construir_servicios_pausa(fecha)
+
+
 # Cada entrada: el constructor de Luna y la landing adonde volver explicando.
 # La base pública no dibuja los mensajes de Django, así que el motivo viaja en
 # la dirección — mismo patrón que el día.
@@ -47,6 +52,10 @@ EXPERIENCIAS = {
     'refugio': {
         'constructor': _constructor_refugio,
         'landing': 'refugio_landing',
+    },
+    'pausa': {
+        'constructor': _constructor_pausa,
+        'landing': 'pausa_landing',
     },
 }
 
@@ -147,3 +156,7 @@ def ritual_reservar_view(request):
 
 def refugio_reservar_view(request):
     return _reservar_paquete(request, 'refugio')
+
+
+def pausa_reservar_view(request):
+    return _reservar_paquete(request, 'pausa')

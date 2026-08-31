@@ -55,6 +55,17 @@
   .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
   .rr-rev .who{font-size:14px;color:#8a7f6c}
   .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  .rr-form{display:flex;flex-direction:column;gap:12px;max-width:380px;margin:0 auto}
+  .rr-select{padding:14px 16px;font-size:16px;border:1px solid #d8d2c4;border-radius:12px;
+    background:#fff;color:#3a352e;font-family:inherit;width:100%;}
+  .rr-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    background:#0f6e56;color:#eafaf3;border:0;padding:15px 26px;border-radius:999px;
+    font-size:17px;font-weight:600;cursor:pointer;font-family:inherit}
+  .rr-btn:hover{background:#0c5b48}
+  .rr-o{font-size:15px;color:#8a7f6c;margin:22px 0 0}
+  .rr-o a{color:#0f6e56;text-decoration:underline}
+  .rr-aviso{background:#fff4e5;border:1px solid #f0d9b5;color:#7a5c2e;border-radius:14px;
+    padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.55;text-align:left}
   @media(max-width:600px){.rr-h1{font-size:25px}.rr-lead{font-size:16px}}
 </style>
 {% endblock %}
@@ -168,9 +179,27 @@
 
   <section class="rr-section">
     <div class="rr-final">
-      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Aparta tu Pausa por WhatsApp 👇</h2>
-      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Te coordinamos la fecha y la hora por WhatsApp.</p>
-      <a class="rr-cta" href="{{ whatsapp_url }}">Reserva por WhatsApp</a>
+      {% if motivo %}
+      <div class="rr-aviso">
+        {% if motivo == 'no_disponible' %}
+          Ese día no pudimos armar tu Pausa al precio publicado. Elige otra fecha — o escríbenos y la coordinamos.
+        {% elif motivo == 'sin_fecha' %}
+          Elige primero qué día quieren venir.
+        {% else %}
+          No pudimos armar tu Pausa en este momento. Escríbenos por WhatsApp y lo resolvemos al tiro.
+        {% endif %}
+      </div>
+      {% endif %}
+      <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Reserva tu Pausa 👇</h2>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Elige el día, pagas al tiro y queda confirmada.<br>
+        <strong>${{ precio_domjue }}</strong> domingo a jueves · <strong>${{ precio_finde }}</strong> viernes y sábado — tina clásica + masaje, para dos.<br>
+        <span style="font-size:14px;opacity:.8">¿Prefieren tina con hidromasaje? Eso lo cotizamos por WhatsApp.</span></p>
+      <form class="rr-form" method="post" action="{% url 'pausa_reservar' %}">
+        {% csrf_token %}
+        <input class="rr-select" type="date" name="fecha" required min="{{ hoy }}" aria-label="Elige el día">
+        <button type="submit" class="rr-btn" id="btnReservarPausa">Reservar y pagar</button>
+      </form>
+      <p class="rr-o">o <a href="{{ whatsapp_url }}">escríbenos por WhatsApp</a> si prefieres coordinarlo conversando</p>
       <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
     </div>
   </section>

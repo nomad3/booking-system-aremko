@@ -215,12 +215,16 @@ def _candidatos_opcion(tinas_grupo, etiqueta, f, personas, agendados, masaje_por
             candidatos.append((t_ini, {
                 'etiqueta': etiqueta,
                 'tina': {
+                    # servicio_id: lo necesita el armador web de la Pausa para
+                    # poner la tina en el carrito; a Luna no le estorba.
+                    'servicio_id': t['servicio_id'],
                     'nombre': t['nombre'], 'hora': t_slot,
                     'duracion_texto': t['duracion_texto'],
                     'precio_total': t['precio_total'],
                     'precio_por_persona': t['precio_por_persona'],
                 },
                 'masaje': {
+                    'servicio_id': masaje_id,
                     'nombre': masaje_nombre, 'hora': masaje_hora, 'cantidad': personas,
                     'precio_total': masaje_total,
                 },
@@ -1199,6 +1203,105 @@ def disponibilidad_dia(fecha, preferir_premium=False):
 # este texto para deshacerlos si la reserva se cancela, así que no cambiarlo a
 # la ligera.
 DIA_MOTIVO_BLOQUEO = 'Cabaña y spa por el día'
+
+
+# ── Pausa junto al río (web): tina clásica + masaje, al precio publicado ──
+
+PAUSA_PRECIO_DOMJUE = 110000   # dom-jue, 2 personas (Jorge 2026-06-26, el de la landing)
+PAUSA_PRECIO_FINDE = 130000    # viernes y sábado
+PAUSA_DIAS_DOMJUE = (0, 1, 3, 4)   # 0=Dom..6=Sáb; Mar(2) cae solo (sin slots)
+
+
+def _precio_objetivo_pausa(f):
+    dia = (f.weekday() + 1) % 7
+    return PAUSA_PRECIO_DOMJUE if dia in PAUSA_DIAS_DOMJUE else PAUSA_PRECIO_FINDE
+
+
+def construir_servicios_pausa(fecha):
+    """Arma la Pausa CLÁSICA (tina sin hidromasaje + masaje, 2 personas) para la
+    reserva web, clavada al precio PUBLICADO en su landing: $110.000 dom-jue /
+    $130.000 vie-sáb.
+
+    Reutiliza el cotizador de Luna (disponibilidad_pack_tina_masaje) y elige,
+    entre TODAS las alternativas clásicas del día, la más temprana cuyo precio
+    cobrado (con descuento de pack si aplica) sea EXACTAMENTE el publicado. Si
+    ninguna cuadra —una tina más cara, un pack desconfigurado— devuelve
+    disponible=False en vez de vender a otro precio: la web no puede cobrar
+    distinto de lo que la página promete. La opción con hidromasaje se cotiza
+    por WhatsApp (precio variable).
+    """
+    from ventas.models import Servicio
+    from .availability import _parse_fecha
+
+    f = _parse_fecha(fecha)
+    if f is None:
+        return {'fecha': None, 'disponible': False, 'falta_fecha': True,
+                'nota': 'No dijo para qué día. Pregúntale la fecha.'}
+
+    objetivo = _precio_objetivo_pausa(f)
+    r = disponibilidad_pack_tina_masaje(fecha, personas=2, todas=True)
+    if r.get('error'):
+        return {'error': r['error']}
+
+    candidatos = [o for o in (r.get('alternativas') or r.get('opciones') or [])
+                  if o.get('etiqueta') == 'sin hidromasaje']
+    elegido = None
+    for o in candidatos:
+        cobrado = o['precio_con_descuento'] if o.get('hay_descuento') else o['precio_total']
+        if int(cobrado) == objetivo:
+            elegido = o
+            break
+    if elegido is None:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': 'ese día la Pausa clásica no cuadra con el precio '
+                        'publicado; coordinar por WhatsApp u ofrecer otro día'}
+
+    def _pb(servicio_id):
+        srv = Servicio.objects.filter(id=servicio_id).first()
+        return int(srv.precio_base) if srv else 0
+
+    tina, masaje = elegido['tina'], elegido['masaje']
+    # La cantidad de cada línea se deriva del precio REAL de la opción: el
+    # carrito multiplica precio_base × cantidad, y esto garantiza que sumen lo
+    # mismo que cotizó Luna (tinas por persona y tinas flat por igual).
+    pb_tina = _pb(tina['servicio_id'])
+    pb_masaje = _pb(masaje['servicio_id'])
+    if not pb_tina or not pb_masaje:
+        return {'error': 'falta el precio de la tina o del masaje en el catálogo'}
+    servicios = [
+        {'servicio_id': tina['servicio_id'], 'fecha': f.isoformat(),
+         'hora': tina['hora'],
+         'cantidad_personas': round(tina['precio_total'] / pb_tina)},
+        {'servicio_id': masaje['servicio_id'], 'fecha': f.isoformat(),
+         'hora': masaje['hora'],
+         'cantidad_personas': round(masaje['precio_total'] / pb_masaje)},
+    ]
+    suma = sum(_pb(x['servicio_id']) * x['cantidad_personas'] for x in servicios)
+    descuento = max(0, suma - objetivo)
+    if descuento:
+        ds = _servicio_descuento()
+        if ds is None:
+            return {'error': 'no existe el servicio "Descuento de servicios" '
+                             'para clavar el total'}
+        pb = int(ds.precio_base)
+        if pb >= 0:
+            return {'error': f'el servicio de descuento tiene precio_base {pb} '
+                             f'(debería ser negativo)'}
+        servicios.append({'servicio_id': ds.id, 'fecha': f.isoformat(),
+                          'hora': tina['hora'],
+                          'cantidad_personas': round(descuento / abs(pb))})
+
+    return {
+        'disponible': True,
+        'fecha': f.isoformat(),
+        'personas': 2,
+        'servicios': servicios,
+        'suma_componentes': suma,
+        'descuento': descuento,
+        'total': suma - descuento,           # = objetivo (110k dom-jue / 130k finde)
+        'objetivo': objetivo,
+        'itinerario': {'tina': tina, 'masaje': masaje, 'orden': elegido.get('orden')},
+    }
 
 
 def _noche_previa_libre(cabana_id, f_previa):

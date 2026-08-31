@@ -151,6 +151,8 @@ urlpatterns = [
          name='ritual_reservar'),
     # Landing INDEXABLE de la "Pausa junto al río" (H-041) — tina + masaje, destino de anuncios
     path('pausa-junto-al-rio/', pausa_landing_view, name='pausa_landing'),
+    path('pausa-junto-al-rio/reservar/', reserva_experiencia_view.pausa_reservar_view,
+         name='pausa_reservar'),
     path('cabana-y-spa-por-el-dia/', dia_landing_view, name='dia_landing'),
     path('cabana-y-spa-por-el-dia/reservar/', dia_reserva_view.dia_reservar_view,
          name='dia_reservar'),

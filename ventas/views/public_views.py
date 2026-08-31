@@ -921,6 +921,8 @@ def ritual_rio_landing_view(request):
 
 
 def pausa_landing_view(request):
+    from django.utils import timezone
+
     """Landing INDEXABLE de la "Pausa junto al río" (H-041): la experiencia de ENTRADA —
     tina caliente + masaje en pareja, el MISMO día, sin alojamiento. Destino de los anuncios
     de Google + Meta. CTA único → WhatsApp con medición (GA4 pausa_whatsapp_click + Meta Lead).
@@ -953,6 +955,9 @@ def pausa_landing_view(request):
         'resenas': resenas,
         'precio_domjue': '110.000',   # Pausa dom-jue, 2 personas (Jorge 2026-06-26)
         'precio_finde': '130.000',    # Pausa vie-sáb, 2 personas
+        'hoy': timezone.localdate().isoformat(),
+        'motivo': request.GET.get('motivo', ''),
+        'motivo_fecha': request.GET.get('fecha', ''),
     })
 
 
