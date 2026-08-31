@@ -813,6 +813,15 @@ def conversation(request):
         canal, external_id = 'whatsapp', phone
     if not external_id:
         return JsonResponse({'error': 'external_id (o phone) requerido'}, status=400)
+
+    # El «+» del teléfono llega como ESPACIO cuando un cliente lo manda sin
+    # codificar (+56… → « 56…»), el strip lo borra, y el hilo se buscaba como
+    # 56936940690 contra un guardado +56936940690: conversación vacía,
+    # «cargando» eterno en la bandeja del celular (Jorge, 2026-08-31; la lista
+    # funcionaba y el hilo no). La tolerancia vive AQUÍ, en el servidor, porque
+    # arregla a TODOS los builds de frontend de una vez.
+    if canal == 'whatsapp' and external_id.isdigit():
+        external_id = '+' + external_id
     try:
         limit = min(int(request.GET.get('limit', 50)), 500)
     except (ValueError, TypeError):
