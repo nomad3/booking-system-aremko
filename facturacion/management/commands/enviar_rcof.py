@@ -35,6 +35,9 @@ class Command(BaseCommand):
         parser.add_argument('--enviar', action='store_true')
         parser.add_argument('--todas', action='store_true',
                             help='Incluir también boletas del día sin enviar al SII.')
+        parser.add_argument('--ambiente', type=str, default='',
+                            help='certificacion | produccion. Por defecto, el de '
+                                 'la configuración (que puede seguir en simulado).')
 
     def handle(self, *args, **opts):
         if not simpleapi_client.credenciales_listas():
@@ -44,14 +47,23 @@ class Command(BaseCommand):
         fecha = (datetime.date.fromisoformat(opts['fecha']) if opts['fecha']
                  else timezone.localdate())
 
-        qs = (BoletaElectronica.objects.filter(ambiente=config.ambiente)
+        ambiente = opts['ambiente'] or config.ambiente
+        qs = (BoletaElectronica.objects.filter(ambiente=ambiente)
               .exclude(estado='error'))
         if not opts['todas']:
             qs = qs.exclude(track_id__isnull=True).exclude(track_id='')
         boletas = [b for b in qs.order_by('folio')
                    if b.xml_dte and f'<FchEmis>{fecha:%Y-%m-%d}</FchEmis>' in b.xml_dte]
         if not boletas:
-            raise CommandError(f'No hay boletas del {fecha} para reportar.')
+            # El error tiene que decir DÓNDE buscó: la primera vez falló porque
+            # la configuración seguía en «simulado» y las boletas del set viven
+            # en «certificacion».
+            hay = BoletaElectronica.objects.filter(ambiente=ambiente).count()
+            raise CommandError(
+                f'No hay boletas del {fecha} para reportar en ambiente '
+                f'«{ambiente}» (hay {hay} boleta(s) en ese ambiente en total; '
+                f'{"solo se miran las que tienen trackId" if not opts["todas"] else "se miraron todas"}). '
+                f'Prueba --ambiente certificacion o --todas.')
         self.stdout.write(f'Folios del {fecha}: {[b.folio for b in boletas]} '
                           f'(total ${sum(int(b.monto_total or 0) for b in boletas):,})'
                           .replace(',', '.'))
@@ -80,7 +92,7 @@ class Command(BaseCommand):
             self.stdout.write('--- generado y válido, NO enviado (usa --enviar) ---')
             return
 
-        ambiente_num = 0 if config.ambiente == 'certificacion' else 1
+        ambiente_num = 0 if ambiente == 'certificacion' else 1
         resp = simpleapi_client.enviar_sobre(
             xml, cert_bytes, cert_password, config, ambiente_num,
             tipo=simpleapi_client.TIPO_ENVIO_RVD)
