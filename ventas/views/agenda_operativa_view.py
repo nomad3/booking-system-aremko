@@ -146,6 +146,13 @@ def filtro_alojamiento():
             'servicio__capacidad_maxima__gte': CAPACIDAD_MINIMA_ALOJAMIENTO}
 
 
+def es_alojamiento(reserva_servicio):
+    """`filtro_alojamiento()` aplicado a un objeto ya cargado (sin ir a la BD)."""
+    s = getattr(reserva_servicio, 'servicio', None)
+    return bool(s and s.tipo_servicio == 'cabana'
+                and (s.capacidad_maxima or 0) >= CAPACIDAD_MINIMA_ALOJAMIENTO)
+
+
 def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
     """Reservas que hacen checkout hoy + las que salieron antes debiendo.
 
@@ -467,9 +474,21 @@ def agenda_operativa(request):
                     en_curso = False
                     es_pasado = True
 
+                # Una cabaña no TERMINA cuando se cumple su duración: el huésped
+                # se queda a dormir. Tratarla como un servicio con hora de fin
+                # la marcaba «✓ COMPLETADO» y la sacaba de la agenda a media
+                # tarde, así que el personal del turno siguiente miraba la lista
+                # y no veía ninguna cabaña ocupada (reportado por Jorge).
+                alojamiento_hoy = fecha_servicio == hoy and es_alojamiento(servicio)
+                if alojamiento_hoy:
+                    es_pasado = False
+                    en_curso = servicio_hora <= hora_actual
+
                 servicio.en_curso = en_curso
                 servicio.es_pasado = es_pasado
-                servicio.hora_fin = hora_fin.strftime('%H:%M')
+                # Sin hora de fin para el alojamiento: «(hasta 17:00)» en una
+                # cabaña es tan engañoso como marcarla completada.
+                servicio.hora_fin = None if alojamiento_hoy else hora_fin.strftime('%H:%M')
 
                 # Aplicar filtro según vista seleccionada
                 if filtro_vista == 'pendientes_pago':
@@ -485,14 +504,18 @@ def agenda_operativa(request):
                     elif fecha_servicio < hoy:
                         servicios_pendientes.append(servicio)
                 else:  # filtro_vista == 'actual'
-                    # Mostrar servicios futuros o en curso (comportamiento original)
-                    if fecha_servicio == hoy and (servicio_hora >= hora_actual or en_curso):
+                    # Futuros, en curso… y las cabañas del día completas: siguen
+                    # ocupadas aunque su hora de ingreso haya quedado atrás.
+                    if fecha_servicio == hoy and (servicio_hora >= hora_actual
+                                                  or en_curso or alojamiento_hoy):
                         servicios_pendientes.append(servicio)
             else:
                 # Si no hay duración, usar lógica simplificada
+                alojamiento_hoy = fecha_servicio == hoy and es_alojamiento(servicio)
                 if fecha_servicio == hoy:
-                    servicio.en_curso = False
-                    servicio.es_pasado = (servicio_hora < hora_actual)
+                    servicio.en_curso = alojamiento_hoy and servicio_hora <= hora_actual
+                    servicio.es_pasado = (not alojamiento_hoy
+                                          and servicio_hora < hora_actual)
                 else:
                     servicio.en_curso = False
                     servicio.es_pasado = True
@@ -506,7 +529,8 @@ def agenda_operativa(request):
                     if fecha_servicio < hoy or (fecha_servicio == hoy and servicio_hora < hora_actual):
                         servicios_pendientes.append(servicio)
                 else:  # filtro_vista == 'actual'
-                    if fecha_servicio == hoy and servicio_hora >= hora_actual:
+                    if fecha_servicio == hoy and (servicio_hora >= hora_actual
+                                                  or alojamiento_hoy):
                         servicios_pendientes.append(servicio)
         except Exception as e:
             # Log del error pero continuar con otros servicios
