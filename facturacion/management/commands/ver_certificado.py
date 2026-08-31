@@ -1,0 +1,63 @@
+"""Muestra de QUIÉN es el certificado con el que firmamos (P-16).
+
+El SII rechazó el envío con «Rut No Autorizado a Firmar». Eso puede ser dos
+cosas muy distintas: (a) el RUT que declaramos no es el del certificado —
+culpa nuestra, se arregla en la configuración; (b) el RUT es correcto pero el
+SII no lo tiene autorizado para firmar por la empresa — trámite de Jorge.
+
+Esto imprime el titular y la vigencia del certificado y los compara con la
+configuración. Nunca imprime la clave ni el contenido del certificado.
+"""
+from django.core.management.base import BaseCommand, CommandError
+
+from facturacion.models import ConfiguracionFacturacion
+from facturacion.services import simpleapi_client
+
+
+def _solo_digitos(rut):
+    return ''.join(c for c in (rut or '') if c.isalnum()).upper()
+
+
+class Command(BaseCommand):
+    help = 'Titular y vigencia del certificado digital, contra la configuración.'
+
+    def handle(self, *args, **opts):
+        from cryptography.hazmat.primitives.serialization import pkcs12
+
+        cert_bytes, password = simpleapi_client.obtener_certificado()
+        if not cert_bytes:
+            raise CommandError('No hay certificado en el entorno.')
+        _, cert, _ = pkcs12.load_key_and_certificates(
+            cert_bytes, password.encode())
+        if cert is None:
+            raise CommandError('El .pfx no trae certificado.')
+
+        titular = {}
+        for attr in cert.subject:
+            titular[attr.oid._name or attr.oid.dotted_string] = str(attr.value)
+
+        config = ConfiguracionFacturacion.get()
+        self.stdout.write('--- CERTIFICADO ---')
+        for k, v in titular.items():
+            self.stdout.write(f'  {k}: {v}')
+        emisor_cert = ', '.join(str(a.value) for a in cert.issuer
+                                if (a.oid._name or '') == 'commonName')
+        self.stdout.write(f'  emitido por: {emisor_cert}')
+        self.stdout.write(f'  vigente: {cert.not_valid_before_utc:%d-%m-%Y} '
+                          f'→ {cert.not_valid_after_utc:%d-%m-%Y}')
+
+        rut_cert = titular.get('serialNumber', '')
+        self.stdout.write('--- CONFIGURACIÓN ---')
+        self.stdout.write(f'  rut_firmante (va como RutEnvia): {config.rut_firmante}')
+        self.stdout.write(f'  rut_emisor  (la empresa):        {config.rut_emisor}')
+
+        if rut_cert:
+            coincide = _solo_digitos(rut_cert) == _solo_digitos(config.rut_firmante)
+            self.stdout.write(
+                f'--- VEREDICTO: el RUT del certificado ({rut_cert}) '
+                f'{"COINCIDE" if coincide else "NO COINCIDE"} con rut_firmante ---')
+            if coincide:
+                self.stdout.write('  Entonces el XML declara bien quién firma: '
+                                  'lo que falta es la autorización en el SII.')
+            else:
+                self.stdout.write('  Es nuestro: hay que corregir rut_firmante.')
