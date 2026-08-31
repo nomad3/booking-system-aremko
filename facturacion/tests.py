@@ -227,3 +227,14 @@ class PaginaPublicaDeConsulta(TestCase):
     def test_el_enlace_directo_de_una_de_prueba_no_muestra_nada(self):
         r = self.client.get(f'/boletas/b/{self.del_set.token_consulta}/')
         self.assertNotContains(r, 'Boleta encontrada')
+
+
+class DescargaDelSobreDelSet(TestCase):
+    """El sobre lleva documentos tributarios firmados: no puede quedar
+    colgando en una URL pública."""
+
+    def test_un_visitante_cualquiera_no_puede_bajarlo(self):
+        r = self.client.get('/boletas/sobre-set/')
+        self.assertIn(r.status_code, (302, 403))
+        if r.status_code == 302:
+            self.assertIn('login', r['Location'])
