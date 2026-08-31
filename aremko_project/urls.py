@@ -6,7 +6,7 @@ from django.conf.urls.static import static # Import static
 # from ventas import views
 from django.contrib.auth import views as auth_views # Import auth views
 # Import the specific view functions needed for root URLs
-from ventas.views import dia_reserva_view
+from ventas.views import dia_reserva_view, reserva_experiencia_view
 from ventas.views.public_views import unsubscribe_view, homepage_view, empresas_view, empresas_presentacion_view, solicitar_cotizacion_empresa, tinas_view, masajes_view, alojamientos_view, productos_view, garantia_view, tarjetas_qr_reviews_view, encuesta_satisfaccion_view, encuesta_gracias_view, refugio_landing_view, refugio_submit_view, privacy_policy_view, ritual_rio_landing_view, pausa_landing_view, noche_aguas_calientes_landing_view, dia_landing_view
 from ventas.views import flow_views
 from ventas.views import experiencia_romantica_view, plan_veladas_view
@@ -145,6 +145,8 @@ urlpatterns = [
     path('refugio/submit/', refugio_submit_view, name='refugio_submit'),
     # Landing OCULTA (noindex, no enlazada, fuera del sitemap) — producto insignia ritual del río
     path('ritual-del-rio/', ritual_rio_landing_view, name='ritual_rio_landing'),
+    path('ritual-del-rio/reservar/', reserva_experiencia_view.ritual_reservar_view,
+         name='ritual_reservar'),
     # Landing INDEXABLE de la "Pausa junto al río" (H-041) — tina + masaje, destino de anuncios
     path('pausa-junto-al-rio/', pausa_landing_view, name='pausa_landing'),
     path('cabana-y-spa-por-el-dia/', dia_landing_view, name='dia_landing'),

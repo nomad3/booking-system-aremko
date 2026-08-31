@@ -896,11 +896,16 @@ def ritual_rio_landing_view(request):
             (config.resena2_foto, config.resena2_texto, config.resena2_autor),
             (config.resena3_foto, config.resena3_texto, config.resena3_autor),
         ]
+    from django.utils import timezone as _tz
+
     return render(request, 'ventas/ritual_rio_landing.html', {
         'canonical_url': canonical_url,
         'whatsapp_url': whatsapp_url,
         'config': config,
         'resenas': resenas,
+        'hoy': _tz.localdate().isoformat(),
+        'motivo': request.GET.get('motivo', ''),
+        'motivo_fecha': request.GET.get('fecha', ''),
     })
 
 

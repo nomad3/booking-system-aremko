@@ -58,6 +58,18 @@
   .rr-rev .q{font-style:italic;color:#5f5a52;line-height:1.6;margin:0 0 8px}
   .rr-rev .who{font-size:14px;color:#8a7f6c}
   .rr-final{text-align:center;background:#f4f0e9;border-radius:18px;padding:42px 22px}
+  .rr-form{display:flex;flex-direction:column;gap:12px;max-width:380px;margin:0 auto}
+  /* 16px a propósito: bajo eso iOS hace zoom al tocar el campo. */
+  .rr-select{padding:14px 16px;font-size:16px;border:1px solid #d8d2c4;border-radius:12px;
+    background:#fff;color:#3a352e;font-family:inherit;width:100%;}
+  .rr-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    background:#0f6e56;color:#eafaf3;border:0;padding:15px 26px;border-radius:999px;
+    font-size:17px;font-weight:600;cursor:pointer;font-family:inherit}
+  .rr-btn:hover{background:#0c5b48}
+  .rr-o{font-size:15px;color:#8a7f6c;margin:22px 0 0}
+  .rr-o a{color:#0f6e56;text-decoration:underline}
+  .rr-aviso{background:#fff4e5;border:1px solid #f0d9b5;color:#7a5c2e;border-radius:14px;
+    padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.55;text-align:left}
   @media(max-width:600px){.rr-h1{font-size:25px}.rr-lead{font-size:16px}}
 </style>
 {% endblock %}
@@ -188,11 +200,29 @@
 
   <section class="rr-section">
     <div class="rr-final">
+      {% if motivo %}
+      <div class="rr-aviso">
+        {% if motivo == 'no_disponible' %}
+          Esa noche ya no está disponible. Elige otra fecha — o escríbenos y buscamos alternativa.
+        {% elif motivo == 'sin_fecha' %}
+          Elige primero qué noche quieren venir.
+        {% elif motivo == 'precio' %}
+          No pudimos confirmar el precio en este momento. Escríbenos por WhatsApp y lo resolvemos al tiro.
+        {% else %}
+          No pudimos armar tu noche en este momento. Escríbenos por WhatsApp y lo resolvemos al tiro.
+        {% endif %}
+      </div>
+      {% endif %}
       <h2 style="margin:0 0 8px;font-size:26px;font-weight:600">Esta noche podría ser de ustedes</h2>
-      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Quedan pocos cupos por noche.
-        Te coordinamos la fecha por WhatsApp.</p>
-      <a class="rr-cta" href="{{ whatsapp_url }}">Reservar mi noche por WhatsApp</a>
-      <p class="rr-cta-note">Aguas calientes junto al río · Aremko Spa Boutique, Puerto Varas</p>
+      <p style="font-size:17px;color:#5f5a52;margin:0 0 22px">Elige la noche, pagas al tiro y queda confirmada.<br>
+        <strong>$210.000</strong> domingo a jueves · <strong>$240.000</strong> viernes y sábado — para dos.</p>
+      <form class="rr-form" method="post" action="{% url 'ritual_reservar' %}">
+        {% csrf_token %}
+        <input class="rr-select" type="date" name="fecha" required
+               min="{{ hoy }}" aria-label="Elige la noche">
+        <button type="submit" class="rr-btn" id="btnReservarRitual">Reservar y pagar</button>
+      </form>
+      <p class="rr-o">o <a href="{{ whatsapp_url }}">escríbenos por WhatsApp</a> si prefieres coordinarlo conversando</p>
     </div>
   </section>
 
