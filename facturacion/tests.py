@@ -4,6 +4,7 @@ Tests de la lógica de emisión (corren con `python manage.py test facturacion`)
 Cubren: cálculo neto/IVA, filtro por medio de pago, idempotencia del candado
 OneToOne y el modo simulado end-to-end.
 """
+import datetime
 from django.test import TestCase
 
 from facturacion.models import BoletaElectronica, ConfiguracionFacturacion, MedioPago
@@ -180,3 +181,54 @@ class ComparacionDeRutDelCertificado(TestCase):
         self.assertEqual(_solo_digitos('07604892-4'), _solo_digitos('7604892-4'))
         self.assertEqual(_solo_digitos('7.604.892-4'), _solo_digitos('7604892-4'))
         self.assertNotEqual(_solo_digitos('76485192-7'), _solo_digitos('7604892-4'))
+
+
+class ConsumoDeFoliosDelDia(TestCase):
+    """El RCOF es lo que el SII mira para creer que sabemos operar: si los
+    tramos de folios o los montos salen mal, la certificación se cae y, ya en
+    producción, se cae la obligación diaria."""
+
+    def setUp(self):
+        self.config = ConfiguracionFacturacion.get()
+        self.config.rut_emisor = '76485192-7'
+        self.config.rut_firmante = '7604892-4'
+        self.config.fecha_resolucion = datetime.date(2026, 7, 12)
+        self.config.numero_resolucion = 0
+        self.config.save()
+
+    def _boleta(self, folio, neto, iva, total):
+        return BoletaElectronica(folio=folio, monto_neto=neto, monto_iva=iva,
+                                 monto_total=total, tipo_dte=39)
+
+    def test_los_folios_seguidos_se_informan_como_un_tramo(self):
+        from facturacion.services.rcof_builder import _rangos
+
+        self.assertEqual(_rangos([14, 15, 16, 17, 18]), [(14, 18)])
+
+    def test_un_hueco_parte_el_tramo_en_dos(self):
+        from facturacion.services.rcof_builder import _rangos
+
+        self.assertEqual(_rangos([14, 15, 18, 19]), [(14, 15), (18, 19)])
+        self.assertEqual(_rangos([7]), [(7, 7)])
+
+    def test_el_exento_sale_de_la_resta_y_no_se_pierde(self):
+        from facturacion.services.rcof_builder import construir_consumo_folios
+
+        # CASO-4 del set: 12.720 afecto (neto 10.689 + iva 2.031) y 2.000 exento.
+        boletas = [self._boleta(17, 10689, 2031, 14720)]
+        xml, _ = construir_consumo_folios(
+            self.config, datetime.date(2026, 8, 31), boletas)
+        self.assertIn('<MntExento>2000</MntExento>', xml)
+        self.assertIn('<MntTotal>14720</MntTotal>', xml)
+        self.assertIn('<FoliosUtilizados>1</FoliosUtilizados>', xml)
+
+    def test_informa_el_dia_y_la_secuencia_que_se_le_piden(self):
+        from facturacion.services.rcof_builder import construir_consumo_folios
+
+        xml, doc_id = construir_consumo_folios(
+            self.config, datetime.date(2026, 8, 31),
+            [self._boleta(14, 1000, 190, 1190)], secuencia=2)
+        self.assertIn('<FchInicio>2026-08-31</FchInicio>', xml)
+        self.assertIn('<FchFinal>2026-08-31</FchFinal>', xml)
+        self.assertIn('<SecEnvio>2</SecEnvio>', xml)
+        self.assertIn(doc_id, xml)
