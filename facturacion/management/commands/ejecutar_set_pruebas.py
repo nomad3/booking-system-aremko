@@ -3,7 +3,7 @@ Ejecuta el SET DE PRUEBAS de boleta electrónica del SII (certificación P-16).
 
 Los 5 casos están transcritos EXACTOS desde docs/certificacion_sii/Set_Prueba_BE.txt
 (el SII exige informar los caracteres tal cual). Cada boleta referencia su caso
-(TipoDocumento=SET, RazonReferencia=CASO-N) como pide el instructivo.
+(CodRef=SET vía CodigoReferencia=4, RazonRef=CASO-N) como pide el instructivo de BOLETAS.
 
 Flujo: por cada caso asigna folio del CAF de certificación → genera y timbra la
 boleta vía SimpleAPI → guarda BoletaElectronica (sin pago, caso_set=CASO-N).
@@ -131,10 +131,15 @@ class Command(BaseCommand):
             if folio is None:
                 raise CommandError("Sin folios CAF de certificación: corre `solicitar_caf` primero.")
 
+            # BOLETA ≠ factura: la Referencia de boleta solo admite
+            # NroLinRef + CodRef + RazonRef (EnvioBOLETA_v11.xsd). El propio
+            # instructivo del SII lo ejemplifica: <CodRef> SET / <RazonRef>
+            # CASO-1. Mandar TipoDocumento producía <TpoDocRef> — ilegal en
+            # tipo 39: el SII rechazó el sobre entero por schema (LSX-00204,
+            # trackId 32032105, 2026-08-31). CodigoReferencia=4 es el enum
+            # SetPruebas del SDK oficial y serializa <CodRef>SET</CodRef>.
             referencias = [{
-                "TipoDocumento": "SET",
-                "FolioReferencia": str(numero),
-                "FechaDocumentoReferencia": hoy.strftime('%Y-%m-%d'),
+                "CodigoReferencia": 4,
                 "RazonReferencia": caso,
             }]
             documento = simpleapi_client.construir_documento_boleta(

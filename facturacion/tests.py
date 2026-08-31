@@ -136,3 +136,30 @@ class ConsultaDeEstadoDelEnvio(TestCase):
                    return_value={'estado': 'ACEPTADO'}) as consulta:
             call_command('consultar_envio')
         self.assertEqual(consulta.call_args.args[0], 32032105)
+
+
+class LaReferenciaDelSetEsDeBoleta(TestCase):
+    """El rechazo LSX-00204 (trackId 32032105): mandamos TipoDocumento=SET y
+    SimpleAPI serializó <TpoDocRef> — un campo de FACTURA, ilegal en el
+    esquema de boletas. La Referencia de boleta solo admite NroLinRef +
+    CodRef + RazonRef, y el instructivo del SII lo ejemplifica textual:
+    <CodRef> SET / <RazonRef> CASO-1.
+
+    Guarda de fuente: si alguien vuelve a armar la referencia con ojos de
+    factura, esto cae ANTES de quemar folios del CAF."""
+
+    def test_el_set_manda_codref_y_no_tipodocumento(self):
+        import os
+
+        from django.conf import settings
+
+        src = open(os.path.join(settings.BASE_DIR, 'facturacion', 'management',
+                                'commands', 'ejecutar_set_pruebas.py'),
+                   encoding='utf-8').read()
+        self.assertIn('"CodigoReferencia": 4', src)
+        self.assertIn('"RazonReferencia"', src)
+        self.assertNotIn('"TipoDocumento": "SET"', src,
+                         'volvió la referencia estilo factura: el SII la '
+                         'rechaza entera por schema en boletas')
+        self.assertNotIn('"FolioReferencia"', src,
+                         'FolioRef tampoco existe en la Referencia de boleta')
