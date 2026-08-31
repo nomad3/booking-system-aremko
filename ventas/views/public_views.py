@@ -1109,6 +1109,9 @@ def noche_aguas_calientes_landing_view(request):
     ]
 
     return render(request, 'ventas/noche_aguas_calientes_landing.html', {
+        'hoy': timezone.localdate().isoformat(),
+        'motivo': request.GET.get('motivo', ''),
+        'motivo_fecha': request.GET.get('fecha', ''),
         'canonical_url': canonical_url,
         'whatsapp_url': whatsapp_url,
         'config': config,

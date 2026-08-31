@@ -158,6 +158,8 @@ urlpatterns = [
          name='dia_reservar'),
     # Landing INDEXABLE de "Noche de Aguas Calientes" (H-055) — cabaña 1 noche + tina, sin masaje
     path('noche-de-aguas-calientes/', noche_aguas_calientes_landing_view, name='noche_aguas_calientes_landing'),
+    path('noche-de-aguas-calientes/reservar/', reserva_experiencia_view.noche_reservar_view,
+         name='noche_reservar'),
     # Configurador de veladas — DOS puertas, UN motor (ver experiencia_romantica_view).
     # Puerta 1: sorprender a la pareja (de a dos, con invitación secreta).
     path('experiencia-romantica/', experiencia_romantica_view.experiencia_romantica_view, name='experiencia_romantica'),

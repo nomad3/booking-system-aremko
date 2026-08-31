@@ -41,6 +41,11 @@ def _constructor_pausa(fecha):
     return construir_servicios_pausa(fecha)
 
 
+def _constructor_noche(fecha):
+    from whatsapp_agent.packs import construir_servicios_noche
+    return construir_servicios_noche(fecha)
+
+
 # Cada entrada: el constructor de Luna y la landing adonde volver explicando.
 # La base pública no dibuja los mensajes de Django, así que el motivo viaja en
 # la dirección — mismo patrón que el día.
@@ -56,6 +61,10 @@ EXPERIENCIAS = {
     'pausa': {
         'constructor': _constructor_pausa,
         'landing': 'pausa_landing',
+    },
+    'noche': {
+        'constructor': _constructor_noche,
+        'landing': 'noche_aguas_calientes_landing',
     },
 }
 
@@ -160,3 +169,7 @@ def refugio_reservar_view(request):
 
 def pausa_reservar_view(request):
     return _reservar_paquete(request, 'pausa')
+
+
+def noche_reservar_view(request):
+    return _reservar_paquete(request, 'noche')

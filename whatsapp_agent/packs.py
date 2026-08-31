@@ -447,7 +447,8 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
         # $50k + desayuno $20k = $180k, cuando el valor real es $160k.
         desayuno = _desayuno_de_cabana(c['nombre'])
         op = {
-            'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
+            'cabana': {'servicio_id': c['servicio_id'],
+                       'nombre': c['nombre'], 'hora_check_in': '16:00',
                        'hora_check_out': '11:00 del día siguiente', 'precio_total': cab_total},
             'desayuno': desayuno,            # incluido en el precio de la cabaña (NO se suma aparte)
             'desayuno_incluido': True,
@@ -457,7 +458,8 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
             precio_total = cab_total + tina_total   # desayuno YA incluido en cab_total
             descuento = _descuento_pack_cabana(c, tina, f, cabana_hora, tina_hora, personas)
             op.update({
-                'tina': {'nombre': tina['nombre'], 'hora': tina_hora, 'precio_total': tina_total},
+                'tina': {'servicio_id': tina['servicio_id'],
+                         'nombre': tina['nombre'], 'hora': tina_hora, 'precio_total': tina_total},
                 'precio_total': precio_total,
                 'descuento_pack': descuento,
                 'precio_con_descuento': max(0, precio_total - descuento),
@@ -495,12 +497,14 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
                 precio_total = cab_total + t_total
                 desc = _descuento_pack_cabana(c, t, f, cabana_hora, hora_t, personas)
                 alternativas.append({
-                    'cabana': {'nombre': c['nombre'], 'hora_check_in': '16:00',
+                    'cabana': {'servicio_id': c['servicio_id'],
+                               'nombre': c['nombre'], 'hora_check_in': '16:00',
                                'hora_check_out': '11:00 del día siguiente',
                                'precio_total': cab_total},
                     'desayuno': _desayuno_de_cabana(c['nombre']),
                     'desayuno_incluido': True,
-                    'tina': {'nombre': t['nombre'], 'hora': hora_t,
+                    'tina': {'servicio_id': t['servicio_id'],
+                             'nombre': t['nombre'], 'hora': hora_t,
                              'precio_total': t_total},
                     'precio_total': precio_total,
                     'descuento_pack': desc,
@@ -1301,6 +1305,87 @@ def construir_servicios_pausa(fecha):
         'total': suma - descuento,           # = objetivo (110k dom-jue / 130k finde)
         'objetivo': objetivo,
         'itinerario': {'tina': tina, 'masaje': masaje, 'orden': elegido.get('orden')},
+    }
+
+
+# ── Noche de Aguas Calientes (web): cabaña + tina, precio variable «desde» ──
+
+def construir_servicios_noche(fecha):
+    """Arma la Noche de Aguas Calientes (cabaña 1 noche + tina, 2 personas,
+    desayuno incluido en el precio de la cabaña) para la reserva web.
+
+    A diferencia del Ritual/Refugio/Pausa, esta combinación NO tiene precio
+    plano: la landing dice «desde $X». Por eso el armador elige la opción MÁS
+    BARATA disponible (cobrado real, con descuento de pack si aplica) — es la
+    única elección coherente con esa promesa — y declara ese cobrado como
+    `objetivo`, que la vista genérica blinda igual que a los demás. El precio
+    exacto se le muestra al cliente en el checkout ANTES de pagar.
+    """
+    from ventas.models import Servicio
+    from .availability import _parse_fecha
+
+    f = _parse_fecha(fecha)
+    if f is None:
+        return {'fecha': None, 'disponible': False, 'falta_fecha': True,
+                'nota': 'No dijo para qué noche. Pregúntale la fecha.'}
+
+    r = disponibilidad_pack_cabana_tina(fecha, personas=2)
+    if r.get('error'):
+        return {'error': r['error']}
+    opciones = [o for o in (r.get('opciones') or []) if o.get('tina')]
+    if not opciones:
+        return {'fecha': f.isoformat(), 'disponible': False,
+                'nota': r.get('nota') or 'no hay cabaña con tina esa noche'}
+
+    def _cobrado(o):
+        return int(o['precio_con_descuento'] if o.get('hay_descuento')
+                   else o['precio_total'])
+
+    elegido = min(opciones, key=_cobrado)
+    objetivo = _cobrado(elegido)
+
+    def _pb(servicio_id):
+        srv = Servicio.objects.filter(id=servicio_id).first()
+        return int(srv.precio_base) if srv else 0
+
+    cab, tina = elegido['cabana'], elegido['tina']
+    pb_cab, pb_tina = _pb(cab['servicio_id']), _pb(tina['servicio_id'])
+    if not pb_cab or not pb_tina:
+        return {'error': 'falta el precio de la cabaña o la tina en el catálogo'}
+    servicios = [
+        {'servicio_id': cab['servicio_id'], 'fecha': f.isoformat(),
+         'hora': '16:00',
+         'cantidad_personas': round(cab['precio_total'] / pb_cab)},
+        {'servicio_id': tina['servicio_id'], 'fecha': f.isoformat(),
+         'hora': tina['hora'],
+         'cantidad_personas': round(tina['precio_total'] / pb_tina)},
+    ]
+    suma = sum(_pb(x['servicio_id']) * x['cantidad_personas'] for x in servicios)
+    descuento = max(0, suma - objetivo)
+    if descuento:
+        ds = _servicio_descuento()
+        if ds is None:
+            return {'error': 'no existe el servicio "Descuento de servicios" '
+                             'para clavar el total'}
+        pb = int(ds.precio_base)
+        if pb >= 0:
+            return {'error': f'el servicio de descuento tiene precio_base {pb} '
+                             f'(debería ser negativo)'}
+        servicios.append({'servicio_id': ds.id, 'fecha': f.isoformat(),
+                          'hora': '16:00',
+                          'cantidad_personas': round(descuento / abs(pb))})
+
+    return {
+        'disponible': True,
+        'fecha': f.isoformat(),
+        'personas': 2,
+        'servicios': servicios,
+        'suma_componentes': suma,
+        'descuento': descuento,
+        'total': suma - descuento,
+        'objetivo': objetivo,
+        'itinerario': {'cabana': cab, 'tina': tina,
+                       'desayuno_incluido': True},
     }
 
 
