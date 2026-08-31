@@ -1,5 +1,11 @@
 # BRIEF P-16 · Boletas electrónicas SII automáticas (SimpleAPI)
 
+> **2026-08-31 — DESTRABADO**: reintento idempotente de `ejecutar_set_pruebas`
+> (job Render one-liner) → **Envío OK, trackId=32032105, estado=REC**. El 500
+> de julio era la habilitación de recepción propagándose en el SII, no
+> SimpleAPI. Siguiente: consultar aceptación del track y seguir el runbook.
+
+
 _Estado al 2026-07-13 (domingo) — **CERTIFICACIÓN EN CURSO**: postulación SII
 aceptada, credenciales verificadas, CAF cert 1-50 cargado, y las **5 boletas
 del set TIMBRADAS** (folios 1-5, incluye caso exento y unidad Kg, referencias

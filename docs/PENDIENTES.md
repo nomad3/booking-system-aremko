@@ -48,10 +48,11 @@ _Última revisión: 2026-08-20 (P-33 cerrado; P-34 carta EN PROD, revisar result
     gratuito (solo al final; antes del switch: respaldar documentos del portal
     + OK del contador). **CERTIFICACIÓN 2026-07-12 PM**: CAF cert 1-50 cargado
     vía API + las 5 BOLETAS DEL SET TIMBRADAS (folios 1-5, exento y Kg OK).
-    Pendiente SOLO el envío del sobre: SII cert responde 500 (4 intentos,
-    sábado; reintento nocturno programado; comando idempotente
-    `ejecutar_set_pruebas` reutiliza lo timbrado). Bitácora en admin (caso
-    __LOG__). Si persiste → soporte SimpleAPI. Después: declarar avance +
+    **SOBRE ENVIADO Y RECIBIDO 2026-08-31**: reintento idempotente tras 6
+    semanas → `Envío OK — trackId=32032105 estado=REC`. El 500 de julio ERA
+    propagación del SII (no SimpleAPI). Falta: consultar aceptación del track
+    → declarar avance + muestras impresas → declaración de cumplimiento
+    (Jorge) → switch producción. Después: declarar avance +
     muestras impresas → declaración de cumplimiento (Jorge) → switch
     producción. F2 (cola automática) y F3 (notas de crédito) tras el switch.
     F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
