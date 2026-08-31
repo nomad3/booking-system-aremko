@@ -15,7 +15,11 @@ from facturacion.services import simpleapi_client
 
 
 def _solo_digitos(rut):
-    return ''.join(c for c in (rut or '') if c.isalnum()).upper()
+    """Normaliza un RUT para compararlo: sin puntos, sin guión y SIN ceros de
+    relleno. El certificado trae 07604892-4 y la configuración 7604892-4: es
+    el mismo RUT, y compararlos literalmente hacía gritar «no coincide»."""
+    limpio = ''.join(c for c in (rut or '') if c.isalnum()).upper()
+    return limpio.lstrip('0')
 
 
 class Command(BaseCommand):

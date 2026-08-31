@@ -166,3 +166,17 @@ class LaReferenciaDelSetEsDeBoleta(TestCase):
                          'rechaza entera por schema en boletas')
         self.assertNotIn('"FolioReferencia"', src,
                          'FolioRef tampoco existe en la Referencia de boleta')
+
+
+class ComparacionDeRutDelCertificado(TestCase):
+    """El certificado de e-certchile trae el RUT con cero de relleno
+    (07604892-4) y la configuración lo guarda sin él (7604892-4). Comparar
+    literalmente acusaba un error de configuración que no existía y mandaba
+    el diagnóstico por el camino equivocado."""
+
+    def test_el_cero_de_relleno_no_hace_distintos_dos_ruts_iguales(self):
+        from facturacion.management.commands.ver_certificado import _solo_digitos
+
+        self.assertEqual(_solo_digitos('07604892-4'), _solo_digitos('7604892-4'))
+        self.assertEqual(_solo_digitos('7.604.892-4'), _solo_digitos('7604892-4'))
+        self.assertNotEqual(_solo_digitos('76485192-7'), _solo_digitos('7604892-4'))
