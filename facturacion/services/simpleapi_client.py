@@ -49,6 +49,10 @@ PATH_ENVIAR_SII = '/api/v1/envio/enviar'
 # Models/Estados/ConsultaTrackID.cs + Services/ApiBase.cs → api.simpleapi.cl/api/v1/).
 PATH_CONSULTA_ENVIO = '/api/v1/consulta/envio'
 
+# Tipos de envío al SII (enum TipoEnvio.EnvioType del SDK oficial).
+TIPO_ENVIO_BOLETA = 2
+TIPO_ENVIO_RVD = 4  # Registro de Ventas Diarias, el ex-RCOF
+
 RUT_SII = '60803000-K'
 TIMEOUT = 90
 
@@ -241,9 +245,47 @@ def generar_sobre(xmls_dte, cert_bytes, cert_password, config):
     return sobre
 
 
+def generar_rvd(xmls_dte, cert_bytes, cert_password, config, fecha,
+                secuencia=1):
+    """Genera el Registro de Ventas Diarias (ex-RCOF) del día.
+
+    El SII exige, junto al set de boletas, el reporte de consumo de folios: qué
+    folios se usaron ese día y por cuánto. Se arma con el MISMO endpoint del
+    sobre, cambiando el tipo de envío a RVD (4) — el catálogo público de la API
+    (swagger) y el enum del SDK oficial (TipoEnvio.EnvioType.RVD = 4) lo
+    confirman: no existe un endpoint aparte de «consumo de folios».
+    """
+    dia = fecha.strftime('%Y-%m-%d')
+    caratula = {
+        "RutEmisor": config.rut_emisor,
+        "RutReceptor": RUT_SII,
+        "FechaResolucion": config.fecha_resolucion.strftime('%Y-%m-%d')
+                           if config.fecha_resolucion else '',
+        "NumeroResolucion": config.numero_resolucion,
+        # Propios del RVD: el día que se reporta y el número de envío de ese día.
+        "FechaEnvio": dia,
+        "FechaInicio": dia,
+        "FechaFinal": dia,
+        "SecEnvio": str(secuencia),
+    }
+    input_json = {
+        "Certificado": {"Rut": config.rut_firmante, "Password": cert_password},
+        "Caratula": caratula,
+        "Tipo": TIPO_ENVIO_RVD,
+    }
+    archivos = [('files', 'certificado.pfx', cert_bytes, 'application/x-pkcs12')]
+    for i, xml in enumerate(xmls_dte, start=2):
+        archivos.append((f'files{i}', f'dte_{i - 1}.xml',
+                         xml.encode('ISO-8859-1', errors='replace'), 'text/xml'))
+    rvd = _post_multipart(BASE_URL + PATH_GENERAR_SOBRE, input_json, archivos)
+    if '<ConsumoFolios' not in rvd:
+        raise SimpleAPIError(f"Respuesta sin ConsumoFolios: {rvd[:400]}")
+    return rvd
+
+
 def enviar_sobre(sobre_xml, cert_bytes, cert_password, config, ambiente_num, tipo=2):
-    """Envía el sobre al SII. tipo: 1=EnvioDTE, 2=EnvioBoleta. Devuelve dict
-    con trackId/estado/ok según SimpleAPI."""
+    """Envía el sobre al SII. tipo: 1=EnvioDTE, 2=EnvioBoleta, 4=RVD
+    (consumo de folios). Devuelve dict con trackId/estado/ok según SimpleAPI."""
     input_json = {
         "Certificado": {"Rut": config.rut_firmante, "Password": cert_password},
         "Ambiente": ambiente_num,
