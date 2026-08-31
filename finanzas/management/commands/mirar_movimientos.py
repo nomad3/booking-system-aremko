@@ -25,6 +25,9 @@ class Command(BaseCommand):
         parser.add_argument('--texto', type=str, default='',
                             help='Parte de la descripción.')
         parser.add_argument('--limite', type=int, default=60)
+        parser.add_argument('--completo', action='store_true',
+                            help='Glosa entera y referencia: para comparar dos '
+                                 'movimientos que parecen el mismo.')
         parser.add_argument('--cuentas', action='store_true',
                             help='Solo listar las cuentas y sus totales.')
 
@@ -54,7 +57,15 @@ class Command(BaseCommand):
             monto = f'${int(m.monto):,}'.replace(',', '.')
             par = f' ⇄ #{m.traspaso_par_id}' if m.traspaso_par_id else ''
             cat = m.categoria.nombre if m.categoria else '—'
-            self.stdout.write(
-                f'  #{m.id:<6} {m.fecha} {m.cuenta.nombre[:22]:<22} '
-                f'{m.clase:<8} {m.sentido:<5} {monto:>12} · {cat[:22]:<22} '
-                f'· {m.descripcion[:46]}{par}')
+            if o['completo']:
+                self.stdout.write(
+                    f'  #{m.id:<6} {m.fecha} {m.cuenta.nombre} · {m.clase} '
+                    f'{monto} · {cat}{par}')
+                self.stdout.write(f'         glosa: «{m.descripcion}»')
+                self.stdout.write(f'         ref:   «{m.referencia}» '
+                                  f'· fuente {m.fuente}')
+            else:
+                self.stdout.write(
+                    f'  #{m.id:<6} {m.fecha} {m.cuenta.nombre[:22]:<22} '
+                    f'{m.clase:<8} {m.sentido:<5} {monto:>12} · {cat[:22]:<22} '
+                    f'· {m.descripcion[:46]}{par}')
