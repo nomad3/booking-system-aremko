@@ -39,6 +39,49 @@ def firma_exacta(mov):
     return (mov.fecha, int(mov.monto), (mov.descripcion or '').strip())
 
 
+def _glosa_normalizada(mov):
+    """La glosa sin espacios repetidos, para comparar recortes."""
+    return ' '.join((mov.descripcion or '').split()).upper()
+
+
+def agrupar_por_recorte(movs):
+    """Duplicados que la glosa IDÉNTICA no ve: la misma línea, recortada
+    distinto por el banco o por el parser.
+
+    El 19-08-2026 entraron cinco compras dos veces en Scotiabank ($355.295):
+    «REDCOMPRA LAPIZ LOPEZ      PUE» y «REDCOMPRA LAPIZ LOPEZ» son la misma
+    compra, pero la referencia se calcula sobre la glosa y al cambiar el
+    recorte cambió la llave de idempotencia.
+
+    El criterio es estrecho a propósito: misma cuenta, misma fecha, mismo
+    monto, y una glosa PREFIJO de la otra. No basta con «mismo comercio»,
+    porque las comisiones de Mercado Pago y SumUp llevan el id de la venta y
+    dos ventas distintas del mismo monto no son un duplicado — ahí ninguna
+    glosa es prefijo de la otra.
+    """
+    grupos, usados = [], set()
+    lista = sorted(movs, key=lambda m: (m.fecha, int(m.monto), m.cuenta_id, m.id))
+    for i, a in enumerate(lista):
+        if a.id in usados:
+            continue
+        familia = [a]
+        ga = _glosa_normalizada(a)
+        for b in lista[i + 1:]:
+            if (b.fecha, int(b.monto), b.cuenta_id) != (a.fecha, int(a.monto),
+                                                        a.cuenta_id):
+                continue
+            if b.id in usados:
+                continue
+            gb = _glosa_normalizada(b)
+            if ga != gb and (ga.startswith(gb) or gb.startswith(ga)):
+                familia.append(b)
+        if len(familia) > 1:
+            for m in familia:
+                usados.add(m.id)
+            grupos.append(familia)
+    return grupos
+
+
 def firma_comercio(mov):
     """Para la ATRIBUCIÓN doble: el mismo cobro visto desde dos medios de
     pago, donde cada fuente escribe la glosa a su manera."""
@@ -117,10 +160,19 @@ class Command(BaseCommand):
                         f'{m.fuente:<8} {(m.descripcion or "")[:52]}')
             return total
 
+        recortes = {(g[0].fecha, int(g[0].monto), _glosa_normalizada(g[0])[:40]): g
+                    for g in agrupar_por_recorte(movs)
+                    if not _misma_carga(g)}
+        if opts['solo']:
+            aguja = opts['solo'].upper()
+            recortes = {k: v for k, v in recortes.items() if aguja in k[2]}
+
         sobra_misma = _mostrar('MISMA CUENTA (doble carga)', misma)
+        sobra_recorte = _mostrar('MISMA CUENTA (misma línea, recorte distinto)',
+                                 recortes)
         sobra_dist = _mostrar('CUENTAS DISTINTAS (atribución)', distintas)
         self.stdout.write(f'\nSobrante total estimado: '
-                          f'{_clp(sobra_misma + sobra_dist)}')
+                          f'{_clp(sobra_misma + sobra_recorte + sobra_dist)}')
 
         objetivo = opts['eliminar_de']
         if not objetivo:
