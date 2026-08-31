@@ -3,7 +3,7 @@ Ejecuta el SET DE PRUEBAS de boleta electrónica del SII (certificación P-16).
 
 Los 5 casos están transcritos EXACTOS desde docs/certificacion_sii/Set_Prueba_BE.txt
 (el SII exige informar los caracteres tal cual). Cada boleta referencia su caso
-(CodRef=SET vía CodigoReferencia=4, RazonRef=CASO-N) como pide el instructivo de BOLETAS.
+(CodRef=SET, RazonRef=CASO-N) como pide el instructivo de BOLETAS.
 
 Flujo: por cada caso asigna folio del CAF de certificación → genera y timbra la
 boleta vía SimpleAPI → guarda BoletaElectronica (sin pago, caso_set=CASO-N).
@@ -121,7 +121,7 @@ class Command(BaseCommand):
         for numero, (caso, detalles) in enumerate(CASOS, start=1):
             existente = (BoletaElectronica.objects
                          .filter(caso_set=caso, ambiente='certificacion')
-                         .exclude(estado='error').first())
+                         .exclude(estado='error').order_by('-folio').first())
             if existente and existente.xml_dte and not options['regenerar']:
                 self._bitacora(f"{caso}: ya generado (folio {existente.folio}) — se reutiliza.")
                 boletas.append(existente)
@@ -139,7 +139,13 @@ class Command(BaseCommand):
             # trackId 32032105, 2026-08-31). CodigoReferencia=4 es el enum
             # SetPruebas del SDK oficial y serializa <CodRef>SET</CodRef>.
             referencias = [{
-                "CodigoReferencia": 4,
+                # null EXPLÍCITO: si omitimos la llave, SimpleAPI igual emite
+                # <TpoDocRef/> vacío y el SII rechaza el sobre entero (LSX-00204,
+                # trackId 32032105). Mandado en null, el campo desaparece.
+                "TipoDocumento": None,
+                # "SET" textual, como pide el instructivo. El 4 (enum del SDK)
+                # salía literal <CodRef>4</CodRef>: no es lo que el SII espera.
+                "CodigoReferencia": "SET",
                 "RazonReferencia": caso,
             }]
             documento = simpleapi_client.construir_documento_boleta(

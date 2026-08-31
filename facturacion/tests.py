@@ -156,7 +156,10 @@ class LaReferenciaDelSetEsDeBoleta(TestCase):
         src = open(os.path.join(settings.BASE_DIR, 'facturacion', 'management',
                                 'commands', 'ejecutar_set_pruebas.py'),
                    encoding='utf-8').read()
-        self.assertIn('"CodigoReferencia": 4', src)
+        self.assertIn('"CodigoReferencia": "SET"', src)
+        self.assertIn('"TipoDocumento": None', src,
+                      'sin el null explícito, SimpleAPI emite <TpoDocRef/> '
+                      'vacío y el SII rechaza el sobre completo')
         self.assertIn('"RazonReferencia"', src)
         self.assertNotIn('"TipoDocumento": "SET"', src,
                          'volvió la referencia estilo factura: el SII la '
