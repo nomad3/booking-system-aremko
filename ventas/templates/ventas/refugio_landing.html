@@ -343,13 +343,13 @@
         <h1>{{ config.hero_title }}</h1>
         <p class="lead">{{ config.hero_subtitle }}</p>
         <div class="refugio-hero-ctas">
+            <a href="#refugio-formulario" class="btn-whatsapp-refugio" data-event="refugio_hero_cta_click">
+                Reservar y pagar
+            </a>
             <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24{{ config.precio_fmt }}).%20%5BRefugio%5D"
                target="_blank" rel="noopener"
-               class="btn-whatsapp-refugio" data-event="refugio_whatsapp_click">
-                <i class="fab fa-whatsapp"></i> Reservar por WhatsApp
-            </a>
-            <a href="#refugio-formulario" class="btn-refugio btn-secundario" data-event="refugio_hero_cta_click">
-                {{ config.hero_cta_text }}
+               class="btn-refugio btn-secundario" data-event="refugio_whatsapp_click">
+                <i class="fab fa-whatsapp"></i> o por WhatsApp
             </a>
         </div>
         <div class="refugio-trust-strip">
@@ -580,64 +580,25 @@
         </div>
 
         <div class="refugio-form-card">
-            <form id="refugio-form" method="post" action="{% url 'refugio_submit' %}" novalidate>
-                {% csrf_token %}
-                {# UTM hidden inputs — capturados desde GET por la view #}
-                <input type="hidden" name="utm_source" value="{{ request.GET.utm_source|default:'' }}">
-                <input type="hidden" name="utm_medium" value="{{ request.GET.utm_medium|default:'' }}">
-                <input type="hidden" name="utm_campaign" value="{{ request.GET.utm_campaign|default:'' }}">
-                <input type="hidden" name="utm_content" value="{{ request.GET.utm_content|default:'' }}">
-                <input type="hidden" name="utm_term" value="{{ request.GET.utm_term|default:'' }}">
-
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label for="refugio-nombre" class="form-label">Nombre *</label>
-                        <input type="text" class="form-control" id="refugio-nombre" name="nombre" required maxlength="120">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="refugio-telefono" class="form-label">WhatsApp *</label>
-                        <input type="tel" class="form-control" id="refugio-telefono" name="telefono" required placeholder="+56 9 ..." maxlength="30">
-                    </div>
-                    <div class="col-12">
-                        <label for="refugio-email" class="form-label">Email <span class="text-muted">(opcional)</span></label>
-                        <input type="email" class="form-control" id="refugio-email" name="email" maxlength="254">
-                    </div>
-                    <div class="col-12">
-                        <details>
-                            <summary class="refugio-detalles-toggle"><i class="fas fa-plus-circle me-1"></i>Agregar detalles (opcional)</summary>
-                            <div class="row g-3 mt-1">
-                                <div class="col-md-6">
-                                    <label for="refugio-ciudad" class="form-label">Ciudad de origen</label>
-                                    <input type="text" class="form-control" id="refugio-ciudad" name="ciudad_origen" placeholder="Ej: Santiago, Concepción, Puerto Montt" maxlength="120">
-                                </div>
-                                <div class="col-md-3">
-                                    <label for="refugio-fecha" class="form-label">Fecha tentativa</label>
-                                    <input type="date" class="form-control" id="refugio-fecha" name="fecha_tentativa">
-                                </div>
-                                <div class="col-md-3">
-                                    <label for="refugio-personas" class="form-label">Personas</label>
-                                    <input type="number" class="form-control" id="refugio-personas" name="num_personas" value="2" min="1" max="20">
-                                </div>
-                                <div class="col-12">
-                                    <label for="refugio-mensaje" class="form-label">Mensaje</label>
-                                    <textarea class="form-control" id="refugio-mensaje" name="mensaje" rows="2" placeholder="¿Alguna preferencia o consulta?"></textarea>
-                                </div>
-                            </div>
-                        </details>
-                    </div>
-                    <div class="col-12 text-center mt-3">
-                        <button type="submit" class="btn-refugio" id="refugio-submit-btn">
-                            <i class="fas fa-paper-plane me-2"></i>Quiero que me contacten
-                        </button>
-                        <p class="text-muted small mt-2 mb-0">
-                            O reserva directo por
-                            <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko%20(2%20noches%20%24{{ config.precio_fmt }}).%20%5BRefugio%5D"
-                               target="_blank" rel="noopener" data-event="refugio_whatsapp_click">WhatsApp</a>
-                        </p>
-                    </div>
-                </div>
-
-                <div id="refugio-form-result" class="mt-4" role="status" aria-live="polite"></div>
+            {% if motivo %}
+            <div style="background:#fff4e5;border:1px solid #f0d9b5;color:#7a5c2e;border-radius:14px;padding:14px 18px;margin:0 0 22px;font-size:15px;line-height:1.55;text-align:left">
+              {% if motivo == 'no_disponible' %}Esas noches ya no están disponibles. Elige otra fecha de llegada — o escríbenos y buscamos alternativa.
+              {% elif motivo == 'sin_fecha' %}Elige primero la fecha de llegada.
+              {% else %}No pudimos armar tu Refugio en este momento. Escríbenos por WhatsApp y lo resolvemos al tiro.{% endif %}
+            </div>
+            {% endif %}
+            <form method="post" action="{% url 'refugio_reservar' %}" style="display:flex;flex-direction:column;gap:12px;max-width:380px;margin:0 auto">
+              {% csrf_token %}
+              <p style="font-size:17px;margin:0 0 4px">Elige la <strong>fecha de llegada</strong> — son 2 noches, misma cabaña.<br>
+                <strong>${{ precio_motor }}</strong> para dos, todo incluido. Pagas ahora y queda confirmado.</p>
+              {# 16px a propósito: bajo eso iOS hace zoom al tocar el campo. #}
+              <input type="date" name="fecha" required min="{{ hoy }}" aria-label="Fecha de llegada"
+                     style="padding:14px 16px;font-size:16px;border:1px solid #d8d2c4;border-radius:12px;background:#fff;color:#3a352e;font-family:inherit;width:100%">
+              <button type="submit" class="btn-whatsapp-refugio" style="border:0;cursor:pointer;font-family:inherit">
+                Reservar y pagar ${{ precio_motor }}</button>
+              <p style="font-size:15px;color:#8a7f6c;margin:10px 0 0">o
+                <a href="https://wa.me/56957902525?text=Hola%2C%20quiero%20reservar%20el%20Refugio%20Aremko" style="color:#0f6e56;text-decoration:underline">escríbenos por WhatsApp</a>
+                si prefieres coordinarlo conversando</p>
             </form>
         </div>
     </div>
@@ -681,6 +642,7 @@
     var form = document.getElementById('refugio-form');
     var btn = document.getElementById('refugio-submit-btn');
     var result = document.getElementById('refugio-form-result');
+    if (!form || !btn) { return; }
 
     if (!form) return;
 

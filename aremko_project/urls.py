@@ -142,6 +142,8 @@ urlpatterns = [
     # (el real vive bajo /ventas/); sin esto, 'Darse de baja' daba 404.
     path('unsubscribe/<str:email>/', unsubscribe_view, name='unsubscribe_root'),
     path('refugio/', refugio_landing_view, name='refugio_landing'),
+    path('refugio/reservar/', reserva_experiencia_view.refugio_reservar_view,
+         name='refugio_reservar'),
     path('refugio/submit/', refugio_submit_view, name='refugio_submit'),
     # Landing OCULTA (noindex, no enlazada, fuera del sitemap) — producto insignia ritual del río
     path('ritual-del-rio/', ritual_rio_landing_view, name='ritual_rio_landing'),

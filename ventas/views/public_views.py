@@ -857,10 +857,21 @@ def refugio_landing_view(request):
     if utm_data:
         request.session['refugio_utm'] = utm_data
 
+    from django.utils import timezone as _tz
+
+    from whatsapp_agent.packs import REFUGIO_PRECIO_PLANO
+
     context = {
         'config': config,
         'imagenes': imagenes,
         'canonical_url': canonical_url,
+        'hoy': _tz.localdate().isoformat(),
+        'motivo': request.GET.get('motivo', ''),
+        'motivo_fecha': request.GET.get('fecha', ''),
+        # El precio del FORMULARIO de pago es el del MOTOR (el que se cobra),
+        # no el editable de RefugioConfig: si divergen, que se note acá y no
+        # en el checkout.
+        'precio_motor': f'{REFUGIO_PRECIO_PLANO:,}'.replace(',', '.'),
         # Bloques SEO consumidos por base_public.html
         'page_title': config.seo_title,
         'meta_description': config.seo_description,

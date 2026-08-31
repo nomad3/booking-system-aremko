@@ -31,6 +31,11 @@ def _constructor_ritual(fecha):
     return construir_servicios_ritual(fecha)
 
 
+def _constructor_refugio(fecha):
+    from whatsapp_agent.packs import construir_servicios_refugio
+    return construir_servicios_refugio(fecha)
+
+
 # Cada entrada: el constructor de Luna y la landing adonde volver explicando.
 # La base pública no dibuja los mensajes de Django, así que el motivo viaja en
 # la dirección — mismo patrón que el día.
@@ -38,6 +43,10 @@ EXPERIENCIAS = {
     'ritual': {
         'constructor': _constructor_ritual,
         'landing': 'ritual_rio_landing',
+    },
+    'refugio': {
+        'constructor': _constructor_refugio,
+        'landing': 'refugio_landing',
     },
 }
 
@@ -134,3 +143,7 @@ def _reservar_paquete(request, clave):
 
 def ritual_reservar_view(request):
     return _reservar_paquete(request, 'ritual')
+
+
+def refugio_reservar_view(request):
+    return _reservar_paquete(request, 'refugio')
