@@ -950,6 +950,28 @@ class TarjetaCelularDelPanel(TestCase):
         self.assertLess(html.find('Celular'), html.find('CRM y Marketing'),
                         'la tarjeta Celular tiene que ir primera')
 
+    def test_TODAS_las_opciones_vuelven_al_menu(self):
+        """Jorge (30-08): cada opción de la tarjeta Celular debe tener su
+        botón de volver al menú. Se recorren las SEIS páginas del circuito
+        (las 5 de la tarjeta + la tarjeta de reserva misma) y en cada una se
+        exige el enlace a /admin/. La agenda ya lo tenía; el resto se agregó."""
+        cliente = Cliente.objects.create(nombre='Vuelta', telefono='+56900004444')
+        venta = VentaReserva.objects.create(cliente=cliente)
+        self.client.force_login(self.staff)
+        paginas = (
+            reverse('ventas:nueva_reserva'),
+            reverse('ventas:tarjetas_lista'),
+            reverse('ventas:agenda_operativa'),
+            reverse('ventas:servicios_vendidos'),
+            reverse('ventas:embudo_luna'),
+            reverse('ventas:tarjeta_reserva', args=[venta.pk]),
+        )
+        for url in paginas:
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 200, f'{url} no se dibujó')
+            self.assertIn('href="/admin/"', r.content.decode(),
+                          f'{url} no ofrece la vuelta al menú')
+
     def test_servicios_vendidos_deriva_a_la_tarjeta_no_al_admin(self):
         """Guarda de fuente, como la de la agenda: si alguien devuelve el
         enlace al admin viejo en el reporte, esto cae."""
