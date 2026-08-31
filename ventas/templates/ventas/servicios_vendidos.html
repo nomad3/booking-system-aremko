@@ -251,7 +251,7 @@
             {% for servicio in servicios %}
             <tr>
                 <td class="px-4 py-3">
-                    <a href="{% url 'admin:ventas_ventareserva_change' servicio.venta_reserva_id %}">
+                    <a href="{% url 'ventas:tarjeta_reserva' servicio.venta_reserva_id %}">
                         {{ servicio.venta_reserva_id }}
                     </a>
                 </td>

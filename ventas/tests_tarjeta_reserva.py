@@ -927,3 +927,38 @@ class ListaMovilDeReservas(TestCase):
         changelist = self.client.get(
             reverse('admin:ventas_ventareserva_changelist')).content.decode()
         self.assertIn(self.url, changelist)
+
+
+class TarjetaCelularDelPanel(TestCase):
+    """La tarjeta «📱 Celular» del panel de control (Jorge, 30-08): junta la
+    operación diaria del teléfono y va PRIMERA. Y el reporte de servicios
+    vendidos deriva sus ediciones a la tarjeta móvil, no al admin viejo.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_superuser(
+            username='panel_test', email='pn@test.cl', password='x')
+
+    def test_el_panel_ofrece_las_cinco_y_la_tarjeta_va_primera(self):
+        self.client.force_login(self.staff)
+        html = self.client.get(reverse('admin:index')).content.decode()
+        for destino in ('nueva_reserva', 'tarjetas_lista', 'agenda_operativa',
+                        'servicios_vendidos', 'embudo_luna'):
+            self.assertIn(reverse(f'ventas:{destino}'), html,
+                          f'al panel le falta el botón de {destino}')
+        self.assertLess(html.find('Celular'), html.find('CRM y Marketing'),
+                        'la tarjeta Celular tiene que ir primera')
+
+    def test_servicios_vendidos_deriva_a_la_tarjeta_no_al_admin(self):
+        """Guarda de fuente, como la de la agenda: si alguien devuelve el
+        enlace al admin viejo en el reporte, esto cae."""
+        import os
+
+        from django.conf import settings
+
+        src = open(os.path.join(settings.BASE_DIR, 'ventas', 'templates',
+                                'ventas', 'servicios_vendidos.html'),
+                   encoding='utf-8').read()
+        self.assertNotIn('ventas_ventareserva_change', src)
+        self.assertIn("'ventas:tarjeta_reserva'", src)

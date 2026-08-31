@@ -45,6 +45,31 @@
         </div>
         {% else %}
 
+        <!-- Celular: la operación diaria desde el teléfono (Jorge, 2026-08-30).
+             Va PRIMERA: junta crear/buscar reserva (tarjeta móvil), agenda,
+             servicios vendidos y el embudo de Luna. Tocar la tarjeta abre la
+             lista de reservas — el uso más frecuente. -->
+        <div class="col-lg-4 col-md-6 col-sm-12">
+            <a href="{% url 'ventas:tarjetas_lista' %}" class="text-decoration-none">
+                <div class="card h-100 text-center card-hover">
+                    <div class="card-body">
+                        <div style="font-size:2.4rem;">📱</div>
+                        <h5 class="card-title">Celular</h5>
+                        <p class="card-text text-muted">Operación diaria desde el teléfono.</p>
+                        <div class="mt-2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;">
+                            <a href="{% url 'ventas:nueva_reserva' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">➕ Crear reserva</a>
+                            <a href="{% url 'ventas:tarjetas_lista' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">📋 Buscar / editar</a>
+                            <a href="{% url 'ventas:agenda_operativa' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">📅 Agenda del día</a>
+                            <a href="{% url 'ventas:servicios_vendidos' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">🛎 Servicios vendidos</a>
+                        </div>
+                        <div class="mt-1" style="display: grid; grid-template-columns: repeat(1, 1fr); gap: 5px;">
+                            <a href="{% url 'ventas:embudo_luna' %}" class="btn btn-sm btn-outline-primary" style="font-size: 11px;" onclick="event.stopPropagation();">🔻 Embudo de Luna (WhatsApp)</a>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
         <!-- CRM Section Card -->
         <div class="col-lg-4 col-md-6 col-sm-12">
             <a href="{% url 'ventas:admin_section_crm' %}" class="text-decoration-none"> {# Link to the new section view URL #}
