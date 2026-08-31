@@ -18,6 +18,10 @@ class Command(BaseCommand):
     help = 'Consulta al SII el estado de un envío por trackId (vía SimpleAPI).'
 
     def add_arguments(self, parser):
+        parser.add_argument('--clasico', action='store_true',
+                            help='Consultar el canal clásico (subida web) en vez '
+                                 'del servidor REST de boletas: son numeraciones '
+                                 'distintas y no se ven entre sí.')
         parser.add_argument('--trackid', type=int, default=None,
                             help='TrackId a consultar (default: el del set de pruebas).')
 
@@ -39,6 +43,10 @@ class Command(BaseCommand):
         ambiente_num = 0 if config.ambiente != 'produccion' else 1
         self.stdout.write(f'Consultando trackId={track_id} '
                           f'(ambiente={"cert" if ambiente_num == 0 else "prod"})...')
+        # El canal clásico (subida web, trackId de 10 dígitos) y el servidor
+        # REST de boletas (8 dígitos) son numeraciones distintas: preguntarle
+        # a uno por el número del otro devuelve «no existe».
         r = simpleapi_client.consultar_estado_envio(
-            track_id, cert_bytes, cert_password, config, ambiente_num)
+            track_id, cert_bytes, cert_password, config, ambiente_num,
+            servidor_boleta=not opts['clasico'])
         self.stdout.write(f'RESPUESTA: {r}')
