@@ -25,8 +25,13 @@ class Command(BaseCommand):
             raise CommandError(f'No está el XSD en {XSD}')
         schema = etree.XMLSchema(etree.parse(str(XSD)))
 
-        boletas = list(BoletaElectronica.objects
-                       .filter(caso_set__startswith='CASO').order_by('folio'))
+        # La ÚLTIMA de cada caso: al regenerar, las anteriores quedan en la
+        # base y meterlas al sobre reporta errores ya arreglados.
+        ultimas = {}
+        for b in (BoletaElectronica.objects
+                  .filter(caso_set__startswith='CASO').order_by('folio')):
+            ultimas[b.caso_set] = b
+        boletas = [ultimas[c] for c in sorted(ultimas)]
         if not boletas:
             raise CommandError('No hay boletas del set.')
         if not simpleapi_client.credenciales_listas():
