@@ -73,3 +73,66 @@ class EmisionTest(TestCase):
         pago = self._pago(metodo='flow')  # sin fila MedioPago
         boleta, _ = emitir_boleta_para_pago(pago)
         self.assertIsNone(boleta)
+
+
+class ConsultaDeEstadoDelEnvio(TestCase):
+    """P-16: consultar al SII el estado de un envío por trackId (2026-08-31).
+
+    Cierra el ciclo del set: el sobre quedó REC (trackId 32032105) y esto
+    pregunta si el SII lo ACEPTÓ. El endpoint viene del código fuente público
+    del SDK oficial (POST /api/v1/consulta/envio, multipart input + .pfx),
+    con el mismo contrato multipart del hermano enviar_sobre.
+    """
+
+    def _config(self):
+        from facturacion.models import ConfiguracionFacturacion
+
+        config = ConfiguracionFacturacion.get()
+        config.rut_emisor = '76485192-7'
+        config.rut_firmante = '7604892-4'
+        config.save()
+        return config
+
+    def test_arma_la_consulta_con_el_contrato_del_hermano(self):
+        from unittest.mock import patch
+
+        from facturacion.services import simpleapi_client as cli
+
+        config = self._config()
+        with patch.object(cli, '_post_multipart',
+                          return_value={'estado': 'EPR', 'ok': True}) as pm:
+            r = cli.consultar_estado_envio(32032105, b'PFX', 'clave',
+                                           config, ambiente_num=0)
+        self.assertEqual(r['estado'], 'EPR')
+        url, input_json, archivos = pm.call_args.args[:3]
+        self.assertTrue(url.endswith('/api/v1/consulta/envio'))
+        self.assertEqual(input_json['TrackId'], 32032105)
+        self.assertEqual(input_json['RutEmpresa'], '76485192-7')
+        self.assertEqual(input_json['Ambiente'], 0)
+        self.assertTrue(input_json['ServidorBoletaREST'],
+                        'las boletas van al SII REST, no al SOAP de DTE')
+        self.assertEqual(input_json['Certificado']['Rut'], '7604892-4')
+        # El contrato de _post_multipart: tuplas de 4 y el cert en 'files'.
+        self.assertEqual(archivos[0][0], 'files')
+        self.assertEqual(len(archivos[0]), 4)
+
+    def test_el_comando_usa_el_trackid_de_las_boletas_del_set(self):
+        from unittest.mock import patch
+
+        from django.core.management import call_command
+
+        from facturacion.models import BoletaElectronica
+
+        self._config()
+        BoletaElectronica.objects.create(caso_set='CASO-1', folio=1,
+                                         track_id='32032105', estado='enviada',
+                                         monto_total=19900, monto_neto=16723,
+                                         monto_iva=3177)
+        with patch('facturacion.services.simpleapi_client.credenciales_listas',
+                   return_value=True), \
+             patch('facturacion.services.simpleapi_client.obtener_certificado',
+                   return_value=(b'PFX', 'clave')), \
+             patch('facturacion.services.simpleapi_client.consultar_estado_envio',
+                   return_value={'estado': 'ACEPTADO'}) as consulta:
+            call_command('consultar_envio')
+        self.assertEqual(consulta.call_args.args[0], 32032105)

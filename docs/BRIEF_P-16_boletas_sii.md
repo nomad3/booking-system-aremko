@@ -4,6 +4,13 @@
 > (job Render one-liner) → **Envío OK, trackId=32032105, estado=REC**. El 500
 > de julio era la habilitación de recepción propagándose en el SII, no
 > SimpleAPI. Siguiente: consultar aceptación del track y seguir el runbook.
+>
+> **Correo de soporte (Gonzalo Bustamante, ChileSystems, 14-07)** — respondió al
+> día siguiente: «El ambiente de certificación del SII está con problemas como
+> hace una semana. Solo queda esperar. Ojo que la certificación de boletas no se
+> hace contra el servidor apicert, sino que contra **maullin**.» ⇒ dos lecciones:
+> (1) el diagnóstico de julio verificaba apicert (semilla 200) — el servidor
+> EQUIVOCADO para boletas-cert; (2) «esperar» era correcto, tomó ~6 semanas.
 
 
 _Estado al 2026-07-13 (domingo) — **CERTIFICACIÓN EN CURSO**: postulación SII

@@ -45,6 +45,9 @@ BASE_URL_SERVICIOS = 'https://servicios.simpleapi.cl'
 PATH_GENERAR_DTE = '/api/v1/dte/generar'
 PATH_GENERAR_SOBRE = '/api/v1/envio/generar'
 PATH_ENVIAR_SII = '/api/v1/envio/enviar'
+# Confirmado en el código fuente público del SDK oficial (chilesystems/SimpleSDK:
+# Models/Estados/ConsultaTrackID.cs + Services/ApiBase.cs → api.simpleapi.cl/api/v1/).
+PATH_CONSULTA_ENVIO = '/api/v1/consulta/envio'
 
 RUT_SII = '60803000-K'
 TIMEOUT = 90
@@ -251,6 +254,35 @@ def enviar_sobre(sobre_xml, cert_bytes, cert_password, config, ambiente_num, tip
         input_json,
         [('files', 'certificado.pfx', cert_bytes, 'application/x-pkcs12'),
          ('files2', 'sobre.xml', sobre_xml.encode('ISO-8859-1', errors='replace'), 'text/xml')],
+        como_json=True,
+    )
+
+
+def consultar_estado_envio(track_id, cert_bytes, cert_password, config,
+                           ambiente_num, servidor_boleta=True):
+    """Consulta al SII (vía SimpleAPI) el estado de un envío por trackId.
+
+    Endpoint tomado del código fuente público del SDK oficial
+    (chilesystems/SimpleSDK, Models/Estados/ConsultaTrackID.cs):
+    POST {base}/api/v1/consulta/envio — multipart con `input` JSON
+    {RutEmpresa, TrackId, Ambiente, ServidorBoletaREST} + `file` (.pfx).
+    Para boletas, ServidorBoletaREST=True (el SII de boletas es la API REST,
+    no el SOAP de DTE estándar). Devuelve el JSON de SimpleAPI tal cual
+    (estado REC/EPR/ACEPTADO/RECHAZADO según el SII).
+    """
+    # Mismo contrato multipart que enviar_sobre (el hermano que YA funciona):
+    # input como dict (serializa _post_multipart), cert en el campo 'files'.
+    input_json = {
+        "RutEmpresa": config.rut_emisor,
+        "TrackId": int(track_id),
+        "Ambiente": ambiente_num,
+        "ServidorBoletaREST": bool(servidor_boleta),
+        "Certificado": {"Rut": config.rut_firmante, "Password": cert_password},
+    }
+    return _post_multipart(
+        BASE_URL + PATH_CONSULTA_ENVIO,
+        input_json,
+        [('files', 'certificado.pfx', cert_bytes, 'application/x-pkcs12')],
         como_json=True,
     )
 
