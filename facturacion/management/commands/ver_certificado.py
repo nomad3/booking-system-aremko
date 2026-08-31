@@ -46,7 +46,24 @@ class Command(BaseCommand):
         self.stdout.write(f'  vigente: {cert.not_valid_before_utc:%d-%m-%Y} '
                           f'→ {cert.not_valid_after_utc:%d-%m-%Y}')
 
+        # Los certificados chilenos (e-certchile) no ponen el RUT en el
+        # subject sino en la extensión subjectAltName, como otherName.
         rut_cert = titular.get('serialNumber', '')
+        if not rut_cert:
+            try:
+                from cryptography.x509.oid import ExtensionOID
+                san = cert.extensions.get_extension_for_oid(
+                    ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
+                for nombre in san:
+                    crudo = getattr(nombre, 'value', b'')
+                    if isinstance(crudo, bytes):
+                        texto = ''.join(chr(c) for c in crudo
+                                        if 45 <= c <= 57 or c in (75, 107))
+                        if len(texto) >= 8 and any(c.isdigit() for c in texto):
+                            rut_cert = texto.strip('-')
+                            break
+            except Exception as exc:
+                self.stdout.write(f'  (no se pudo leer el RUT del certificado: {exc})')
         self.stdout.write('--- CONFIGURACIÓN ---')
         self.stdout.write(f'  rut_firmante (va como RutEnvia): {config.rut_firmante}')
         self.stdout.write(f'  rut_emisor  (la empresa):        {config.rut_emisor}')
