@@ -183,7 +183,10 @@ class Command(BaseCommand):
             return
 
         borrados = total = 0
-        for lista in list(misma.values()) + list(distintas.values()):
+        # `recortes` también se puede limpiar: si no entrara acá, el
+        # informe encontraría duplicados que nadie puede borrar.
+        for lista in (list(misma.values()) + list(recortes.values())
+                      + list(distintas.values())):
             candidatos = [m for m in lista if m.cuenta.clave == objetivo]
             # Nunca dejar el grupo vacío: si todos son de esa cuenta, se
             # conserva el primero. Borrar el cobro entero sería peor que el
