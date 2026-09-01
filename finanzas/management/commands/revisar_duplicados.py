@@ -97,6 +97,12 @@ class Command(BaseCommand):
         parser.add_argument('--desde', default='2026-07-01')
         parser.add_argument('--eliminar-de', default='',
                             help='Clave de la cuenta cuyos duplicados se borran.')
+        parser.add_argument('--grupo', default='todos',
+                            choices=['todos', 'exactos', 'recortes', 'atribucion'],
+                            help='Qué grupo limpiar. «atribucion» junta cargos de '
+                                 'CUENTAS distintas y ahí un duplicado aparente '
+                                 'puede ser real —dos tarjetas con su propio cobro '
+                                 'mensual—, así que conviene acotar.')
         parser.add_argument('--solo', default='',
                             help='Filtra por texto del comercio.')
 
@@ -185,8 +191,17 @@ class Command(BaseCommand):
         borrados = total = 0
         # `recortes` también se puede limpiar: si no entrara acá, el
         # informe encontraría duplicados que nadie puede borrar.
-        for lista in (list(misma.values()) + list(recortes.values())
-                      + list(distintas.values())):
+        elegidos = {'exactos': list(misma.values()),
+                    'recortes': list(recortes.values()),
+                    'atribucion': list(distintas.values())}
+        if opts['grupo'] == 'todos':
+            a_borrar = (elegidos['exactos'] + elegidos['recortes']
+                        + elegidos['atribucion'])
+        else:
+            a_borrar = elegidos[opts['grupo']]
+        self.stdout.write(f'\nBorrando del grupo «{opts["grupo"]}»: '
+                          f'{len(a_borrar)} caso(s).')
+        for lista in a_borrar:
             candidatos = [m for m in lista if m.cuenta.clave == objetivo]
             # Nunca dejar el grupo vacío: si todos son de esa cuenta, se
             # conserva el primero. Borrar el cobro entero sería peor que el
