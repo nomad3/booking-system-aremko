@@ -44,7 +44,9 @@ que el SII pregunte.
 <div class="wrap">
   <h1>Pagos sin boleta</h1>
   <p class="sub">Medios que sí boletean, últimos {{ dias }} días.
-     Los cobros con tarjeta, link o Flow no salen acá: su voucher ya es la boleta.</p>
+     Los cobros con tarjeta, link o Flow no salen acá: su voucher ya es la boleta.{% if devoluciones %}
+     Tampoco {{ devoluciones }} devolución{{ devoluciones|pluralize:"es" }} del período: esas se anulan con
+     nota de crédito en el sistema del SII.{% endif %}</p>
 
   <div class="totales">
     <div>Sin decidir: <b>{{ sin_decidir|length }}</b> ·

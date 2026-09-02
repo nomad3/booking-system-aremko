@@ -188,6 +188,30 @@ class ElListadoAparte(BaseTarjeta):
             estado='error', monto_total=10000, monto_neto=8403, monto_iva=1597)
         self.assertEqual(len(self._ver().context['sin_decidir']), 1)
 
+    def test_una_devolucion_no_es_un_pendiente(self):
+        # Una devolución no se boletea: se anula con nota de crédito, y esas
+        # se emiten en el sistema del SII (decisión de Jorge, 02-09-2026).
+        # Si apareciera acá sería un pendiente que nadie puede resolver nunca.
+        Pago.objects.create(venta_reserva=self.venta, monto=-45000,
+                            metodo_pago='efectivo', usuario=self.staff)
+        r = self._ver()
+        self.assertEqual(len(r.context['sin_decidir']), 0)
+        self.assertEqual(len(r.context['con_decision']), 0)
+
+    def test_la_pagina_dice_cuantas_devoluciones_dejo_fuera(self):
+        # Un total que no declara lo que excluye, miente.
+        Pago.objects.create(venta_reserva=self.venta, monto=-45000,
+                            metodo_pago='efectivo', usuario=self.staff)
+        r = self._ver()
+        self.assertEqual(r.context['devoluciones'], 1)
+        self.assertIn('nota de crédito', r.content.decode())
+
+    def test_una_devolucion_no_suma_al_total(self):
+        self._cobrar(monto=50000, metodo='efectivo')
+        Pago.objects.create(venta_reserva=self.venta, monto=-45000,
+                            metodo_pago='efectivo', usuario=self.staff)
+        self.assertEqual(self._ver().context['total_sin_decidir'], 50000)
+
     def test_se_llega_desde_el_panel(self):
         # Un listado de control al que nadie llega no controla nada.
         html = self.client.get('/admin/').content.decode()

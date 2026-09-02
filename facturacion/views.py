@@ -202,7 +202,13 @@ def pagos_sin_boleta(request):
     decididos = {d.pago_id: d for d in DecisionSinBoleta.objects
                  .select_related('usuario', 'pago')}
 
-    pagos = (Pago.objects.filter(metodo_pago__in=codigos, fecha_pago__gte=desde)
+    # Las devoluciones (monto <= 0) NO van acá. Una devolución no se boletea:
+    # se anula con nota de crédito, y esas Jorge y Alda las emiten en el
+    # sistema gratuito del SII, igual que las facturas (decisión 02-09-2026).
+    # Sin este filtro el listado arrastraría 69 devoluciones históricas como
+    # «nadie las ha mirado» — pendientes que nadie puede resolver nunca.
+    pagos = (Pago.objects.filter(metodo_pago__in=codigos, fecha_pago__gte=desde,
+                                 monto__gt=0)
              .exclude(id__in=con_boleta)
              .select_related('venta_reserva__cliente')
              .order_by('-fecha_pago'))
@@ -212,8 +218,13 @@ def pagos_sin_boleta(request):
         fila = {'pago': p, 'decision': decididos.get(p.id)}
         (con_decision if fila['decision'] else sin_decidir).append(fila)
 
+    # Un panel tiene que declarar lo que NO cuenta, o el total miente.
+    devoluciones = Pago.objects.filter(metodo_pago__in=codigos,
+                                       fecha_pago__gte=desde, monto__lte=0).count()
+
     return render(request, 'facturacion/pagos_sin_boleta.html', {
         'dias': dias,
+        'devoluciones': devoluciones,
         'sin_decidir': sin_decidir,
         'con_decision': con_decision,
         'total_sin_decidir': sum(int(f['pago'].monto or 0) for f in sin_decidir),
