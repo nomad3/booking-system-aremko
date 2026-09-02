@@ -41,8 +41,14 @@ GENERAN_BOLETA = {
 OCULTOS_AL_COBRAR = {
     'transferencia', 'webpay', 'descuento',
     'machjorge', 'machalda', 'bicegoalda', 'bcialda', 'andesalda',
-    'mercadopagoaremko', 'scotiabankalda', 'copecjorge', 'copecalda',
+    'scotiabankalda', 'copecjorge', 'copecalda',
 }
+# `mercadopagoaremko` VUELVE a la lista de cobro (Jorge, 02-09-2026). Se ocultó
+# el 15-08 junto con las cuentas personales, y con eso quedó sin forma de
+# registrar una transferencia recibida en la Cuenta Vista de Mercado Pago: hay
+# que elegir «MercadoPago», que NO boletea porque se asume cobro con tarjeta.
+# Mientras decidía una persona caso a caso se notaba poco; cuando la emisión
+# mire el switch, esas transferencias se quedarían sin boleta.
 
 NOTAS = {
     'mercadopago_link': 'Link de pago MP: lo informa MP al SII (voucher = boleta).',
@@ -54,7 +60,9 @@ NOTAS = {
     'giftcard': 'Canje: nunca boletea. La VENTA de una giftcard es un producto más: '
                 'boletea según el medio con que se pagó (Jorge 2026-07-11).',
     'booking': 'Lo gestiona el contador aparte.',
-    'mercadopagoaremko': 'Transferencia directa a Cuenta Vista MP → boletea (Jorge 2026-07-11).',
+    'mercadopagoaremko': 'Transferencia a la Cuenta Vista MP → boletea. Es el ÚNICO '
+                         'medio para transferencias recibidas en Mercado Pago '
+                         '(Jorge 2026-07-11, repuesto al cobro 2026-09-02).',
 }
 
 
