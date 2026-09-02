@@ -86,15 +86,16 @@ def tarjeta_reserva(request, venta_id):
     productos = venta.reservaproductos.select_related('producto')
     pagos = venta.pagos.order_by('fecha_pago')
 
-    # Catálogo para el selector: LA MISMA función que usa el admin al agregar
-    # productos a una reserva (productos_vendibles: menú de comanda del
-    # cliente + venta en mesón, con stock). La primera versión filtró solo
-    # venta_meson y era estrecha por el otro lado: los productos del menú del
-    # cliente (jugos) habrían desaparecido de la tarjeta — lo destapó Jorge
-    # preguntando si eran los mismos productos que en el admin.
-    from ventas.admin import productos_vendibles
+    # Catálogo del selector: SOLO los marcados «Venta en Mesón», con stock
+    # (Jorge, 01-09-2026). Antes se usaba `productos_vendibles`, que suma el
+    # menú de comanda del CLIENTE —lo que él ve en su link— y eso alargaba la
+    # lista con cosas que en el mesón no se venden. Los ya guardados en esta
+    # reserva se incluyen igual, para que una reserva antigua con un producto
+    # descatalogado siga abriéndose.
+    from ventas.admin import productos_de_meson
 
-    catalogo = productos_vendibles()
+    catalogo = productos_de_meson(
+        ids_visibles=list(productos.values_list('producto_id', flat=True)))
 
     # La ubicación del cliente se guarda como COMUNA, igual que en el admin
     # (el campo `ciudad` es texto libre y el propio modelo lo desaconseja).
@@ -194,13 +195,12 @@ def tarjeta_agregar_producto(request, venta_id):
         return JsonResponse({'ok': False, 'mensaje': 'Elige un producto de la lista.'},
                             status=400)
 
-    # El mismo criterio que el selector (productos_vendibles del admin): lo
-    # que no es vendible por el personal no entra ni desde una pestaña
-    # desactualizada. Esos productos se manejan en el admin.
-    if not (producto.venta_meson or producto.comanda_cliente):
+    # El mismo criterio que el selector: lo que no es de mesón no entra ni
+    # desde una pestaña vieja que todavía lo muestre en su lista.
+    if not producto.venta_meson:
         return JsonResponse(
-            {'ok': False, 'mensaje': f'{producto.nombre} no es de venta al '
-                                     'cliente: se agrega desde el admin.'},
+            {'ok': False, 'mensaje': f'{producto.nombre} no está marcado para '
+                                     'venta en mesón: se agrega desde el admin.'},
             status=400)
 
     crudo = (request.POST.get('cantidad') or '').strip()

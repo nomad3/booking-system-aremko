@@ -162,6 +162,25 @@ def productos_vendibles(ids_visibles=None):
     return Producto.objects.filter(filtro).order_by('nombre')
 
 
+def productos_de_meson(ids_visibles=None):
+    """Solo los marcados «Venta en Mesón», con inventario.
+
+    Es lo que el personal vende cara a cara, y es lo que pidió Jorge para la
+    tarjeta del celular (01-09-2026). No es lo mismo que `productos_vendibles`:
+    ésa incluye además el menú de comanda del CLIENTE —lo que él ve en su
+    link—, y mezclarlos alargaba la lista con cosas que en el mesón no se
+    venden.
+
+    `ids_visibles` funciona igual que allá: los ya guardados en la reserva
+    siguen apareciendo aunque hoy no califiquen, para que abrir una reserva
+    antigua no reviente.
+    """
+    filtro = Q(venta_meson=True) & Q(cantidad_disponible__gt=0)
+    if ids_visibles:
+        filtro |= Q(id__in=list(ids_visibles))
+    return Producto.objects.filter(filtro).order_by('nombre')
+
+
 class ReservaProductoInline(admin.TabularInline):
     model = ReservaProducto
     extra = 1

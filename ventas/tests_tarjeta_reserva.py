@@ -264,15 +264,15 @@ class AgregarProductoFase3(TestCase):
         cliente = Cliente.objects.create(nombre='Carmen Puerto Montt',
                                          telefono='+56933334444')
         cls.venta = VentaReserva.objects.create(cliente=cliente)
-        # Del menú de comanda del CLIENTE, sin venta_meson: el caso que el
-        # primer filtro (solo venta_meson) dejaba fuera por error.
+        # Del menú de comanda del CLIENTE, sin venta_meson: desde el
+        # 01-09-2026 la tarjeta NO lo ofrece (Jorge: solo lo del mesón).
         cls.jugo = Producto.objects.create(nombre='Jugo Natural de Frambuesa',
                                            precio_base=3500, cantidad_disponible=10,
                                            comanda_cliente=True, venta_meson=False)
-        # Venta en mesón sin menú del cliente (espumante: cara a cara, pero no
-        # a la vista en el link público).
+        # Venta en mesón: lo que el personal sí vende cara a cara. Es el
+        # producto de trabajo de estas pruebas.
         cls.espumante = Producto.objects.create(nombre='Espumante Valdivieso',
-                                                precio_base=12000, cantidad_disponible=6,
+                                                precio_base=3500, cantidad_disponible=10,
                                                 venta_meson=True, comanda_cliente=False)
         cls.agotado = Producto.objects.create(nombre='Chocolate Agotado',
                                               precio_base=5000, cantidad_disponible=0,
@@ -288,7 +288,7 @@ class AgregarProductoFase3(TestCase):
         return self.client.post(self.url, datos)
 
     def test_agrega_congela_el_precio_y_sube_el_total(self):
-        r = self._post(producto_id=self.jugo.pk, cantidad='2')
+        r = self._post(producto_id=self.espumante.pk, cantidad='2')
         self.assertEqual(r.status_code, 200)
         d = r.json()
         self.assertEqual(d['producto']['subtotal'], 7000)
@@ -299,8 +299,8 @@ class AgregarProductoFase3(TestCase):
         self.assertEqual(int(linea.precio_unitario_venta), 3500)
 
         # El congelamiento de verdad: sube el catálogo, lo vendido no cambia.
-        self.jugo.precio_base = 9999
-        self.jugo.save()
+        self.espumante.precio_base = 9999
+        self.espumante.save()
         self.venta.calcular_total()
         self.venta.refresh_from_db()
         self.assertEqual(int(self.venta.total), 7000,
@@ -309,24 +309,24 @@ class AgregarProductoFase3(TestCase):
     def test_vender_NO_descuenta_stock(self):
         """El stock se descuenta al ENTREGAR. Si vender también descontara,
         cada producto se descontaría dos veces — ese bug ya existió."""
-        self._post(producto_id=self.jugo.pk, cantidad='2')
-        self.jugo.refresh_from_db()
-        self.assertEqual(self.jugo.cantidad_disponible, 10)
+        self._post(producto_id=self.espumante.pk, cantidad='2')
+        self.espumante.refresh_from_db()
+        self.assertEqual(self.espumante.cantidad_disponible, 10)
 
     def test_entregar_SI_descuenta_y_una_sola_vez(self):
         """La otra mitad de la regla: al poner fecha_entrega, la señal
         descuenta exactamente la cantidad, desde este camino también."""
         from django.utils import timezone as tz
 
-        self._post(producto_id=self.jugo.pk, cantidad='2')
+        self._post(producto_id=self.espumante.pk, cantidad='2')
         linea = self.venta.reservaproductos.get()
         linea.fecha_entrega = tz.localdate()
         linea.save()
-        self.jugo.refresh_from_db()
-        self.assertEqual(self.jugo.cantidad_disponible, 8)
+        self.espumante.refresh_from_db()
+        self.assertEqual(self.espumante.cantidad_disponible, 8)
 
     def test_no_se_vende_lo_que_no_hay(self):
-        r = self._post(producto_id=self.jugo.pk, cantidad='11')
+        r = self._post(producto_id=self.espumante.pk, cantidad='11')
         self.assertEqual(r.status_code, 400)
         self.assertIn('Queda(n) 10', r.json()['mensaje'])
         self.assertEqual(self.venta.reservaproductos.count(), 0)
@@ -335,20 +335,20 @@ class AgregarProductoFase3(TestCase):
         self.client.force_login(self.staff)
         html = self.client.get(reverse('ventas:tarjeta_reserva',
                                        args=[self.venta.pk])).content.decode()
-        self.assertIn('Jugo Natural de Frambuesa', html)
+        self.assertIn('Espumante Valdivieso', html)   # control: sí dibuja el selector
         self.assertNotIn('Chocolate Agotado', html)
 
-    def test_ofrece_LO_MISMO_que_el_admin(self):
-        """La pregunta de Jorge que destapó el error: ¿son los mismos
-        productos que el admin? Deben serlo — el criterio es UNO
-        (productos_vendibles): menú del cliente + venta en mesón, con stock.
-        El primer filtro (solo mesón) habría escondido los jugos."""
+    def test_ofrece_SOLO_lo_marcado_para_venta_en_meson(self):
+        """La regla que pidió Jorge el 01-09-2026: la tarjeta es la
+        herramienta del mesón. `comanda_cliente` es otra cosa —el menú que el
+        cliente ve en su link— y mezclarlos alargaba la lista con productos
+        que ahí no se venden."""
         self.client.force_login(self.staff)
         html = self.client.get(reverse('ventas:tarjeta_reserva',
                                        args=[self.venta.pk])).content.decode()
-        self.assertIn('Jugo Natural de Frambuesa', html)   # menú del cliente
-        self.assertIn('Espumante Valdivieso', html)        # venta en mesón
-        self.assertNotIn('Artesanías Inventario', html)    # interno: fuera
+        self.assertIn('Espumante Valdivieso', html)          # venta en mesón
+        self.assertNotIn('Jugo Natural de Frambuesa', html)  # menú del cliente
+        self.assertNotIn('Artesanías Inventario', html)      # interno
 
     def test_el_interno_ni_se_acepta_por_POST_directo(self):
         """El candado del endpoint: una pestaña desactualizada o una llamada
@@ -361,9 +361,16 @@ class AgregarProductoFase3(TestCase):
         r = self._post(producto_id=self.espumante.pk, cantidad='1')
         self.assertTrue(r.json()['ok'])
 
+    def test_el_del_menu_del_cliente_ya_no_se_acepta(self):
+        # La otra mitad de la regla nueva: si el selector no lo ofrece, el
+        # servidor tampoco puede aceptarlo desde una pestaña vieja.
+        r = self._post(producto_id=self.jugo.pk, cantidad='1')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.venta.reservaproductos.count(), 0)
+
     def test_la_segunda_linea_acumula(self):
-        self._post(producto_id=self.jugo.pk, cantidad='1')
-        r = self._post(producto_id=self.jugo.pk, cantidad='3')
+        self._post(producto_id=self.espumante.pk, cantidad='1')
+        r = self._post(producto_id=self.espumante.pk, cantidad='3')
         self.assertEqual(r.json()['total'], 3500 * 4)
         self.assertEqual(self.venta.reservaproductos.count(), 2)
 
@@ -371,9 +378,9 @@ class AgregarProductoFase3(TestCase):
         casos = (
             {'producto_id': '', 'cantidad': '1'},
             {'producto_id': '999999', 'cantidad': '1'},
-            {'producto_id': str(self.jugo.pk), 'cantidad': '0'},
-            {'producto_id': str(self.jugo.pk), 'cantidad': 'abc'},
-            {'producto_id': str(self.jugo.pk), 'cantidad': '-2'},
+            {'producto_id': str(self.espumante.pk), 'cantidad': '0'},
+            {'producto_id': str(self.espumante.pk), 'cantidad': 'abc'},
+            {'producto_id': str(self.espumante.pk), 'cantidad': '-2'},
         )
         for datos in casos:
             r = self._post(**datos)
