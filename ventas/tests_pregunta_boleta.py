@@ -188,6 +188,11 @@ class ElListadoAparte(BaseTarjeta):
             estado='error', monto_total=10000, monto_neto=8403, monto_iva=1597)
         self.assertEqual(len(self._ver().context['sin_decidir']), 1)
 
+    def test_se_llega_desde_el_panel(self):
+        # Un listado de control al que nadie llega no controla nada.
+        html = self.client.get('/admin/').content.decode()
+        self.assertIn(reverse('facturacion:pagos_sin_boleta'), html)
+
     def test_la_pagina_es_solo_para_staff(self):
         self.client.logout()
         r = self._ver()
