@@ -32,6 +32,7 @@ cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -62,6 +63,19 @@ def staff_required(view_func):
     """Decorador para requerir que el usuario sea staff."""
     decorated_view = user_passes_test(lambda u: u.is_staff)(view_func)
     return login_required(decorated_view)
+
+
+def _codigos_que_boletean():
+    """Códigos de medio de pago marcados para emitir boleta, o vacío si no se
+    puede leer. Ante la duda NO se pregunta: preguntar de más empuja a emitir
+    un documento que el operador ya emitió, y un duplicado ante el SII cuesta
+    más de arreglar que una boleta que falta."""
+    try:
+        from facturacion.models import MedioPago
+        return list(MedioPago.objects.filter(genera_boleta=True)
+                    .values_list('codigo', flat=True))
+    except Exception:  # noqa: BLE001 — tabla sin sembrar, deploy a medias
+        return []
 
 
 # Los mismos accesos rápidos que el admin: la gran mayoría de los
@@ -111,6 +125,10 @@ def tarjeta_reserva(request, venta_id):
         'mensaje_pase': mensaje_pase(venta),
         'debe': int(venta.saldo_pendiente or 0) > 0,
         'metodos_pago': METODOS_PAGO_TARJETA,
+        # Códigos que SÍ boletean: la tarjeta pregunta «¿generar la boleta?»
+        # solo cuando corresponde. En un cobro con tarjeta o link, el voucher
+        # del operador ya ES la boleta y preguntar invitaría a duplicar.
+        'medios_que_boletean': json.dumps(_codigos_que_boletean()),
         'catalogo': catalogo,
         'comunas': Comuna.objects.select_related('region').order_by('nombre'),
         'comunas_rapidas': COMUNAS_RAPIDAS,
@@ -156,18 +174,59 @@ def tarjeta_agregar_pago(request, venta_id):
         return JsonResponse({'ok': False, 'mensaje': 'No se pudo guardar el pago. '
                              'Inténtalo desde el admin.'}, status=400)
 
+    # La boleta va DESPUÉS y aparte: el pago ya está guardado, así que si la
+    # emisión falla no se pierde la plata registrada — se informa y queda en el
+    # listado de revisión. Al revés (emitir dentro del guardado) un problema con
+    # el SII dejaría a Deborah sin poder cobrar.
+    boleta_msg = _resolver_boleta_del_pago(pago, request)
+
     venta.refresh_from_db()
     return JsonResponse({
         'ok': True,
         'total': int(venta.total or 0),
         'pagado': int(venta.pagado or 0),
         'saldo': int(venta.saldo_pendiente or 0),
+        'boleta': boleta_msg,
         'pago': {
             'monto': int(pago.monto),
             'metodo': pago.get_metodo_pago_display(),
             'hora': timezone.localtime(pago.fecha_pago).strftime('%d/%m %H:%M'),
         },
     })
+
+
+def _resolver_boleta_del_pago(pago, request):
+    """Actúa sobre la respuesta a «¿Desea generar la boleta electrónica?».
+
+    Tres caminos, y ninguno puede voltear el pago que ya se guardó:
+    · «sí»  → se emite. Si el SII falla, se informa y el pago queda listado.
+    · «no»  → se deja constancia de QUIÉN decidió no emitir. Sin ese registro,
+              un pago sin boleta es indistinguible de un olvido.
+    · nada  → el medio no boletea (el voucher del operador ya es la boleta) o
+              la pregunta no llegó: no se inventa una decisión.
+    """
+    respuesta = (request.POST.get('emitir_boleta') or '').strip().lower()
+    if respuesta not in ('si', 'sí', 'no'):
+        return ''
+    if respuesta == 'no':
+        try:
+            from facturacion.models import DecisionSinBoleta
+            DecisionSinBoleta.objects.get_or_create(
+                pago=pago, defaults={'usuario': request.user})
+            return 'Sin boleta: queda en el listado de revisión.'
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('[tarjeta] no se pudo registrar el «no» del pago %s: %s',
+                             pago.pk, exc)
+            return 'No se pudo registrar la decisión; revísalo en el admin.'
+    try:
+        from facturacion.services.emisor import emitir_boleta_para_pago
+        boleta, mensaje = emitir_boleta_para_pago(pago)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] falló la emisión del pago %s: %s', pago.pk, exc)
+        return 'El pago quedó guardado, pero la boleta falló. Está en el listado.'
+    if boleta is None:
+        return f'Sin boleta: {mensaje}'
+    return f'Boleta {boleta.folio or "(en proceso)"}: {mensaje}'
 
 
 @staff_required

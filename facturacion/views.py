@@ -10,7 +10,8 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
 from django.shortcuts import render
 
-from .models import BoletaElectronica, ConfiguracionFacturacion
+from .models import (BoletaElectronica, ConfiguracionFacturacion,
+                     MedioPago)
 
 
 def _publicables():
@@ -162,3 +163,59 @@ def descargar_cof_set(request):
     resp['Content-Disposition'] = (
         f'attachment; filename="consumo_folios_{fecha:%Y%m%d}.xml"')
     return resp
+
+
+@staff_member_required
+def pagos_sin_boleta(request):
+    """Los pagos que SÍ correspondía boletear y no tienen boleta.
+
+    La otra mitad del diseño de Jorge (02-09-2026): si al cobrar se puede
+    responder «no», ese «no» tiene que quedar a la vista en alguna parte. Sin
+    este listado, un pago sin boleta es indistinguible de un olvido — y el
+    olvido solo aparecería cuando el SII pregunte.
+
+    Se separan a propósito en dos grupos, porque significan cosas distintas:
+    · DECIDIDOS: alguien miró y dijo que no. Hay nombre y hora.
+    · SIN DECIDIR: nadie los miró. Estos son los que preocupan.
+    """
+    import datetime
+
+    from django.utils import timezone
+
+    from ventas.models import Pago
+
+    from .models import BoletaElectronica, DecisionSinBoleta
+
+    dias = 30
+    try:
+        dias = max(1, min(365, int(request.GET.get('dias') or 30)))
+    except ValueError:
+        pass
+    desde = timezone.localdate() - datetime.timedelta(days=dias)
+
+    codigos = list(MedioPago.objects.filter(genera_boleta=True)
+                   .values_list('codigo', flat=True))
+    con_boleta = set(BoletaElectronica.objects
+                     .exclude(estado__in=('error', 'pendiente'))
+                     .exclude(pago__isnull=True)
+                     .values_list('pago_id', flat=True))
+    decididos = {d.pago_id: d for d in DecisionSinBoleta.objects
+                 .select_related('usuario', 'pago')}
+
+    pagos = (Pago.objects.filter(metodo_pago__in=codigos, fecha_pago__gte=desde)
+             .exclude(id__in=con_boleta)
+             .select_related('venta_reserva__cliente')
+             .order_by('-fecha_pago'))
+
+    sin_decidir, con_decision = [], []
+    for p in pagos:
+        fila = {'pago': p, 'decision': decididos.get(p.id)}
+        (con_decision if fila['decision'] else sin_decidir).append(fila)
+
+    return render(request, 'facturacion/pagos_sin_boleta.html', {
+        'dias': dias,
+        'sin_decidir': sin_decidir,
+        'con_decision': con_decision,
+        'total_sin_decidir': sum(int(f['pago'].monto or 0) for f in sin_decidir),
+        'total_con_decision': sum(int(f['pago'].monto or 0) for f in con_decision),
+    })

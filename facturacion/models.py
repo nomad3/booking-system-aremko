@@ -233,3 +233,35 @@ class BoletaElectronica(models.Model):
     @property
     def es_definitiva(self):
         return self.estado in ('generada', 'enviada', 'aceptada')
+
+
+class DecisionSinBoleta(models.Model):
+    """Un pago que SÍ correspondía boletear y alguien decidió no emitir.
+
+    Jorge (02-09-2026) pidió que la emisión no fuera automática sino con una
+    pregunta al cobrar: «¿Desea generar la boleta electrónica?». Quien cobra es
+    el único que sabe si el cliente ya recibió su voucher — el sistema ve el
+    medio de pago, no la conversación.
+
+    Guardar el «no» importa tanto como emitir el «sí»: sin este registro, un
+    pago sin boleta es indistinguible de un olvido. Acá queda quién decidió,
+    cuándo y por qué, y el listado de revisión se arma con esto.
+    """
+    pago = models.OneToOneField(
+        'ventas.Pago', on_delete=models.CASCADE, related_name='decision_sin_boleta',
+        help_text='El pago que se decidió no boletear.')
+    usuario = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+', help_text='Quién lo decidió.')
+    motivo = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text='Opcional: por qué no se emitió (ej. «el cliente ya tiene su voucher»).')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Pago sin boleta (decidido)'
+        verbose_name_plural = 'Pagos sin boleta (decididos)'
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return f'Pago {self.pago_id} sin boleta'

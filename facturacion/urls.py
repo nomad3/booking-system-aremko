@@ -11,4 +11,6 @@ urlpatterns = [
     path('sobre-set/', views.descargar_sobre_set, name='descargar_sobre_set'),
     # El consumo de folios del día, para subirlo a mano junto al sobre.
     path('cof-set/', views.descargar_cof_set, name='descargar_cof_set'),
+    # Los pagos que correspondía boletear y no tienen boleta.
+    path('pendientes/', views.pagos_sin_boleta, name='pagos_sin_boleta'),
 ]

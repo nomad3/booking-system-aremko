@@ -57,6 +57,12 @@ internas y se reconocen entre sí.
   .campo{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);
          border-radius:10px;margin-bottom:10px;background:#fff;font-family:inherit;
          color:var(--ink)}
+  .pregunta-boleta{border:1px solid var(--line);border-radius:12px;
+                   background:#fff;padding:12px;margin:0 0 12px}
+  .pb-titulo{font-size:14px;font-weight:600;margin:0 0 8px}
+  .pb-opciones{display:flex;flex-direction:column;gap:8px}
+  .pb-opciones label{font-size:15px;display:flex;align-items:center;gap:8px}
+  .pb-opciones input{width:20px;height:20px}
   .comunas-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
   .chip-comuna{border:1px solid var(--line);background:#fff;color:var(--ink);
                border-radius:999px;padding:7px 12px;font-size:14px;
@@ -207,6 +213,13 @@ internas y se reconocen entre sí.
         <option value="{{ codigo }}">{{ nombre }}</option>
         {% endfor %}
       </select>
+      <div class="pregunta-boleta oculto" id="preguntaBoleta">
+        <div class="pb-titulo">¿Desea generar la boleta electrónica?</div>
+        <div class="pb-opciones">
+          <label><input type="radio" name="emitir_boleta" value="si"> Sí, emitir</label>
+          <label><input type="radio" name="emitir_boleta" value="no"> No, revisar después</label>
+        </div>
+      </div>
       <div class="err" id="pagoError"></div>
       <button type="submit" class="btn btn-pago">Guardar pago</button>
       <button type="button" class="btn btn-admin" id="pagoCancelar">Cancelar</button>
@@ -321,6 +334,23 @@ internas y se reconocen entre sí.
   var monto = document.getElementById('pagoMonto');
   var error = document.getElementById('pagoError');
 
+  // La pregunta de la boleta aparece SOLO en los medios que boletean. En un
+  // cobro con tarjeta o link, el voucher del operador ya es la boleta y
+  // preguntar invitaría a emitir un duplicado.
+  var BOLETEAN = {{ medios_que_boletean|safe }};
+  var selMetodo = document.getElementById('pagoMetodo');
+  var pregunta = document.getElementById('preguntaBoleta');
+  function refrescarPregunta() {
+    var toca = BOLETEAN.indexOf(selMetodo.value) !== -1;
+    pregunta.classList.toggle('oculto', !toca);
+    if (!toca) {
+      Array.prototype.forEach.call(
+        pregunta.querySelectorAll('input'), function (r) { r.checked = false; });
+    }
+  }
+  selMetodo.addEventListener('change', refrescarPregunta);
+  refrescarPregunta();
+
   function fmt(n) { return '$' + Number(n).toLocaleString('es-CL'); }
 
   abrir.addEventListener('click', function () {
@@ -334,6 +364,14 @@ internas y se reconocen entre sí.
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
     error.style.display = 'none';
+    // Si el medio boletea, la respuesta es obligatoria: dejar pasar un pago sin
+    // decidir lo convierte en un pendiente silencioso.
+    if (!pregunta.classList.contains('oculto') &&
+        !pregunta.querySelector('input[name=emitir_boleta]:checked')) {
+      error.textContent = 'Indica si se genera la boleta electrónica.';
+      error.style.display = 'block';
+      return;
+    }
     fetch("{% url 'ventas:tarjeta_agregar_pago' venta.pk %}",
           {method: 'POST', body: new FormData(form)})
       .then(function (r) { return r.json(); })
@@ -357,10 +395,21 @@ internas y se reconocen entre sí.
         var s2 = document.createElement('span'); s2.className = 'cuando';
         s2.textContent = d.pago.hora;
         fila.appendChild(s1); fila.appendChild(s2);
+        if (d.boleta) {
+          var nota = document.createElement('div');
+          nota.className = 'cuando';
+          nota.style.marginTop = '2px';
+          nota.textContent = d.boleta;   // textContent: no se interpreta como HTML
+          fila.appendChild(nota);
+        }
         document.getElementById('listaPagos').appendChild(fila);
         var vacio = document.getElementById('pagosVacio');
         if (vacio) { vacio.remove(); }
         form.reset();
+        // El reset devuelve el selector a su valor por defecto: hay que
+        // recalcular la pregunta o el SEGUNDO pago hereda el estado del
+        // primero (cobras con tarjeta, después en efectivo, y no te pregunta).
+        refrescarPregunta();
         caja.classList.add('oculto');
         abrir.textContent = '✓ Pago guardado';
         setTimeout(function () { abrir.textContent = '💰 Agregar pago'; }, 2600);
