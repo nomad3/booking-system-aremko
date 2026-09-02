@@ -64,6 +64,12 @@ def staff_required(view_func):
     return login_required(decorated_view)
 
 
+# Los mismos accesos rápidos que el admin: la gran mayoría de los
+# clientes vive en estas ciudades.
+COMUNAS_RAPIDAS = ('Puerto Varas', 'Puerto Montt', 'Osorno',
+                   'Santiago', 'Valparaíso', 'Temuco', 'Concepción')
+
+
 @staff_required
 def tarjeta_reserva(request, venta_id):
     venta = get_object_or_404(
@@ -90,6 +96,12 @@ def tarjeta_reserva(request, venta_id):
 
     catalogo = productos_vendibles()
 
+    # La ubicación del cliente se guarda como COMUNA, igual que en el admin
+    # (el campo `ciudad` es texto libre y el propio modelo lo desaconseja).
+    # Los accesos rápidos son los mismos 7 del admin: casi todos los clientes
+    # son de esas ciudades y así se resuelve con un toque, sin buscar entre 346.
+    from ventas.models import Comuna
+
     return render(request, 'ventas/tarjeta_reserva.html', {
         'venta': venta,
         'servicios': servicios,
@@ -99,6 +111,8 @@ def tarjeta_reserva(request, venta_id):
         'debe': int(venta.saldo_pendiente or 0) > 0,
         'metodos_pago': METODOS_PAGO_TARJETA,
         'catalogo': catalogo,
+        'comunas': Comuna.objects.select_related('region').order_by('nombre'),
+        'comunas_rapidas': COMUNAS_RAPIDAS,
     })
 
 
@@ -320,17 +334,67 @@ def nueva_reserva(request):
 @staff_required
 @require_POST
 def tarjeta_editar_datos(request, venta_id):
-    """Guarda SOLO los datos complementarios: comentarios y documento fiscal.
+    """Guarda los datos complementarios de la reserva Y los del cliente.
+
+    La reserva se crea con lo mínimo —nombre y teléfono— porque al teléfono
+    hay que atender rápido. El resto (correo, RUT, comuna) llega después, y
+    éste es el lugar donde se completa sin abrir el admin.
 
     update_fields a propósito: este endpoint no puede tocar totales, estados
     ni nada que no sea suyo — un guardado parcial que pisa campos ajenos es el
-    mismo tipo de bug que la vista previa que mutaba datos.
+    mismo tipo de bug que la vista previa que mutaba datos. Por eso el cliente
+    se guarda con su propia lista de campos: el teléfono y el nombre no se
+    tocan desde acá.
     """
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    from ventas.models import Comuna
+
     venta = get_object_or_404(VentaReserva, pk=venta_id)
     venta.comentarios = (request.POST.get('comentarios') or '').strip()
     venta.numero_documento_fiscal = (request.POST.get('numero_documento_fiscal')
                                      or '').strip()
     venta.save(update_fields=['comentarios', 'numero_documento_fiscal'])
+
+    cliente = venta.cliente
+    if cliente is None:
+        return JsonResponse({'ok': True})
+
+    email = (request.POST.get('email') or '').strip()
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            # Un correo mal escrito no avisa: simplemente no llega. Mejor
+            # rechazarlo acá que descubrirlo cuando la confirmación rebote.
+            return JsonResponse(
+                {'ok': False, 'mensaje': f'El correo «{email}» no parece válido.'},
+                status=400)
+
+    campos = ['email', 'documento_identidad']
+    cliente.email = email or None
+    cliente.documento_identidad = (request.POST.get('documento_identidad')
+                                   or '').strip() or None
+
+    comuna_id = (request.POST.get('comuna') or '').strip()
+    if comuna_id:
+        comuna = Comuna.objects.filter(pk=comuna_id).select_related('region').first()
+        if comuna is None:
+            return JsonResponse({'ok': False, 'mensaje': 'Comuna no encontrada.'},
+                                status=400)
+        cliente.comuna = comuna
+        # 'region' va en la lista aunque no se le asigne nada: Cliente.save()
+        # la deriva de la comuna (Plan Geo E1), y sin nombrarla acá
+        # update_fields no la escribiría — quedaría la comuna nueva con la
+        # región vieja.
+        campos += ['comuna', 'region']
+    elif cliente.comuna_id:
+        cliente.comuna = None
+        cliente.region = None
+        campos += ['comuna', 'region']
+
+    cliente.save(update_fields=campos)
     return JsonResponse({'ok': True})
 
 

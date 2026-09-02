@@ -57,6 +57,12 @@ internas y se reconocen entre sí.
   .campo{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);
          border-radius:10px;margin-bottom:10px;background:#fff;font-family:inherit;
          color:var(--ink)}
+  .comunas-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .chip-comuna{border:1px solid var(--line);background:#fff;color:var(--ink);
+               border-radius:999px;padding:7px 12px;font-size:14px;
+               font-family:inherit;cursor:pointer}
+  .chip-comuna.puesta{background:var(--brand);color:#fff;border-color:var(--brand)}
+  select.campo{appearance:none;background:#fff}
   .err{color:var(--debe);font-size:14px;margin-bottom:8px;display:none}
   .btn-prod{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .btn-serv{background:#456990;color:#fff;margin-bottom:10px}
@@ -229,6 +235,36 @@ internas y se reconocen entre sí.
   <div class="card oculto" id="formDatos">
     <h2>Datos complementarios</h2>
     <form id="fDatos">{% csrf_token %}
+      <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+                  color:var(--hint);margin:0 0 8px">Datos del cliente</div>
+      <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">Correo</label>
+      <input class="campo" name="email" type="email" inputmode="email"
+             autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="cliente@correo.cl"
+             value="{{ venta.cliente.email|default:"" }}">
+      <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">RUT o pasaporte</label>
+      <input class="campo" name="documento_identidad" type="text" autocomplete="off"
+             placeholder="12.345.678-9"
+             value="{{ venta.cliente.documento_identidad|default:"" }}">
+      <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">Comuna</label>
+      <div class="comunas-rapidas">
+        {% for nombre in comunas_rapidas %}
+        <button type="button" class="chip-comuna" data-comuna="{{ nombre }}">{{ nombre }}</button>
+        {% endfor %}
+      </div>
+      <select class="campo" name="comuna" id="selComuna">
+        <option value="">— sin comuna —</option>
+        {% for c in comunas %}
+        <option value="{{ c.pk }}"{% if venta.cliente.comuna_id == c.pk %} selected{% endif %}>{{ c.nombre }}{% if c.region %} · {{ c.region.nombre }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      {% if venta.cliente.ciudad and not venta.cliente.comuna_id %}
+      <div style="font-size:12px;color:var(--hint);margin:-6px 0 12px">
+        Antes decía «{{ venta.cliente.ciudad }}»: elige la comuna para dejarlo firme.</div>
+      {% endif %}
+
+      <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+                  color:var(--hint);margin:18px 0 8px">De esta reserva</div>
       <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">Comentarios</label>
       <textarea class="campo" name="comentarios" rows="4">{{ venta.comentarios|default:"" }}</textarea>
       <label style="display:block;font-size:13px;color:var(--hint);margin:0 0 4px">N° documento fiscal</label>
@@ -431,15 +467,45 @@ internas y se reconocen entre sí.
 })();
 
 (function () {
-  // Fase 5: datos complementarios. Guarda SOLO comentarios y documento fiscal
-  // (el endpoint usa update_fields); al guardar recarga, para que lo que se ve
-  // sea siempre lo que quedó en el servidor.
+  // Datos complementarios: los del cliente (correo, RUT, comuna) y los de la
+  // reserva (comentarios, documento fiscal). El endpoint guarda cada cosa en
+  // su tabla con update_fields; al terminar recarga, para que lo que se ve sea
+  // siempre lo que quedó en el servidor.
   var abrir = document.getElementById('btnAbrirDatos');
   var caja = document.getElementById('formDatos');
   var form = document.getElementById('fDatos');
   var error = document.getElementById('datosError');
 
   abrir.addEventListener('click', function () { caja.classList.toggle('oculto'); });
+
+  // Accesos rápidos de comuna: buscan por NOMBRE dentro del mismo select, sin
+  // ids quemados — el día que cambie la lista de comunas, esto sigue sirviendo.
+  var selComuna = document.getElementById('selComuna');
+  function nombreDe(opcion) {
+    return opcion ? opcion.text.split('·')[0].trim().toLowerCase() : '';
+  }
+  function pintarChips() {
+    var elegido = nombreDe(selComuna.options[selComuna.selectedIndex]);
+    Array.prototype.forEach.call(document.querySelectorAll('.chip-comuna'),
+      function (b) {
+        b.classList.toggle('puesta', b.dataset.comuna.toLowerCase() === elegido);
+      });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.chip-comuna'),
+    function (b) {
+      b.addEventListener('click', function () {
+        var buscado = b.dataset.comuna.toLowerCase();
+        for (var i = 0; i < selComuna.options.length; i++) {
+          if (nombreDe(selComuna.options[i]) === buscado) {
+            selComuna.selectedIndex = i; break;
+          }
+        }
+        pintarChips();
+      });
+    });
+  selComuna.addEventListener('change', pintarChips);
+  pintarChips();
+
   document.getElementById('datosCancelar').addEventListener('click', function () {
     caja.classList.add('oculto'); error.style.display = 'none';
   });
