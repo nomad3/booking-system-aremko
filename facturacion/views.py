@@ -99,3 +99,66 @@ def descargar_sobre_set(request):
     resp['Content-Disposition'] = (
         f'attachment; filename="set_boletas_folios_{folios}.xml"')
     return resp
+
+
+@staff_member_required
+def descargar_cof_set(request):
+    """Descarga el consumo de folios del día del set, para subirlo A MANO.
+
+    El SII rechaza el set con «Valor del Monto Total no coinciden con el del
+    COF» aunque cada boleta cuadre por dentro y el día tenga solo esas cinco
+    (verificado el 02-09-2026 con folios 29-33, en un día limpio). El reparo
+    cae siempre en el ÚLTIMO folio del lote: es el validador comparando contra
+    un consumo de folios que nunca enviamos.
+
+    Su propio correo lo dice: «se pretende verificar la capacidad de generación
+    del RCOF». La API de SimpleAPI lo rechaza —«Impuestos Internos ya no admite
+    este tipo de documento»—, pero la API también ignoraba el set y por el
+    formulario web sí entró. Así que el archivo se genera acá y se sube a mano.
+    """
+    import datetime
+
+    from django.utils import timezone
+
+    from .services import rcof_builder, simpleapi_client
+
+    if not simpleapi_client.credenciales_listas():
+        return HttpResponse('Faltan credenciales de facturación.', status=503)
+
+    crudo = (request.GET.get('fecha') or '').strip()
+    try:
+        fecha = datetime.date.fromisoformat(crudo) if crudo else timezone.localdate()
+    except ValueError:
+        return HttpResponse('Fecha inválida (usa AAAA-MM-DD).', status=400)
+
+    boletas = [b for b in BoletaElectronica.objects
+               .filter(ambiente='certificacion').exclude(estado='error')
+               .order_by('folio')
+               if b.xml_dte and f'<FchEmis>{fecha:%Y-%m-%d}</FchEmis>' in b.xml_dte]
+    if not boletas:
+        return HttpResponse(f'No hay boletas de certificación del {fecha}.', status=404)
+
+    config = ConfiguracionFacturacion.get()
+    cert_bytes, cert_password = simpleapi_client.obtener_certificado()
+    sin_firma, doc_id = rcof_builder.construir_consumo_folios(
+        config, fecha, boletas, secuencia=int(request.GET.get('secuencia') or 1),
+        timestamp=timezone.localtime())
+    xml = rcof_builder.firmar(sin_firma, doc_id, cert_bytes, cert_password)
+
+    # La misma compuerta del sobre: no se entrega un XML que el esquema rechaza.
+    from pathlib import Path
+
+    from lxml import etree
+
+    xsd = Path('/app/docs/certificacion_sii/ConsumoFolio_v10.xsd')
+    if xsd.exists():
+        schema = etree.XMLSchema(etree.parse(str(xsd)))
+        if not schema.validate(etree.fromstring(xml.encode('ISO-8859-1', errors='replace'))):
+            errores = '; '.join(e.message for e in schema.error_log)
+            return HttpResponse(f'El consumo de folios no valida: {errores}', status=500)
+
+    resp = HttpResponse(xml.encode('ISO-8859-1', errors='replace'),
+                        content_type='application/xml')
+    resp['Content-Disposition'] = (
+        f'attachment; filename="consumo_folios_{fecha:%Y%m%d}.xml"')
+    return resp

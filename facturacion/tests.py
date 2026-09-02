@@ -238,3 +238,12 @@ class DescargaDelSobreDelSet(TestCase):
         self.assertIn(r.status_code, (302, 403))
         if r.status_code == 302:
             self.assertIn('login', r['Location'])
+
+
+class DescargaDelConsumoDeFolios(TestCase):
+    """El COF lleva documentos firmados y datos de venta: no puede colgar de una
+    URL pública, igual que el sobre."""
+
+    def test_un_visitante_cualquiera_no_puede_bajarlo(self):
+        r = self.client.get('/boletas/cof-set/')
+        self.assertIn(r.status_code, (302, 403))
