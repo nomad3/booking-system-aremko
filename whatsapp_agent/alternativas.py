@@ -21,7 +21,9 @@ Shape unificado de cada alternativa:
     "precio_con_descuento": 60000,                  # int CLP, tras pack (== total si no hay)
     "hay_descuento": false,
     "texto_sugerido": "Tina ... a las 18:00 hrs para 2 personas, $60.000.",
-    "itinerario": [{"servicio": "Tina ...", "hora": "18:00"}]   # 1..N líneas con hora
+    "itinerario": [{"servicio": "Tina ...", "hora": "18:00", "servicio_id": 12}]
+                                                # 1..N líneas; servicio_id solo
+                                                # en las que se agendan
   }
 
 Nota de negocio (confirmada por Jorge 2026-07-06):
@@ -62,6 +64,22 @@ MAX_ALTERNATIVAS = 12
 MAX_ALTERNATIVAS_NOCHE = 6
 
 
+def _linea(origen, nombre, hora):
+    """Una línea del itinerario, con el ID del servicio cuando se conoce.
+
+    El nombre solo sirve para leer; para convertir una alternativa en cotización
+    hace falta el `servicio_id` — sin él, el cajón tendría que adivinar por
+    texto, que es como se cuela el error el día que haya dos tinas de nombre
+    parecido. `origen` es el dict del motor (trae servicio_id); va en None
+    cuando la línea es informativa y no se agenda («Llegada y desayuno»).
+    """
+    linea = {'servicio': nombre, 'hora': hora}
+    sid = (origen or {}).get('servicio_id')
+    if sid:
+        linea['servicio_id'] = int(sid)
+    return linea
+
+
 def _alt(titulo, precio_total, precio_con_descuento, hay_descuento, texto_sugerido, itinerario):
     return {
         'titulo': titulo,
@@ -95,7 +113,7 @@ def _tina_sola(fecha, personas):
                 titulo=f"{s['nombre']} · {hora}",
                 precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
                 texto_sugerido=texto,
-                itinerario=[{'servicio': s['nombre'], 'hora': hora}]))
+                itinerario=[_linea(s, s['nombre'], hora)]))
     alts.sort(key=lambda a: a['itinerario'][0]['hora'])
     return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
 
@@ -121,7 +139,7 @@ def _masaje_solo(fecha, personas):
                 titulo=f"{s['nombre']} · {hora}",
                 precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
                 texto_sugerido=texto,
-                itinerario=[{'servicio': s['nombre'], 'hora': hora}]))
+                itinerario=[_linea(s, s['nombre'], hora)]))
     alts.sort(key=lambda a: a['itinerario'][0]['hora'])
     return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
 
@@ -142,10 +160,10 @@ def _noche_aguas_calientes(fecha, personas):
     for op in (res.get('alternativas') or res.get('opciones', [])):
         cab = op['cabana']
         tina = op.get('tina')
-        itin = [{'servicio': cab['nombre'], 'hora': cab['hora_check_in']}]
+        itin = [_linea(cab, cab['nombre'], cab['hora_check_in'])]
         partes = [f"{cab['nombre']} (check-in {cab['hora_check_in']})"]
         if tina:
-            itin.append({'servicio': tina['nombre'], 'hora': tina['hora']})
+            itin.append(_linea(tina, tina['nombre'], tina['hora']))
             partes.append(f"{tina['nombre']} a las {tina['hora']} hrs")
         precio = int(op['precio_total'])
         precio_desc = int(op.get('precio_con_descuento', precio))
@@ -181,8 +199,8 @@ def _pausa(fecha, personas):
             titulo=f"{a['etiqueta']} · tina {tina['hora']} / masaje {masaje['hora']}",
             precio_total=a['precio_total'], precio_con_descuento=a['precio_con_descuento'],
             hay_descuento=a['hay_descuento'], texto_sugerido=texto,
-            itinerario=[{'servicio': tina['nombre'], 'hora': tina['hora']},
-                        {'servicio': masaje['nombre'], 'hora': masaje['hora']}]))
+            itinerario=[_linea(tina, tina['nombre'], tina['hora']),
+                        _linea(masaje, masaje['nombre'], masaje['hora'])]))
     return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
 
 
@@ -226,9 +244,9 @@ def _ritual(fecha, personas):
             titulo=f"Ritual · masaje {hora_masaje}",
             precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
             texto_sugerido=texto,
-            itinerario=[{'servicio': cab['nombre'], 'hora': cab['hora_check_in']},
-                        {'servicio': tina['nombre'], 'hora': tina['hora']},
-                        {'servicio': masaje['nombre'], 'hora': hora_masaje}]))
+            itinerario=[_linea(cab, cab['nombre'], cab['hora_check_in']),
+                        _linea(tina, tina['nombre'], tina['hora']),
+                        _linea(masaje, masaje['nombre'], hora_masaje)]))
     return {'fecha': base['fecha'], 'alternativas': alts}
 
 
@@ -254,10 +272,10 @@ def _refugio(fecha, personas):
             titulo=f"Refugio · masaje {hora_masaje}",
             precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
             texto_sugerido=texto,
-            itinerario=[{'servicio': f"{cab['nombre']} (2 noches)", 'hora': cab['hora_check_in']},
-                        {'servicio': f"{tina1['nombre']} (noche 1)", 'hora': tina1['hora']},
-                        {'servicio': f"{tina2['nombre']} (noche 2)", 'hora': tina2['hora']},
-                        {'servicio': masaje['nombre'], 'hora': hora_masaje}]))
+            itinerario=[_linea(cab, f"{cab['nombre']} (2 noches)", cab['hora_check_in']),
+                        _linea(tina1, f"{tina1['nombre']} (noche 1)", tina1['hora']),
+                        _linea(tina2, f"{tina2['nombre']} (noche 2)", tina2['hora']),
+                        _linea(masaje, masaje['nombre'], hora_masaje)]))
     return {'fecha': base['fecha'], 'alternativas': alts}
 
 
@@ -303,9 +321,9 @@ def _dia(fecha, personas):
             titulo=f"Por el día · {primero} primero ({masaje_hora}/{tina_hora})",
             precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
             texto_sugerido=texto,
-            itinerario=[{'servicio': 'Llegada y desayuno', 'hora': '10:00'},
-                        {'servicio': masaje['nombre'], 'hora': masaje_hora},
-                        {'servicio': tina['nombre'], 'hora': tina_hora}]))
+            itinerario=[_linea(None, 'Llegada y desayuno', '10:00'),
+                        _linea(masaje, masaje['nombre'], masaje_hora),
+                        _linea(tina, tina['nombre'], tina_hora)]))
     return {'fecha': base['fecha'], 'alternativas': alts}
 
 
