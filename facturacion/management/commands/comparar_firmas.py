@@ -15,7 +15,7 @@ from facturacion.services import rcof_builder, simpleapi_client
 
 
 def _firma(xml):
-    m = re.search(r'<(?:\w+:)?Signature[ >].*?</(?:\w+:)?Signature>', xml or '', re.S)
+    m = re.search(r'<(?:\w+:)?Signature[\s>].*?</(?:\w+:)?Signature>', xml or '', re.S)
     return m.group(0) if m else ''
 
 
@@ -46,3 +46,21 @@ class Command(BaseCommand):
         nuestro = rcof_builder.firmar(sin_firma, doc_id, cert_bytes, cert_password)
         self.stdout.write('=== NUESTRA FIRMA (rechazada) ===')
         self.stdout.write(_esqueleto(_firma(nuestro))[:1800])
+
+        # Autocomprobación: ¿la huella que firmamos sigue siendo la del
+        # documento DESPUÉS de serializarlo? Si no, el error es nuestro y no
+        # hace falta molestar al SII para saberlo.
+        import base64
+        import hashlib
+
+        from lxml import etree
+
+        arbol = etree.fromstring(nuestro.encode('ISO-8859-1', errors='replace'))
+        doc = arbol.find('{http://www.sii.cl/SiiDte}DocumentoConsumoFolios')
+        canon = etree.tostring(doc, method='c14n', exclusive=False, with_comments=False)
+        recalculada = base64.b64encode(hashlib.sha1(canon).digest()).decode()
+        escrita = arbol.find('.//{http://www.w3.org/2000/09/xmldsig#}DigestValue').text
+        self.stdout.write(f'AUTOCHEQUEO huella escrita:     {escrita}')
+        self.stdout.write(f'AUTOCHEQUEO huella recalculada: {recalculada}')
+        self.stdout.write('AUTOCHEQUEO: ' +
+                          ('COINCIDEN' if escrita == recalculada else 'NO COINCIDEN'))
