@@ -160,19 +160,28 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
         email = cliente_data.get('email', '').strip()
         rut = cliente_data.get('documento_identidad', '').strip()
 
+        # Cotización armada A MANO en el cajón (Jorge, 01-09-2026): basta el
+        # nombre. El caso es alguien que escribió «¿cuánto sale una noche con
+        # tina el sábado?» y solo dejó su teléfono; exigirle el RUT antes de
+        # decirle el precio es la forma más segura de perder la venta. El
+        # correo y el RUT se piden al APROBAR, en la propia cotización, que es
+        # cuando el cliente se compromete — y los escribe él, que es mejor dato
+        # que dictados por teléfono.
+        minima = (payload.get('origen') or '').strip().lower() == 'cajon'
+
         if not nombre or len(nombre) < 3:
             return {
                 'success': False,
                 'error': 'validation_error',
                 'mensaje': 'Nombre requerido (mín 3 caracteres)'
             }
-        if not email or '@' not in email:
+        if not minima and (not email or '@' not in email):
             return {
                 'success': False,
                 'error': 'validation_error',
                 'mensaje': 'Email válido requerido'
             }
-        if not rut:
+        if not minima and not rut:
             return {
                 'success': False,
                 'error': 'validation_error',

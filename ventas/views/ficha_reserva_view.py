@@ -738,6 +738,24 @@ def _cotizacion_lineas_total(propuesta):
     return lineas, _clp(total), giftcards
 
 
+def _faltan_datos_del_cliente(propuesta):
+    """Qué datos le faltan a la propuesta para poder convertirse en reserva.
+
+    Una cotización armada a mano en el cajón puede nacer solo con el nombre
+    (el cliente todavía no daba su correo ni su RUT). La reserva sí los
+    necesita —para la boleta y para escribirle—, así que se piden en la propia
+    cotización, al aprobar: es el momento en que el cliente se compromete, y
+    los escribe él en vez de dictarlos por teléfono.
+    """
+    cliente = (propuesta.payload or {}).get('cliente', {}) or {}
+    faltan = []
+    if '@' not in (cliente.get('email') or ''):
+        faltan.append('email')
+    if not (cliente.get('documento_identidad') or '').strip():
+        faltan.append('documento_identidad')
+    return faltan
+
+
 def cotizacion_cliente(request, token):
     """Cotización del cliente (Ficha en modo cotización + botón Aprobar)."""
     from django.urls import reverse
@@ -764,6 +782,7 @@ def cotizacion_cliente(request, token):
         'solo_giftcards': solo_gc,
         'vigente': propuesta.esta_vigente(),
         'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
+        'faltan_datos': _faltan_datos_del_cliente(propuesta),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 
@@ -786,6 +805,39 @@ def aprobar_cotizacion(request, token):
 
     if request.method != 'POST':
         return redirect('ventas:cotizacion_cliente', token=token)
+
+    # Si la cotización nació sin correo ni RUT (armada a mano en el cajón), se
+    # completan ACÁ, con lo que el cliente acaba de escribir. Sin esto la
+    # creación falla más adelante con «Datos de cliente inválidos», que para él
+    # sería un botón que no hace nada.
+    faltan = _faltan_datos_del_cliente(propuesta)
+    if faltan:
+        email = (request.POST.get('email') or '').strip()
+        rut = (request.POST.get('documento_identidad') or '').strip()
+        errores = []
+        if 'email' in faltan and '@' not in email:
+            errores.append('Necesitamos un correo válido para enviarte la reserva.')
+        if 'documento_identidad' in faltan and not rut:
+            errores.append('Necesitamos tu RUT para emitir la boleta.')
+        if errores:
+            lineas, total_str, giftcards_cot = _cotizacion_lineas_total(propuesta)
+            return render(request, 'ventas/ficha_reserva_cliente.html', {
+                'es_cotizacion': True, 'error_aprobar': ' '.join(errores),
+                'lineas': lineas, 'total_str': total_str,
+                'giftcards': giftcards_cot, 'aprobar_url': aprobar_url,
+                'faltan_datos': faltan,
+                'email_previo': email, 'rut_previo': rut,
+            }, status=400)
+        payload = propuesta.payload or {}
+        cliente = dict(payload.get('cliente') or {})
+        if 'email' in faltan:
+            cliente['email'] = email
+        if 'documento_identidad' in faltan:
+            cliente['documento_identidad'] = rut
+        payload['cliente'] = cliente
+        propuesta.payload = payload
+        propuesta.cliente_data = cliente
+        propuesta.save(update_fields=['payload', 'cliente_data'])
 
     # Llamada interna a crear_reserva con propuesta_id (bypass de la API key vía force_authenticate).
     factory = APIRequestFactory()

@@ -380,6 +380,27 @@
                           setTimeout(function(){ if(b){b.disabled=true; b.textContent='Generando tu reserva…';} },0);
                           return true;">
             {% csrf_token %}
+            {% if faltan_datos %}
+            <div style="margin:0 0 12px">
+              {% if 'email' in faltan_datos %}
+              <label style="display:block;font-size:13px;margin:0 0 4px">Tu correo</label>
+              <input name="email" type="email" inputmode="email" required
+                     autocomplete="email" autocapitalize="off" spellcheck="false"
+                     value="{{ email_previo|default:'' }}" placeholder="tucorreo@ejemplo.cl"
+                     style="width:100%;padding:11px;font-size:16px;border:1px solid #d9d2c4;
+                            border-radius:8px;margin:0 0 10px">
+              {% endif %}
+              {% if 'documento_identidad' in faltan_datos %}
+              <label style="display:block;font-size:13px;margin:0 0 4px">Tu RUT</label>
+              <input name="documento_identidad" type="text" required autocomplete="off"
+                     value="{{ rut_previo|default:'' }}" placeholder="12.345.678-9"
+                     style="width:100%;padding:11px;font-size:16px;border:1px solid #d9d2c4;
+                            border-radius:8px;margin:0 0 4px">
+              {% endif %}
+              <div style="font-size:12px;color:#7b7263">Los necesitamos para enviarte la
+                reserva y emitir tu boleta.</div>
+            </div>
+            {% endif %}
             <button type="submit" class="btn" style="background:#3D6B4A">Aprobar cotización</button>
           </form>
           <div class="com-note">{% if solo_giftcards %}Al aprobar, te enviamos los datos de transferencia; con el pago confirmado, las gift cards llegan a tu email.{% else %}Al aprobar, generamos tu reserva al instante.{% endif %}</div>
