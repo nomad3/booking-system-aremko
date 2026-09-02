@@ -80,56 +80,54 @@ def construir_consumo_folios(config, fecha, boletas, secuencia=1, timestamp=None
 
 
 def firmar(xml_sin_firma, doc_id, cert_bytes, cert_password):
-    """Firma XML-DSig como la pide el SII: referencia al documento, SHA1,
-    RSA-SHA1, canonicalización inclusiva y el certificado en el KeyInfo."""
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import padding
+    """Firma el consumo de folios con XML-DSig, como lo pide el SII.
+
+    Usa `signxml` y NO una implementación a mano. La primera versión la escribí
+    a pulso —canonicalizar, calcular la huella, firmar el SignedInfo— y el SII
+    la rechazó con «Error en Firma» (02-09-2026). Un verificador estándar
+    también la rechazaba, mientras que la de la librería se verifica sola: el
+    problema no era el SII sino la firma. XML-DSig tiene demasiadas sutilezas
+    de canonicalización y espacios de nombres como para escribirlo uno mismo.
+
+    SHA-1 no es una elección: es lo que especifica el SII para DTE. Por eso hay
+    que desactivar la guarda de la librería, que lo bloquea por inseguro.
+    """
+    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.serialization import pkcs12
     from lxml import etree
+    from signxml import (CanonicalizationMethod, DigestAlgorithm,
+                         SignatureConstructionMethod, SignatureMethod, XMLSigner)
 
     llave, cert, _ = pkcs12.load_key_and_certificates(
         cert_bytes, cert_password.encode())
     if llave is None or cert is None:
         raise ValueError('El .pfx no trae llave o certificado.')
 
-    nums = llave.public_key().public_numbers()
-    b64 = lambda x: base64.b64encode(x).decode()
-    modulo = b64(nums.n.to_bytes((nums.n.bit_length() + 7) // 8, 'big'))
-    exponente = b64(nums.e.to_bytes((nums.e.bit_length() + 7) // 8, 'big'))
-    x509 = b64(cert.public_bytes(serialization.Encoding.DER))
+    class _FirmadorSII(XMLSigner):
+        def check_deprecated_methods(self):
+            return None  # el SII firma con SHA-1
 
-    # Andamio de la firma: se rellena con los valores reales más abajo.
-    firma = (
-        f'<Signature xmlns="{NS_DS}"><SignedInfo>'
-        '<CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>'
-        f'<SignatureMethod Algorithm="{NS_DS}rsa-sha1"/>'
-        f'<Reference URI="#{doc_id}"><Transforms>'
-        f'<Transform Algorithm="{NS_DS}enveloped-signature"/></Transforms>'
-        f'<DigestMethod Algorithm="{NS_DS}sha1"/><DigestValue></DigestValue>'
-        '</Reference></SignedInfo><SignatureValue></SignatureValue>'
-        '<KeyInfo><KeyValue><RSAKeyValue>'
-        f'<Modulus>{modulo}</Modulus><Exponent>{exponente}</Exponent>'
-        '</RSAKeyValue></KeyValue>'
-        f'<X509Data><X509Certificate>{x509}</X509Certificate></X509Data>'
-        '</KeyInfo></Signature>'
-    )
-    completo = xml_sin_firma.replace('</ConsumoFolios>', firma + '</ConsumoFolios>')
-    arbol = etree.fromstring(completo.encode('ISO-8859-1', errors='replace'))
+    firmador = _FirmadorSII(
+        method=SignatureConstructionMethod.enveloped,
+        signature_algorithm=SignatureMethod.RSA_SHA1,
+        digest_algorithm=DigestAlgorithm.SHA1,
+        c14n_algorithm=CanonicalizationMethod.CANONICAL_XML_1_0)
 
-    # 1) Huella del documento referenciado, sobre su forma canónica.
-    doc = arbol.find(f'{{{NS_SII}}}DocumentoConsumoFolios')
-    canon_doc = etree.tostring(doc, method='c14n', exclusive=False, with_comments=False)
-    digest = base64.b64encode(hashlib.sha1(canon_doc).digest()).decode()
-    arbol.find(f'.//{{{NS_DS}}}DigestValue').text = digest
+    arbol = etree.fromstring(xml_sin_firma.encode('ISO-8859-1', errors='replace'))
+    firmado = firmador.sign(
+        arbol,
+        key=llave.private_bytes(serialization.Encoding.PEM,
+                                serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption()),
+        cert=cert.public_bytes(serialization.Encoding.PEM),
+        reference_uri=f'#{doc_id}',
+        # Dos exigencias del esquema del SII, más estrictas que el XML-DSig
+        # genérico (las dijo su propio XSD al validar): una sola Transform —la
+        # de enveloped-signature—, y KeyInfo con KeyValue ANTES del X509Data.
+        exclude_c14n_transform_element=True,
+        always_add_key_value=True)
 
-    # 2) La firma va sobre el SignedInfo YA con la huella dentro.
-    signed_info = arbol.find(f'.//{{{NS_DS}}}SignedInfo')
-    canon_si = etree.tostring(signed_info, method='c14n', exclusive=False,
-                              with_comments=False)
-    valor = llave.sign(canon_si, padding.PKCS1v15(), hashes.SHA1())
-    arbol.find(f'.//{{{NS_DS}}}SignatureValue').text = base64.b64encode(valor).decode()
-
-    cuerpo = etree.tostring(arbol, encoding='ISO-8859-1').decode('ISO-8859-1')
+    cuerpo = etree.tostring(firmado, encoding='ISO-8859-1').decode('ISO-8859-1')
     if cuerpo.startswith('<?xml'):
         cuerpo = cuerpo.split('?>', 1)[1].lstrip()
     return '<?xml version="1.0" encoding="ISO-8859-1"?>\n' + cuerpo
