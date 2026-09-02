@@ -190,6 +190,12 @@
             <i class="fas fa-filter me-2"></i>Filtros
         </div>
         <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap gap-2 justify-content-center">
+                {% for a in atajos %}
+                <a href="?fecha_inicio={{ a.fecha }}&amp;fecha_fin={{ a.fecha }}{% if categoria_id %}&amp;categoria={{ categoria_id }}{% endif %}{% if venta_reserva_id %}&amp;venta_reserva_id={{ venta_reserva_id }}{% endif %}"
+                   class="btn btn-modern {% if a.activo %}btn-primary-modern{% else %}btn-outline-secondary{% endif %}">{{ a.nombre }}</a>
+                {% endfor %}
+            </div>
             <form method="GET" action="" class="row g-3 align-items-end">
                 <div class="col-md-6 col-lg-3">
                     <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>

@@ -111,6 +111,13 @@ def servicios_vendidos_view(request):
         })
 
     # Pasar los datos y las categorías a la plantilla
+    # Atajos de un toque (pedido de Jorge, 01-09-2026): el listado abre en HOY,
+    # y lo que se mira a diario es el día anterior —para cerrar— y el siguiente
+    # —para preparar—. Se calculan acá y no en JavaScript para que el enlace
+    # sea compartible y funcione igual desde el celular.
+    ayer = hoy - timedelta(days=1)
+    manana = hoy + timedelta(days=1)
+    un_dia = fecha_inicio == fecha_fin
     context = {
         'servicios': data,
         'categorias': categorias,
@@ -118,7 +125,15 @@ def servicios_vendidos_view(request):
         'fecha_fin': fecha_fin.strftime('%Y-%m-%d'),     # Pass formatted string
         'categoria_id': categoria_id,
         'venta_reserva_id': venta_reserva_id,
-        'total_monto_vendido': total_monto_vendido
+        'total_monto_vendido': total_monto_vendido,
+        'atajos': [
+            {'nombre': 'Ayer', 'fecha': ayer.strftime('%Y-%m-%d'),
+             'activo': un_dia and fecha_inicio == ayer},
+            {'nombre': 'Hoy', 'fecha': hoy.strftime('%Y-%m-%d'),
+             'activo': un_dia and fecha_inicio == hoy},
+            {'nombre': 'Mañana', 'fecha': manana.strftime('%Y-%m-%d'),
+             'activo': un_dia and fecha_inicio == manana},
+        ],
     }
 
     # Verificar si se solicitó exportación
