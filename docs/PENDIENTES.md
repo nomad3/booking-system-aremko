@@ -285,6 +285,25 @@ _Última revisión: 2026-08-31_
     en rojo los `failed` con el motivo traducido; lo demás es lujo.
     Ver `[[feedback_whatsapp_plantillas_facturacion_131042]]`.
 
+36. **P-36 · SEGURIDAD: cerrar con auth el backend Go (H-110)** — ⚠️ **DIFERIDO POR JORGE
+    el 2026-08-31** ("déjalo pendiente y me lo vas recordando en cada sesión"). Verificado
+    con curl: **113 de las 116 rutas `/api/v1/*` responden sin credencial desde internet**
+    (solo 3 exigen X-API-Key). No es solo lectura de conversaciones —como decía el reporte
+    original— sino también **escritura**: `/whatsapp/reply` e `/instagram/reply` permiten
+    escribirle a clientes desde el número de Aremko, y `/meta-ads/campaigns/{id}/budget`
+    `/pause` `/activate` permiten mover presupuestos de publicidad. Mitigación de hecho (NO
+    es seguridad): la URL del backend no es pública ni indexada.
+    **Hueco del brief original:** poner la key "en Vercel" NO basta — el dashboard llama al
+    backend DESDE EL NAVEGADOR (`NEXT_PUBLIC_API_URL`, 5 archivos del front), así que la
+    llave viajaría en el bundle JS.
+    **Plan acordado:** proxy server-side en Next.js (BFF) — el navegador llama a una ruta
+    del propio Vercel (ya autenticada por next-auth) y el servidor agrega la llave. Deploy
+    en 3 pasos sin downtime: (1) el Go acepta la llave pero tolera su ausencia; (2) el front
+    pasa al proxy; (3) el Go cierra (único paso con riesgo → hacerlo fuera del horario de
+    atención de Deborah y Alda). SIN auth: `/health` y los webhooks de Meta (validan HMAC).
+    Env var en el proyecto Vercel `aremko-cli-frontend`, NO en el duplicado `aremko-cli`.
+    Brief: `docs/BRIEF_H-110_auth_backend_go.md` · fila H-110 en `docs/HANDOFFS.md`.
+
 ## Asistente de Publicaciones (community manager)
 
 > Este módulo (cola semanal + revisión IA de material + publicar en un clic) se
