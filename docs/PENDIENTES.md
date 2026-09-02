@@ -48,40 +48,29 @@ _Última revisión: 2026-08-31_
     gratuito (solo al final; antes del switch: respaldar documentos del portal
     + OK del contador). **CERTIFICACIÓN 2026-07-12 PM**: CAF cert 1-50 cargado
     vía API + las 5 BOLETAS DEL SET TIMBRADAS (folios 1-5, exento y Kg OK).
-    **JORNADA DEL 2026-08-31 — cuatro muros caídos, uno en pie.**
-    (a) El 500 de julio ERA propagación del SII, no SimpleAPI: el reintento pasó
-    sin cambiar nada. (b) El sobre se rechazaba por schema (LSX-00204) porque
-    armábamos la Referencia con ojos de FACTURA; en boleta solo caben NroLinRef +
-    CodRef + RazonRef. Forma verificada contra la API:
-    `{"TipoDocumento": None, "CodigoReferencia": "SET", "RazonReferencia": caso}`
-    — omitir TipoDocumento NO basta (sale `<TpoDocRef/>` vacío), hay que mandarlo
-    en null. (c) «Rut No Autorizado a Firmar»: los permisos de certificación
-    viven en `maullin.sii.cl/cvc_cgi/dte/eu_enrola_usuarios`, SEPARADOS de los de
-    producción (palena) — Jorge estaba en S allá y en N acá. (d) El set de julio
-    estaba vencido: hay que bajarlo y usarlo el mismo día.
-    **(e) EL MURO CLAVE: el validador del set NO ve los envíos por API.** Enviado
-    por SimpleAPI (trackId 8 dígitos) la revisión respondía «El Documento no esta
-    en el envio» en los 5 casos, aunque la recepción del propio SII acusara 5/5
-    aceptadas. Subiendo el MISMO sobre por el formulario web de maullin
-    (`cgi_dte/UPL/DTEauth?1`, trackId 10 dígitos: 0257020586) el validador
-    encontró los documentos y **CASO-1 a CASO-4 pasaron sin reparos**.
+    **✅ CERTIFICACIÓN APROBADA — 2026-09-02.** «Ud cuenta con el V°B° en el
+    proceso de Certificación de Boletas Electrónicas». Set 4949774, sobre
+    0257251130 (folios 29-33), consumo de folios 0257269154.
+    Los cinco muros: (1) el 500 de julio era propagación del SII; (2) la
+    referencia iba con forma de FACTURA —en boleta solo NroLinRef+CodRef+RazonRef,
+    y `TipoDocumento` hay que mandarlo en null EXPLÍCITO; (3) los permisos de
+    firma de certificación viven en maullin, separados de palena; (4) **el
+    validador del set NO ve los envíos por API** —el mismo sobre subido por el
+    formulario web (`maullin.sii.cl/cgi_dte/UPL/DTEauth?1`) sí lo encontró—;
+    (5) faltaba el consumo de folios, y su reparo caía siempre en el ÚLTIMO
+    folio del lote (no era el CASO-5). La firma del COF la hace `signxml`, no
+    código propio.
 
-    **PENDIENTE PARA EL 2026-09-01 — corrida limpia (≈15 min).** Único reparo que
-    queda: `CASO-5 · 39 · folio 28 · «Valor del Monto Total no coinciden con el
-    del COF - Fecha Emision [20260831]»`. El COF es el consumo de folios del día
-    y hoy emitimos 15 boletas de prueba (folios 14-28, tres tandas de los mismos
-    5 casos): el set espera $54.160 y el día registra el triple. Por eso el
-    reparo cae en el último caso — es descuadre del DÍA, no del CASO-5. Secuencia
-    en un día sin ruido: 1) Jorge baja set nuevo (`www4.sii.cl/certBolElectDteInternet/?SET=1`,
-    casilla SET DE BOLETA ELECTRÓNICA AFECTA + correo del proveedor);
-    2) Claude timbra las 5 boletas (`ejecutar_set_pruebas --regenerar --solo-generar`)
-    y valida (`validar_sobre` → debe decir OK); 3) Jorge baja el sobre desde
-    `aremko.cl/boletas/sobre-set/` y lo sube por el formulario web de maullin
-    — **NO por API**; 4) Jorge informa ese trackId en `?SET=2`.
-    Después: muestras impresas → declaración de cumplimiento (proveedor de
-    software = **Aremko misma**, RUT 76485192-7, decidido por Jorge; link de
-    consulta `https://www.aremko.cl/boletas/consulta/`) → switch producción.
-    F2 (cola automática) y F3 (notas de crédito) tras el switch.
+    **AHORA — antes de declarar cumplimiento (ojo, es irreversible):** al
+    declarar, la obligación de emitir boleta electrónica empieza ESE día y se
+    pierde el sistema gratuito del SII. Antes hay que tener: (a) **F2, la cola
+    automática de emisión** —hoy solo existe el botón manual, así que cada venta
+    exigiría emitir a mano—; (b) respaldo de los documentos del portal gratuito;
+    (c) OK del contador. La declaración va en
+    `www4.sii.cl/certBolElectDteInternet/` (sin parámetro) con: 9 requisitos,
+    link de consulta `https://www.aremko.cl/boletas/consulta/`, y proveedor de
+    software = **Aremko misma** (76485192-7), decidido por Jorge.
+    F3 (notas de crédito) después del switch.
     F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
     los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
     + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
