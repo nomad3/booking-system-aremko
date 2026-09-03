@@ -683,3 +683,44 @@ def cron_normalizar_ciudades(request):
             "ok": False, "error": str(e),
             "command": "normalizar_ciudades_clientes",
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_enviar_boletas_sii(request):
+    """Endpoint cron: transmite al SII el sobre con las boletas electrónicas
+    ya timbradas (P-16, F2) que aún no se enviaron.
+
+    Timbrar y transmitir son dos pasos distintos: al cobrar, la boleta se
+    genera y timbra al toque (con folio del CAF); pero el SII exige además
+    el envío del sobre — este comando es esa segunda mitad, y este endpoint
+    la dispara desde un cron externo.
+
+    Si el envío falla, las boletas NO quedan marcadas 'error': siguen
+    'generada' y la corrida de mañana las reintenta con el mismo folio ya
+    válido (ver docstring de enviar_boletas_sii). Por eso este endpoint no
+    necesita alertar de forma especial más allá del log — un fallo de hoy
+    se autorepara solo si el problema era transitorio.
+
+    GET o POST: /ventas/cron/enviar-boletas-sii/?token=xxx
+    Frecuencia recomendada: Diario (ej. 07:00 AM).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('enviar_boletas_sii', stdout=output)
+        logger.info("✅ Cron enviar_boletas_sii ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Envío de boletas al SII ejecutado",
+            "command": "enviar_boletas_sii",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron enviar-boletas-sii: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "enviar_boletas_sii",
+        }, status=500)

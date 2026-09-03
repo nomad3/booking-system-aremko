@@ -349,6 +349,8 @@ urlpatterns = [
     path('cron/seguimientos-masaje/', cron_views.cron_seguimientos_masaje, name='cron_seguimientos_masaje'),
     # Geo — clasificar clientes nuevos sin_clasificar (idempotente, respeta manuales)
     path('cron/normalizar-ciudades/', cron_views.cron_normalizar_ciudades, name='cron_normalizar_ciudades'),
+    # P-16 — transmitir al SII las boletas ya timbradas y aún no enviadas
+    path('cron/enviar-boletas-sii/', cron_views.cron_enviar_boletas_sii, name='cron_enviar_boletas_sii'),
     # === END CRON JOBS ===
 
     # Pack Descuento Management
