@@ -95,7 +95,14 @@ def generar_timbre(ted):
     # achatando), y se toma la primera que entra en el alto máximo.
     elegida = None
     for columnas in COLUMNAS_CANDIDATAS:
-        codigos = encode(datos, columns=columnas, security_level=NIVEL_CORRECCION)
+        try:
+            codigos = encode(datos, columns=columnas, security_level=NIVEL_CORRECCION)
+        except ValueError:
+            # El PDF417 tiene un tope duro de 90 filas: con pocas columnas un
+            # TED real (~720 caracteres con el CAF de producción adentro) no
+            # cabe y la librería aborta. No es un error — es la señal de que
+            # hacen falta más columnas, así que se sigue probando.
+            continue
         medida = render_image(codigos, scale=1, ratio=RATIO_ALTO_ANCHO, padding=2)
         proporcion = medida.width / medida.height
         if ANCHO_MAX_CM / proporcion <= ALTO_MAX_CM:

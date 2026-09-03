@@ -29,8 +29,11 @@ from facturacion.models import BoletaElectronica, ConfiguracionFacturacion
 from facturacion.services import representacion_impresa as ri
 
 
-# Un DTE con la misma forma que los reales (verificado contra el folio 33 de
-# producción), pero con indentación y con un ítem que lleva espacios y acento.
+# Un DTE con la misma forma que los reales — CAF y firmas del largo real
+# (copiados del folio 33 de producción), con indentación y un ítem con
+# espacios. El largo importa: con un CAF de juguete el TED daba 540 caracteres
+# y cabía en 6 columnas, escondiendo el tope de 90 filas del PDF417 que sí
+# aparece con el TED real de ~720.
 XML_DTE = """<?xml version="1.0" encoding="ISO-8859-1"?>
 <DTE version="1.0">
   <Documento ID="T_1">
@@ -83,14 +86,14 @@ XML_DTE = """<?xml version="1.0" encoding="ISO-8859-1"?>
             <TD>39</TD>
             <RNG><D>1</D><H>50</H></RNG>
             <FA>2026-07-12</FA>
-            <RSAPK><M>wWVsTSO6ZFf5rm73zeSv</M><E>Aw==</E></RSAPK>
+            <RSAPK><M>wWVsTSO6ZFf5rm73zeSvvORc6Gta8DnS+Enu+bjiX8L8eI+lYGizXZmTcHeSXDw4MpqPkhDOAPtjAwTvOz+4nQ==</M><E>Aw==</E></RSAPK>
             <IDK>100</IDK>
           </DA>
-          <FRMA algoritmo="SHA1withRSA">vWDgPfVBwlnr+w6ooE01</FRMA>
+          <FRMA algoritmo="SHA1withRSA">vWDgPfVBwlnr+w6ooE01jWQqANxFVZ63aqzMhCUjnF64snttYkmzRap/9ayuSkjRIU2dJFnE1Fi78teOTET35g==</FRMA>
         </CAF>
         <TSTED>2026-09-02T09:52:36</TSTED>
       </DD>
-      <FRMT algoritmo="SHA1withRSA">iUR+WXuxoKcHbGlhNhHq</FRMT>
+      <FRMT algoritmo="SHA1withRSA">iUR+WXuxoKcHbGlhNhHqU6eDCQf1VqFXVKCUyQl8FpwV4WXgIkYeLuJyU3xf9R5T1nspGmDmj5CVc/hOvgbRzA==</FRMT>
     </TED>
   </Documento>
 </DTE>"""
@@ -176,6 +179,16 @@ class ElTimbreCumpleLosParametrosDelSii(TestCase):
         t = ri.generar_timbre(ri.extraer_ted(largo))
         self.assertLessEqual(t['alto_cm'], ri.ALTO_MAX_CM)
         self.assertGreater(t['ancho_cm'], t['alto_cm'])
+
+    def test_un_ted_del_largo_real_no_revienta(self):
+        # El PDF417 tiene un tope duro de 90 filas. Con pocas columnas un TED
+        # real no cabe y la librería lanza ValueError: hay que seguir probando
+        # con más columnas, no abortar. Se descubrió en producción — el fixture
+        # anterior era más corto que un TED real y no lo alcanzaba.
+        ted = ri.extraer_ted(XML_DTE)
+        self.assertGreater(len(ted), 700, 'el fixture dejó de ser realista')
+        t = ri.generar_timbre(ted)          # no debe lanzar
+        self.assertGreater(t['columnas'], 6)
 
     def test_codifica_en_binario_y_no_en_texto(self):
         # El SII exige byte compaction mode «para evitar problemas con los
