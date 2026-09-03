@@ -84,6 +84,11 @@ class ConfiguracionFacturacion(models.Model):
         help_text="Glosa corta del giro para la boleta (máx 80).")
     direccion = models.CharField(max_length=70, blank=True, default='')
     comuna = models.CharField(max_length=20, blank=True, default='Puerto Varas')
+    unidad_sii = models.CharField(
+        max_length=60, blank=True, default='',
+        help_text='Unidad del SII que va en el recuadro rojo de la boleta impresa '
+                  '(ej. «PUERTO MONTT»). Si se deja vacío se usa la comuna. Es un '
+                  'dato tributario: confírmalo con el contador antes de imprimir.')
     indicador_servicio = models.PositiveSmallIntegerField(
         default=3, help_text="3 = ventas y servicios (boleta). No cambiar sin razón.")
     rut_firmante = models.CharField(

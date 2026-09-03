@@ -80,6 +80,16 @@
           {% endif %}
         </td></tr>
       </table>
+      {% comment %}Solo con folio: sin él la boleta aún no está timbrada y no
+      hay timbre que imprimir.{% endcomment %}
+      {% if boleta.folio %}
+      <p style="margin-top:18px">
+        <a href="{% url 'facturacion:boleta_impresa_por_token' boleta.token_consulta %}"
+           style="display:inline-block;background:#1e7d32;color:#fff;text-decoration:none;
+                  padding:11px 18px;border-radius:8px;font-family:Arial,sans-serif;
+                  font-size:15px">Descargar boleta en PDF</a>
+      </p>
+      {% endif %}
       <p class="lead" style="margin-top:16px;font-size:13px">
         Puedes contrastar estos datos en el
         <a href="https://www4.sii.cl/bolcoreinternetui/#!/home" target="_blank"

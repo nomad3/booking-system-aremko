@@ -55,6 +55,9 @@ pytz>=2024.1  # Timezone support for reminder emails
 
 # PDF Generation
 WeasyPrint>=62.3  # PDF generation
+# Timbre PDF417 de la boleta electrónica (P-16). Pineado a la versión
+# efectivamente probada: pinear a ciegas ya costó un AttributeError con signxml.
+pdf417gen==0.8.0
 
 # Email Service
 django-anymail[sendgrid]>=10.3  # SendGrid integration

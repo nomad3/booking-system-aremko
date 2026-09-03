@@ -230,3 +230,68 @@ def pagos_sin_boleta(request):
         'total_sin_decidir': sum(int(f['pago'].monto or 0) for f in sin_decidir),
         'total_con_decision': sum(int(f['pago'].monto or 0) for f in con_decision),
     })
+
+
+def _pdf_boleta_impresa(boleta):
+    """El PDF de la representación impresa, o (None, mensaje) si no se puede.
+
+    Falla con mensaje y no con un 500: quien pide esto puede ser Deborah con
+    un cliente al frente, o el cliente mismo desde su enlace.
+    """
+    from django.template.loader import render_to_string
+
+    from .services import representacion_impresa
+
+    try:
+        datos = representacion_impresa.datos_para_impresion(boleta)
+    except representacion_impresa.SinTimbre as exc:
+        return None, str(exc)
+
+    config = ConfiguracionFacturacion.get()
+    html = render_to_string('facturacion/boleta_impresa.html', {
+        'd': datos,
+        # El recuadro rojo lleva la unidad del SII. Si nadie la configuró, la
+        # comuna es lo más cercano y honesto -- no se inventa una regional.
+        'unidad_sii': (config.unidad_sii or config.comuna or '').upper(),
+        'url_verificacion': 'www.aremko.cl/boletas/consulta/',
+    })
+
+    from weasyprint import HTML
+    return HTML(string=html).write_pdf(), ''
+
+
+def _responder_pdf(boleta, request):
+    pdf, error = _pdf_boleta_impresa(boleta)
+    if pdf is None:
+        return HttpResponse(f'No se puede imprimir esta boleta: {error}',
+                            status=409, content_type='text/plain; charset=utf-8')
+    respuesta = HttpResponse(pdf, content_type='application/pdf')
+    # inline: se abre en el visor del teléfono en vez de bajar un archivo que
+    # después hay que buscar. `descargar=1` fuerza la descarga.
+    disposicion = 'attachment' if request.GET.get('descargar') else 'inline'
+    respuesta['Content-Disposition'] = (
+        f'{disposicion}; filename="boleta-{boleta.folio or boleta.pk}.pdf"')
+    return respuesta
+
+
+@staff_member_required
+def boleta_impresa_staff(request, pk):
+    """Reimprimir cualquier boleta desde el admin — incluidas las de
+    certificación, que es como se generan las muestras impresas para el SII."""
+    from django.shortcuts import get_object_or_404
+    boleta = get_object_or_404(BoletaElectronica, pk=pk)
+    return _responder_pdf(boleta, request)
+
+
+def boleta_impresa_por_token(request, token):
+    """La boleta impresa del cliente, desde el enlace que ya recibe.
+
+    Misma regla que la consulta pública: solo boletas REALES. Una de
+    certificación en manos de un cliente sería un documento sin valor
+    presentado como si lo tuviera.
+    """
+    boleta = _publicables().filter(token_consulta=token).first()
+    if boleta is None:
+        return HttpResponse('Boleta no encontrada.', status=404,
+                            content_type='text/plain; charset=utf-8')
+    return _responder_pdf(boleta, request)

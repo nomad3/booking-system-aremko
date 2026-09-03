@@ -1,0 +1,138 @@
+{% comment %}
+Representación impresa de la boleta electrónica (DTE tipo 39).
+
+Las medidas van en CENTÍMETROS y no en píxeles a propósito: los requisitos del
+SII están expresados en centímetros sobre el papel, así que escribirlos en la
+misma unidad los hace verificables con una regla sobre la hoja impresa.
+
+Del manual de muestras impresas y del instructivo técnico:
+· Hoja: mínimo 21,5 × 11 cm  → carta cumple de sobra.
+· Timbre: mínimo 2 × 5 cm, máximo recomendado 3 × 9 cm.
+· Timbre: en la parte INFERIOR, a un mínimo de 2 cm del borde izquierdo
+  (de ahí el margen extra sobre el margen de página).
+· Quiet Zone: 0,25 pulgadas = 0,635 cm de blanco alrededor de los 4 lados.
+· Debajo del timbre va la leyenda «Timbre Electrónico SII».
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Boleta electrónica N° {{ d.folio }}</title>
+<style>
+  @page { size: letter; margin: 1.5cm; }
+
+  body { font-family: "Helvetica", Arial, sans-serif; color: #000;
+         font-size: 10pt; line-height: 1.35; margin: 0; }
+
+  /* Encabezado: emisor a la izquierda, recuadro del SII a la derecha. */
+  .encabezado { display: flex; justify-content: space-between;
+                align-items: flex-start; gap: 1cm; }
+  .emisor { max-width: 11cm; }
+  .emisor .razon { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+  .emisor .linea { font-size: 9pt; }
+
+  /* El recuadro reglamentario: borde rojo, RUT + tipo de documento + folio. */
+  .recuadro-sii { border: 2px solid #C00; color: #C00; padding: 0.35cm 0.5cm;
+                  text-align: center; min-width: 6cm; }
+  .recuadro-sii .rut { font-size: 11pt; font-weight: bold; }
+  .recuadro-sii .tipo { font-size: 11pt; font-weight: bold; margin: 0.1cm 0; }
+  .recuadro-sii .folio { font-size: 13pt; font-weight: bold; }
+  .recuadro-sii .unidad { color: #000; font-size: 8pt; margin-top: 0.2cm;
+                          border-top: 1px solid #C00; padding-top: 0.15cm; }
+
+  .fecha { margin-top: 0.5cm; font-size: 9pt; }
+  .receptor { margin-top: 0.4cm; font-size: 9pt;
+              border-top: 1px solid #999; padding-top: 0.25cm; }
+
+  table.detalle { width: 100%; border-collapse: collapse; margin-top: 0.5cm; }
+  table.detalle th { text-align: left; font-size: 8.5pt; text-transform: uppercase;
+                     border-bottom: 1.5px solid #000; padding: 0.15cm 0.1cm;
+                     letter-spacing: 0.02em; }
+  table.detalle td { padding: 0.15cm 0.1cm; font-size: 9.5pt;
+                     border-bottom: 0.5px solid #DDD; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+
+  .totales { margin-top: 0.5cm; margin-left: auto; width: 7cm; }
+  .totales tr td { padding: 0.1cm 0.15cm; font-size: 9.5pt; }
+  .totales tr.total td { font-size: 12pt; font-weight: bold;
+                         border-top: 1.5px solid #000; padding-top: 0.2cm; }
+
+  /* El timbre. margin-left completa los 2 cm desde el borde FÍSICO de la
+     hoja (1,5 cm de margen de página + 0,5 cm de aquí). */
+  .zona-timbre { margin-top: 1cm; margin-left: 0.5cm; }
+  .timbre-caja { padding: 0.7cm; background: #FFF; display: inline-block; }
+  .timbre-caja img { display: block; }
+  .leyenda { font-size: 8pt; margin-left: 0.7cm; }
+  .leyenda .verificar { color: #444; }
+</style>
+</head>
+<body>
+
+  <div class="encabezado">
+    <div class="emisor">
+      <div class="razon">{{ d.emisor.razon_social }}</div>
+      <div class="linea">{{ d.emisor.giro }}</div>
+      <div class="linea">{{ d.emisor.direccion }} — {{ d.emisor.comuna }}</div>
+    </div>
+    <div class="recuadro-sii">
+      <div class="rut">R.U.T. {{ d.emisor.rut }}</div>
+      <div class="tipo">BOLETA ELECTRÓNICA</div>
+      <div class="folio">N° {{ d.folio }}</div>
+      <div class="unidad">S.I.I. — {{ unidad_sii }}</div>
+    </div>
+  </div>
+
+  <div class="fecha"><b>Fecha de emisión:</b> {{ d.fecha_emision }}</div>
+
+  <div class="receptor">
+    <b>Señor(es):</b> {{ d.receptor.razon_social }}
+    {% if d.receptor.rut != '66666666-6' %} — R.U.T. {{ d.receptor.rut }}{% endif %}
+  </div>
+
+  <table class="detalle">
+    <thead>
+      <tr>
+        <th>Detalle</th>
+        <th class="num">Cant.</th>
+        <th class="num">P. unit.</th>
+        <th class="num">Monto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in d.detalles %}
+      <tr>
+        <td>{{ item.nombre }}</td>
+        <td class="num">{{ item.cantidad }}{% if item.unidad %} {{ item.unidad }}{% endif %}</td>
+        <td class="num">{{ item.precio }}</td>
+        <td class="num">{{ item.monto }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totales">
+    {% if d.totales.exento %}
+    <tr><td>Monto exento</td><td class="num">${{ d.totales.exento }}</td></tr>
+    {% endif %}
+    <tr><td>Monto neto</td><td class="num">${{ d.totales.neto }}</td></tr>
+    <tr><td>I.V.A. (19%)</td><td class="num">${{ d.totales.iva }}</td></tr>
+    <tr class="total"><td>TOTAL</td><td class="num">${{ d.totales.total }}</td></tr>
+  </table>
+
+  <div class="zona-timbre">
+    <div class="timbre-caja">
+      {% comment %}Las medidas salen del código realmente generado: fijarlas
+      en el CSS lo estiraría o aplastaría, y un PDF417 deformado no se lee.
+      {% endcomment %}
+      <img src="data:image/png;base64,{{ d.timbre.png_base64 }}"
+           style="{{ d.timbre.estilo_css }}"
+           alt="Timbre electrónico SII">
+    </div>
+    <div class="leyenda">
+      Timbre Electrónico SII<br>
+      <span class="verificar">Verifique este documento en {{ url_verificacion }}</span>
+    </div>
+  </div>
+
+</body>
+</html>
