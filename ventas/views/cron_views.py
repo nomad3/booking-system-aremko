@@ -724,3 +724,68 @@ def cron_enviar_boletas_sii(request):
             "ok": False, "error": str(e),
             "command": "enviar_boletas_sii",
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_generar_rcof_diario(request):
+    """Endpoint cron: genera y valida (sin enviar) el RCOF del día anterior.
+
+    El SII rechaza este documento por API desde 2022 (ya no es obligatorio);
+    este cron deja evidencia de que el sistema sigue siendo capaz de
+    producirlo — punto 4 de la Declaración de Cumplimiento del SII.
+
+    GET o POST: /ventas/cron/generar-rcof-diario/?token=xxx
+    Frecuencia recomendada: Diario, después de medianoche (ej. 00:30 AM).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('generar_rcof_diario', stdout=output)
+        logger.info("✅ Cron generar_rcof_diario ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "RCOF del día generado y validado",
+            "command": "generar_rcof_diario",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron generar-rcof-diario: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "generar_rcof_diario",
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_cuadrar_envios_sii(request):
+    """Endpoint cron: consulta al SII el resultado real de los envíos de
+    boletas ya transmitidos y clasifica cada una (aceptada / rechazada /
+    aceptada con reparo) — punto 7 de la Declaración de Cumplimiento.
+
+    GET o POST: /ventas/cron/cuadrar-envios-sii/?token=xxx
+    Frecuencia recomendada: Diario (ej. 08:00 AM, después del envío nocturno).
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('cuadrar_envios_sii', stdout=output)
+        logger.info("✅ Cron cuadrar_envios_sii ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Cuadratura de envíos SII ejecutada",
+            "command": "cuadrar_envios_sii",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron cuadrar-envios-sii: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "cuadrar_envios_sii",
+        }, status=500)
+

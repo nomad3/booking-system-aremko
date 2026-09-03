@@ -265,3 +265,38 @@ class DecisionSinBoleta(models.Model):
 
     def __str__(self):
         return f'Pago {self.pago_id} sin boleta'
+
+
+class ReporteConsumoFolios(models.Model):
+    """Un RCOF (Reporte/Resumen de Consumo de Folios) diario, generado y
+    validado — punto 4 de la Declaración de Cumplimiento del SII.
+
+    El SII eliminó la OBLIGACIÓN de enviar este reporte en agosto de 2022, y
+    su API lo rechaza de plano si se intenta transmitir ("Impuestos Internos
+    ya no admite este tipo de documento" — verificado, no es un bug nuestro).
+    Por eso este modelo no guarda un envío: guarda la EVIDENCIA de que el
+    sistema sigue siendo capaz de generar y validar el reporte todos los
+    días, listo para presentar si el SII lo pidiera. Eso es lo que la
+    declaración pregunta en realidad — "capacidad", no un envío imposible.
+    """
+    ambiente = models.CharField(max_length=20, db_index=True)
+    fecha = models.DateField(db_index=True)
+    secuencia = models.PositiveSmallIntegerField(default=1)
+    cantidad_folios = models.PositiveIntegerField(default=0)
+    monto_total = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    xml = models.TextField(blank=True, default='')
+    valido = models.BooleanField(default=False)
+    error_validacion = models.TextField(blank=True, default='')
+    generado_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Reporte de consumo de folios (RCOF)'
+        verbose_name_plural = 'Reportes de consumo de folios (RCOF)'
+        ordering = ['-fecha']
+        constraints = [
+            models.UniqueConstraint(fields=['ambiente', 'fecha', 'secuencia'],
+                                    name='unique_rcof_dia'),
+        ]
+
+    def __str__(self):
+        return f'RCOF {self.fecha} ({self.ambiente}) — {self.cantidad_folios} folio(s)'

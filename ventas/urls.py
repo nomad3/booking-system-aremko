@@ -351,6 +351,10 @@ urlpatterns = [
     path('cron/normalizar-ciudades/', cron_views.cron_normalizar_ciudades, name='cron_normalizar_ciudades'),
     # P-16 — transmitir al SII las boletas ya timbradas y aún no enviadas
     path('cron/enviar-boletas-sii/', cron_views.cron_enviar_boletas_sii, name='cron_enviar_boletas_sii'),
+    # P-16 — declaración de cumplimiento: generar RCOF diario (evidencia, no envío)
+    path('cron/generar-rcof-diario/', cron_views.cron_generar_rcof_diario, name='cron_generar_rcof_diario'),
+    # P-16 — declaración de cumplimiento: cuadrar aceptados/rechazados/con reparos
+    path('cron/cuadrar-envios-sii/', cron_views.cron_cuadrar_envios_sii, name='cron_cuadrar_envios_sii'),
     # === END CRON JOBS ===
 
     # Pack Descuento Management
