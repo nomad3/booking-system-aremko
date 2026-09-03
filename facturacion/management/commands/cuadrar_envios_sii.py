@@ -52,9 +52,18 @@ class Command(BaseCommand):
             self.stdout.write(f"Ambiente '{ambiente}' no tiene envíos que cuadrar.")
             return
 
+        # .order_by() VACÍO antes de .distinct() es obligatorio acá: el
+        # modelo trae Meta.ordering = ['-creada_at'], y en Postgres el
+        # ORDER BY implícito se cuela dentro del SELECT DISTINCT -- termina
+        # deduplicando por (track_id, creada_at) en vez de por track_id
+        # solo. Se veía perfecto en sqlite (los tests locales) y llamaba a
+        # consultar_estado_envio una vez por CADA boleta del mismo sobre en
+        # producción real -- lo agarré viendo el mismo trackId repetido 5
+        # veces en un envío que solo tenía un track.
         track_ids = list(
             BoletaElectronica.objects.filter(ambiente=ambiente, estado='enviada')
-            .exclude(track_id='').values_list('track_id', flat=True).distinct())
+            .exclude(track_id='').order_by().values_list('track_id', flat=True)
+            .distinct())
         if not track_ids:
             self.stdout.write(f"Sin envíos pendientes de cuadrar en {ambiente}.")
             return

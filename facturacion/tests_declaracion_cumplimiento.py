@@ -201,6 +201,23 @@ class CuadrarEnviosSii(TestCase):
     @CREDS_OK
     @CERT_OK
     @patch('facturacion.services.simpleapi_client.consultar_estado_envio')
+    def test_un_trackid_compartido_por_varias_boletas_se_consulta_una_sola_vez(
+            self, consultar, _c, _creds):
+        # BoletaElectronica ordena por -creada_at; en Postgres eso se cuela
+        # en el SELECT DISTINCT y termina "deduplicando" por (track_id,
+        # creada_at) en vez de por track_id solo -- se ve perfecto en
+        # sqlite (no reproduce el trap) pero en producción real llamaba a
+        # consultar_estado_envio una vez por CADA boleta del mismo sobre.
+        consultar.return_value = RESPUESTA_REAL_EPR
+        _boleta(ambiente='certificacion', folio=6, track_id='999')
+        _boleta(ambiente='certificacion', folio=7, track_id='999')
+        _boleta(ambiente='certificacion', folio=8, track_id='999')
+        _run_cuadrar(ambiente='certificacion')
+        self.assertEqual(consultar.call_count, 1)
+
+    @CREDS_OK
+    @CERT_OK
+    @patch('facturacion.services.simpleapi_client.consultar_estado_envio')
     def test_sobre_completo_rechazado_vuelve_a_generada_para_reintentar(
             self, consultar, _c, _creds):
         consultar.return_value = {'estado': 'RECHAZADO'}
