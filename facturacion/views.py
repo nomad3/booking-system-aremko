@@ -6,6 +6,7 @@ pueda verificar su boleta. Dos entradas:
 - /boletas/consulta/            → formulario folio + monto
 - /boletas/b/<token>/           → link directo (se adjuntará en el email al cliente)
 """
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -295,3 +296,54 @@ def boleta_impresa_por_token(request, token):
         return HttpResponse('Boleta no encontrada.', status=404,
                             content_type='text/plain; charset=utf-8')
     return _responder_pdf(boleta, request)
+
+
+@staff_member_required
+def decidir_boleta_pago(request, pago_id):
+    """La misma pregunta de la tarjeta, para los cobros hechos desde el admin.
+
+    Va en su propia página y por POST a propósito: emitir una boleta es un
+    acto tributario, y un enlace que emitiera con solo abrirlo se dispararía
+    con el prefetch del navegador o un clic curioso.
+    """
+    from django.shortcuts import get_object_or_404, redirect
+
+    from ventas.models import Pago
+
+    from .models import BoletaElectronica, DecisionSinBoleta
+    from .services.decision import codigos_que_boletean
+
+    pago = get_object_or_404(Pago.objects.select_related('venta_reserva__cliente'),
+                             pk=pago_id)
+    boleta = (BoletaElectronica.objects.filter(pago=pago)
+              .exclude(estado__in=('error', 'pendiente')).first())
+    decision = DecisionSinBoleta.objects.filter(pago=pago).first()
+    volver = request.GET.get('volver') or f'/admin/ventas/ventareserva/{pago.venta_reserva_id}/change/'
+
+    if request.method == 'POST':
+        respuesta = (request.POST.get('emitir_boleta') or '').strip().lower()
+        if respuesta == 'no':
+            DecisionSinBoleta.objects.get_or_create(
+                pago=pago, defaults={'usuario': request.user,
+                                     'motivo': (request.POST.get('motivo') or '')[:200]})
+            messages.info(request, f'Pago de ${int(pago.monto or 0):,}'.replace(',', '.')
+                          + ': queda registrado que no se emite boleta.')
+        elif respuesta in ('si', 'sí'):
+            try:
+                from .services.emisor import emitir_boleta_para_pago
+                emitida, mensaje = emitir_boleta_para_pago(pago)
+            except Exception as exc:  # noqa: BLE001
+                emitida, mensaje = None, str(exc)
+            if emitida is not None and emitida.folio:
+                messages.success(request, f'Boleta {emitida.folio} emitida. {mensaje}')
+            else:
+                messages.error(request, f'No se pudo emitir la boleta: {mensaje}')
+        return redirect(volver)
+
+    return render(request, 'facturacion/decidir_boleta.html', {
+        'pago': pago,
+        'boleta': boleta,
+        'decision': decision,
+        'volver': volver,
+        'boletea': pago.metodo_pago in codigos_que_boletean(),
+    })

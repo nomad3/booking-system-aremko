@@ -6,7 +6,7 @@ no emitir (con nombre y hora), y los que nadie miró todavía. Los segundos son
 los que preocupan — un pago sin boleta y sin decisión es un olvido esperando a
 que el SII pregunte.
 {% endcomment %}
-{% load humanize %}<!DOCTYPE html>
+{% load ventas_extras %}<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -50,9 +50,9 @@ que el SII pregunte.
 
   <div class="totales">
     <div>Sin decidir: <b>{{ sin_decidir|length }}</b> ·
-      ${{ total_sin_decidir|intcomma }}</div>
+      {{ total_sin_decidir|formato_clp }}</div>
     <div class="meta">Decididos no emitir: {{ con_decision|length }} ·
-      ${{ total_con_decision|intcomma }}</div>
+      {{ total_con_decision|formato_clp }}</div>
   </div>
 
   <h2>Nadie los ha mirado</h2>
@@ -64,7 +64,7 @@ que el SII pregunte.
         {{ f.pago.get_metodo_pago_display }} ·
         {{ f.pago.fecha_pago|date:"d/m/Y H:i" }}</div>
     </div>
-    <div class="monto">${{ f.pago.monto|floatformat:0|intcomma }}</div>
+    <div class="monto">{{ f.pago.monto|formato_clp }}</div>
   </a>
   {% empty %}
   <div class="vacio">Ninguno. Todos los pagos que correspondía boletear están resueltos.</div>
@@ -82,7 +82,7 @@ que el SII pregunte.
         {{ f.decision.creado_en|date:"d/m/Y H:i" }}{% if f.decision.motivo %} ·
         {{ f.decision.motivo }}{% endif %}</div>
     </div>
-    <div class="monto">${{ f.pago.monto|floatformat:0|intcomma }}</div>
+    <div class="monto">{{ f.pago.monto|formato_clp }}</div>
   </a>
   {% empty %}
   <div class="vacio">Todavía nadie ha respondido «no» a la pregunta de la boleta.</div>

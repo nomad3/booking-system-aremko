@@ -13,6 +13,8 @@ urlpatterns = [
     path('cof-set/', views.descargar_cof_set, name='descargar_cof_set'),
     # Los pagos que correspondía boletear y no tienen boleta.
     path('pendientes/', views.pagos_sin_boleta, name='pagos_sin_boleta'),
+    # La pregunta de la boleta para los cobros hechos desde el admin.
+    path('decidir/<int:pago_id>/', views.decidir_boleta_pago, name='decidir_boleta_pago'),
     # Representación impresa (timbre PDF417) — requisito del SII.
     path('<int:pk>/impresa/', views.boleta_impresa_staff, name='boleta_impresa_staff'),
     path('b/<str:token>/impresa/', views.boleta_impresa_por_token,

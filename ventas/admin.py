@@ -789,6 +789,33 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 "No se creó la comanda automática de la reserva #%s (no crítico): %s",
                 getattr(form.instance, 'pk', None), exc,
             )
+        # La tarjeta móvil pregunta por la boleta al cobrar; este formulario no
+        # tiene dónde hacerlo (guarda varios pagos a la vez). Sin este aviso, un
+        # cobro hecho acá se descubre recién al revisar /boletas/pendientes/.
+        # Defensivo igual que arriba: avisar nunca puede voltear el guardado.
+        try:
+            self._avisar_boletas_pendientes(request, form.instance)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "No se pudo avisar de boletas pendientes en la reserva #%s: %s",
+                getattr(form.instance, 'pk', None), exc,
+            )
+
+    def _avisar_boletas_pendientes(self, request, venta):
+        """Un aviso por cada pago que debía boletear y nadie resolvió."""
+        from django.urls import reverse
+
+        from facturacion.services.decision import pagos_sin_resolver
+
+        for pago in pagos_sin_resolver(venta):
+            url = reverse('facturacion:decidir_boleta_pago', args=[pago.pk])
+            self.message_user(request, format_html(
+                'El pago de <b>${}</b> ({}) necesita boleta y no se ha '
+                'decidido. <a href="{}?volver={}" style="font-weight:600">'
+                'Resolver ahora →</a>',
+                f'{int(pago.monto or 0):,}'.replace(',', '.'),
+                pago.get_metodo_pago_display(), url, request.get_full_path(),
+            ), messages.WARNING)
 
     def _asegurar_comanda_de_productos(self, request, venta):
         if not venta or not venta.pk:

@@ -1,4 +1,4 @@
-{% load humanize %}<!DOCTYPE html>
+{% load ventas_extras %}<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -67,9 +67,9 @@
         <tr><td>Folio</td><td>{{ boleta.folio|default:"— (en proceso)" }}</td></tr>
         <tr><td>Fecha de emisión</td><td>{{ boleta.emitida_at|date:"d/m/Y H:i"|default:"—" }}</td></tr>
         <tr><td>Detalle</td><td>{{ boleta.glosa }}</td></tr>
-        <tr><td>Monto neto</td><td>${{ boleta.monto_neto|floatformat:0|intcomma }}</td></tr>
-        <tr><td>IVA (19%)</td><td>${{ boleta.monto_iva|floatformat:0|intcomma }}</td></tr>
-        <tr><td><b>Monto total</b></td><td><b>${{ boleta.monto_total|floatformat:0|intcomma }}</b></td></tr>
+        <tr><td>Monto neto</td><td>{{ boleta.monto_neto|formato_clp }}</td></tr>
+        <tr><td>IVA (19%)</td><td>{{ boleta.monto_iva|formato_clp }}</td></tr>
+        <tr><td><b>Monto total</b></td><td><b>{{ boleta.monto_total|formato_clp }}</b></td></tr>
         <tr><td>Estado</td><td>
           {% if boleta.estado == 'simulada' %}
             <span class="pill" style="background:#616161">Simulada — sin valor tributario</span>
