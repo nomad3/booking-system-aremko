@@ -343,9 +343,29 @@ def ficha_reserva_cliente(request, token):
         'qr_svg': '' if (llego_en or solo_giftcards) else qr_svg(url_llegada(token)),
     }
 
+    # Las boletas de esta visita, en el mismo Pase que el cliente ya tiene
+    # guardado (idea de Jorge, 04-09-2026): se actualiza solo cuando se emite
+    # otra —transferencia, después un café, después otro— y evita enseñarle
+    # una dirección más. Mismo criterio que la consulta pública: SOLO boletas
+    # reales; una de certificación o simulada mostrada al cliente sería un
+    # documento sin valor presentado como si lo tuviera.
+    try:
+        from facturacion.models import BoletaElectronica
+
+        boletas_venta = list(
+            BoletaElectronica.objects
+            .filter(venta_reserva=venta, ambiente='produccion')
+            .exclude(estado__in=('pendiente', 'error', 'simulada'))
+            .exclude(folio__isnull=True)
+            .order_by('folio'))
+    except Exception:  # noqa: BLE001 — las boletas no deben tumbar el Pase
+        logger.exception('[ficha] no se pudieron leer las boletas (reserva %s)', venta.id)
+        boletas_venta = []
+
     context = {
         'venta': venta,
         'numero': venta.id,
+        'boletas': boletas_venta,
         'cliente': venta.cliente,
         'estado_label': estado_label,
         'estado_cls': estado_cls,

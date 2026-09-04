@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load ventas_extras %}<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -212,6 +212,36 @@
             {% endif %}
           </div>
         </details>
+
+        {% comment %}Las boletas de esta visita. Van después del detalle de
+        la compra porque son su comprobante: primero qué compró, después el
+        documento. Solo aparecen si hay alguna emitida — un bloque vacío
+        preguntando por boletas inexistentes solo genera dudas.{% endcomment %}
+        {% if boletas %}
+        <div style="border:1px solid var(--line2); border-radius:14px; background:var(--surface);
+                    padding:16px; margin-top:14px;">
+          <div style="font-size:15px; font-weight:600; margin-bottom:2px;">🧾 Tu{{ boletas|pluralize:"s" }} boleta{{ boletas|pluralize:"s" }} electrónica{{ boletas|pluralize:"s" }}</div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:12px;">
+            {% if boletas|length > 1 %}Cada pago tiene la suya.{% endif %}
+            Emitidas ante el Servicio de Impuestos Internos.</div>
+          {% for b in boletas %}
+          <a href="{% url 'facturacion:boleta_por_token' b.token_consulta %}"
+             target="_blank" rel="noopener"
+             style="display:flex; justify-content:space-between; align-items:center;
+                    gap:10px; padding:11px 12px; border:1px solid var(--line2);
+                    border-radius:10px; margin-bottom:8px; text-decoration:none;
+                    color:var(--ink); background:var(--bg2, #fff);">
+            <span>
+              <span style="font-weight:600;">Boleta N° {{ b.folio }}</span><br>
+              <span style="font-size:12px; color:var(--muted);">{{ b.emitida_at|date:"d/m/Y" }} · {{ b.glosa }}</span>
+            </span>
+            <span style="white-space:nowrap; font-weight:600;">{{ b.monto_total|formato_clp }}</span>
+          </a>
+          {% endfor %}
+          <div style="font-size:12px; color:var(--muted); margin-top:4px;">
+            Toca una para verla o descargarla en PDF.</div>
+        </div>
+        {% endif %}
 
         {% if invitacion_url %}
         <div style="border:2px solid #D4537E; border-radius:14px; background:#fdf2f5; padding:16px; margin-top:14px; text-align:center;">
