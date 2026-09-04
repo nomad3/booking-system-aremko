@@ -256,7 +256,22 @@ def _resolver_boleta_del_pago(pago, request):
         return 'El pago quedó guardado, pero la boleta falló. Está en el listado.'
     if boleta is None:
         return f'Sin boleta: {mensaje}'
-    return f'Boleta {boleta.folio or "(en proceso)"}: {mensaje}'
+    # Avisarle al cliente va DESPUÉS y aparte: la boleta ya existe ante el SII
+    # y un problema de WhatsApp no puede cambiar eso. Si la ventana de 24h
+    # está cerrada no se manda nada acá — esas las junta el proceso diario en
+    # un solo mensaje, que es lo que se paga.
+    aviso = ''
+    try:
+        from facturacion.services.envio_whatsapp import enviar_pdf_al_cliente
+        enviado, motivo = enviar_pdf_al_cliente(boleta)
+        aviso = ' · enviada al cliente' if enviado else ''
+        if not enviado:
+            logger.info('[tarjeta] boleta %s no se envió ahora: %s',
+                        boleta.folio, motivo)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('[tarjeta] fallo al avisar de la boleta %s: %s',
+                       getattr(boleta, 'folio', None), exc)
+    return f'Boleta {boleta.folio or "(en proceso)"}: {mensaje}{aviso}'
 
 
 @staff_required

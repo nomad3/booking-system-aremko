@@ -335,7 +335,16 @@ def decidir_boleta_pago(request, pago_id):
             except Exception as exc:  # noqa: BLE001
                 emitida, mensaje = None, str(exc)
             if emitida is not None and emitida.folio:
-                messages.success(request, f'Boleta {emitida.folio} emitida. {mensaje}')
+                aviso = ''
+                try:
+                    from .services.envio_whatsapp import enviar_pdf_al_cliente
+                    enviado, motivo = enviar_pdf_al_cliente(emitida)
+                    aviso = (' Se le envió al cliente por WhatsApp.' if enviado
+                             else f' (no se envió ahora: {motivo})')
+                except Exception:  # noqa: BLE001
+                    aviso = ''
+                messages.success(request,
+                                 f'Boleta {emitida.folio} emitida. {mensaje}{aviso}')
             else:
                 messages.error(request, f'No se pudo emitir la boleta: {mensaje}')
         return redirect(volver)

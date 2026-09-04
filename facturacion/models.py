@@ -224,6 +224,13 @@ class BoletaElectronica(models.Model):
 
     creada_at = models.DateTimeField(auto_now_add=True)
     emitida_at = models.DateTimeField(null=True, blank=True)
+    # Cuándo se le mandó al cliente por WhatsApp. Sirve de candado: sin esto,
+    # un reintento o el cron de los de fuera de ventana se la mandarían dos
+    # veces, y recibir la misma boleta repetida hace dudar de si son dos
+    # cobros distintos.
+    enviada_cliente_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Cuándo se le envió al cliente por WhatsApp.')
     actualizada_at = models.DateTimeField(auto_now=True)
 
     class Meta:
