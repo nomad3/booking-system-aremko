@@ -789,3 +789,39 @@ def cron_cuadrar_envios_sii(request):
             "command": "cuadrar_envios_sii",
         }, status=500)
 
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def cron_enviar_boletas_pendientes(request):
+    """Endpoint cron: manda por plantilla las boletas de clientes que quedaron
+    fuera de la ventana de 24h (P-16 fase 3), agrupadas por visita.
+
+    Las de clientes que escribieron hace poco ya salieron solas con el PDF
+    adjunto y gratis. Estas se pagan, por eso van agrupadas: un cliente con
+    tres boletas de la misma visita recibe UN mensaje con el enlace a su Pase,
+    donde están las tres.
+
+    GET o POST: /ventas/cron/enviar-boletas-pendientes/?token=xxx
+    Frecuencia recomendada: Diario a media mañana (ej. 11:00), cuando ya se
+    sabe si el cliente escribió o no.
+    """
+    err = _validar_cron_token(request)
+    if err:
+        return err
+    try:
+        output = StringIO()
+        call_command('enviar_boletas_pendientes', stdout=output)
+        logger.info("✅ Cron enviar_boletas_pendientes ejecutado vía HTTP")
+        return JsonResponse({
+            "ok": True,
+            "message": "Envío de boletas pendientes ejecutado",
+            "command": "enviar_boletas_pendientes",
+            "output": output.getvalue(),
+        })
+    except Exception as e:
+        logger.error(f"❌ Error en cron enviar-boletas-pendientes: {e}", exc_info=True)
+        return JsonResponse({
+            "ok": False, "error": str(e),
+            "command": "enviar_boletas_pendientes",
+        }, status=500)
+
