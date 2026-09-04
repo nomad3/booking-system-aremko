@@ -221,3 +221,66 @@ class ElListadoAparte(BaseTarjeta):
         self.client.logout()
         r = self._ver()
         self.assertIn(r.status_code, (302, 403))
+
+
+class LaBoletaSeVeEnLaTarjeta(BaseTarjeta):
+    """Jorge, mirando la tarjeta de la reserva 6741 (04-09-2026): «en la
+    primera boleta creada, ¿debería aparecer la boleta o el link acá?».
+
+    Sí. El plan decía que cada pago mostraría su folio en la tarjeta, pero eso
+    solo se había hecho en el Pase del cliente. Sin esto, Deborah cobra, se
+    emite la boleta, y en la misma pantalla no queda rastro de que exista.
+    """
+
+    def _tarjeta(self):
+        return self.client.get(reverse('ventas:tarjeta_reserva', args=[self.venta.pk]))
+
+    def _pago_con_boleta(self, folio=69012):
+        from facturacion.models import BoletaElectronica
+        self._cobrar(monto=500, metodo='efectivo')
+        pago = Pago.objects.latest('id')
+        return BoletaElectronica.objects.create(
+            pago=pago, venta_reserva=self.venta, ambiente='produccion',
+            folio=folio, estado='aceptada', monto_total=500,
+            monto_neto=420, monto_iva=80)
+
+    def test_muestra_el_folio_de_la_boleta(self):
+        self._pago_con_boleta()
+        self.assertIn('Boleta 69012', self._tarjeta().content.decode())
+
+    def test_el_folio_es_un_enlace_a_la_boleta(self):
+        b = self._pago_con_boleta()
+        self.assertIn(f'/boletas/b/{b.token_consulta}/',
+                      self._tarjeta().content.decode())
+
+    def test_un_pago_sin_resolver_ofrece_decidir(self):
+        # Antes esto solo se veía en el listado aparte, que es un repaso
+        # posterior: acá está donde se cobra.
+        self._cobrar(monto=40000, metodo='efectivo')
+        html = self._tarjeta().content.decode()
+        self.assertIn('Falta decidir la boleta', html)
+        self.assertIn('/boletas/decidir/', html)
+
+    def test_un_pago_que_no_boletea_no_muestra_nada(self):
+        self._cobrar(monto=40000, metodo='tarjeta')
+        html = self._tarjeta().content.decode()
+        self.assertNotIn('Falta decidir la boleta', html)
+        self.assertNotIn('🧾 Boleta', html)
+
+    def test_una_boleta_en_error_no_se_muestra_como_emitida(self):
+        from facturacion.models import BoletaElectronica
+        self._cobrar(monto=500, metodo='efectivo')
+        BoletaElectronica.objects.create(
+            pago=Pago.objects.latest('id'), venta_reserva=self.venta,
+            ambiente='produccion', folio=99, estado='error',
+            monto_total=500, monto_neto=420, monto_iva=80)
+        html = self._tarjeta().content.decode()
+        self.assertNotIn('Boleta 99', html)
+
+    def test_un_problema_con_las_boletas_no_tumba_la_tarjeta(self):
+        from unittest.mock import patch
+        self._cobrar(monto=500, metodo='efectivo')
+        with patch('facturacion.services.decision.pagos_sin_resolver',
+                   side_effect=RuntimeError('BD caída')):
+            r = self._tarjeta()
+        self.assertEqual(r.status_code, 200)

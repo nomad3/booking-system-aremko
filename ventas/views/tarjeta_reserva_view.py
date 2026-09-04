@@ -125,7 +125,28 @@ def tarjeta_reserva(request, venta_id):
     for r in servicios:
         r.editable = r.servicio.tipo_servicio != 'cabana'
     productos = venta.reservaproductos.select_related('producto')
-    pagos = venta.pagos.order_by('fecha_pago')
+    pagos = list(venta.pagos.order_by('fecha_pago'))
+    # Cada pago con su boleta, para que Deborah la vea sin salir de la tarjeta
+    # (Jorge, 04-09-2026). Los que todavía nadie resolvió llevan la marca para
+    # decidir ahí mismo — hasta ahora eso solo se veía en el listado aparte,
+    # que es un repaso posterior.
+    try:
+        from facturacion.models import BoletaElectronica
+        from facturacion.services.decision import pagos_sin_resolver
+
+        boletas = {b.pago_id: b for b in BoletaElectronica.objects
+                   .filter(pago__in=pagos)
+                   .exclude(estado__in=('error', 'pendiente'))}
+        pendientes = {p.pk for p in pagos_sin_resolver(venta)}
+        for pago in pagos:
+            pago.boleta = boletas.get(pago.pk)
+            pago.falta_decidir = pago.pk in pendientes
+    except Exception:  # noqa: BLE001 — la tarjeta abre igual sin esto
+        logger.exception('[tarjeta] no se pudieron leer las boletas de la venta %s',
+                         venta.pk)
+        for pago in pagos:
+            pago.boleta = None
+            pago.falta_decidir = False
 
     # Catálogo del selector: SOLO los marcados «Venta en Mesón», con stock
     # (Jorge, 01-09-2026). Antes se usaba `productos_vendibles`, que suma el
