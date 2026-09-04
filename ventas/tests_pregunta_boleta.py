@@ -248,9 +248,9 @@ class LaBoletaSeVeEnLaTarjeta(BaseTarjeta):
         self._pago_con_boleta()
         self.assertIn('Boleta 69012', self._tarjeta().content.decode())
 
-    def test_el_folio_es_un_enlace_a_la_boleta(self):
+    def test_el_folio_lleva_directo_al_pdf(self):
         b = self._pago_con_boleta()
-        self.assertIn(f'/boletas/b/{b.token_consulta}/',
+        self.assertIn(f'/boletas/b/{b.token_consulta}/impresa/',
                       self._tarjeta().content.decode())
 
     def test_un_pago_sin_resolver_ofrece_decidir(self):

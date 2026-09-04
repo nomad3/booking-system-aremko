@@ -225,7 +225,11 @@
             {% if boletas|length > 1 %}Cada pago tiene la suya.{% endif %}
             Emitidas ante el Servicio de Impuestos Internos.</div>
           {% for b in boletas %}
-          <a href="{% url 'facturacion:boleta_por_token' b.token_consulta %}"
+          {% comment %}El toque va DIRECTO al PDF: el cliente quiere guardar
+          su documento, no navegar. La página de verificación queda como
+          enlace secundario para quien quiera contrastar contra el SII.
+          {% endcomment %}
+          <a href="{% url 'facturacion:boleta_impresa_por_token' b.token_consulta %}"
              target="_blank" rel="noopener"
              style="display:flex; justify-content:space-between; align-items:center;
                     gap:10px; padding:11px 12px; border:1px solid var(--line2);
@@ -239,7 +243,11 @@
           </a>
           {% endfor %}
           <div style="font-size:12px; color:var(--muted); margin-top:4px;">
-            Toca una para verla o descargarla en PDF.</div>
+            Toca una para abrir el PDF.
+            {% for b in boletas %}{% if forloop.first %}
+            <a href="{% url 'facturacion:boleta_por_token' b.token_consulta %}"
+               style="color:var(--muted);">Verificar ante el SII</a>{% endif %}{% endfor %}
+          </div>
         </div>
         {% endif %}
 

@@ -114,6 +114,28 @@ class Command(BaseCommand):
         self.stdout.write(f'Enviados: {enviados} · saltados: {saltados} · '
                           f'fallidos: {fallidos}')
 
+    def _enlace(self, venta, boletas):
+        """A dónde manda el mensaje: al PDF si hay UNA boleta, al Pase si hay
+        varias.
+
+        Jorge (04-09-2026): «se da muchas vueltas, ¿por qué no poner directo
+        el link de la boleta en pdf?». Con una sola boleta tenía razón — el
+        camino era mensaje → Pase → boleta → descargar, tres toques para algo
+        que el cliente solo quiere guardar. Con varias no se puede: un enlace
+        no lleva a tres PDF, y ahí el Pase sí gana porque las muestra todas.
+        """
+        import os
+
+        from django.urls import reverse
+
+        from ventas.views.ficha_reserva_view import url_ficha_reserva
+
+        base = os.getenv('COMANDA_PUBLIC_BASE_URL', 'https://www.aremko.cl').rstrip('/')
+        if len(boletas) == 1:
+            return base + reverse('facturacion:boleta_impresa_por_token',
+                                  kwargs={'token': boletas[0].token_consulta})
+        return url_ficha_reserva(venta.pk)
+
     def _enviar(self, venta, cliente, telefono, boletas):
         """Manda UNA plantilla con el enlace al Pase y marca las boletas."""
         import os
@@ -125,9 +147,9 @@ class Command(BaseCommand):
 
         nombre = ((getattr(cliente, 'nombre', '') or '').strip().split(' ') or [''])[0]
         try:
-            url_pase = url_ficha_reserva(venta.pk)
+            url_pase = self._enlace(venta, boletas)
         except Exception as exc:  # noqa: BLE001
-            return False, f'no se pudo armar el enlace del Pase: {exc}'
+            return False, f'no se pudo armar el enlace: {exc}'
 
         try:
             resp = requests.post(
@@ -135,7 +157,7 @@ class Command(BaseCommand):
                 json={'to': telefono, 'template_name': PLANTILLA, 'lang': IDIOMA,
                       # En orden: {{1}} nombre, {{2}} enlace al Pase.
                       'texts': [nombre or 'hola', url_pase],
-                      'display_text': (f'Boleta electrónica: {url_pase}')},
+                      'display_text': f'Boleta electrónica: {url_pase}'},
                 timeout=60)
         except Exception as exc:  # noqa: BLE001
             return False, f'error de red: {exc}'

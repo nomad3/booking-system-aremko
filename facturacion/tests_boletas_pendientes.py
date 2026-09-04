@@ -71,14 +71,15 @@ class AgrupaPorVisita(TestCase):
             _correr()
         self.assertEqual(post.call_count, 2)
 
-    def test_manda_el_nombre_y_el_enlace_del_pase(self):
-        self._boleta(18)
+    def test_manda_el_nombre_y_un_enlace(self):
+        b = self._boleta(18)
         with patch('requests.post', return_value=_ok()) as post:
             _correr()
         enviado = post.call_args.kwargs['json']
         self.assertEqual(enviado['template_name'], 'boleta_electronica')
-        self.assertEqual(enviado['texts'][0], 'Marta')          # solo el nombre
-        self.assertIn('/ventas/reserva/', enviado['texts'][1])  # el Pase
+        self.assertEqual(enviado['texts'][0], 'Marta')   # solo el nombre de pila
+        # Una sola boleta: va derecho al PDF (ver ADondeApuntaElEnlace).
+        self.assertIn(f'/boletas/b/{b.token_consulta}/impresa/', enviado['texts'][1])
 
 
 class AQuienNoSeLeManda(TestCase):
@@ -165,3 +166,35 @@ class SiFallaNoSePierde(TestCase):
         self.assertIn('[simulado]', salida)
         self.boleta.refresh_from_db()
         self.assertIsNone(self.boleta.enviada_cliente_at)
+
+
+class ADondeApuntaElEnlace(TestCase):
+    """Jorge: «se da muchas vueltas, ¿por qué no poner directo el link de la
+    boleta en pdf?». Con una sola boleta, directo al PDF. Con varias no se
+    puede —un enlace no lleva a tres PDF— y ahí el Pase las muestra todas."""
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(nombre='Pía', telefono='+56922223333')
+        self.venta = VentaReserva.objects.create(cliente=self.cliente)
+
+    def _boleta(self, folio):
+        return BoletaElectronica.objects.create(
+            pago=None, venta_reserva=self.venta, ambiente='produccion',
+            folio=folio, estado='aceptada', monto_total=5000, monto_neto=4202,
+            monto_iva=798, emitida_at=timezone.now())
+
+    def test_una_sola_boleta_va_directo_al_pdf(self):
+        b = self._boleta(40)
+        with patch('requests.post', return_value=_ok()) as post:
+            _correr()
+        enlace = post.call_args.kwargs['json']['texts'][1]
+        self.assertIn(f'/boletas/b/{b.token_consulta}/impresa/', enlace)
+
+    def test_varias_boletas_van_al_pase(self):
+        self._boleta(41)
+        self._boleta(42)
+        with patch('requests.post', return_value=_ok()) as post:
+            _correr()
+        enlace = post.call_args.kwargs['json']['texts'][1]
+        self.assertIn('/ventas/reserva/', enlace)
+        self.assertNotIn('/impresa/', enlace)

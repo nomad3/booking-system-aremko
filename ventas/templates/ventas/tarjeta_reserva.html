@@ -157,7 +157,7 @@ internas y se reconocen entre sí.
         <span>${{ p.monto|floatformat:"0g" }} · {{ p.get_metodo_pago_display|default:p.metodo_pago }}
           {% if p.boleta %}<br>
           <a class="cuando" style="color:#1e7d32;text-decoration:none"
-             href="{% url 'facturacion:boleta_por_token' p.boleta.token_consulta %}"
+             href="{% url 'facturacion:boleta_impresa_por_token' p.boleta.token_consulta %}"
              target="_blank" rel="noopener">🧾 Boleta {{ p.boleta.folio }}</a>
           {% elif p.falta_decidir %}<br>
           <a class="cuando" style="color:#BC5630;text-decoration:none"

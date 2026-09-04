@@ -56,10 +56,19 @@ class LasBoletasEnElPase(TestCase):
         _boleta(self.venta, 103, 1087500)
         self.assertIn('$1.087.500', self._pase().content.decode())
 
-    def test_lleva_al_enlace_de_cada_boleta(self):
+    def test_el_toque_lleva_DIRECTO_al_pdf(self):
+        # Jorge: «se da muchas vueltas». Antes el camino era Pase → página de
+        # verificación → botón descargar. El cliente quiere el documento.
         b = _boleta(self.venta, 104)
         html = self._pase().content.decode()
-        self.assertIn(f'/boletas/b/{b.token_consulta}/', html)
+        self.assertIn(f'/boletas/b/{b.token_consulta}/impresa/', html)
+
+    def test_deja_la_verificacion_como_enlace_secundario(self):
+        # La página de verificación es lo que se declaró al SII: sigue
+        # alcanzable, pero no en el camino de quien solo quiere su boleta.
+        b = _boleta(self.venta, 105)
+        html = self._pase().content.decode()
+        self.assertIn('Verificar ante el SII', html)
 
     def test_sin_boletas_no_muestra_la_seccion(self):
         # Un bloque vacío preguntando por boletas inexistentes genera dudas.
