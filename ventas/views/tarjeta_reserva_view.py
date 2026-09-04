@@ -59,6 +59,33 @@ METODOS_PAGO_TARJETA = tuple(
     if codigo not in ('giftcard', 'descuento'))
 
 
+def _metodos_pago_visibles():
+    """Lo que el selector OFRECE: los mismos medios que muestra el admin.
+
+    Hasta el 04-09-2026 la tarjeta armaba su lista directo del modelo y se
+    saltaba el interruptor `visible_al_cobrar`: mostraba 20 opciones donde el
+    admin mostraba 11, incluidas las cuentas personales que se ocultaron en
+    agosto (mach jorge, bci alda, copec alda…). Dos caminos para la misma
+    lista, y solo uno respetaba la decisión ya tomada.
+
+    El daño no era cosmético. «Transferencia a Mercado Pago» quedaba en la
+    posición 16 de 20, y quien cobraba elegía «MercadoPago» —que está en la 6
+    y NO boletea— para registrar transferencias. Resultado: la pregunta de la
+    boleta no aparecía y la venta se quedaba sin documento.
+
+    Se evalúa en cada request, no al importar: `codigos_visibles_al_cobrar`
+    cachea con TTL y se invalida por señal cuando alguien toca un medio en el
+    admin. Congelarlo en una constante de módulo perdería justamente eso.
+    """
+    try:
+        from facturacion.medios import filtrar_choices_pago
+        return filtrar_choices_pago(METODOS_PAGO_TARJETA)
+    except Exception:  # noqa: BLE001 — tabla sin sembrar, deploy a medias
+        # Ante la duda, mostrar todo: un selector corto de más deja a Deborah
+        # sin poder registrar un cobro real, que es peor que uno largo.
+        return list(METODOS_PAGO_TARJETA)
+
+
 def staff_required(view_func):
     """Decorador para requerir que el usuario sea staff."""
     decorated_view = user_passes_test(lambda u: u.is_staff)(view_func)
@@ -124,7 +151,7 @@ def tarjeta_reserva(request, venta_id):
         'pagos': pagos,
         'mensaje_pase': mensaje_pase(venta),
         'debe': int(venta.saldo_pendiente or 0) > 0,
-        'metodos_pago': METODOS_PAGO_TARJETA,
+        'metodos_pago': _metodos_pago_visibles(),
         # Códigos que SÍ boletean: la tarjeta pregunta «¿generar la boleta?»
         # solo cuando corresponde. En un cobro con tarjeta o link, el voucher
         # del operador ya ES la boleta y preguntar invitaría a duplicar.
@@ -161,6 +188,9 @@ def tarjeta_agregar_pago(request, venta_id):
     monto = int(limpio)
 
     metodo = (request.POST.get('metodo_pago') or '').strip()
+    # La guarda del servidor usa la lista COMPLETA, no la filtrada: si alguien
+    # tenía la pantalla abierta cuando se ocultó un medio, su cobro no debe
+    # rebotar. Ocultar es para no ofrecer, no para prohibir lo ya elegido.
     if metodo not in {codigo for codigo, _ in METODOS_PAGO_TARJETA}:
         return JsonResponse({'ok': False, 'mensaje': 'Método de pago no válido.'},
                             status=400)
