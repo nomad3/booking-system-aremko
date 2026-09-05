@@ -92,6 +92,34 @@ def staff_required(view_func):
     return login_required(decorated_view)
 
 
+# Ventana para considerar sospechoso un pago repetido. El caso real que lo
+# motivó fueron 6 segundos (Deborah no vio la confirmación y volvió a guardar),
+# pero 10 minutos cubre también al que se distrae. No bloquea: dos personas
+# pagando $20.000 cada una en efectivo es normal — solo pregunta.
+MINUTOS_PAGO_REPETIDO = 10
+
+
+def _pago_igual_reciente(venta, monto, metodo):
+    """Un pago idéntico a esta misma reserva hace pocos minutos, o None.
+
+    Nació de un caso real (04-09-2026, reserva 6742): el mismo cobro quedó
+    registrado dos veces con 6 segundos de diferencia, la reserva marcó
+    $120.000 sobre un total de $60.000, y —peor— se emitieron DOS boletas
+    electrónicas por la misma venta. El sistema no dijo nada.
+    """
+    import datetime
+
+    from django.utils import timezone
+
+    try:
+        desde = timezone.now() - datetime.timedelta(minutes=MINUTOS_PAGO_REPETIDO)
+        return (venta.pagos.filter(monto=monto, metodo_pago=metodo,
+                                   fecha_pago__gte=desde)
+                .order_by('-fecha_pago').first())
+    except Exception:  # noqa: BLE001 — avisar nunca puede impedir un cobro
+        return None
+
+
 def _codigos_que_boletean():
     """Códigos de medio de pago marcados para emitir boleta, o vacío si no se
     puede leer. Ante la duda NO se pregunta: preguntar de más empuja a emitir
@@ -215,6 +243,26 @@ def tarjeta_agregar_pago(request, venta_id):
     if metodo not in {codigo for codigo, _ in METODOS_PAGO_TARJETA}:
         return JsonResponse({'ok': False, 'mensaje': 'Método de pago no válido.'},
                             status=400)
+
+    # Aviso de repetido: se pregunta UNA vez y quien cobra decide. Bloquear
+    # de plano dejaría sin registrar dos pagos iguales legítimos.
+    if not request.POST.get('confirmar_repetido'):
+        # Envuelto también acá, no solo dentro: quien está al otro lado es
+        # Deborah con un cliente al frente, y un aviso que revienta sería peor
+        # que el duplicado que intenta evitar.
+        try:
+            anterior = _pago_igual_reciente(venta, monto, metodo)
+        except Exception:  # noqa: BLE001
+            logger.warning('[tarjeta] no se pudo revisar si el pago se repite')
+            anterior = None
+        if anterior is not None:
+            hace = timezone.localtime(anterior.fecha_pago).strftime('%H:%M')
+            return JsonResponse({
+                'ok': False,
+                'repetido': True,
+                'mensaje': (f'Ya hay un pago de ${monto:,} con este mismo medio '
+                            f'a las {hace}. ¿Es un pago DISTINTO?'.replace(',', '.')),
+            }, status=409)
 
     try:
         pago = Pago.objects.create(venta_reserva=venta, monto=monto,

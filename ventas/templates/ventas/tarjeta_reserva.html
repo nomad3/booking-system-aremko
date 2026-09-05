@@ -386,6 +386,26 @@ internas y se reconocen entre sí.
           {method: 'POST', body: new FormData(form)})
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        // Pago repetido: se pregunta UNA vez y quien cobra decide. Nació de un
+        // cobro que quedó registrado dos veces con 6 segundos de diferencia
+        // (reserva 6742), y que además emitió DOS boletas por la misma venta.
+        if (d.repetido) {
+          if (confirm(d.mensaje)) {
+            var datos = new FormData(form);
+            datos.append('confirmar_repetido', '1');
+            fetch("{% url 'ventas:tarjeta_agregar_pago' venta.pk %}",
+                  {method: 'POST', body: datos})
+              .then(function (r) { return r.json(); })
+              .then(function (d2) {
+                if (d2.ok) { location.reload(); }
+                else {
+                  error.textContent = d2.mensaje || 'No se pudo guardar.';
+                  error.style.display = 'block';
+                }
+              });
+          }
+          return;
+        }
         if (!d.ok) {
           error.textContent = d.mensaje || 'No se pudo guardar.';
           error.style.display = 'block';
