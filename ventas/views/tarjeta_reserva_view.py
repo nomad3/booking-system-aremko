@@ -152,7 +152,19 @@ def tarjeta_reserva(request, venta_id):
     # por persona, así que editar personas es exactamente lo que corresponde.
     for r in servicios:
         r.editable = r.servicio.tipo_servicio != 'cabana'
-    productos = venta.reservaproductos.select_related('producto')
+    productos = list(venta.reservaproductos.select_related('producto'))
+    # Los descuentos se leen como plata rebajada, en la lista de la familia a
+    # la que pertenecen (Jorge, 05-09-2026: "vendemos una tina para 6 personas
+    # y cobramos solo 5" = descuento de servicios; "dos café y cobramos uno" =
+    # de productos). Antes productos mostraba "59× Descuento -1000".
+    try:
+        _marcar_descuentos(servicios, 'servicio', 'cantidad_personas')
+        _marcar_descuentos(productos, 'producto', 'cantidad')
+    except Exception:  # noqa: BLE001 — la tarjeta abre igual sin esto
+        logger.exception('[tarjeta] no se pudieron marcar los descuentos (venta %s)',
+                         venta.pk)
+        for linea in list(servicios) + list(productos):
+            linea.es_descuento = False
     pagos = list(venta.pagos.order_by('fecha_pago'))
     # Cada pago con su boleta, para que Deborah la vea sin salir de la tarjeta
     # (Jorge, 04-09-2026). Los que todavía nadie resolvió llevan la marca para
@@ -185,7 +197,7 @@ def tarjeta_reserva(request, venta_id):
     from ventas.admin import productos_de_meson
 
     catalogo = productos_de_meson(
-        ids_visibles=list(productos.values_list('producto_id', flat=True)))
+        ids_visibles=[r.producto_id for r in productos])
 
     # La ubicación del cliente se guarda como COMUNA, igual que en el admin
     # (el campo `ciudad` es texto libre y el propio modelo lo desaconseja).
@@ -422,6 +434,46 @@ def tarjeta_agregar_producto(request, venta_id):
 # Acá se le da su propia puerta: se escribe el monto en pesos y el sistema
 # arma la línea. Por debajo es exactamente lo mismo de siempre.
 DESCUENTO_MAXIMO = 2_000_000
+
+
+def _etiqueta_descuento(nombre):
+    """El nombre del item de descuento, sin el monto pegado al final.
+
+    Los items se llaman "Descuento -1000", "Descuento_Servicios",
+    "Descuento Socios del Club -1.000". El monto va aparte y en grande, así
+    que repetirlo en el nombre solo estorba — pero "Socios del Club" SÍ
+    importa: dice por qué se descontó.
+    """
+    import re
+
+    limpio = re.sub(r'[-−]\s*[\d.,]+\s*$', '', (nombre or '').strip())
+    limpio = limpio.replace('_', ' ').strip(' -')
+    # "Descuento Servicios" dentro de un bloque que ya se llama SERVICIOS es
+    # decir lo mismo dos veces.
+    for sobra in ('Servicios', 'Servicio', 'Productos', 'Producto'):
+        if limpio.lower() == f'descuento {sobra}'.lower():
+            return 'Descuento'
+    return limpio or 'Descuento'
+
+
+def _marcar_descuentos(lineas, campo_item, campo_cantidad):
+    """Anota cada línea: si es descuento, con qué etiqueta y por cuánto.
+
+    Se hace acá y no en la plantilla por la trampa de locale de Django —la
+    misma que hace que el total diga "$141 000" con espacio— y porque un
+    descuento se ve distinto en las dos listas: en servicios la cantidad son
+    "personas" y en productos un "5×", y ninguna de las dos cosa es cierta
+    para un descuento.
+    """
+    for linea in lineas:
+        item = getattr(linea, campo_item, None)
+        precio = getattr(item, 'precio_base', 0) or 0
+        linea.es_descuento = precio < 0
+        if linea.es_descuento:
+            monto = int(getattr(linea, campo_cantidad, 0) or 0) * abs(int(precio))
+            linea.etiqueta = _etiqueta_descuento(getattr(item, 'nombre', ''))
+            linea.monto_descuento = f'−${monto:,}'.replace(',', '.')
+    return lineas
 
 
 def _item_descuento(en_productos):

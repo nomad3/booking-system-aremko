@@ -93,6 +93,25 @@ class DescontarEnPesos(BaseDescuento):
         self.assertIn('saldo', d)
 
 
+class ElMontoSaleDelPrecioPorLaCantidad(BaseDescuento):
+    """Con el item de -1 el monto coincide con la cantidad y un error de
+    cálculo no se nota. Los descuentos reales de Aremko son de -1000 y -500
+    (reserva 6747: "59× Descuento -1000" = $59.000)."""
+
+    def test_un_item_de_menos_1000_muestra_el_monto_correcto(self):
+        mil = Producto.objects.create(
+            nombre='Descuento -1000', precio_base=-1000,
+            categoria=CategoriaProducto.objects.get(nombre='Descuento'),
+            cantidad_disponible=99999, venta_meson=True)
+        ReservaProducto.objects.create(
+            venta_reserva=self.venta, producto=mil, cantidad=59,
+            precio_unitario_venta=-1000)
+        html = self.client.get(
+            reverse('ventas:tarjeta_reserva', args=[self.venta.pk])).content.decode()
+        self.assertIn('−$59.000', html)     # 59 × 1000, no "59"
+        self.assertNotIn('−$59<', html)
+
+
 class LoQueNoDeberiaPasar(BaseDescuento):
     def test_no_acepta_un_monto_vacio(self):
         r = self._descontar('')
@@ -131,25 +150,86 @@ class LoQueNoDeberiaPasar(BaseDescuento):
 
 
 class SeLeeComoPlata(BaseDescuento):
-    """El descuento no dice "30000 pers." — dice lo que es."""
+    """Jorge: "lo que nos importa es que los descuentos se lean como
+    corresponde y se apliquen a la familia de servicio o de productos... ¿eso
+    se ve claramente así en la ficha?".
+
+    No se veía. En productos decía "59× Descuento -1000" —caso real de la
+    reserva 6747— y en servicios el descuento arrastraba una hora sin
+    sentido. La familia queda clara porque cada descuento vive en la lista de
+    los suyos: el de la tina de 6 que se cobra como 5 va en SERVICIOS, el de
+    los dos cafés que se cobran como uno va en PRODUCTOS.
+    """
 
     def _tarjeta(self):
         return self.client.get(
             reverse('ventas:tarjeta_reserva', args=[self.venta.pk])
         ).content.decode()
 
-    def test_el_descuento_se_muestra_en_pesos(self):
+    def test_el_descuento_de_servicios_se_lee_como_plata(self):
         self._descontar('30000')
         html = self._tarjeta()
         self.assertIn('−$30.000', html)
         self.assertNotIn('30000 pers.', html)
 
-    def test_un_servicio_normal_sigue_diciendo_personas(self):
+    def test_el_descuento_de_productos_NO_dice_10000x(self):
+        # El caso real: "59× Descuento -1000" en vez de "− $59.000".
+        self._descontar('59000', 'productos')
+        html = self._tarjeta()
+        self.assertIn('−$59.000', html)
+        self.assertNotIn('59000×', html)
+
+    def test_el_descuento_de_servicios_va_en_la_lista_de_SERVICIOS(self):
+        # La familia se lee por dónde aparece: es lo que hace obvio a qué se
+        # le descontó sin tener que explicarlo.
+        self._descontar('30000', 'servicios')
+        html = self._tarjeta()
+        servicios = html.split('id="servicios"')[1].split('id="productos"')[0]
+        self.assertIn('−$30.000', servicios)
+
+    def test_el_descuento_de_productos_va_en_la_lista_de_PRODUCTOS(self):
+        self._descontar('5000', 'productos')
+        html = self._tarjeta()
+        productos = html.split('id="listaProductos"')[1].split('id="pagos"')[0]
+        self.assertIn('−$5.000', productos)
+
+    def test_no_repite_la_palabra_servicios_dentro_de_SERVICIOS(self):
+        # El item se llama "Descuento_Servicios" y el bloque ya se llama
+        # SERVICIOS: decirlo dos veces solo estorba.
+        self._descontar('10000')
+        html = self._tarjeta()
+        self.assertNotIn('Descuento_Servicios', html)
+        self.assertNotIn('Descuento Servicios', html)   # ni con espacio
+
+    def test_el_descuento_no_arrastra_una_hora_sin_sentido(self):
+        # Antes mostraba "06/09 · 00:00", que no significa nada.
+        self._descontar('10000')
+        html = self._tarjeta()
+        servicios = html.split('id="servicios"')[1].split('id="productos"')[0]
+        self.assertNotIn('00:00', servicios)
+        # La fila del descuento es la editable (tipo 'otro'): que no arrastre
+        # ni la fecha ni la hora, que para un descuento no significan nada.
+        fila = servicios.split('fila-tap')[1].split('</button>')[0]
+        self.assertNotIn('class="cuando"', fila)
+
+    def test_un_servicio_normal_sigue_diciendo_personas_y_hora(self):
         ReservaServicio.objects.create(
             venta_reserva=self.venta, servicio=self.tina,
             fecha_agendamiento=timezone.localdate(), hora_inicio='14:00',
             cantidad_personas=2, precio_unitario_venta=40000)
-        self.assertIn('2 pers.', self._tarjeta())
+        html = self._tarjeta()
+        self.assertIn('2 pers.', html)
+        self.assertIn('14:00', html)
+
+    def test_un_producto_normal_sigue_diciendo_2x(self):
+        cafe = Producto.objects.create(
+            nombre='Café Americano', precio_base=2500,
+            categoria=CategoriaProducto.objects.create(nombre='Cafetería'),
+            cantidad_disponible=50, venta_meson=True)
+        ReservaProducto.objects.create(
+            venta_reserva=self.venta, producto=cafe, cantidad=2,
+            precio_unitario_venta=2500)
+        self.assertIn('2× Café Americano', self._tarjeta())
 
     def test_la_tarjeta_ofrece_el_boton(self):
         self.assertIn('Aplicar descuento', self._tarjeta())

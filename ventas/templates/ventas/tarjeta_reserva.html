@@ -9,7 +9,6 @@ variable de JS, no en el cuerpo: mostrarlo entero era media pantalla perdida.
 Misma paleta que llegada_recepcion.html: son la misma familia de herramientas
 internas y se reconocen entre sí.
 {% endcomment %}
-{% load ventas_extras %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -57,6 +56,7 @@ internas y se reconocen entre sí.
   .btn-estado{background:#456990;color:#fff;margin-bottom:10px}
   .btn-desc{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .desc-linea{color:#2f6b34;font-weight:600}
+  .desc-monto{color:#2f6b34;font-weight:700;font-variant-numeric:tabular-nums}
   .btn-estado-salida{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .btn-admin{background:transparent;color:var(--hint);font-size:14px;
              font-weight:400;padding:10px;margin-top:2px}
@@ -140,28 +140,31 @@ internas y se reconocen entre sí.
     {% for r in servicios %}
       {% if r.editable %}
       <button type="button" class="fila-tap" data-linea="{{ r.pk }}"
-              data-nombre="{{ r.servicio.nombre }}"
+              data-nombre="{% if r.es_descuento %}{{ r.etiqueta }}{% else %}{{ r.servicio.nombre }}{% endif %}"
+              data-descuento="{% if r.es_descuento %}1{% else %}0{% endif %}"
               data-personas="{{ r.cantidad_personas }}"
               data-min="{{ r.servicio.capacidad_minima }}"
               data-max="{{ r.servicio.capacidad_maxima }}">
-        {% if r.servicio.precio_base < 0 %}
-        {# Un descuento no tiene "personas": la cantidad ES el monto. Se lee #}
-        {# como plata rebajada, que es lo que quien cobra tiene en la cabeza. #}
-        <span class="desc-linea">{{ r.servicio.nombre }}
-          <span class="edit">· −{{ r.cantidad_personas|formato_clp }} ✎</span></span>
+        {% if r.es_descuento %}
+        {# Un descuento no tiene "personas" ni hora: la cantidad ES el monto. #}
+        {# Se lee como plata rebajada, dentro de la lista de la familia a la #}
+        {# que se aplica — que es lo que hace obvio a qué se le descontó. #}
+        <span class="desc-linea">{{ r.etiqueta }} <span class="edit">✎</span></span>
+        <span class="desc-monto">{{ r.monto_descuento }}</span>
         {% else %}
         <span>{{ r.servicio.nombre }} <span class="edit">· {{ r.cantidad_personas }} pers. ✎</span></span>
-        {% endif %}
         <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
+        {% endif %}
       </button>
       {% else %}
       <div class="fila">
-        {% if r.servicio.precio_base < 0 %}
-        <span class="desc-linea">{{ r.servicio.nombre }} · −{{ r.cantidad_personas|formato_clp }}</span>
+        {% if r.es_descuento %}
+        <span class="desc-linea">{{ r.etiqueta }}</span>
+        <span class="desc-monto">{{ r.monto_descuento }}</span>
         {% else %}
         <span>{{ r.servicio.nombre }} · {{ r.cantidad_personas }} pers.</span>
-        {% endif %}
         <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
+        {% endif %}
       </div>
       {% endif %}
     {% empty %}<div class="vacio">Sin servicios todavía.</div>{% endfor %}
@@ -172,8 +175,13 @@ internas y se reconocen entre sí.
     <div id="listaProductos">
     {% for r in productos %}
       <div class="fila">
+        {% if r.es_descuento %}
+        <span class="desc-linea">{{ r.etiqueta }}</span>
+        <span class="desc-monto">{{ r.monto_descuento }}</span>
+        {% else %}
         <span>{{ r.cantidad }}× {{ r.producto.nombre }}</span>
         <span class="cuando">{{ r.mostrar_valor_total }}</span>
+        {% endif %}
       </div>
     {% endfor %}
     </div>
@@ -814,13 +822,22 @@ internas y se reconocen entre sí.
     fila.addEventListener('click', function () {
       document.getElementById('personasLinea').value = fila.dataset.linea;
       document.getElementById('personasCantidad').value = fila.dataset.personas;
-      document.getElementById('personasTitulo').textContent =
-        '¿Cuántas personas? · ' + fila.dataset.nombre;
-      var min = parseInt(fila.dataset.min, 10) || 0;
-      var max = parseInt(fila.dataset.max, 10) || 0;
+      // En un descuento la "cantidad" son pesos, no personas: preguntarle a
+      // Deborah cuántas personas quiere de un descuento es la misma confusión
+      // que se acaba de sacar de la lista.
+      var esDesc = fila.dataset.descuento === '1';
+      document.getElementById('personasTitulo').textContent = esDesc
+        ? '¿Cuánto descuento? · ' + fila.dataset.nombre
+        : '¿Cuántas personas? · ' + fila.dataset.nombre;
       var pista = '';
-      if (min > 1 && max) { pista = 'Entre ' + min + ' y ' + max + ' personas.'; }
-      else if (max) { pista = 'Admite hasta ' + max + '.'; }
+      if (esDesc) {
+        pista = 'En pesos. Ej: 10000';
+      } else {
+        var min = parseInt(fila.dataset.min, 10) || 0;
+        var max = parseInt(fila.dataset.max, 10) || 0;
+        if (min > 1 && max) { pista = 'Entre ' + min + ' y ' + max + ' personas.'; }
+        else if (max) { pista = 'Admite hasta ' + max + '.'; }
+      }
       document.getElementById('personasTope').textContent = pista;
       caja.classList.remove('oculto');
       caja.scrollIntoView({behavior: 'smooth', block: 'center'});
