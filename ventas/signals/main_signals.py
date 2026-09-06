@@ -646,10 +646,20 @@ def set_pago_user(sender, instance, **kwargs):
 
 # Availability Signal (Keep this active)
 
+# Solo lo que OCUPA un horario tiene disponibilidad que verificar. Una caja
+# de chocolates, un desayuno o una comisión no tienen slots declarados, así
+# que `verificar_disponibilidad` siempre respondía "no disponible" y esto
+# anotaba un ERROR por cada uno: alarma falsa, y ruido que tapa los avisos
+# que sí importan (Jorge, 06-09-2026, al ver el registro del botón nuevo).
+TIPOS_QUE_OCUPAN_HORARIO = ('tina', 'cabana', 'masaje')
+
+
 @receiver(pre_save, sender=ReservaServicio)
 def validar_disponibilidad_admin(sender, instance, **kwargs):
     # Check if servicio exists before accessing attributes
     if hasattr(instance, 'servicio') and instance.servicio:
+        if getattr(instance.servicio, 'tipo_servicio', None) not in TIPOS_QUE_OCUPAN_HORARIO:
+            return
         try:
             # Pass the instance itself to verificar_disponibilidad to exclude it from checks if it exists
             if not verificar_disponibilidad(
