@@ -47,6 +47,14 @@ internas y se reconocen entre sí.
        border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;
        font-family:inherit;text-decoration:none}
   .btn-pase{background:var(--brand);color:#fff}
+  /* Estado de la reserva: se lee de un vistazo sin bajar a los botones. */
+  .estado{display:inline-block;padding:2px 10px;border-radius:999px;
+          font-size:12px;font-weight:700;margin-left:6px;vertical-align:2px}
+  .estado-pendiente{background:#f3ece1;color:#8a6d3b}
+  .estado-checkin{background:#dff0e0;color:#2f6b34}
+  .estado-checkout{background:#e8e8e8;color:#666}
+  .btn-estado{background:#456990;color:#fff;margin-bottom:10px}
+  .btn-estado-salida{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .btn-admin{background:transparent;color:var(--hint);font-size:14px;
              font-weight:400;padding:10px;margin-top:2px}
   .coment{white-space:pre-line;font-size:14px;color:#5D4037;
@@ -98,6 +106,15 @@ internas y se reconocen entre sí.
     <div class="sub">Reserva #{{ venta.pk }}
       {% if venta.cliente.telefono %} · {{ venta.cliente.telefono }}{% endif %}
       · {{ venta.fecha_reserva|date:"d/m/Y" }}</div>
+    <div style="margin-top:6px">
+      {% if venta.estado_reserva == 'checkin' %}
+        <span class="estado estado-checkin" id="marcaEstado">🚪 Check-in</span>
+      {% elif venta.estado_reserva == 'checkout' %}
+        <span class="estado estado-checkout" id="marcaEstado">👋 Check-out</span>
+      {% else %}
+        <span class="estado estado-pendiente" id="marcaEstado">Pendiente</span>
+      {% endif %}
+    </div>
   </div>
 
   {# La plata primero, y los tres números por separado a propósito: #}
@@ -236,6 +253,24 @@ internas y se reconocen entre sí.
     </form>
   </div>
 
+  {% comment %}
+  Llegada y salida SIN pasar por el admin. No se reimplementa nada: pega
+  contra los mismos endpoints que usa la agenda operativa, que a su vez usan
+  las funciones de ventas/llegadas.py — así los tres caminos (QR del Pase,
+  agenda y esta tarjeta) dejan el mismo rastro en el historial del cliente y
+  no pueden contradecirse.
+  {% endcomment %}
+  {% if venta.estado_reserva == 'checkout' %}
+    <div class="card" style="text-align:center;color:var(--muted);font-size:13px">
+      👋 La estadía ya está cerrada.</div>
+  {% elif venta.estado_reserva == 'checkin' %}
+    <button type="button" class="btn btn-estado-salida" id="btnEstado"
+            data-accion="salida">👋 Registrar salida (check-out)</button>
+  {% else %}
+    <button type="button" class="btn btn-estado" id="btnEstado"
+            data-accion="llegada">🚪 Registrar llegada (check-in)</button>
+  {% endif %}
+
   <button type="button" class="btn btn-pase" id="btnCopiarPase">🔑 Copiar el Pase</button>
 
   {% comment %}
@@ -311,6 +346,63 @@ internas y se reconocen entre sí.
   // El mensaje NO se muestra: al tocar el botón se copia y listo. Deborah lo
   // pega en el cajón de la bandeja omnicanal.
   var MENSAJE = "{{ mensaje_pase|escapejs }}";
+  // --- Llegada y salida -------------------------------------------------
+  // Pega contra los endpoints de la agenda operativa. Idempotentes: apretar
+  // dos veces no duplica el movimiento ni pisa la hora real.
+  (function () {
+    var bEstado = document.getElementById('btnEstado');
+    if (!bEstado) { return; }   // ya está en check-out
+
+    bEstado.addEventListener('click', function () {
+      var salida = bEstado.dataset.accion === 'salida';
+      // Se pregunta una vez: un toque accidental en el celular no debería
+      // registrar una llegada ni cerrar una estadía.
+      var pregunta = salida
+        ? '¿Registrar la SALIDA de {{ venta.cliente.nombre|default:"este cliente"|escapejs }}?'
+        : '¿Registrar la LLEGADA de {{ venta.cliente.nombre|default:"este cliente"|escapejs }}?';
+      {% if venta.saldo_pendiente and venta.saldo_pendiente > 0 %}
+      if (salida) {
+        // Cerrar debiendo SÍ se puede —a veces el cobro se acuerda aparte—
+        // pero que quien lo hace lo sepa. El monto queda escrito en el
+        // movimiento del cliente.
+        pregunta += '\n\nOJO: queda un saldo pendiente de {{ venta.saldo_pendiente|floatformat:0 }}.';
+      }
+      {% endif %}
+      if (!confirm(pregunta)) { return; }
+
+      var url = salida
+        ? "{% url 'ventas:marcar_checkout_api' %}"
+        : "{% url 'ventas:marcar_llegada_api' %}";
+      bEstado.disabled = true;
+      bEstado.textContent = 'Registrando…';
+
+      fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify({reserva_id: {{ venta.pk }}})
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.success) {
+            alert(d.error || 'No se pudo registrar.');
+            bEstado.disabled = false;
+            location.reload();
+            return;
+          }
+          // Recargar y no pintar a mano: el estado que manda es el del
+          // servidor, y así la marca de arriba y el botón quedan siempre
+          // de acuerdo entre ellos.
+          location.reload();
+        })
+        .catch(function () {
+          alert('No se pudo conectar. Intenta de nuevo.');
+          bEstado.disabled = false;
+          location.reload();
+        });
+    });
+  })();
+
   var btn = document.getElementById('btnCopiarPase');
 
   function listo() {
