@@ -112,6 +112,66 @@ class ElMontoSaleDelPrecioPorLaCantidad(BaseDescuento):
         self.assertNotIn('−$59<', html)
 
 
+class LaFechaDelDescuento(BaseDescuento):
+    """Jorge: "¿con qué fecha y hora quedará el descuento del servicio
+    aplicado?".
+
+    Con la de los SERVICIOS que descuenta, no con la de la venta.
+    `fecha_reserva` es cuándo se vendió, y en una reserva tomada con
+    anticipación las dos se separan: la 6747 se vendió el 04/09 para el
+    16/09, y el descuento habría caído doce días antes de la visita.
+    Deborah, poniéndolos a mano, siempre los deja junto a los servicios.
+    """
+
+    def _servicio_el(self, dia):
+        return ReservaServicio.objects.create(
+            venta_reserva=self.venta, servicio=self.tina,
+            fecha_agendamiento=dia, hora_inicio='14:00',
+            cantidad_personas=2, precio_unitario_venta=40000)
+
+    def test_toma_la_fecha_de_los_servicios_no_la_de_la_venta(self):
+        import datetime
+        visita = timezone.localdate() + datetime.timedelta(days=12)
+        self._servicio_el(visita)
+        self._descontar('10000')
+        desc = ReservaServicio.objects.get(servicio=self.desc_serv)
+        self.assertEqual(desc.fecha_agendamiento, visita)
+
+    def test_con_varias_fechas_toma_la_primera(self):
+        import datetime
+        hoy = timezone.localdate()
+        self._servicio_el(hoy + datetime.timedelta(days=5))
+        self._servicio_el(hoy + datetime.timedelta(days=2))
+        self._descontar('10000')
+        desc = ReservaServicio.objects.get(servicio=self.desc_serv)
+        self.assertEqual(desc.fecha_agendamiento, hoy + datetime.timedelta(days=2))
+
+    def test_un_descuento_previo_no_arrastra_la_fecha(self):
+        # El orden real del mesón: Deborah descuenta primero y agrega la tina
+        # después. El primer descuento cae en HOY porque no hay servicios; si
+        # los descuentos contaran entre sí, el segundo heredaría esa fecha en
+        # vez de la de la visita.
+        import datetime
+        self._descontar('5000')          # todavía sin servicios -> hoy
+        visita = timezone.localdate() + datetime.timedelta(days=8)
+        self._servicio_el(visita)        # recién ahora se agenda la tina
+        self._descontar('3000')
+        ultimo = ReservaServicio.objects.filter(
+            servicio=self.desc_serv).order_by('-id').first()
+        self.assertEqual(ultimo.fecha_agendamiento, visita)
+
+    def test_sin_servicios_todavia_no_se_cae(self):
+        # Descontar antes de agregar nada: tiene que aplicarse igual.
+        self.assertTrue(self._descontar('10000').json()['ok'])
+
+    def test_la_hora_es_00_00(self):
+        # Un descuento no ocurre a una hora. La agenda ya no los muestra
+        # (filtra por nombre), así que no estorba a nadie.
+        self._descontar('10000')
+        self.assertEqual(
+            ReservaServicio.objects.get(servicio=self.desc_serv).hora_inicio, '00:00')
+
+
 class LoQueNoDeberiaPasar(BaseDescuento):
     def test_no_acepta_un_monto_vacio(self):
         r = self._descontar('')

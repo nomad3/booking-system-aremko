@@ -476,6 +476,33 @@ def _marcar_descuentos(lineas, campo_item, campo_cantidad):
     return lineas
 
 
+def _fecha_del_descuento(venta):
+    """La fecha de los servicios que se están descontando.
+
+    NO la de la venta. `fecha_reserva` es cuándo se VENDIÓ, y en una reserva
+    tomada con anticipación las dos cosas se separan: la 6747 se vendió el
+    04/09 para el 16/09, y el descuento habría caído doce días antes de la
+    visita que descuenta. Deborah, poniéndolos a mano, siempre los deja en la
+    fecha de los servicios — los seis últimos revisados así estaban.
+
+    Se toma la PRIMERA fecha con servicio de verdad (los descuentos previos no
+    cuentan, o se irían arrastrando entre ellos). Si no hay ninguno todavía,
+    cae en la fecha de venta, y si tampoco hay, en hoy.
+    """
+    from ventas.models import ReservaServicio
+
+    primera = (ReservaServicio.objects
+               .filter(venta_reserva=venta)
+               .exclude(servicio__precio_base__lt=0)
+               .order_by('fecha_agendamiento')
+               .values_list('fecha_agendamiento', flat=True)
+               .first())
+    if primera:
+        return primera
+    cuando = getattr(venta, 'fecha_reserva', None)
+    return cuando.date() if cuando else timezone.localdate()
+
+
 def _item_descuento(en_productos):
     """El item de -1 peso que sirve de descuento, o None.
 
@@ -531,12 +558,7 @@ def tarjeta_aplicar_descuento(request, venta_id):
                 precio_unitario_venta=item.precio_base)
         else:
             from ventas.models import ReservaServicio
-            # Misma fecha de la reserva y 00:00, igual que como se hace hoy a
-            # mano: el descuento no ocupa un horario ni un proveedor. Si la
-            # reserva no tiene fecha —pasa en las recién creadas— se usa hoy:
-            # el descuento no puede quedarse sin aplicar por eso.
-            cuando = getattr(venta, 'fecha_reserva', None)
-            fecha = cuando.date() if cuando else timezone.localdate()
+            fecha = _fecha_del_descuento(venta)
             ReservaServicio.objects.create(
                 venta_reserva=venta, servicio=item,
                 fecha_agendamiento=fecha,
