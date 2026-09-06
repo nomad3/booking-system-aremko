@@ -9,6 +9,7 @@ variable de JS, no en el cuerpo: mostrarlo entero era media pantalla perdida.
 Misma paleta que llegada_recepcion.html: son la misma familia de herramientas
 internas y se reconocen entre sí.
 {% endcomment %}
+{% load ventas_extras %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -54,6 +55,8 @@ internas y se reconocen entre sí.
   .estado-checkin{background:#dff0e0;color:#2f6b34}
   .estado-checkout{background:#e8e8e8;color:#666}
   .btn-estado{background:#456990;color:#fff;margin-bottom:10px}
+  .btn-desc{background:#8a6d3b;color:#fff;margin-bottom:10px}
+  .desc-linea{color:#2f6b34;font-weight:600}
   .btn-estado-salida{background:#8a6d3b;color:#fff;margin-bottom:10px}
   .btn-admin{background:transparent;color:var(--hint);font-size:14px;
              font-weight:400;padding:10px;margin-top:2px}
@@ -141,12 +144,23 @@ internas y se reconocen entre sí.
               data-personas="{{ r.cantidad_personas }}"
               data-min="{{ r.servicio.capacidad_minima }}"
               data-max="{{ r.servicio.capacidad_maxima }}">
+        {% if r.servicio.precio_base < 0 %}
+        {# Un descuento no tiene "personas": la cantidad ES el monto. Se lee #}
+        {# como plata rebajada, que es lo que quien cobra tiene en la cabeza. #}
+        <span class="desc-linea">{{ r.servicio.nombre }}
+          <span class="edit">· −{{ r.cantidad_personas|formato_clp }} ✎</span></span>
+        {% else %}
         <span>{{ r.servicio.nombre }} <span class="edit">· {{ r.cantidad_personas }} pers. ✎</span></span>
+        {% endif %}
         <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
       </button>
       {% else %}
       <div class="fila">
+        {% if r.servicio.precio_base < 0 %}
+        <span class="desc-linea">{{ r.servicio.nombre }} · −{{ r.cantidad_personas|formato_clp }}</span>
+        {% else %}
         <span>{{ r.servicio.nombre }} · {{ r.cantidad_personas }} pers.</span>
+        {% endif %}
         <span class="cuando">{{ r.fecha_agendamiento|date:"d/m" }} · {{ r.hora_inicio }}</span>
       </div>
       {% endif %}
@@ -225,6 +239,29 @@ internas y se reconocen entre sí.
       <div class="err" id="prodError"></div>
       <button type="submit" class="btn btn-prod">Agregar producto</button>
       <button type="button" class="btn btn-admin" id="prodCancelar">Cancelar</button>
+    </form>
+  </div>
+
+  <button type="button" class="btn btn-desc" id="btnAbrirDesc">🏷️ Aplicar descuento</button>
+
+  {% comment %}
+  El descuento se escribe en PESOS. Por debajo usa el mismo item de -1 de
+  siempre con la cantidad como monto, así que la contabilidad no cambia —
+  pero quien cobra ya no tiene que traducir plata a "cantidad de personas"
+  ni buscar el item correcto entre 56 productos.
+  {% endcomment %}
+  <div class="card oculto" id="formDesc">
+    <h2>Aplicar descuento</h2>
+    <form id="fDesc">{% csrf_token %}
+      <input class="campo" name="monto" id="descMonto" type="text" inputmode="numeric"
+             placeholder="¿Cuánto? Ej: 10000" autocomplete="off">
+      <select class="campo" name="destino" id="descDestino">
+        <option value="servicios">Descontar de los servicios</option>
+        <option value="productos">Descontar de los productos</option>
+      </select>
+      <div class="err" id="descError"></div>
+      <button type="submit" class="btn btn-desc">Aplicar descuento</button>
+      <button type="button" class="btn btn-admin" id="descCancelar">Cancelar</button>
     </form>
   </div>
 
@@ -346,6 +383,61 @@ internas y se reconocen entre sí.
   // El mensaje NO se muestra: al tocar el botón se copia y listo. Deborah lo
   // pega en el cajón de la bandeja omnicanal.
   var MENSAJE = "{{ mensaje_pase|escapejs }}";
+  // --- Descuento --------------------------------------------------------
+  // Se escribe en pesos; el servidor arma la línea con el item de -1 de
+  // siempre. Recarga al terminar: el descuento entra en la lista de
+  // servicios o de productos, y pintarla a mano acá la dejaría a medias.
+  (function () {
+    var abrir = document.getElementById('btnAbrirDesc');
+    var caja = document.getElementById('formDesc');
+    var form = document.getElementById('fDesc');
+    var error = document.getElementById('descError');
+    var monto = document.getElementById('descMonto');
+
+    abrir.addEventListener('click', function () {
+      caja.classList.toggle('oculto');
+      if (!caja.classList.contains('oculto')) { monto.focus(); }
+    });
+    document.getElementById('descCancelar').addEventListener('click', function () {
+      caja.classList.add('oculto'); error.style.display = 'none';
+    });
+
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      error.style.display = 'none';
+      var pesos = (monto.value || '').replace(/\./g, '').trim();
+      if (!/^\d+$/.test(pesos) || Number(pesos) < 1) {
+        error.textContent = 'Escribe cuánto descontar, en pesos.';
+        error.style.display = 'block';
+        return;
+      }
+      var donde = document.getElementById('descDestino');
+      var texto = donde.options[donde.selectedIndex].text.toLowerCase();
+      if (!confirm('¿Descontar $' + Number(pesos).toLocaleString('es-CL') +
+                   ' ' + texto.replace('descontar de ', 'de ') + '?')) { return; }
+
+      var boton = form.querySelector('button[type=submit]');
+      boton.disabled = true; boton.textContent = 'Aplicando…';
+      fetch("{% url 'ventas:tarjeta_aplicar_descuento' venta.pk %}",
+            {method: 'POST', body: new FormData(form)})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            error.textContent = d.mensaje || 'No se pudo aplicar.';
+            error.style.display = 'block';
+            boton.disabled = false; boton.textContent = 'Aplicar descuento';
+            return;
+          }
+          location.reload();
+        })
+        .catch(function () {
+          error.textContent = 'No se pudo conectar. Intenta de nuevo.';
+          error.style.display = 'block';
+          boton.disabled = false; boton.textContent = 'Aplicar descuento';
+        });
+    });
+  })();
+
   // --- Llegada y salida -------------------------------------------------
   // Pega contra los endpoints de la agenda operativa. Idempotentes: apretar
   // dos veces no duplica el movimiento ni pisa la hora real.

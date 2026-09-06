@@ -48,6 +48,9 @@ urlpatterns = [
     path('agenda-operativa/', agenda_operativa_view.agenda_operativa, name='agenda_operativa'),
     path('reserva/<int:venta_id>/tarjeta/', tarjeta_reserva_view.tarjeta_reserva, name='tarjeta_reserva'),
     path('reserva/<int:venta_id>/tarjeta/pago/', tarjeta_reserva_view.tarjeta_agregar_pago, name='tarjeta_agregar_pago'),
+    # Descuento por monto en pesos, sin buscar el item de -1 en la lista
+    path('reserva/<int:venta_id>/tarjeta/descuento/',
+         tarjeta_reserva_view.tarjeta_aplicar_descuento, name='tarjeta_aplicar_descuento'),
     path('reserva/<int:venta_id>/tarjeta/producto/', tarjeta_reserva_view.tarjeta_agregar_producto, name='tarjeta_agregar_producto'),
     path('reserva/<int:venta_id>/tarjeta/datos/', tarjeta_reserva_view.tarjeta_editar_datos, name='tarjeta_editar_datos'),
     path('reserva/<int:venta_id>/tarjeta/servicio/', tarjeta_reserva_view.tarjeta_editar_servicio, name='tarjeta_editar_servicio'),

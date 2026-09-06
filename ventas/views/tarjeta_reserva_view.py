@@ -412,6 +412,101 @@ def tarjeta_agregar_producto(request, venta_id):
     })
 
 
+# --- Descuentos -------------------------------------------------------------
+# Aremko descuenta con un item de -1 peso y la CANTIDAD como monto: 10.000 de
+# cantidad = $10.000 de descuento. Es un truco que ya lleva años y que la
+# contabilidad entiende, así que NO se cambia — pero obliga a quien cobra a
+# pensar en "cantidad de personas" cuando lo que quiere es rebajar plata, y en
+# la tarjeta se leía "Descuento_Servicios · 30000 pers.".
+#
+# Acá se le da su propia puerta: se escribe el monto en pesos y el sistema
+# arma la línea. Por debajo es exactamente lo mismo de siempre.
+DESCUENTO_MAXIMO = 2_000_000
+
+
+def _item_descuento(en_productos):
+    """El item de -1 peso que sirve de descuento, o None.
+
+    Se busca por precio y nombre en vez de fijar el id: si alguien lo
+    recrea en el admin, esto lo encuentra igual. Si hubiera varios, gana el
+    de menor id — el más antiguo, que es el que tiene el historial.
+    """
+    from ventas.models import Producto, Servicio
+
+    modelo = Producto if en_productos else Servicio
+    return (modelo.objects.filter(precio_base=-1,
+                                  nombre__istartswith='descuento')
+            .order_by('pk').first())
+
+
+@staff_required
+@require_POST
+def tarjeta_aplicar_descuento(request, venta_id):
+    """Rebaja un monto en pesos de los servicios o de los productos.
+
+    Jorge (05-09-2026): "monto libre no más". No hay descuentos con nombre —
+    quien cobra escribe cuánto y listo.
+    """
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+
+    crudo = (request.POST.get('monto') or '').strip().replace('.', '')
+    if not crudo.isdigit() or int(crudo) < 1:
+        return JsonResponse({'ok': False, 'mensaje': 'Escribe cuánto descontar.'},
+                            status=400)
+    monto = int(crudo)
+    # Un tope alto pero real: protege del cero de más (100.000 -> 1.000.000)
+    # sin estorbar un descuento grande de verdad.
+    if monto > DESCUENTO_MAXIMO:
+        return JsonResponse(
+            {'ok': False,
+             'mensaje': f'${monto:,}'.replace(',', '.') + ' es demasiado. '
+                        'Si es correcto, hazlo desde el admin.'},
+            status=400)
+
+    en_productos = request.POST.get('destino') == 'productos'
+    item = _item_descuento(en_productos)
+    if item is None:
+        donde = 'productos' if en_productos else 'servicios'
+        return JsonResponse(
+            {'ok': False, 'mensaje': f'No encuentro el item de descuento de {donde}. '
+                                     'Hay que crearlo en el admin.'}, status=400)
+
+    try:
+        if en_productos:
+            from ventas.models import ReservaProducto
+            ReservaProducto.objects.create(
+                venta_reserva=venta, producto=item, cantidad=monto,
+                precio_unitario_venta=item.precio_base)
+        else:
+            from ventas.models import ReservaServicio
+            # Misma fecha de la reserva y 00:00, igual que como se hace hoy a
+            # mano: el descuento no ocupa un horario ni un proveedor. Si la
+            # reserva no tiene fecha —pasa en las recién creadas— se usa hoy:
+            # el descuento no puede quedarse sin aplicar por eso.
+            cuando = getattr(venta, 'fecha_reserva', None)
+            fecha = cuando.date() if cuando else timezone.localdate()
+            ReservaServicio.objects.create(
+                venta_reserva=venta, servicio=item,
+                fecha_agendamiento=fecha,
+                hora_inicio='00:00', cantidad_personas=monto,
+                precio_unitario_venta=item.precio_base)
+        venta.calcular_total()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] no se pudo descontar $%s en la reserva %s: %s',
+                         monto, venta_id, exc)
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo aplicar el '
+                             'descuento. Inténtalo desde el admin.'}, status=400)
+
+    venta.refresh_from_db()
+    return JsonResponse({
+        'ok': True,
+        'total': int(venta.total or 0),
+        'pagado': int(venta.pagado or 0),
+        'saldo': int(venta.saldo_pendiente or 0),
+        'descuento': monto,
+    })
+
+
 @staff_required
 def tarjetas_lista(request):
     """Lista móvil de reservas: lo mínimo para ENCONTRAR una y abrir su tarjeta.
