@@ -336,7 +336,26 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
         box-shadow: 0 15px 35px rgba(201, 169, 97, 0.4);
     }
 
-    .service-title-premium {
+    .service-price-premium {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--premium-gold);
+            line-height: 1.1;
+            margin-bottom: .9rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .service-price-premium span {
+            display: block;
+            font-size: .72rem;
+            font-weight: 600;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            opacity: .65;
+            margin-top: .25rem;
+        }
+
+        .service-title-premium {
         font-size: 1.8rem;
         font-weight: 700;
         color: var(--premium-black);
@@ -823,8 +842,8 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
             </div>
             <div class="col-lg-3 col-md-6">
                 <div class="stat-item">
-                    <div class="stat-number">12</div>
-                    <div class="stat-label">Capacidad Máxima</div>
+                    <div class="stat-number">18</div>
+                    <div class="stat-label">Personas por Jornada</div>
                 </div>
             </div>
             <div class="col-lg-3 col-md-6">
@@ -842,90 +861,78 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
     <div class="container">
         <div class="section-header">
             <div class="section-label">Experiencias Corporativas</div>
-            <h2 class="section-title">Tres Propuestas Premium</h2>
+            <h2 class="section-title">Dos Programas</h2>
             <p class="section-subtitle">
                 Cada experiencia está cuidadosamente diseñada para elevar la productividad,
-                fortalecer vínculos y renovar las energías de su equipo ejecutivo
+                Una mañana completa junto al río, de 9:00 a 14:00. Hasta 18 personas:
+                es lo que recibe la sala ejecutiva y es exactamente lo que reciben
+                las tinas, así que el equipo entero cabe en las dos partes del día.
             </p>
         </div>
 
-        <div class="row g-4">
-            <div class="col-lg-4 col-md-6">
+        <div class="row g-4 justify-content-center">
+            <div class="col-lg-6 col-md-10">
                 <div class="service-card-premium">
                     <img src="https://res.cloudinary.com/dtuncr1pi/image/upload/v1765420739/categorias/desayuno_empresas_aremko.jpg"
-                        alt="Experiencia Completa Empresarial" class="service-image-premium">
+                        alt="La Mañana Aremko" class="service-image-premium">
                     <div class="service-content-premium">
                         <div class="service-icon-premium">
-                            <i class="fas fa-crown"></i>
+                            <i class="fas fa-mug-hot"></i>
                         </div>
-                        <h3 class="service-title-premium">Experiencia Ejecutiva Completa</h3>
+                        <h3 class="service-title-premium">La Mañana Aremko</h3>
+                        <div class="service-price-premium">$45.000<span>por persona</span></div>
                         <p class="service-description-premium">
-                            <strong>Desayuno Gourmet + Sala Ejecutiva + Wellness</strong><br><br>
-                            La propuesta más completa para su equipo: desayuno con productos premium de la región,
-                            sala de reuniones completamente equipada, y sesión de wellness en tinas calientes
-                            con vista privilegiada al Río Pescado.
+                            <strong>Desayuno + circuito de tinas + masajes</strong><br><br>
+                            Llegan a desayunar a la sala ejecutiva, con vista al bosque nativo.
+                            Ahí mismo se arman los grupos y se sortean los masajes. Después,
+                            cuatro horas de circuito: tina caliente a 38°, tina de agua fría,
+                            descanso junto al río. Los masajes corren en paralelo, sin que
+                            nadie tenga que esperar fuera del agua.
                         </p>
                         <div class="d-flex justify-content-center flex-wrap gap-2">
                             <span class="badge"
                                 style="background: var(--premium-gold); color: var(--premium-black);">Desayuno
-                                Gourmet</span>
-                            <span class="badge" style="background: var(--premium-black);">Sala Premium</span>
-                            <span class="badge" style="background: var(--premium-grey);">Wellness VIP</span>
+                                de bienvenida</span>
+                            <span class="badge" style="background: var(--premium-grey);">Circuito de tinas</span>
+                            <span class="badge" style="background: var(--premium-black);">6 masajes</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-lg-4 col-md-6">
-                <div class="service-card-premium">
-                    <img src="https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto/v1765420740/categorias/4_amigas_en_la_calbuco.png"
-                        alt="Desayuno y Wellness" class="service-image-premium">
-                    <div class="service-content-premium">
-                        <div class="service-icon-premium">
-                            <i class="fas fa-utensils"></i>
-                        </div>
-                        <h3 class="service-title-premium">Desayuno & Wellness</h3>
-                        <p class="service-description-premium">
-                            <strong>Gastronomía + Relajación</strong><br><br>
-                            Perfecto para celebraciones corporativas y eventos especiales. Disfrute de un desayuno
-                            con productos locales de alta calidad, seguido de una experiencia de relajación
-                            en nuestras instalaciones wellness junto al río.
-                        </p>
-                        <div class="d-flex justify-content-center flex-wrap gap-2">
-                            <span class="badge"
-                                style="background: var(--premium-gold); color: var(--premium-black);">Desayuno
-                                Gourmet</span>
-                            <span class="badge" style="background: var(--premium-grey);">Wellness Premium</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-4 col-md-6">
+            <div class="col-lg-6 col-md-10">
                 <div class="service-card-premium">
                     <img src="https://res.cloudinary.com/dtuncr1pi/image/upload/f_auto,q_auto/v1765420740/categorias/charla_empresas_aremko.jpg"
-                        alt="Wellness Corporativo" class="service-image-premium">
+                        alt="Deshielo · programa de equipos" class="service-image-premium">
                     <div class="service-content-premium">
                         <div class="service-icon-premium">
-                            <i class="fas fa-spa"></i>
+                            <i class="fas fa-people-group"></i>
                         </div>
-                        <h3 class="service-title-premium">Wellness Corporativo</h3>
+                        <h3 class="service-title-premium">Deshielo</h3>
+                        <div class="service-price-premium">$55.000<span>por persona</span></div>
                         <p class="service-description-premium">
-                            <strong>Team Building de Excelencia</strong><br><br>
-                            La experiencia más pura de conexión humana. Tinas calientes privadas en un entorno
-                            natural exclusivo, diseñado para fortalecer los vínculos auténticos entre los miembros
-                            de su equipo ejecutivo.
+                            <strong>Para el equipo que dejó de conversar</strong><br><br>
+                            La misma mañana, con tres decisiones tomadas a propósito: los
+                            grupos los armamos nosotros y van mezclados, el paso por el agua
+                            fría se hace en conjunto, y los masajes se sortean por grupo y no
+                            por persona. En una sala de reuniones cada uno llega con su cargo
+                            puesto; en el agua, no.
                         </p>
                         <div class="d-flex justify-content-center flex-wrap gap-2">
-                            <span class="badge" style="background: var(--premium-black);">Experiencia Privada</span>
+                            <span class="badge" style="background: var(--premium-black);">Grupos diseñados</span>
                             <span class="badge"
-                                style="background: var(--premium-gold); color: var(--premium-black);">Team
-                                Building</span>
+                                style="background: var(--premium-gold); color: var(--premium-black);">Con
+                                anfitrión</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <p class="text-center mt-4 mb-0" style="opacity:.75;font-size:.95rem">
+            Mínimo 10 personas, máximo 18. De lunes a viernes, excepto martes.
+            La sala ejecutiva queda disponible si la jornada incluye trabajo.
+        </p>
     </div>
 </section>
 
@@ -1089,10 +1096,10 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
                             <label for="servicio_interes">Experiencia de Interés *</label>
                             <select class="form-select-premium" id="servicio_interes" name="servicio_interes" required>
                                 <option value="">Seleccione una experiencia...</option>
-                                <option value="experiencia_completa">Experiencia Ejecutiva Completa (Desayuno + Sala +
-                                    Wellness)</option>
-                                <option value="desayuno_relax">Desayuno & Wellness</option>
-                                <option value="solo_tinas">Wellness Corporativo (Team Building)</option>
+                                <option value="manana_aremko">La Mañana Aremko · $45.000 por persona</option>
+                                <option value="deshielo">Deshielo · programa de equipos · $55.000 por persona</option>
+                                <option value="giftcards">Giftcards para colaboradores</option>
+                                <option value="convenio">Convenio de empresa</option>
                             </select>
                         </div>
                     </div>
@@ -1200,11 +1207,10 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Nuestras instalaciones pueden acomodar cómodamente hasta 12 personas para la experiencia
-                        completa,
-                        garantizando exclusividad y atención personalizada. Para grupos más grandes, podemos coordinar
-                        turnos escalonados o soluciones personalizadas.
-                    </div>
+                        Recibimos hasta 18 personas por jornada. No es un número al azar: es lo que
+                        acomoda la sala ejecutiva y es exactamente lo que reciben las tinas, así que el
+                        equipo entero cabe en las dos partes del programa sin turnos ni esperas. Para
+                        grupos mayores coordinamos jornadas en días distintos.</div>
                 </div>
             </div>
 
@@ -1259,10 +1265,9 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Ofrecemos dos turnos principales: matutino (9:00-13:00) e vespertino (14:30-18:30).
-                        También podemos coordinar horarios especiales para eventos que requieran mayor flexibilidad.
-                        Recomendamos reservar con al menos dos semanas de anticipación.
-                    </div>
+                        Los dos programas son de mañana, de 9:00 a 14:00, de lunes a viernes excepto
+                        martes. También coordinamos jornadas de tarde para empresas que lo necesiten.
+                        Recomendamos reservar con al menos dos semanas de anticipación.</div>
                 </div>
             </div>
 
