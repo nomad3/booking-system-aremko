@@ -32,6 +32,7 @@ cálculo — total/pagado/saldo son campos almacenados. Nada de ficha 360.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 
@@ -208,6 +209,12 @@ def tarjeta_reserva(request, venta_id):
     return render(request, 'ventas/tarjeta_reserva.html', {
         'venta': venta,
         'servicios': servicios,
+        # Para el botón «Agregar de la lista»: los servicios que no ocupan
+        # una hora no necesitan el calendario, y por él son un trámite.
+        'catalogo_servicios': _servicios_de_lista(),
+        # Viene puesta para que agregar sea un toque: es la fecha de los
+        # servicios de la reserva, la misma que usa el descuento.
+        'fecha_sugerida': _fecha_del_descuento(venta),
         'productos': productos,
         'pagos': pagos,
         'mensaje_pase': mensaje_pase(venta),
@@ -578,6 +585,109 @@ def tarjeta_aplicar_descuento(request, venta_id):
         'pagado': int(venta.pagado or 0),
         'saldo': int(venta.saldo_pendiente or 0),
         'descuento': monto,
+    })
+
+
+# --- Agregar servicio desde una lista ---------------------------------------
+# El calendario está hecho para lo que OCUPA una hora: muestra la grilla y se
+# elige el hueco libre. Pero hay servicios que no ocupan ninguna —chocolates,
+# desayuno de una cabaña, comisión de Booking— y para ésos el calendario es un
+# trámite: elegir fecha, esperar la grilla, elegir una hora que da lo mismo.
+#
+# Jorge (05-09-2026): "también debe dar la posibilidad de elegir servicios de
+# una lista, la lista visible del admin de django". Se da la lista completa,
+# como el admin — pero el admin NO valida disponibilidad, y por acá sí se
+# valida: agregar una tina a una hora ocupada es sobreventa, y eso no se
+# arregla después.
+TIPOS_CON_HORARIO = ('tina', 'cabana', 'masaje')
+
+
+def _servicios_de_lista():
+    """Los servicios activos, sin los descuentos.
+
+    Los descuentos tienen su propio botón desde el 05-09-2026, donde se
+    escribe el monto en pesos. Dejarlos también acá sería ofrecer el camino
+    confuso —"cantidad" que en realidad son pesos— que se acaba de sacar.
+    """
+    from ventas.models import Servicio
+
+    return (Servicio.objects.filter(activo=True)
+            .exclude(precio_base__lt=0)
+            .select_related('categoria')
+            .order_by('categoria__nombre', 'nombre'))
+
+
+@staff_required
+@require_POST
+def tarjeta_agregar_servicio_lista(request, venta_id):
+    """Agrega un servicio elegido de la lista, sin pasar por el calendario."""
+    from ventas.models import ReservaServicio, Servicio
+
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+
+    try:
+        servicio = Servicio.objects.get(pk=request.POST.get('servicio_id'), activo=True)
+    except (Servicio.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({'ok': False, 'mensaje': 'Elige un servicio de la lista.'},
+                            status=400)
+    # Mismo criterio que el selector: un descuento entra por su propio botón.
+    if (servicio.precio_base or 0) < 0:
+        return JsonResponse(
+            {'ok': False, 'mensaje': 'Los descuentos se aplican con el botón '
+                                     '«Aplicar descuento».'}, status=400)
+
+    crudo = (request.POST.get('cantidad') or '1').strip()
+    if not crudo.isdigit() or int(crudo) < 1:
+        return JsonResponse({'ok': False, 'mensaje': 'Cantidad inválida.'}, status=400)
+    cantidad = int(crudo)
+
+    fecha = _fecha_del_descuento(venta)          # la de los servicios de la reserva
+    cruda_fecha = (request.POST.get('fecha') or '').strip()
+    if cruda_fecha:
+        try:
+            fecha = datetime.datetime.strptime(cruda_fecha, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'ok': False, 'mensaje': 'Fecha inválida.'}, status=400)
+
+    hora = (request.POST.get('hora') or '').strip() or '00:00'
+
+    # Lo que ocupa un horario se valida. El admin no lo hace y por eso el
+    # calendario existe; acá se aprovecha la misma función que ya usa el resto
+    # del sistema en vez de escribir otra.
+    if servicio.tipo_servicio in TIPOS_CON_HORARIO:
+        try:
+            from ventas.calendar_utils import verificar_disponibilidad
+            libre = verificar_disponibilidad(servicio, fecha, hora, cantidad)
+        except Exception:  # noqa: BLE001
+            logger.exception('[tarjeta] no se pudo verificar disponibilidad de %s',
+                             servicio.pk)
+            libre = False
+        if not libre:
+            return JsonResponse(
+                {'ok': False,
+                 'mensaje': f'{servicio.nombre} no está disponible el '
+                            f'{fecha:%d/%m} a las {hora}. Usa el calendario '
+                            'para ver los horarios libres.'}, status=400)
+
+    try:
+        ReservaServicio.objects.create(
+            venta_reserva=venta, servicio=servicio,
+            fecha_agendamiento=fecha, hora_inicio=hora,
+            cantidad_personas=cantidad,
+            precio_unitario_venta=servicio.precio_base)
+        venta.calcular_total()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] no se pudo agregar el servicio %s a la '
+                         'reserva %s: %s', servicio.pk, venta_id, exc)
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo agregar el '
+                             'servicio. Inténtalo desde el admin.'}, status=400)
+
+    venta.refresh_from_db()
+    return JsonResponse({
+        'ok': True,
+        'total': int(venta.total or 0),
+        'pagado': int(venta.pagado or 0),
+        'saldo': int(venta.saldo_pendiente or 0),
     })
 
 

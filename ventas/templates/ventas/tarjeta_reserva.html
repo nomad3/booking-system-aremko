@@ -55,6 +55,7 @@ internas y se reconocen entre sí.
   .estado-checkout{background:#e8e8e8;color:#666}
   .btn-estado{background:#456990;color:#fff;margin-bottom:10px}
   .btn-desc{background:#8a6d3b;color:#fff;margin-bottom:10px}
+  .btn-lista{background:#5b7a99;color:#fff;margin-bottom:10px}
   .desc-linea{color:#2f6b34;font-weight:600}
   .desc-monto{color:#2f6b34;font-weight:700;font-variant-numeric:tabular-nums}
   .btn-estado-salida{background:#8a6d3b;color:#fff;margin-bottom:10px}
@@ -231,6 +232,39 @@ internas y se reconocen entre sí.
 
   <button type="button" class="btn btn-serv" id="btnAbrirCalendario">📅 Agregar servicio</button>
 
+  <button type="button" class="btn btn-lista" id="btnAbrirLista">📋 Agregar de la lista</button>
+
+  {% comment %}
+  Para lo que NO ocupa una hora: chocolates, el desayuno de una cabaña, una
+  comisión. Por el calendario esos son un trámite —elegir fecha, esperar la
+  grilla, elegir una hora que da lo mismo—. Lo que sí ocupa hora se puede
+  agregar igual, pero el servidor valida disponibilidad: sobrevender una tina
+  no se arregla después.
+  {% endcomment %}
+  <div class="card oculto" id="formLista">
+    <h2>Agregar servicio</h2>
+    <form id="fLista">{% csrf_token %}
+      <select class="campo" name="servicio_id" id="listaSelect">
+        <option value="">Elige un servicio…</option>
+        {% for s in catalogo_servicios %}
+        <option value="{{ s.pk }}" data-horario="{% if s.tipo_servicio == 'tina' or s.tipo_servicio == 'cabana' or s.tipo_servicio == 'masaje' %}1{% else %}0{% endif %}">
+          {{ s.nombre }}{% if s.precio_base %} · ${{ s.precio_base|floatformat:"0g" }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      <input class="campo" name="cantidad" id="listaCantidad" type="text"
+             inputmode="numeric" value="1" autocomplete="off">
+      <input class="campo" name="fecha" id="listaFecha" type="date"
+             value="{{ fecha_sugerida|date:"Y-m-d" }}">
+      {# La hora solo aparece para lo que de verdad ocupa un horario. #}
+      <input class="campo oculto" name="hora" id="listaHora" type="time">
+      <div class="pista" id="listaAviso"
+           style="font-size:14px;color:var(--hint);margin:-6px 0 10px"></div>
+      <div class="err" id="listaError"></div>
+      <button type="submit" class="btn btn-lista">Agregar servicio</button>
+      <button type="button" class="btn btn-admin" id="listaCancelar">Cancelar</button>
+    </form>
+  </div>
+
   <button type="button" class="btn btn-prod" id="btnAbrirProducto">🛒 Agregar producto</button>
 
   <div class="card oculto" id="formProducto">
@@ -391,6 +425,66 @@ internas y se reconocen entre sí.
   // El mensaje NO se muestra: al tocar el botón se copia y listo. Deborah lo
   // pega en el cajón de la bandeja omnicanal.
   var MENSAJE = "{{ mensaje_pase|escapejs }}";
+  // --- Agregar servicio de la lista -------------------------------------
+  (function () {
+    var abrir = document.getElementById('btnAbrirLista');
+    var caja = document.getElementById('formLista');
+    var form = document.getElementById('fLista');
+    var error = document.getElementById('listaError');
+    var sel = document.getElementById('listaSelect');
+    var hora = document.getElementById('listaHora');
+    var aviso = document.getElementById('listaAviso');
+
+    // La hora solo se pide para lo que ocupa un horario. Para chocolates o
+    // un desayuno es una pregunta sin respuesta.
+    function ajustar() {
+      var op = sel.options[sel.selectedIndex];
+      var conHorario = op && op.dataset.horario === '1';
+      hora.classList.toggle('oculto', !conHorario);
+      aviso.textContent = conHorario
+        ? 'Ocupa horario: se revisa que esté libre. Si no, usa el calendario.'
+        : '';
+    }
+    sel.addEventListener('change', ajustar);
+
+    abrir.addEventListener('click', function () {
+      caja.classList.toggle('oculto');
+      if (!caja.classList.contains('oculto')) { ajustar(); }
+    });
+    document.getElementById('listaCancelar').addEventListener('click', function () {
+      caja.classList.add('oculto'); error.style.display = 'none';
+    });
+
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      error.style.display = 'none';
+      if (!sel.value) {
+        error.textContent = 'Elige un servicio de la lista.';
+        error.style.display = 'block';
+        return;
+      }
+      var boton = form.querySelector('button[type=submit]');
+      boton.disabled = true; boton.textContent = 'Agregando…';
+      fetch("{% url 'ventas:tarjeta_agregar_servicio_lista' venta.pk %}",
+            {method: 'POST', body: new FormData(form)})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            error.textContent = d.mensaje || 'No se pudo agregar.';
+            error.style.display = 'block';
+            boton.disabled = false; boton.textContent = 'Agregar servicio';
+            return;
+          }
+          location.reload();
+        })
+        .catch(function () {
+          error.textContent = 'No se pudo conectar. Intenta de nuevo.';
+          error.style.display = 'block';
+          boton.disabled = false; boton.textContent = 'Agregar servicio';
+        });
+    });
+  })();
+
   // --- Descuento --------------------------------------------------------
   // Se escribe en pesos; el servidor arma la línea con el item de -1 de
   // siempre. Recarga al terminar: el descuento entra en la lista de
