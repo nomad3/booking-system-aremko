@@ -59,13 +59,18 @@ class LosDosProgramas(LaPaginaDeEmpresas):
 
 class LosPreciosSeVen(LaPaginaDeEmpresas):
     """Lo que más faltaba. Sin precio, quien lee no puede llevarlo a su jefe:
-    dice "mándame más información" y ahí se muere la venta."""
+    dice "mándame más información" y ahí se muere la venta.
+
+    Los precios salieron de un cálculo corregido: las tinas se cobran POR
+    PERSONA, no por tina. Una mañana para 18 vale $910.000 a precio de lista
+    ($50.555 por cabeza), así que vender a $45.000 era vender bajo lista sin
+    saberlo. Jorge eligió el punto medio: $50.000 y $60.000."""
 
     def test_muestra_el_precio_de_la_manana(self):
-        self.assertIn('$45.000', self.html)
+        self.assertIn('$50.000', self.html)
 
     def test_muestra_el_precio_de_deshielo(self):
-        self.assertIn('$55.000', self.html)
+        self.assertIn('$60.000', self.html)
 
     def test_dice_que_el_precio_es_por_persona(self):
         self.assertIn('por persona', self.html)
