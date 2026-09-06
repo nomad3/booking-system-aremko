@@ -32,6 +32,11 @@ class LosNumerosQueDebenCoincidir(LaPaginaDeEmpresas):
         self.assertIn('18', self.html)
         self.assertNotIn('hasta 12 personas', self.html)
 
+    def test_la_bajada_no_arrastra_la_frase_vieja(self):
+        # Al reemplazar el texto quedó "…elevar la productividad, Una mañana
+        # completa…": dos frases pegadas, visible en producción.
+        self.assertNotIn('elevar la productividad', self.html)
+
     def test_el_horario_es_de_9_a_14(self):
         self.assertIn('9:00 a 14:00', self.html)
         self.assertNotIn('9:00-13:00', self.html)
