@@ -117,9 +117,14 @@ def empaquetar(venta, giftcard, usuario=None):
         venta.save(update_fields=['total'])
 
         quien = getattr(usuario, 'username', None) or 'sistema'
+        # Los miles se formatean aparte: un replace(',', '.') sobre la frase
+        # entera también pisaba la coma de la lista ("R1, 1 Espumante" quedaba
+        # "R1. 1 Espumante"). Se vio en el primer uso real, venta #6780.
+        def _clp(n):
+            return '$' + f'{int(n or 0):,}'.replace(',', '.')
         detalle = (f'Empaquetado en la giftcard {giftcard.codigo}: {nuevo}. '
-                   f'La tarjeta pasó de ${int(antes_ini):,} a '
-                   f'${int(giftcard.monto_inicial):,}.').replace(',', '.')
+                   f'La tarjeta pasó de {_clp(antes_ini)} a '
+                   f'{_clp(giftcard.monto_inicial)}.')
         stamp = timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')
         venta.comentarios = ((venta.comentarios or '').rstrip() +
                              f'\n[{stamp} · {quien}] {detalle}').strip()

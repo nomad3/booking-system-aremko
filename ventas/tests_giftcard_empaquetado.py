@@ -129,6 +129,9 @@ class Empaquetar(Base):
         v.refresh_from_db()
         self.assertIn('Empaquetado en la giftcard', v.comentarios)
         self.assertIn('$110.000 a $142.000', v.comentarios)
+        # La lista conserva su coma: formatear los miles con replace(',', '.')
+        # sobre toda la frase la convertía en punto (primer uso real, #6780).
+        self.assertIn('Ambientación romántica R1, 1 Espumante', v.comentarios)
 
     def test_deja_rastro_en_el_historial_de_la_giftcard(self):
         from django.contrib.admin.models import LogEntry
