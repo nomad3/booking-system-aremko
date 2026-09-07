@@ -37,9 +37,16 @@ class LosNumerosQueDebenCoincidir(LaPaginaDeEmpresas):
         # completa…": dos frases pegadas, visible en producción.
         self.assertNotIn('elevar la productividad', self.html)
 
-    def test_el_horario_es_de_9_a_14(self):
-        self.assertIn('9:00 a 14:00', self.html)
+    def test_el_horario_es_de_930_a_14(self):
+        # 9:30 y no 9:00: desde Puerto Montt son 60 km, y a las 9:00 el grupo
+        # tendría que salir a las 8:00 (Jorge, 07-09-2026).
+        self.assertIn('9:30 a 14:00', self.html)
         self.assertNotIn('9:00-13:00', self.html)
+
+    def test_ofrece_coordinar_el_transporte(self):
+        # Dieciocho personas en bus llegan juntas, y nadie maneja de vuelta
+        # después de las tinas.
+        self.assertIn('transporte', self.html)
 
 
 class LosDosProgramas(LaPaginaDeEmpresas):
