@@ -800,6 +800,13 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 "No se pudo avisar de boletas pendientes en la reserva #%s: %s",
                 getattr(form.instance, 'pk', None), exc,
             )
+        try:
+            self._avisar_extras_sin_empaquetar(request, form.instance)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "No se pudo avisar de extras sin empaquetar en la reserva #%s: %s",
+                getattr(form.instance, 'pk', None), exc,
+            )
 
     def _avisar_boletas_pendientes(self, request, venta):
         """Un aviso por cada pago que debía boletear y nadie resolvió."""
@@ -1480,8 +1487,103 @@ class VentaReservaAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.generar_link_comanda_ajax),
                 name='ventas_ventareserva_generar_link_comanda',
             ),
+            path(
+                '<int:object_id>/empaquetar-giftcard/',
+                self.admin_site.admin_view(self.empaquetar_giftcard_view),
+                name='ventas_ventareserva_empaquetar_giftcard',
+            ),
         ]
         return custom + urls
+
+    # ── Empaquetar en la giftcard ───────────────────────────────────────
+    # Deborah vende una giftcard y le suma un extra desde la página de la
+    # venta: el extra queda como servicio con fecha de relleno (2021) y la
+    # tarjeta por su precio fijo. Al canjear, alguien tiene que acordarse de
+    # que el extra vive en otra venta. Esto lo mueve a la tarjeta con un
+    # clic. Ver ventas/services/giftcard_empaquetado.py.
+    def empaquetar_giftcard_view(self, request, object_id):
+        from django.shortcuts import redirect, render as _render
+        from django.urls import reverse
+
+        from ventas.services.giftcard_empaquetado import (empaquetar, extras_de,
+                                                          giftcard_destino)
+
+        venta = self.get_object(request, object_id)
+        if venta is None:
+            self.message_user(request, 'La venta no existe.', messages.ERROR)
+            return redirect(reverse('admin:ventas_ventareserva_changelist'))
+        volver = reverse('admin:ventas_ventareserva_change', args=[venta.pk])
+
+        extras = extras_de(venta)
+        giftcard = giftcard_destino(venta)
+        if not extras or giftcard is None:
+            self.message_user(request, 'Esta venta no tiene extras que empaquetar.',
+                              messages.INFO)
+            return redirect(volver)
+
+        if request.method == 'POST':
+            r = empaquetar(venta, giftcard, request.user)
+            if r['ok']:
+                self.message_user(request, format_html(
+                    'Empaquetado en la giftcard <b>{}</b>: {}. La tarjeta pasó de '
+                    '<b>${}</b> a <b>${}</b> y la carta ya lo dice.',
+                    r['codigo'], ', '.join(r['nombres']),
+                    f"{int(r['monto_antes']):,}".replace(',', '.'),
+                    f"{int(r['monto_despues']):,}".replace(',', '.')),
+                    messages.SUCCESS)
+            else:
+                self.message_user(request, r['motivo'], messages.ERROR)
+            return redirect(volver)
+
+        # Los montos se arman acá y no con intcomma: el locale de Django los
+        # deja como "142 000" o "142,000" según el servidor (ya pasó en la
+        # tarjeta móvil), y en una confirmación de plata eso confunde.
+        def _clp(n):
+            return '$' + f'{int(n or 0):,}'.replace(',', '.')
+
+        total_extras = sum((e['monto'] for e in extras), 0)
+        for e in extras:
+            e['monto_str'] = _clp(e['monto'])
+        ctx = {
+            **self.admin_site.each_context(request),
+            'title': 'Empaquetar en la giftcard',
+            'venta': venta, 'giftcard': giftcard, 'extras': extras,
+            'antes_str': _clp(giftcard.monto_inicial),
+            'despues_str': _clp((giftcard.monto_inicial or 0) + total_extras),
+            'volver': volver,
+        }
+        return _render(request, 'admin/ventas/ventareserva/empaquetar_giftcard.html', ctx)
+
+    def render_change_form(self, request, context, add=False, change=False,
+                           form_url='', obj=None):
+        # El botón de arriba solo aparece cuando hay algo que empaquetar.
+        try:
+            from ventas.services.giftcard_empaquetado import extras_de, giftcard_destino
+            if obj is not None and extras_de(obj):
+                context['empaquetado'] = {'giftcard': giftcard_destino(obj)}
+        except Exception:  # noqa: BLE001 — un botón no puede tumbar el formulario
+            logger.exception('[giftcard] no se pudo evaluar el empaquetado de la venta %s',
+                             getattr(obj, 'pk', None))
+        return super().render_change_form(request, context, add=add, change=change,
+                                          form_url=form_url, obj=obj)
+
+    def _avisar_extras_sin_empaquetar(self, request, venta):
+        """Al guardar: si hay extras con fecha de relleno junto a una giftcard."""
+        from django.urls import reverse
+
+        from ventas.services.giftcard_empaquetado import extras_de, giftcard_destino
+
+        extras = extras_de(venta)
+        gc = giftcard_destino(venta)
+        if not extras or gc is None:
+            return
+        url = reverse('admin:ventas_ventareserva_empaquetar_giftcard', args=[venta.pk])
+        self.message_user(request, format_html(
+            'Esta venta tiene extras con fecha de relleno ({}). ¿Empaquetarlos en '
+            'la giftcard <b>{}</b>? <a href="{}" style="font-weight:600">'
+            'Empaquetar ahora →</a>',
+            ', '.join(e['nombre'] for e in extras), gc.codigo, url,
+        ), messages.WARNING)
 
     def generar_link_comanda_ajax(self, request, object_id):
         """Crea (o reutiliza) la comanda con token y devuelve JSON con el link."""

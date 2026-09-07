@@ -42,6 +42,10 @@ la primera vez que alguien le cambie una palabra.
            style="background:#8a6d3b;">🪵 Vender artesanía</a></li>
     <li><a href="{% url 'ventas:tarjeta_reserva' original.pk %}"
            style="background:#BC5630;">📱 Tarjeta móvil</a></li>
+    {% if empaquetado %}
+    <li><a href="{% url 'admin:ventas_ventareserva_empaquetar_giftcard' original.pk %}"
+           style="background:#2E7D32;">🎁 Empaquetar en la giftcard</a></li>
+    {% endif %}
     {% endif %}
     {{ block.super }}
 {% endblock %}

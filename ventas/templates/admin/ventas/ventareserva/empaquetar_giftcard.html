@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} · Venta #{{ venta.pk }}{% endblock %}
+{% block content %}
+<style>
+  .emp{max-width:640px;font-size:15px;line-height:1.5}
+  .emp table{width:100%;border-collapse:collapse;margin:14px 0}
+  .emp th,.emp td{text-align:left;padding:8px 10px;border-bottom:1px solid #ddd}
+  .emp td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .emp .tot td{font-weight:700}
+  .emp .btn{display:inline-block;padding:10px 18px;border-radius:6px;font-weight:700;
+            text-decoration:none;border:0;cursor:pointer;font-size:15px}
+  .emp .ok{background:#2E7D32;color:#fff}
+  .emp .no{background:#eee;color:#333;margin-left:8px}
+  .emp .nota{background:#FFF8E1;border-left:4px solid #BC5630;padding:10px 14px;margin:14px 0}
+</style>
+<div class="emp">
+  <h1>Empaquetar en la giftcard {{ giftcard.codigo }}</h1>
+  <p>Venta <b>#{{ venta.pk }}</b> · giftcard para <b>{{ giftcard.destinatario_nombre|default:"—" }}</b>.
+  Estos extras están colgados de la venta con fecha de relleno; al empaquetarlos
+  <b>pasan a la tarjeta</b>, que sube en lo que valen y los dice en la carta.</p>
+
+  <table>
+    <tr><th>Se empaqueta</th><th class="n">Valor</th></tr>
+    {% for e in extras %}
+    <tr><td>{{ e.nombre }}</td><td class="n">{{ e.monto_str }}</td></tr>
+    {% endfor %}
+    <tr class="tot"><td>Giftcard {{ giftcard.codigo }} · antes</td>
+        <td class="n">{{ antes_str }}</td></tr>
+    <tr class="tot"><td>Giftcard {{ giftcard.codigo }} · después</td>
+        <td class="n">{{ despues_str }}</td></tr>
+  </table>
+
+  <div class="nota">El <b>total de la venta no cambia</b>: quien paga sigue pagando lo mismo.
+  Las líneas de relleno salen de la venta y quedan anotadas en sus comentarios y en el
+  Historial de la giftcard.</div>
+
+  <form method="post">{% csrf_token %}
+    <button type="submit" class="btn ok">Sí, empaquetar</button>
+    <a href="{{ volver }}" class="btn no">Volver sin cambios</a>
+  </form>
+</div>
+{% endblock %}
