@@ -62,6 +62,16 @@ class LaCartaImprimeLosAgregados(TestCase):
         self.assertNotIn('Incluye además',
                          GiftCardPDFService.generar_html_giftcard_mobile(datos))
 
+    def test_en_la_carta_oscura_el_texto_va_en_blanco(self):
+        # La carta móvil es verde oscuro. La primera versión heredó el gris
+        # oscuro del brochure y "Incluye además" quedó invisible.
+        datos = GiftCardPDFService.datos_carta(_gc('Tabla de quesos'))
+        html = GiftCardPDFService.generar_html_giftcard_mobile(datos)
+        i = html.index('.exp-extra {')
+        regla = html[i:html.index('}', i)]
+        self.assertIn('color: #ffffff', regla)
+        self.assertNotIn('#3F3A33', regla)
+
     def test_un_menor_que_no_rompe_el_pdf(self):
         # Texto libre del admin: un "<" suelto reventaría el HTML/PDF.
         datos = GiftCardPDFService.datos_carta(_gc('Tabla <premium> & jugo'))

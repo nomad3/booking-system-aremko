@@ -595,24 +595,27 @@ class GiftCardPDFService:
             margin-top: 0.12in;
             padding: 0 0.06in;
         }}
+        /* Sobre el verde oscuro de la carta: letras blancas y borde claro.
+           La primera versión heredó la paleta clara del brochure y el texto
+           quedaba invisible (Jorge, 07-09-2026). */
         .exp-extra {{
-            font-size: 12px;
+            font-size: 12.5px;
             line-height: 1.5;
-            color: #3F3A33;
-            margin: 6px 24px 0;
-            padding: 8px 12px;
-            border: 1px solid #E4D8C4;
-            border-radius: 6px;
+            color: #ffffff;
+            margin: 16px 0.06in 0;
+            padding: 9px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 8px;
             text-align: left;
         }}
         .exp-extra-label {{
             display: block;
             font-size: 9.5px;
             font-weight: 700;
-            letter-spacing: .12em;
+            letter-spacing: .14em;
             text-transform: uppercase;
-            color: #BC5630;
-            margin-bottom: 2px;
+            color: #F3B27A;
+            margin-bottom: 3px;
         }}
 
         .whatsapp {{
