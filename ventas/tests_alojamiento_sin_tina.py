@@ -53,6 +53,18 @@ class LaWebNoPrometeTinaConElAlojamiento(TestCase):
                     f'{ruta} volvió a prometer tina con el alojamiento: '
                     f'«{hallado.group(0) if hallado else ""}»')
 
+    def test_los_comentarios_no_se_ven_en_la_pagina(self):
+        # En Django {# #} comenta UNA línea. Un comentario de varias con esa
+        # sintaxis se renderiza como texto: quedó visible en producción hasta
+        # que se miró la página de verdad (07-09-2026).
+        for ruta in PLANTILLAS:
+            texto = Path(ruta).read_text(encoding='utf-8')
+            for bloque in re.findall(r'\{#(.*?)#\}', texto, re.S):
+                self.assertNotIn(
+                    '\n', bloque,
+                    f'{ruta}: comentario multilínea con llave-numeral. '
+                    'Django solo comenta una línea así — usa comment/endcomment.')
+
     def test_la_pagina_sigue_ofreciendo_la_tina_como_agregado(self):
         # No se trata de esconder la tina —es lo que más se vende— sino de
         # decir que se suma aparte.
