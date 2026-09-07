@@ -5,6 +5,8 @@ Servicio para generar PDFs de GiftCards y enviar emails
 
 from django.conf import settings
 from django.core.mail import EmailMessage
+import html
+
 from django.template.loader import render_to_string
 from datetime import datetime
 import logging
@@ -95,6 +97,12 @@ class GiftCardPDFService:
             'precio': giftcard.monto_inicial,
             'fecha_emision': giftcard.fecha_emision,
             'fecha_vencimiento': giftcard.fecha_vencimiento,
+            # Lo que se vendió ENCIMA de la experiencia: una ambientación, una
+            # tabla. Deborah ya lo anotaba en `detalle_especial` ("Incluye: 1
+            # Tabla Jamón") pero la carta no lo imprimía, así que el regalado
+            # nunca se enteraba de lo que le habían comprado (Jorge,
+            # 07-09-2026). El monto ya lo cubre; faltaba decirlo.
+            'agregados': (giftcard.detalle_especial or '').strip(),
         }
 
     @staticmethod
@@ -130,6 +138,10 @@ class GiftCardPDFService:
             <img src="{imagen_url}" alt="{giftcard_data['experiencia_nombre']}" class="experiencia-img">
         </div>
         '''
+
+        agregados = html.escape((giftcard_data.get('agregados') or '').strip())
+        agregados_html = (f'<div class="detail-section"><div class="detail-label">INCLUYE ADEMÁS</div>'
+                          f'<div class="detail-value">{agregados}</div></div>') if agregados else ''
 
         html_template = f"""
 <!DOCTYPE html>
@@ -369,6 +381,7 @@ class GiftCardPDFService:
                 <div class="detail-label">EXPERIENCIA</div>
                 <div class="detail-value">{giftcard_data['experiencia_nombre']}</div>
             </div>
+            {agregados_html}
         </div>
 
         <!-- Código -->
@@ -434,6 +447,11 @@ class GiftCardPDFService:
 
         descripcion = (giftcard_data.get('experiencia_descripcion') or '').strip()
         descripcion_html = f'<div class="exp-desc">{descripcion}</div>' if descripcion else ''
+
+        # Escapado: es texto libre del admin y un "<" suelto rompería el PDF.
+        agregados = html.escape((giftcard_data.get('agregados') or '').strip())
+        agregados_html = (f'<div class="exp-extra"><span class="exp-extra-label">Incluye además</span>'
+                          f'{agregados}</div>') if agregados else ''
 
         html_template = f"""
 <!DOCTYPE html>
@@ -577,6 +595,25 @@ class GiftCardPDFService:
             margin-top: 0.12in;
             padding: 0 0.06in;
         }}
+        .exp-extra {{
+            font-size: 12px;
+            line-height: 1.5;
+            color: #3F3A33;
+            margin: 6px 24px 0;
+            padding: 8px 12px;
+            border: 1px solid #E4D8C4;
+            border-radius: 6px;
+            text-align: left;
+        }}
+        .exp-extra-label {{
+            display: block;
+            font-size: 9.5px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: #BC5630;
+            margin-bottom: 2px;
+        }}
 
         .whatsapp {{
             background: rgba(37, 211, 102, 0.12);
@@ -645,6 +682,7 @@ class GiftCardPDFService:
         <div class="validez">Hasta el {giftcard_data['fecha_vencimiento'].strftime('%d/%m/%Y')}</div>
 
         {descripcion_html}
+        {agregados_html}
 
         <div class="whatsapp">
             <div class="ws-label">Reserva por WhatsApp</div>
