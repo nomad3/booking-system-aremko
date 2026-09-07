@@ -1188,8 +1188,12 @@ html {
                         <h3 class="h5 mb-2">Guía honesta de tinas calientes en Puerto Varas</h3>
                         <p class="mb-3 text-muted">Cómo se calientan, hasta qué hora abrimos, por qué no usamos leña, y nuestra garantía de temperatura. La guía completa que escribimos para responder lo que la gente nos pregunta más.</p>
                         {% else %}
-                        <h3 class="h5 mb-2">Cómo aprovechar la tina caliente de tu cabaña</h3>
-                        <p class="mb-3 text-muted">Las cabañas Aremko incluyen tina caliente privada. Lee la guía completa: temperatura ideal, cuánto rato quedarse, por qué nuestras tinas no usan leña, y la garantía 38°C.</p>
+                        {# La tina NO viene incluida en el alojamiento: se agrega
+                           aparte. Decir que venía incluida costó una reserva mal
+                           cobrada (Jorge, 07-09-2026) — el texto acá se sostiene
+                           solo si es cierto. #}
+                        <h3 class="h5 mb-2">Suma una tina caliente a tu estadía</h3>
+                        <p class="mb-3 text-muted">La tina se reserva aparte y queda privada para ti. Lee la guía completa: temperatura ideal, cuánto rato quedarse, por qué nuestras tinas no usan leña, y la garantía 38°C.</p>
                         {% endif %}
                         <a href="{% url 'aremko_blog:blog-detail' slug='tinas-calientes-puerto-varas' %}?utm_source=site&utm_medium=internal&utm_campaign=category-{{ categoria_actual.nombre|lower }}" class="btn btn-primary">
                             Leer la guía completa <i class="fas fa-arrow-right ms-2"></i>
