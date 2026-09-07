@@ -1,6 +1,10 @@
 import json
 import traceback
 from datetime import datetime, timedelta
+import logging
+
+from django.db.models import Q
+
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -18,6 +22,8 @@ from ..services.reservation_service import (
     validar_disponibilidad_carrito,
 )
 
+
+logger = logging.getLogger(__name__)
 
 PENDING_RESERVATION_TTL_MINUTES = 60
 
@@ -135,7 +141,26 @@ def add_to_cart(request):
         print(f"Adding to cart: servicio_id={servicio_id}, fecha={fecha}, hora={hora}, cantidad_personas={cantidad_personas}")
 
         try:
-            servicio = Servicio.objects.get(id=servicio_id)
+            # Solo lo que está publicado en la web. El catálogo tiene 24
+            # servicios internos —descuentos, cortesías, desayunos por cabaña—
+            # que nunca debieron ser alcanzables desde acá: hasta hoy bastaba
+            # con mandar su número. El de descuento vale −$1 y admite hasta
+            # 1.000.000 de "personas", así que era un millón de pesos de
+            # rebaja a un POST de distancia.
+            #
+            # El «Desayuno» genérico es la excepción, y está a propósito: no se
+            # publica porque no se vende suelto, pero unas líneas más abajo
+            # este mismo endpoint lo traduce al desayuno de la cabaña reservada.
+            # Dejarlo fuera del filtro rompería ese camino.
+            servicio = Servicio.objects.get(
+                Q(publicado_web=True) | Q(nombre__iexact=DESAYUNO_GENERICO_NOMBRE),
+                id=servicio_id, activo=True)
+            if (servicio.precio_base or 0) < 0:
+                # Cinturón además del tirante: aunque alguien publique un
+                # descuento por error, no entra por esta puerta.
+                messages.error(request, "Ese servicio no se puede agregar.")
+                referer_url = request.META.get('HTTP_REFERER', reverse('ventas:homepage'))
+                return redirect(referer_url)
 
             # --- Desayuno: mapear genérico a desayuno especifico de la cabaña ---
             # El cliente agrega "Desayuno" (servicio publicado en web). Operativamente
@@ -330,6 +355,64 @@ def add_to_cart(request):
     messages.error(request, "Método no permitido.")
     return redirect(reverse('ventas:homepage')) # Redirect to homepage or appropriate page with namespace
 
+def _carrito_no_cuadra(cart):
+    """Devuelve el motivo por el que este carrito NO se puede cobrar, o None.
+
+    Tres cosas que nunca deben pasar y que hasta ahora nadie revisaba en el
+    momento de cobrar:
+
+    · Que el total no sea la suma de lo que hay. Si alguien tocó el total por
+      un lado y los ítems por otro, se cobra un número que no corresponde a
+      nada.
+    · Que sobreviva una línea de descuento sin su paquete. Es exactamente lo
+      que pasó en la reserva 6777: el descuento del Refugio quedó aplicándose
+      sobre un carrito que ya no era el Refugio.
+    · Que el total sea cero o negativo. No es una venta.
+    """
+    servicios = cart.get('servicios') or []
+    giftcards = cart.get('giftcards') or []
+    suma = (sum(float(i.get('subtotal') or 0) for i in servicios)
+            + sum(float(g.get('precio') or 0) for g in giftcards))
+    total = float(cart.get('total') or 0)
+
+    if round(suma) != round(total):
+        return f'el total ({round(total)}) no es la suma de los ítems ({round(suma)})'
+    negativos = [i for i in servicios if float(i.get('subtotal') or 0) < 0]
+    if negativos and not cart.get('paquete_cerrado'):
+        return 'hay un descuento sin paquete que lo justifique'
+    if total <= 0:
+        return f'el total es {round(total)}'
+    return None
+
+
+def _deshacer_paquete(cart):
+    """Saca la línea de descuento y apaga `paquete_cerrado`. Devuelve si lo hizo.
+
+    El precio de un paquete cerrado vale por el conjunto: la cabaña dos noches,
+    las dos tinas y el masaje sumaban $400.000 y el Refugio los deja en
+    $290.000 metiendo una línea de −$110.000. Si el cliente después saca una
+    noche, esa línea ya no corresponde a nada — y como el total se recalculaba
+    sumando subtotales, el descuento entero se aplicaba sobre lo que quedaba.
+
+    Caso real (reserva 6777, 07-09-2026): armó el Refugio, cambió la cabaña por
+    la Torre y sacó una noche y las tinas. Quedó pagando $150.000 por servicios
+    que valen $260.000, sin hacer nada raro — el sistema se lo permitió.
+
+    Deshacer y no recalcular es a propósito: recalcular exigiría rearmar el
+    paquete con los parámetros originales, y lo honesto cuando alguien
+    desarma un combo es cobrarle lo que pide a precio de lista.
+    """
+    if not cart.get('paquete_cerrado'):
+        return False
+    antes = len(cart.get('servicios', []))
+    cart['servicios'] = [i for i in cart.get('servicios', [])
+                         if float(i.get('subtotal') or 0) >= 0]
+    cart.pop('paquete_cerrado', None)
+    cart.pop('descuentos', None)
+    cart.pop('total_descuentos', None)
+    return len(cart['servicios']) != antes or True
+
+
 def remove_from_cart(request):
     if request.method == 'POST':
         try:
@@ -360,6 +443,15 @@ def remove_from_cart(request):
             if not found:
                 print(f"❌ Error removing from cart: Index {index} out of bounds for type {item_type}")
 
+            # Sacar algo de un paquete cerrado lo deshace: el precio de paquete
+            # valía por el conjunto que ya no está.
+            deshecho = False
+            if found and item_type != 'giftcard':
+                deshecho = _deshacer_paquete(cart)
+                if deshecho:
+                    print('⚠️ Paquete cerrado deshecho al quitar un servicio: '
+                          'se vuelve a precio de lista.')
+
             # Recalcular total incluyendo servicios y giftcards
             total_servicios = sum(float(item.get('subtotal', 0)) for item in cart.get('servicios', []))
             total_giftcards = sum(float(item.get('precio', 0)) for item in cart.get('giftcards', []))
@@ -369,7 +461,12 @@ def remove_from_cart(request):
             request.session.modified = True
 
             if found:
-                return JsonResponse({'success': True, 'cart_count': len(cart['servicios']) + len(cart['giftcards'])})
+                return JsonResponse({
+                    'success': True,
+                    'cart_count': len(cart['servicios']) + len(cart['giftcards']),
+                    'paquete_deshecho': bool(deshecho),
+                    'total': cart['total'],
+                })
             else:
                 return JsonResponse({'success': False, 'error': f'Ítem no encontrado en el carrito (tipo: {item_type}, índice: {index}).'})
 
@@ -504,6 +601,20 @@ def complete_checkout(request):
             Servicio.objects.filter(id=item.get('id'), categoria_id=2).exists()
             for item in cart.get('servicios', []) if item.get('id')
         )
+
+        # Última compuerta antes de cobrar. El blindaje del constructor corre al
+        # ARMAR el paquete; si después el carrito se editó, nadie volvía a
+        # mirar. Esto mira siempre, valga el carrito lo que valga.
+        problema = _carrito_no_cuadra(cart)
+        if problema:
+            logger.error('[checkout] carrito rechazado antes de cobrar: %s · %s',
+                         problema, cart.get('total'))
+            return JsonResponse({
+                'success': False,
+                'error': 'Hubo un problema con el detalle de tu reserva. '
+                         'Vuelve a armarla y si sigue pasando escríbenos por '
+                         'WhatsApp y la tomamos nosotros.'
+            })
 
         if metodo_pago == 'flow':
             pending = PendingReservation.objects.create(
