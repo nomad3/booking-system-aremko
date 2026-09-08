@@ -711,6 +711,20 @@ class VentaReservaAdmin(admin.ModelAdmin):
             context['pos_ancla_pagos'] = self.inlines.index(PagoInline) + 1
         except ValueError:
             context['pos_ancla_pagos'] = 0   # sin ancla, quedan donde estaban
+        # Botón «Empaquetar en la giftcard»: solo cuando hay algo que empaquetar.
+        # VA ACÁ Y NO EN OTRO render_change_form: el 07-09-2026 se agregó un
+        # segundo método con este mismo nombre más abajo en la clase, Python se
+        # quedó con ese y este quedó pisado — sin `fieldsets_bajo_pagos` ni
+        # `pos_ancla_pagos` la plantilla no dibujó NINGÚN fieldset, desapareció
+        # el bloque de cliente/estado y nadie pudo guardar una reserva hasta que
+        # Deborah avisó. Hay una prueba que cuenta las definiciones.
+        try:
+            from ventas.services.giftcard_empaquetado import extras_de, giftcard_destino
+            if obj is not None and extras_de(obj):
+                context['empaquetado'] = {'giftcard': giftcard_destino(obj)}
+        except Exception:  # noqa: BLE001 — un botón no puede tumbar el formulario
+            logger.exception('[giftcard] no se pudo evaluar el empaquetado de la venta %s',
+                             getattr(obj, 'pk', None))
         return super().render_change_form(request, context, add=add, change=change,
                                           form_url=form_url, obj=obj)
 
@@ -1553,19 +1567,6 @@ class VentaReservaAdmin(admin.ModelAdmin):
             'volver': volver,
         }
         return _render(request, 'admin/ventas/ventareserva/empaquetar_giftcard.html', ctx)
-
-    def render_change_form(self, request, context, add=False, change=False,
-                           form_url='', obj=None):
-        # El botón de arriba solo aparece cuando hay algo que empaquetar.
-        try:
-            from ventas.services.giftcard_empaquetado import extras_de, giftcard_destino
-            if obj is not None and extras_de(obj):
-                context['empaquetado'] = {'giftcard': giftcard_destino(obj)}
-        except Exception:  # noqa: BLE001 — un botón no puede tumbar el formulario
-            logger.exception('[giftcard] no se pudo evaluar el empaquetado de la venta %s',
-                             getattr(obj, 'pk', None))
-        return super().render_change_form(request, context, add=add, change=change,
-                                          form_url=form_url, obj=obj)
 
     def _avisar_extras_sin_empaquetar(self, request, venta):
         """Al guardar: si hay extras con fecha de relleno junto a una giftcard."""
