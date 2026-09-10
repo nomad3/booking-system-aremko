@@ -793,6 +793,267 @@ ruido de la semana.
 
 _Estado: propuestas dejadas por el loop; pendiente revisión/aplicación de Jorge._
 
+_Cierre en Ciclo 4 (2026-09-09), verificado live:_
+- ✅ **REC 3(a) APLICADA** — `/blog/que-es-spa-boutique-aremko/` está publicado
+  (200 OK, en sitemap). Pero **no está capturando**: 7-16 imp/semana, **0 clics
+  en las últimas 4 semanas**, pos 6.3-7.7. Y `spa puerto varas` igual cayó de
+  7 a 9. El post salió; el efecto esperado no llegó.
+- ❌ **REC 1 NO APLICADA** — la `meta_description` de `/tinas/` sigue siendo la
+  vieja (137 char: "…Sesiones privadas, agua termal y ambiente romántico…").
+  Sin "tinaja", sin "hot tub", y sigue diciendo "agua termal". Se re-propone
+  ampliada y con motivo nuevo en la REC 1 del Ciclo 4 — **aplicar esa, no ésta**.
+- ❌ **REC 2 NO APLICADA** — `/blog/escapada-romantica-sur-de-chile/` sigue con
+  `title` apuntando a "al sur de Chile". La meta live menciona "20 min de Puerto
+  Varas" pero no es el texto propuesto. Consecuencia medida: `escapada romántica
+  puerto varas` **salió del top-100** en DataForSEO (16→14→fuera desde el 08-03).
+- ⚠️ **Alerta de `aremko spa` RESUELTA: era ruido.** Volvió a pos 1.0-1.1 desde
+  el 07-27 y se mantuvo 5 semanas (hoy 2.2). No hubo pérdida de contenido detrás.
+
+---
+
+### Ciclo 4 — 2026-09-09 (cuarta corrida del loop)
+
+> ⚠️ **Hueco de 7 semanas**: el ciclo anterior fue el 2026-07-20. Este ciclo
+> cubre 07-20 → 09-07 completo, no una sola semana. Los crons de snapshot y de
+> rank-sync sí corrieron todas las semanas (serie completa, 8/8), así que no se
+> perdió dato — solo faltó el análisis.
+
+**Titular del ciclo:** Aremko perdió **2 posiciones en casi todas las keywords
+no-marca a la vez, entre el 24 y el 31 de agosto**. No es estacionalidad ni un
+problema técnico del sitio: son **entrantes concretos e identificables**, y el
+más importante no es un spa — es `purkaus.cl`, **una fábrica que VENDE tinas**.
+Google partió la intención de "tinajas puerto varas" entre *comprar una tinaja*
+y *reservar una tina*, y le dio el #1 a la de comprar.
+
+**Snapshot GA4 (8 semanas, serie real completa — sesiones TOTALES, todos los canales):**
+
+| Semana | Sesiones | Conv | Engag | Dur.media | WhatsApp clk | Reservas ini |
+|--------|---------:|-----:|------:|----------:|-------------:|-------------:|
+| 07-20  | 1422 | 167 | 56% | 178s | 167 | 139 |
+| 07-27  | 1170 | 137 | 60% | 189s | 131 | 123 |
+| 08-03  | 1069 |  97 | 58% | 167s |  96 | 102 |
+| 08-10  |  935 |  69 | 51% | 166s |  65 |  57 |
+| 08-17  | 1032 | 111 | 61% | 185s | 109 |  65 |
+| 08-24  |  920 | 105 | 55% | 162s | 105 |  71 |
+| 08-31  |  934 |  95 | 58% | 174s |  93 |  72 |
+| **09-07** | **918** | **78** | **59%** | **171s** | **76** | **62** |
+
+- Sesiones **se estabilizaron** en ~920-1030 desde el 08-10 (5 semanas planas).
+  La caída fuerte fue julio→agosto (1422→935), coherente con el fin de las
+  vacaciones de invierno: julio es temporada alta de tinas en Chile.
+- **El engagement NO se deterioró**: 55-61% todo el tramo, duración 162-189s.
+  El tráfico que llega sigue siendo de calidad; hay menos, no peor.
+
+**Snapshot GSC (8 semanas comparables — dato confiable desde 07-02):**
+
+| Semana | Clicks | Impresiones | CTR | Pos media |
+|--------|-------:|------------:|------:|----------:|
+| 07-20  | 234 | 2922 | 8.01% | 6.30 |
+| 07-27  | 210 | 2366 | 8.88% | 6.25 |
+| 08-03  | 148 | 2288 | 6.47% | 6.54 |
+| 08-10  | 119 | 1987 | 5.99% | 6.75 |
+| 08-17  | 118 | 1927 | 6.12% | 7.19 |
+| 08-24  | 127 | 2053 | 6.19% | 6.39 |
+| 08-31  | 119 | 2131 | 5.58% | 6.46 |
+| **09-07** | **105** | **1982** | **5.30%** | **7.62** |
+
+Desglose marca / no-marca (sumando el top-25 de queries de cada semana):
+
+| Semana | Clics marca | Clics no-marca | Imp marca | Imp no-marca |
+|--------|------------:|---------------:|----------:|-------------:|
+| 07-20  | 82 | 50 | 349 | 504 |
+| **09-07** | **24** | **29** | **195** | **300** |
+
+- **A diferencia del Ciclo 3, esta vez cayeron los dos.** Marca −71% en clics,
+  no-marca −42%. Ya no se puede decir "es solo un blip de marca".
+- La caída de **impresiones de marca (349→195)** es demanda, no ranking:
+  `aremko` sigue en pos 1.2-1.4 todas las semanas. Hay **menos gente buscando
+  "aremko"** — consistente con menos pauta activa y con la ficha de Google sin
+  publicaciones (ver `project_aremko_gbp_abandonado`).
+
+**Rank-check DataForSEO (foto viva 2026-09-09, Puerto Varas) + tendencia persistida:**
+
+| Keyword | 07-20 → 08-17 | 08-24 | 08-31 | 09-07 | Hoy | Quién entró arriba |
+|---|---|---:|---:|---:|---:|---|
+| `aremko` (marca) | 1 (estable) | 1 | 1 | 1 | **1** ✅ | — |
+| `cabaña con tina caliente puerto varas` | 1 | 1 | — | 1 | **1** ✅ | — |
+| `tinajas puerto varas` | **1 (5 sem)** | 2 | 3 | 3 | **3** ⚠️ | **purkaus.cl**, Instagram |
+| `masajes puerto varas` | **1 (4 sem)** | 3 | 3 | 4 | **4** ⚠️ | hotelcabanadellago.cl, Instagram, hotelpuelche.cl |
+| `spa cerca de puerto varas` | **3 (6 sem)** | 3 | 5 | 5 | **5** ⚠️ | agendapro.com, hotelcabanadellago.cl |
+| `spa puerto varas` | **7 (6 sem)** | 7 | 9 | 9 | **9** ⚠️ | wyndhampettra, cabañadellago, IG, bellavista, dreams |
+| `termas en puerto varas` | 8-10 | 7 | 8 | — | **10** | termascochamo, puertovaras.org, termasdelsol |
+| `termas puerto varas` | 8-10 | 9 | 10 | 10 | **12** | puertovaras.org, termascochamo, termasdelsol |
+| `escapada romántica puerto varas` | 16→14→fuera | — | — | — | **no aparece** ⚠️ | OTAs (booking, tripadvisor, despegar) |
+
+**Por qué NO es lo que parece — tres descartes hechos con dato:**
+
+1. **No es la volatilidad de Google de agosto 2026.** Sí hubo un evento no
+   confirmado, pero fue el **1-3 de agosto**; Aremko estaba en pos 1 el 08-17,
+   dos semanas DESPUÉS. Las fechas no calzan. ([seroundtable](https://www.seroundtable.com/google-search-ranking-volatility-august-1-41811.html),
+   [searchenginewatch](https://searchenginewatch.com/google-algorithm-update-august-2026/))
+2. **No es técnico del sitio.** `sitemap.xml` 200 con 36 URLs y las páginas
+   clave presentes; las páginas responden en 0,4-1,1s; `/tinas/`, `/masajes/`,
+   `/alojamientos/` todas 200. (Sí hay un bug de `robots.txt` — REC 2 — pero es
+   de higiene, no la causa de esta caída.)
+3. **No es solo estacionalidad.** La estacionalidad explica las impresiones
+   (−32%), no que aparezcan **competidores nuevos por encima** en 4 keywords
+   distintas en la misma quincena.
+
+**El hallazgo central: `purkaus.cl` no es un spa, vende tinas.**
+Verificado en su sitio: *"Purkaus | Nuevas tinas calientes desde el sur de
+Chile"*, botón **COMPRAR**, "Fabricado en la Región de Los Lagos", "Envíos a
+todo el país", "Pago a través de WebPay", instalaciones en Puerto Varas
+(Colonia 3 Puentes, Bosques del Maullín). **Cero menciones de "spa" o
+"reserva".** Es un fabricante, no un competidor de servicio.
+
+Implicancia: `tinajas puerto varas` dejó de ser una query de intención única.
+Hoy sirve dos intenciones — *comprar una tinaja* (Purkaus) y *reservar una tina*
+(Aremko) — y Aremko compite con una página que no declara en ninguna parte que
+lo suyo es **reservar por sesión**. No se le gana a Purkaus en "comprar"; se le
+gana separando la intención.
+
+**Cannibalización confirmada en el clúster masajes:**
+`/blog/masajes-puerto-varas/` tiene **69 imp y 0 clics (pos 10.7)** mientras
+`/masajes/` tiene 534 imp (pos 4.8). Dos URLs propias compitiendo por la misma
+cabeza, justo la keyword que cayó de 1 a 4.
+
+**Reservas de la semana (contexto, 08-31..09-07):** **54 reservas / $5,89M**
+(vs 71 / $7,35M en el Ciclo 3). Ingreso −20% mientras los clics de GSC cayeron
+−55%. **El negocio aguantó mucho mejor que el tráfico** — la caída de SEO
+todavía no se está pagando en caja proporcionalmente. Mix: solo tinas 25 res /
+$1,64M; tina+masaje 11 / $1,33M; 3-en-1 cabaña+tina+masaje 8 / $1,89M.
+
+---
+
+#### Recomendaciones NUEVAS (Nivel 2 — SOLO PROPUESTA, aplica Jorge)
+
+**REC 1 — Separar la intención "reservar" de la intención "comprar" en `/tinas/` (`SEOContent` → Tinas).**
+Motivo nuevo (Purkaus), y de paso absorbe la REC 1 del Ciclo 3 que nunca se
+aplicó. **Aplicar solo este texto** — reemplaza la propuesta de julio, no se
+suman.
+
+- **Actual (137):** "Relájate en nuestras tinas calientes al aire libre en Puerto
+  Varas. Sesiones privadas, agua termal y ambiente romántico. ¡Reserva online!"
+- **Propuesta `meta_description` (147/160):**
+  **"Reserva tu sesión en las tinas y tinajas calientes (hot tub) de Puerto Varas: agua a 38-39° junto al río Pescado, sesión privada, hasta medianoche."**
+
+Qué cambia y por qué cada pieza:
+- Abre con **"Reserva tu sesión"** → declara intención de servicio desde la
+  primera palabra, que es exactamente lo que Purkaus no puede decir.
+- Mantiene **"tinas" + "tinajas"** (las dos grafías que ya rankean) y suma
+  **"hot tub"** (pendiente del Ciclo 3: `hot tub puerto varas` pos 9.06).
+- Cambia **"agua termal" → "agua a 38-39°"**: el dato real, y deja de
+  contradecir al post de termas que dice honestamente que no hay termas naturales.
+- Suma **"junto al río Pescado"** y **"hasta medianoche"**, diferenciadores que
+  ningún fabricante de tinas puede copiar.
+
+- **Variante B, OPCIONAL y solo si en 2 ciclos no recupera** — tocar también el
+  `meta_title`. El Ciclo 3 recomendaba NO tocarlo porque ahí vivía el #1; ese #1
+  ya se perdió, así que la razón para no tocarlo caducó. Pero sigue siendo el
+  cambio más riesgoso, así que va segundo, no primero:
+  - Actual (66): "Tinas Calientes Puerto Varas | Hot Tubs al Aire Libre - Aremko Spa"
+  - Propuesto (68/70): **"Tinas y Tinajas Calientes Puerto Varas | Reserva por sesión - Aremko"**
+
+**REC 2 — Arreglar `robots.txt`: los bloques de Googlebot y Bingbot están anulando en silencio todo lo que el bloque `*` protege.**
+Hallazgo técnico nuevo, verificado en `templates/seo/robots.txt` (líneas 47-63).
+
+El problema: por el estándar de robots.txt (RFC 9309), **un crawler obedece solo
+el grupo de user-agent más específico que le calce e ignora por completo el
+grupo `*`**. Como existe un grupo `User-agent: Googlebot` propio, Googlebot
+**nunca lee** las reglas del `*`. Y ese grupo propio solo bloquea `/admin/`,
+`/ventas/admin/`, `/checkout/` y `/api/`.
+
+Resultado: para Googlebot y Bingbot — los dos únicos que importan — **queda
+rastreable todo esto**, que el bloque `*` sí bloquea:
+
+```
+/accounts/                      /ventas/caja-diaria/
+/payment/                       /ventas/auditoria-movimientos/
+/ventas/admin-dashboard/        /ventas/clientes/
+/ventas/checkout/               /ventas/reportes/
+/ventas/complete-checkout/      /ventas/importar-clientes/
+/ventas/cart/                   /ventas/exportar-clientes/
+/ventas/api/                    /ventas/servicios-vendidos/
+/ventas/add-to-cart/            /ventas/productos-vendidos/
+/ventas/get-available-hours/    /ventas/check-availability/
+```
+
+Ojo con el detalle que lo hace fácil de pasar por alto: `Disallow: /api/` **no**
+cubre `/ventas/api/`, y `Disallow: /checkout/` **no** cubre `/ventas/checkout/`
+— el prefijo tiene que calzar desde el principio de la ruta. Y `Disallow:
+/ventas/admin/` tampoco cubre `/ventas/admin-dashboard/`.
+
+- **Arreglo propuesto (el más simple y seguro): borrar los dos grupos
+  específicos**, líneas 47-63 de `templates/seo/robots.txt` — el bloque
+  `# Google bot - allow everything public` y el `# Bing bot` completos. Al no
+  existir un grupo propio, Googlebot y Bingbot pasan a obedecer el grupo `*`,
+  que ya está bien escrito y es lo que se quería desde el principio. No hay que
+  reescribir nada: solo eliminar.
+- Los grupos de crawlers de IA (GPTBot, PerplexityBot, etc.) **tienen el mismo
+  patrón**, pero ahí es intencional y de menor riesgo — dejarlos como están.
+- Impacto realista: **esto no es la causa de la caída de este ciclo** y no va a
+  devolver posiciones. Es higiene de indexación y privacidad (páginas internas y
+  de proceso de reserva rastreables por Google) más algo de presupuesto de rastreo
+  gastado en URLs que no deberían visitarse. Vale arreglarlo porque es barato y
+  está mal, no porque vaya a mover el ranking.
+- ⚠️ Es un archivo de **código**, no un modelo del admin — el loop no lo toca.
+
+**REC 3 — `/ventas/giftcards/`: la mayor fuga de CTR del sitio (pos 1,5 y casi cero clics).**
+Nunca se había mirado en 3 ciclos. Sostenido 4 semanas seguidas:
+
+| Semana | Impresiones | Clics | Pos | CTR |
+|--------|------------:|------:|----:|----:|
+| 08-17 | 230 | 2 | 2.0 | 0.87% |
+| 08-24 | 238 | 2 | 1.5 | 0.84% |
+| 08-31 | 183 | 1 | 1.4 | 0.55% |
+| 09-07 | 172 | 2 | 1.5 | 1.16% |
+
+Una página en posición media **1,5** debería rondar 25-30% de CTR. Está en ~0,9%.
+Son ~200 impresiones semanales en el primer puesto rindiendo 1-2 clics —
+en volumen, la única fuga de este tamaño en todo el sitio.
+
+Dos defectos concretos y verificados, ambos baratos:
+
+- **(a) La meta tiene 213 caracteres** — Google la corta. Vive en
+  `ventas/templates/ventas/giftcard_menu.html:12` (**es un template, no
+  `SEOContent`** — no se edita desde el admin).
+  - Actual (213): "Regala el Ritual del Río, la Pausa junto al río o una noche en
+    cabaña con tina caliente. GiftCards digitales con mensaje personalizado,
+    entrega en minutos, válidas 1 año y cualquier día de la semana. Puerto Varas."
+  - **Propuesta (143/160):** **"Regala una experiencia en Puerto Varas: GiftCard digital de tina caliente, masaje o noche junto al río. Entrega en minutos, válida todo el año."**
+- **(b) `/ventas/giftcards/` NO está en el `sitemap.xml`** (36 URLs, no aparece).
+  El sitemap incluye `/productos/`, que es otra URL. Agregarla en
+  `ventas/sitemaps.py` → `MainPagesSitemap`.
+
+⚠️ **Antes de invertir más, un diagnóstico de 30 segundos que el loop no puede
+hacer:** ni (a) ni (b) explican por sí solos un CTR de 0,9% en posición 1,5 —
+una meta truncada baja el CTR, no lo aniquila. Falta saber **con qué queries**
+aparece, y el endpoint `seo-snapshots` no da el desglose de queries por página.
+En Search Console: *Rendimiento → Páginas → filtrar por
+`/ventas/giftcards/` → pestaña Consultas*. Si las queries son de giftcards de
+OTRAS marcas, no hay nada que arreglar y es un falso positivo; si son de Aremko
+o genéricas de regalo, la meta y el sitemap sí valen la pena. **Recomiendo mirar
+eso antes de tocar el código.**
+
+**Para vigilar (no es recomendación, es alerta):**
+- **`/blog/masajes-puerto-varas/` canibaliza a `/masajes/`** (69 imp / 0 clics /
+  pos 10.7 vs 534 imp / pos 4.8), justo mientras `masajes puerto varas` cayó de
+  1 a 4. Si en el próximo ciclo `/masajes/` no recupera, la palanca es
+  re-apuntar ese post a un long-tail ("tipos de masaje", "masaje
+  descontracturante") y enlazarlo hacia `/masajes/`, en vez de pelear la cabeza.
+- **`hotelcabanadellago.cl` está arriba de Aremko en 4 de las 9 keywords**
+  (masajes, spa puerto varas, spa cerca de, escapada romántica) — es hoy el
+  competidor más transversal, por encima de wyndhampettra. Si sigue subiendo,
+  vale pedir `/seo/competitors` y mirar su perfil de enlaces.
+- **Instagram aparece arriba en 6 de 9 keywords.** Perfiles sociales ganando
+  terreno sobre sitios propios, con la ficha de Google de Aremko sin publicar
+  hace meses. No es palanca de `SEOContent`, pero es el patrón de fondo.
+- **`escapada romántica puerto varas` salió del top-100** desde el 08-03. La
+  REC 2 del Ciclo 3 (re-apuntar el post de romance a Puerto Varas) sigue sin
+  aplicarse; el costo de no hacerlo ya es medible.
+
+_Estado: propuestas dejadas por el loop; pendiente revisión/aplicación de Jorge._
+
 ---
 
 ## Loop de publicación de blog (nuevo 2026-07-12)
