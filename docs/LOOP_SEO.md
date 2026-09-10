@@ -1056,6 +1056,54 @@ _Estado: propuestas dejadas por el loop; pendiente revisión/aplicación de Jorg
 
 ---
 
+#### Aplicación del Ciclo 4 (2026-09-09, sesión interactiva con Jorge)
+
+Jorge revisó las 3 recomendaciones una por una. Resultado:
+
+**REC 1 — meta de `/tinas/` → ✅ APLICADA y verificada live.**
+Jorge editó `SEOContent → Tinas` en el admin de prod. Nueva `meta_description`
+(147 car.), verificada en el `<meta name="description">` de `https://www.aremko.cl/tinas/`:
+> "Reserva tu sesión en las tinas y tinajas calientes (hot tub) de Puerto Varas:
+> agua a 38-39° junto al río Pescado, sesión privada, hasta medianoche."
+Absorbe la REC 1 del Ciclo 3 (que nunca se aplicó): abre con "Reserva tu sesión"
+para separar intención de servicio de la de compra (Purkaus), suma "hot tub" y
+los diferenciadores "río Pescado" / "hasta medianoche". El `meta_title`, keywords
+y contenido quedaron intactos. Falta que Google la re-rastree (días).
+
+**REC 2 — `robots.txt` → ✅ APLICADA y desplegada.**
+Commit `532c29d1` en `main` (push 2026-09-09). Se borraron los grupos propios
+de `Googlebot` y `Bingbot` de `templates/seo/robots.txt`; ambos caen ahora al
+grupo `*`, que ya bloquea todo lo privado. Se dejó un comentario en el archivo
+explicando el RFC 9309 para que nadie los vuelva a agregar. Confirmado antes del
+push que aremko.cl sirve ESE template (no el de DPV) vía `aremko_project/urls.py:246`.
+Riesgo BAJO (template, sin migración). Higiene de indexación; **no mueve ranking**
+(como se advirtió). Deploy verificado live: `https://www.aremko.cl/robots.txt`
+ya no tiene los grupos `Googlebot`/`Bingbot`, el bloque `*` y los crawlers de IA
+quedaron intactos.
+
+**REC 3 — GiftCards → 🔴 DESCARTADA (falso positivo confirmado con dato).**
+El diagnóstico de 30 s en Search Console (que el loop pidió pero no podía hacer)
+dio vuelta la tesis. Filtrando `Rendimiento → Páginas` por `/ventas/giftcards/`,
+pestaña Consultas (3 meses): **9 de las 10 consultas top son de MARCA** ("aremko"
+1.242 imp, "aremko spa" 634, "aremko aguas calientes puerto varas" 399…). La única
+de intención de regalo, "giftcards spa", tiene **4 impresiones en 3 meses**.
+Conclusión: el CTR de 0,9% en pos 1,5 **no es por la meta truncada** — es porque
+la página aparece como resultado secundario en búsquedas de marca donde el usuario
+quiere la HOME. Reescribir la meta no recuperaría esos clics. **Las giftcards
+tienen un problema de DEMANDA, no de CTR/meta**: casi nadie busca "tarjeta regalo
+spa puerto varas". Si algún día se quiere tráfico de giftcards, es una jugada de
+contenido/campaña (generar demanda), no de SEO técnico. **No perseguir esto en
+próximos ciclos como fuga de CTR.** (La meta de 213 car. sigue objetivamente mal
+como higiene, pero no vale un deploy por sí sola; se retoma solo si se toca esa
+plantilla por otra razón.)
+
+**Alertas del ciclo que siguen abiertas (sin aplicar):** canibalización
+`/blog/masajes-puerto-varas/` vs `/masajes/`; `escapada romántica puerto varas`
+fuera del top-100 (REC 2 del Ciclo 3 sigue sin aplicarse); `hotelcabanadellago.cl`
+arriba en 4/9 keywords; Instagram en 6/9. Retomar en el Ciclo 5.
+
+---
+
 ## Loop de publicación de blog (nuevo 2026-07-12)
 
 Distinto del loop de SEO de arriba (que analiza tráfico/rankings) — este es
