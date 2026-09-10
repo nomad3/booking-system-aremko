@@ -44,23 +44,11 @@ Disallow: /ventas/remove-from-cart/
 
 # === SPECIFIC BOT RULES ===
 
-# Google bot - allow everything public
-User-agent: Googlebot
-Allow: /
-Allow: /categoria/
-Disallow: /admin/
-Disallow: /ventas/admin/
-Disallow: /checkout/
-Disallow: /api/
-
-# Bing bot
-User-agent: Bingbot
-Allow: /
-Allow: /categoria/
-Disallow: /admin/
-Disallow: /ventas/admin/
-Disallow: /checkout/
-Disallow: /api/
+# NOTA: Googlebot y Bingbot NO tienen grupo propio a propósito. Por el RFC 9309
+# un crawler obedece solo su grupo más específico e ignora el de "*"; si les
+# damos un grupo aquí, dejan de leer todos los Disallow del bloque "*" de arriba
+# (páginas internas, checkout, reportes) y quedan rastreables. Sin grupo propio,
+# ambos caen al "*", que ya bloquea todo lo privado.
 
 # AI Crawlers - allow with guidance
 User-agent: GPTBot
