@@ -16,6 +16,7 @@ from ventas.views import masaje_outbox_api_views
 from ventas.views import whatsapp_api_views
 from ventas.views import metrics_api_views
 from ventas import api_resenas
+from ventas import api_campana_semanal
 from inbox_omnicanal import views as inbox_views
 from personal_operativo import api_views as personal_operativo_api
 # Removed direct import of ventas.urls
@@ -240,6 +241,10 @@ urlpatterns = [
     # Reseñas publicables para el Telar de Datamatic: sin esto, el ángulo que
     # cita a un cliente no tiene a quién citar y la frase saldría inventada.
     path('marketing/api/resenas/', api_resenas.resenas_lista, name='api_resenas'),
+    # H-111: Datamatic manda asunto + cuerpo; Aremko arma el lote (≤ 1.000, todos
+    # los clientes con correo) y deja la campaña en Borrador para que la apruebe
+    # Jorge/Deborah. La manda el cron de siempre, con el pie de baja.
+    path('marketing/api/campana-semanal/', api_campana_semanal.crear, name='api_campana_semanal'),
 
     # SEO endpoints
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
