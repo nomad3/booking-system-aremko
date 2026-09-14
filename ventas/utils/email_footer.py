@@ -33,9 +33,12 @@ def get_email_footer_html(recipient_email=''):
                 <p style="margin:14px 0 0 0;font-size:11px;color:#8a978e;">
                     Recibes este correo porque eres cliente de Aremko o te suscribiste a nuestro bolet&iacute;n.
                 </p>
-                <p style="margin:14px 0 0 0;">
-                    <a href="{privacy_url}" style="color:#7d6c42;text-decoration:underline;margin:0 8px;">Pol&iacute;tica de privacidad</a> &middot;
-                    <a href="{unsubscribe_url}" style="color:#7d6c42;text-decoration:underline;margin:0 8px;">Darse de baja</a>
+                <p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#4f5d55;">
+                    Si no quieres recibir m&aacute;s correos de Aremko,
+                    <a href="{unsubscribe_url}" style="color:#7d6c42;text-decoration:underline;font-weight:bold;">date de baja aqu&iacute; con un clic</a>.
+                </p>
+                <p style="margin:10px 0 0 0;">
+                    <a href="{privacy_url}" style="color:#7d6c42;text-decoration:underline;">Pol&iacute;tica de privacidad</a>
                 </p>
                 <p style="margin:14px 0 0 0;font-size:10px;color:#a5b0a8;">
                     &copy; 2026 Aremko Spa Boutique. Todos los derechos reservados.
@@ -72,7 +75,7 @@ Teléfono: +56 9 5790 2525
 Email: ventas@aremko.cl
 
 Política de Privacidad: {privacy_url}
-Darse de baja: {unsubscribe_url}
+Si no quieres recibir más correos de Aremko, date de baja aquí con un clic: {unsubscribe_url}
 
 Estás recibiendo este correo porque te suscribiste a nuestro boletín o eres cliente de Aremko.
 """

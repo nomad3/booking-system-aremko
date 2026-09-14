@@ -154,14 +154,22 @@ def cron_enviar_campanas_email(request):
 
         # Ejecutar comando en BACKGROUND
         # Esto permite que el endpoint retorne rápido mientras el envío continúa
+        # UN LOTE POR PASADA (`--single-batch`, 2026-09-14, H-111): sin esa
+        # bandera el proceso mandaba TODOS los lotes de la campaña durmiendo
+        # `interval_minutes` entre uno y otro, y como cron-job.org pega cada 5
+        # minutos, se iban apilando procesos que se pisaban sobre la misma
+        # campaña (2.000 correos en 0,8 h en junio: a fuerza bruta). Ahora cada
+        # pasada manda un lote (`batch_size` de la campaña) y termina; el
+        # siguiente lote sale en la pasada siguiente.
         subprocess.Popen(
-            ['python', 'manage.py', 'enviar_campana_email', '--auto'],
+            ['python', 'manage.py', 'enviar_campana_email', '--auto', '--single-batch'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
         )
 
-        logger.info(f"✅ Cron enviar_campanas_email iniciado. {count} campaña(s) en cola")
+        logger.info(f"✅ Cron enviar_campanas_email iniciado (un lote por pasada). "
+                    f"{count} campaña(s) en cola")
 
         return JsonResponse({
             "ok": True,
