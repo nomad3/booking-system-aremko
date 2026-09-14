@@ -77,6 +77,16 @@ interval_minutes: 5, ai_enabled: false}`, `EmailRecipient` por destinatario con 
 cuerpo ya personalizados. Envío: el cron existente `/ventas/cron/enviar-campanas-email/`
 (cron-job.org, cada 5 min) manda **un lote de 50 por pasada** → 1.000 correos en ≈ 1 h 40.
 
+## Remitente de las campañas (hallazgo del deploy 1, 14-09-2026)
+
+SendGrid decía «delivered» y Gmail respondía `250 OK`, pero el correo de prueba del motor
+**no llegó** a la casilla (ni spam ni papelera). Dos correos idénticos aislaron la causa:
+From `aremkospa@gmail.com` (el `DEFAULT_FROM_EMAIL` de Render) → Gmail lo descarta en
+silencio; From `comunicaciones@aremko.cl` (dominio autenticado en SendGrid) → llega en 9 s.
+Desde el deploy 1b las campañas salen **siempre** desde `CAMPAIGN_FROM_EMAIL`
+(«Aremko Spa Boutique <comunicaciones@aremko.cl>») con Reply-To `ventas@aremko.cl`.
+Datamatic no tiene que hacer nada con esto: el remitente lo pone el motor.
+
 ## Plan de deploys (Django)
 
 - **Deploy 1** (motor): frase de baja completa en el pie + cron en modo «un lote por

@@ -19,7 +19,7 @@ import re
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from ventas.models import Cliente, EmailCampaign, EmailRecipient
@@ -27,6 +27,26 @@ from ventas.utils.email_footer import get_email_footer_html, get_email_footer_te
 
 CORREO = 'ana.prueba@test.cl'
 URL_BAJA = f'https://www.aremko.cl/unsubscribe/{CORREO}/'
+
+
+def _mandar_uno_por_el_motor():
+    """Manda UN correo por el camino real del motor y devuelve lo que salió."""
+    from ventas.management.commands.enviar_campana_email import Command
+    cliente = Cliente.objects.create(nombre='Ana Prueba', telefono='+56911111111',
+                                     email=CORREO)
+    campana = EmailCampaign.objects.create(
+        name='prueba pie', email_subject_template='Hola {nombre_cliente}',
+        email_body_template='<p>Hola {nombre_cliente}</p>', status='ready',
+        ai_variation_enabled=False,
+        schedule_config={'ai_enabled': False, 'batch_size': 5, 'interval_minutes': 5})
+    dest = EmailRecipient.objects.create(
+        campaign=campana, client=cliente, email=CORREO, name='Ana',
+        personalized_subject='Hola Ana', personalized_body='<p>Hola Ana</p>')
+    cmd = Command()
+    cmd.stdout = open(os.devnull, 'w')
+    assert cmd.send_email(dest, dry_run=False)
+    assert len(mail.outbox) == 1
+    return mail.outbox[0]
 
 
 class LaBajaSeLee(TestCase):
@@ -48,22 +68,7 @@ class LaBajaSeLee(TestCase):
     def test_el_correo_que_sale_de_verdad_lleva_la_frase_y_el_boton_de_gmail(self):
         # Verificar la página, no el cambio: lo que importa es lo que SALE por el
         # motor, no la función del pie por separado.
-        from ventas.management.commands.enviar_campana_email import Command
-        cliente = Cliente.objects.create(nombre='Ana Prueba', telefono='+56911111111',
-                                         email=CORREO)
-        campana = EmailCampaign.objects.create(
-            name='prueba pie', email_subject_template='Hola {nombre_cliente}',
-            email_body_template='<p>Hola {nombre_cliente}</p>', status='ready',
-            ai_variation_enabled=False,
-            schedule_config={'ai_enabled': False, 'batch_size': 5, 'interval_minutes': 5})
-        dest = EmailRecipient.objects.create(
-            campaign=campana, client=cliente, email=CORREO, name='Ana',
-            personalized_subject='Hola Ana', personalized_body='<p>Hola Ana</p>')
-        cmd = Command()
-        cmd.stdout = open(os.devnull, 'w')
-        self.assertTrue(cmd.send_email(dest, dry_run=False))
-        self.assertEqual(len(mail.outbox), 1)
-        enviado = mail.outbox[0]
+        enviado = _mandar_uno_por_el_motor()
         html = [c for c, t in enviado.alternatives if t == 'text/html'][0]
         self.assertIn('date de baja aqu&iacute; con un clic', html)
         self.assertIn(URL_BAJA, html)
@@ -107,3 +112,25 @@ class CronUnLotePorPasada(TestCase):
         r = self.client.get(self.url + '?token=tok')
         self.assertEqual(r.status_code, 200)
         popen.assert_not_called()
+
+
+class ElRemitenteEsDelDominio(TestCase):
+    """Gmail acepta y descarta en silencio los boletines con From @gmail.com vía
+    SendGrid (14-09-2026: el mismo correo llegó en 9 s desde comunicaciones@
+    y desapareció desde aremkospa@gmail.com). El motor no puede depender de
+    DEFAULT_FROM_EMAIL, que en Render es justamente la de Gmail."""
+
+    def test_sale_desde_comunicaciones_y_las_respuestas_van_a_ventas(self):
+        enviado = _mandar_uno_por_el_motor()
+        self.assertEqual(enviado.from_email, 'Aremko Spa Boutique <comunicaciones@aremko.cl>')
+        self.assertEqual(enviado.reply_to, ['ventas@aremko.cl'])
+
+    @override_settings(DEFAULT_FROM_EMAIL='aremkospa@gmail.com')
+    def test_aunque_el_default_sea_gmail_como_en_render_no_sale_desde_gmail(self):
+        enviado = _mandar_uno_por_el_motor()
+        self.assertNotIn('gmail.com', enviado.from_email)
+        self.assertIn('@aremko.cl', enviado.from_email)
+
+    def test_el_mailto_de_baja_del_header_apunta_a_ventas(self):
+        enviado = _mandar_uno_por_el_motor()
+        self.assertIn('mailto:ventas@aremko.cl', enviado.extra_headers['List-Unsubscribe'])

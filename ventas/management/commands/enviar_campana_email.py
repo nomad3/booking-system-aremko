@@ -17,6 +17,21 @@ from ventas.models import EmailCampaign, EmailRecipient, EmailDeliveryLog
 logger = logging.getLogger(__name__)
 
 
+def remitente_campanas():
+    """From de las campañas: una dirección @aremko.cl autenticada en SendGrid.
+
+    Si algún día falta la setting, cae a DEFAULT_FROM_EMAIL para no dejar de
+    enviar; pero ojo, con un From @gmail.com Gmail descarta los boletines.
+    """
+    return getattr(settings, 'CAMPAIGN_FROM_EMAIL', '') or settings.DEFAULT_FROM_EMAIL
+
+
+def reply_to_campanas():
+    """A dónde llegan las respuestas al boletín (lista para EmailMessage)."""
+    destino = getattr(settings, 'CAMPAIGN_REPLY_TO', '') or ''
+    return [destino] if destino else None
+
+
 class Command(BaseCommand):
     help = 'Envía campañas de email de forma controlada respetando horarios y límites'
 
@@ -325,10 +340,14 @@ class Command(BaseCommand):
             # masivos; el botón "Desuscribirse" del cliente de correo evita que
             # el usuario marque Spam. El POST lo atiende unsubscribe_view.
             unsubscribe_url = f"https://www.aremko.cl/unsubscribe/{recipient.email}/"
+            # El From es SIEMPRE el remitente de campañas (@aremko.cl autenticado),
+            # nunca DEFAULT_FROM_EMAIL: con aremkospa@gmail.com Gmail acepta el
+            # correo y lo descarta sin dejar rastro (verificado 14-09-2026).
             msg = EmailMultiAlternatives(
                 subject=final_subject,
                 body=final_body,  # Fallback text sin HTML
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=remitente_campanas(),
+                reply_to=reply_to_campanas(),
                 to=[recipient.email],
                 headers={
                     'List-Unsubscribe': f'<{unsubscribe_url}>, <mailto:ventas@aremko.cl?subject=unsubscribe>',

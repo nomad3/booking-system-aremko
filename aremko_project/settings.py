@@ -429,6 +429,19 @@ EMAIL_MONTHLY_LIMIT_PER_CLIENT = int(os.getenv('EMAIL_MONTHLY_LIMIT_PER_CLIENT',
 
 # Configuración mejorada de Email
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'comunicaciones@aremko.cl')
+
+# Remitente de las CAMPAÑAS de marketing (H-111, 2026-09-14). Va aparte de
+# DEFAULT_FROM_EMAIL a propósito: en Render ese vale aremkospa@gmail.com, y Gmail
+# ACEPTA y DESCARTA EN SILENCIO los correos con pinta de boletín (headers
+# List-Unsubscribe) que llegan con un From @gmail.com a través de SendGrid.
+# Se comprobó el 14-09 con dos correos idénticos: el de @gmail.com desapareció,
+# el de comunicaciones@aremko.cl (dominio autenticado en SendGrid) llegó en 9 s.
+# Las confirmaciones de reserva y las giftcards siguen con DEFAULT_FROM_EMAIL.
+CAMPAIGN_FROM_EMAIL = os.getenv('CAMPAIGN_FROM_EMAIL',
+                                'Aremko Spa Boutique <comunicaciones@aremko.cl>')
+# A dónde llegan las respuestas de los clientes al boletín (Jorge, 14-09-2026):
+# ventas@aremko.cl redirige a abonosaremko@gmail.com por Cloudflare.
+CAMPAIGN_REPLY_TO = os.getenv('CAMPAIGN_REPLY_TO', 'ventas@aremko.cl')
 VENTAS_FROM_EMAIL = os.getenv('VENTAS_FROM_EMAIL', 'ventas@aremko.cl')
 
 # Destinatarios de notificación cuando entra un lead nuevo en /refugio/.
