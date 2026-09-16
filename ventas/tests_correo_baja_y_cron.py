@@ -134,3 +134,58 @@ class ElRemitenteEsDelDominio(TestCase):
     def test_el_mailto_de_baja_del_header_apunta_a_ventas(self):
         enviado = _mandar_uno_por_el_motor()
         self.assertIn('mailto:ventas@aremko.cl', enviado.extra_headers['List-Unsubscribe'])
+
+
+class UnCorreoMaloNoTrabaLaCampana(TestCase):
+    """Nueve campañas pasaron meses en «Enviando» por UN cliente con el nombre
+    escrito en el campo email: el envío fallaba, el destinatario seguía
+    'pending' y el cron levantaba un proceso cada 5 minutos para nada."""
+
+    def _campana_con_uno_malo(self):
+        from ventas.management.commands.enviar_campana_email import Command
+        buena = Cliente.objects.create(nombre='Ana', telefono='+56911111111', email=CORREO)
+        malo = Cliente.objects.create(nombre='Felipe', telefono='+56922222222',
+                                      email='Felipe Silva Retamal')
+        campana = EmailCampaign.objects.create(
+            name='con uno malo', email_subject_template='Hola', email_body_template='<p>x</p>',
+            status='ready', ai_variation_enabled=False,
+            schedule_config={'ai_enabled': False, 'batch_size': 50, 'interval_minutes': 5})
+        for c in (buena, malo):
+            EmailRecipient.objects.create(campaign=campana, client=c, email=c.email, name=c.nombre,
+                                          personalized_subject='Hola', personalized_body='<p>x</p>')
+        cmd = Command(); cmd.stdout = open(os.devnull, 'w')
+        return cmd, campana
+
+    def _pasada(self, cmd, campana):
+        # El backend de pruebas (locmem) acepta cualquier cosa; el SMTP real
+        # (SendGrid) revienta en sanitize_address con una dirección sin @, y
+        # send_email se traga esa excepción y devuelve False. Se reproduce eso.
+        from django.core.mail import EmailMultiAlternatives
+        original = EmailMultiAlternatives.send
+
+        def send_como_smtp(msg, fail_silently=False):
+            if any('@' not in d for d in msg.to):
+                raise ValueError(f'Invalid address {msg.to}')
+            return original(msg, fail_silently)
+
+        with patch.object(EmailMultiAlternatives, 'send', send_como_smtp):
+            cmd.process_campaign(campana, 50, 5, dry_run=False, ignore_schedule=True,
+                                 single_batch=True)
+
+    def test_el_malo_queda_fallido_y_la_campana_termina(self):
+        cmd, campana = self._campana_con_uno_malo()
+        self._pasada(cmd, campana)
+        estados = dict(EmailRecipient.objects.values_list('email', 'status'))
+        self.assertEqual(estados[CORREO], 'sent')
+        self.assertEqual(estados['Felipe Silva Retamal'], 'failed')
+        self.assertIn('no salió', EmailRecipient.objects.get(email='Felipe Silva Retamal').error_message)
+        campana.refresh_from_db()
+        self.assertEqual(campana.status, 'completed', 'sin pendientes, terminó')
+        self.assertEqual(len(mail.outbox), 1, 'el bueno salió una sola vez')
+
+    def test_una_segunda_pasada_no_vuelve_a_mandar_nada(self):
+        cmd, campana = self._campana_con_uno_malo()
+        self._pasada(cmd, campana)
+        self._pasada(cmd, campana)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(EmailRecipient.objects.filter(status='pending').count(), 0)

@@ -209,7 +209,18 @@ class Command(BaseCommand):
                         processed += 1
                         if not dry_run:
                             recipient.mark_as_sent()
-                    
+                    elif not dry_run:
+                        # send_email atrapa sus propias excepciones y devuelve
+                        # False; sin esta rama el destinatario quedaba 'pending'
+                        # PARA SIEMPRE y la campaña nunca llegaba a 'completed'.
+                        # Así 9 campañas pasaron meses en «Enviando» por UN cliente
+                        # con el nombre escrito en el campo email (16-09-2026).
+                        recipient.status = 'failed'
+                        recipient.error_message = ('El envío no salió: correo inválido o '
+                                                   'rechazado por el servidor.')
+                        recipient.save(update_fields=['status', 'error_message'])
+                        self.stdout.write(f'⛔ Marcado como fallido: {recipient.email}')
+
                 except Exception as e:
                     self.stdout.write(self.style.ERROR(f'❌ Error enviando a {recipient.email}: {e}'))
                     if not dry_run:
@@ -251,22 +262,23 @@ class Command(BaseCommand):
                 status__in=['sent', 'delivered', 'opened', 'clicked']
             ).count()
 
-            # Solo marcar como completada si TODOS los habilitados fueron enviados exitosamente
-            if remaining == 0 and successfully_sent == total_enabled:
+            # Sin pendientes = terminó. Los que fallaron quedan a la vista en la
+            # lista de destinatarios con su motivo; antes la campaña pasaba a
+            # «Pausada» por un solo correo malo y parecía que alguien la detuvo.
+            if remaining == 0:
                 campaign.status = 'completed'
                 campaign.save()
-                self.stdout.write(self.style.SUCCESS(
-                    f'✅ Campaña {campaign.name} completada: {successfully_sent}/{total_enabled} emails enviados'
-                ))
-            elif remaining == 0 and successfully_sent < total_enabled:
-                # Hay algunos que fallaron - marcar como pausada para revisión
-                campaign.status = 'paused'
-                campaign.save()
                 failed_count = total_enabled - successfully_sent
-                self.stdout.write(self.style.WARNING(
-                    f'⚠️ Campaña {campaign.name} pausada: {failed_count} emails fallaron. '
-                    f'Enviados exitosamente: {successfully_sent}/{total_enabled}'
-                ))
+                if failed_count:
+                    self.stdout.write(self.style.WARNING(
+                        f'✅ Campaña {campaign.name} completada con {failed_count} correo(s) '
+                        f'que no salieron (ver destinatarios). Enviados: '
+                        f'{successfully_sent}/{total_enabled}'
+                    ))
+                else:
+                    self.stdout.write(self.style.SUCCESS(
+                        f'✅ Campaña {campaign.name} completada: {successfully_sent}/{total_enabled} emails enviados'
+                    ))
             else:
                 self.stdout.write(f'📊 Quedan {remaining} destinatarios pendientes')
         
