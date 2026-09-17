@@ -456,6 +456,23 @@
           </div>
         </details>
 
+        {% if late_checkout %}
+        {% comment %}Late check-out (17-09-2026): El Pase lo OFRECE y abre WhatsApp; lo
+        confirma recepción, que sabe si ese día llega otro huésped a la cabaña. El precio
+        viene del catálogo. Solo se muestra desde el día anterior a la salida.{% endcomment %}
+        <details>
+          <summary>
+            <span class="ic i-tip">🕚</span>
+            <span><span class="s-tt">¿Quieres quedarte un poco más?</span><br><span class="s-sub">Late check-out · {{ late_checkout.precio }} la hora adicional o fracción</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            <p style="font-size:13.5px;color:var(--ink);margin:0 0 12px">El check-out es hasta las 11:00 hrs. Si quieres quedarte más tiempo, cada hora adicional o fracción vale {{ late_checkout.precio }} por cabaña y está sujeta a disponibilidad. Pídela y te confirmamos al tiro.</p>
+            <a class="btn-wa" href="{{ late_checkout.url }}" target="_blank" rel="noopener">💬 Pedir late check-out por WhatsApp</a>
+          </div>
+        </details>
+        {% endif %}
+
         <details>
           <summary>
             <span class="ic i-com">🛎️</span>

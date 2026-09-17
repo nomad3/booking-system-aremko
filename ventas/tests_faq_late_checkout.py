@@ -22,7 +22,7 @@ from ventas.models import FAQ_ESPACIOS, CategoriaServicio, SEOContent
 RAIZ = Path(__file__).resolve().parent.parent
 PREGUNTA = '¿Debo pagar por late check-out?'
 RESPUESTA = ('Sí. El check-out es hasta las 11:00 hrs. Si quieres quedarte más tiempo, cada '
-             'hora adicional tiene un valor de $20.000 por cabaña y está sujeta a '
+             'hora adicional o fracción tiene un valor de $20.000 por cabaña y está sujeta a '
              'disponibilidad. Coordínalo con recepción o por WhatsApp antes de tu salida.')
 
 

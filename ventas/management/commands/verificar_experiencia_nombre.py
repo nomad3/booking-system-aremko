@@ -19,17 +19,18 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         from ventas.models import VentaReserva
-        from ventas.views.ficha_reserva_view import _experiencia_nombre
+        from ventas.views.ficha_reserva_view import _experiencia_nombre, _tipo_para_nombrar
 
         for rid in (opts['reserva_ids'] or [6176]):
             venta = VentaReserva.objects.filter(id=rid).first()
             if not venta:
                 self.stdout.write(self.style.WARNING(f"Reserva {rid}: no existe, se omite."))
                 continue
-            tipos = list(
-                venta.reservaservicios.select_related('servicio')
-                .values_list('servicio__tipo_servicio', flat=True)
-            )
+            tipos = [
+                _tipo_para_nombrar(tipo, capacidad)
+                for tipo, capacidad in venta.reservaservicios.select_related('servicio')
+                .values_list('servicio__tipo_servicio', 'servicio__capacidad_maxima')
+            ]
             nombre = _experiencia_nombre(tipos)
             self.stdout.write(f"\nReserva {rid}: tipos={tipos}")
             self.stdout.write(

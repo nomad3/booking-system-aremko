@@ -11,6 +11,7 @@ El token es FIRMADO (django.core.signing), no adivinable y sin migración: deriv
 SECRET_KEY, así nadie ve la reserva de otro cambiando el id en la URL.
 """
 
+import datetime
 import logging
 
 from django.conf import settings
@@ -267,12 +268,17 @@ def ficha_reserva_cliente(request, token):
         logger.exception('[ficha] no se pudo obtener datos_transferencia (reserva %s)', venta.id)
         datos_transferencia = pago_nombre = pago_cuenta = pago_correo = ''
 
-    tipos_venta = list(
-        venta.reservaservicios.select_related('servicio')
-        .values_list('servicio__tipo_servicio', flat=True))
+    from .agenda_operativa_view import filtro_alojamiento
+    tipos_venta = [
+        _tipo_para_nombrar(tipo, capacidad)
+        for tipo, capacidad in venta.reservaservicios.select_related('servicio')
+        .values_list('servicio__tipo_servicio', 'servicio__capacidad_maxima')]
     # La hora de la cabaña distingue «por el día» (10:00) del Ritual (16:00).
+    # Solo cabañas de verdad: la «Hora Adicional» también es tipo cabaña y su
+    # hora es la del late check-out (11:00), no la de llegada.
     hora_cabana_venta = (venta.reservaservicios
-                         .filter(servicio__tipo_servicio='cabana')
+                         .filter(**filtro_alojamiento())
+                         .order_by('fecha_agendamiento', 'id')
                          .values_list('hora_inicio', flat=True).first())
 
     try:
@@ -385,6 +391,7 @@ def ficha_reserva_cliente(request, token):
         'pago_nombre': pago_nombre,
         'pago_cuenta': pago_cuenta,
         'whatsapp_pago_url': WHATSAPP_PAGO_URL,
+        'late_checkout': _late_checkout_para(venta),
         'pago_correo': pago_correo,
         'maps_url': config_tips.link_google_maps,
         'participantes_masaje': participantes_masaje,
@@ -635,6 +642,81 @@ def _lineas_desde_payload(servicios_data):
 DIA_HORA_CABANA_FICHA = '10:00'
 
 
+def _tipo_para_nombrar(tipo, capacidad_maxima):
+    """El tipo de un servicio PARA NOMBRAR la experiencia.
+
+    `tipo_servicio='cabana'` no significa «es una cabaña»: también lo llevan
+    «Persona Adicional en Cabaña» y «Hora Adicional Cabaña · late check-out»,
+    que son cargos, no lugares donde dormir. Contándolos como noches, un Ritual
+    del Río con late check-out se le mostraba al cliente como «Refugio Aremko»
+    (2 noches) y una Noche de Aguas Calientes quedaba sin nombre (17-09-2026).
+
+    Se usa la misma regla que la agenda y el calendario de las OTAs —capacidad
+    de 2 o más— para que los tres cuenten exactamente las mismas noches.
+    """
+    from .agenda_operativa_view import CAPACIDAD_MINIMA_ALOJAMIENTO
+    if tipo == 'cabana' and (capacidad_maxima or 0) < CAPACIDAD_MINIMA_ALOJAMIENTO:
+        return 'otro'
+    return tipo
+
+
+HORA_CHECKOUT = datetime.time(11, 0)
+NOMBRE_HORA_ADICIONAL = 'hora adicional'
+
+
+def _late_checkout_para(venta, ahora=None):
+    """El bloque «¿quieres quedarte un poco más?» del Pase, o None si no toca.
+
+    Opción A de Jorge (17-09-2026): El Pase no vende la hora adicional, la
+    OFRECE y abre WhatsApp con el mensaje escrito. Quien confirma es recepción,
+    que sabe si ese día llega otro huésped a la misma cabaña. Así nunca se
+    promete una hora que no existe.
+
+    Solo aparece si la reserva duerme en una cabaña de verdad, desde el día
+    anterior a la salida hasta las 11:00 del día de salida —antes es ruido— y
+    si todavía no tiene la hora adicional agregada. El precio se lee del
+    catálogo: sin servicio o sin precio, no se ofrece nada.
+    """
+    from urllib.parse import quote
+
+    from django.utils import timezone
+
+    from ..models import Servicio
+    from .agenda_operativa_view import es_alojamiento
+
+    if venta.estado_reserva in ('cancelada', 'checkout'):
+        return None
+    lineas = list(venta.reservaservicios.select_related('servicio'))
+    noches = [l.fecha_agendamiento for l in lineas
+              if es_alojamiento(l) and l.fecha_agendamiento]
+    if not noches:
+        return None
+    if any(NOMBRE_HORA_ADICIONAL in (l.servicio.nombre or '').lower() for l in lineas):
+        return None                                   # ya la pidió
+
+    ahora = timezone.localtime(ahora or timezone.now())
+    salida = max(noches) + datetime.timedelta(days=1)  # una estadía no guarda su salida
+    hoy = ahora.date()
+    if hoy < salida - datetime.timedelta(days=1):
+        return None
+    if hoy > salida or (hoy == salida and ahora.time() >= HORA_CHECKOUT):
+        return None
+
+    servicio = (Servicio.objects
+                .filter(activo=True, nombre__icontains=NOMBRE_HORA_ADICIONAL)
+                .order_by('id').first())
+    if not servicio or (servicio.precio_base or 0) <= 0:
+        return None
+    precio = '$' + f'{int(servicio.precio_base):,}'.replace(',', '.')
+
+    nombre = ((venta.cliente.nombre or '').strip().split(' ') or [''])[0] if venta.cliente else ''
+    saludo = f'Hola, soy {nombre} de la reserva #{venta.id}.' if nombre else f'Hola, reserva #{venta.id}.'
+    texto = (f'{saludo} Quiero pedir late check-out para el {salida:%d/%m}. '
+             '¿Hasta qué hora podría quedarme?')
+    return {'precio': precio, 'salida': salida,
+            'url': WHATSAPP_PAGO_URL.split('?')[0] + '?text=' + quote(texto)}
+
+
 def _experiencia_nombre(tipos, hora_cabana=None):
     """Nombre de la EXPERIENCIA según los tipos de servicio (lista, con duplicados), para que el
     cliente vea una experiencia identificable y no 'servicios sueltos':
@@ -672,8 +754,10 @@ def _hora_cabana_del_payload(servicios_data):
     mismo que dirá el pase: si acá dijera «Ritual del Río», el cliente aprobaría
     creyendo que compró una noche."""
     from ..models import Servicio
+    from .agenda_operativa_view import CAPACIDAD_MINIMA_ALOJAMIENTO
     ids = [sd.get('servicio_id') for sd in (servicios_data or []) if sd.get('servicio_id')]
-    cabanas = set(Servicio.objects.filter(id__in=ids, tipo_servicio='cabana')
+    cabanas = set(Servicio.objects.filter(id__in=ids, tipo_servicio='cabana',
+                                          capacidad_maxima__gte=CAPACIDAD_MINIMA_ALOJAMIENTO)
                   .values_list('id', flat=True))
     for sd in (servicios_data or []):
         if sd.get('servicio_id') in cabanas:
@@ -686,7 +770,9 @@ def _tipos_desde_payload(servicios_data):
     en el Refugio → para distinguir Ritual de Refugio)."""
     from ..models import Servicio
     ids = [sd.get('servicio_id') for sd in (servicios_data or []) if sd.get('servicio_id')]
-    tipo_por_id = dict(Servicio.objects.filter(id__in=ids).values_list('id', 'tipo_servicio'))
+    tipo_por_id = {sid: _tipo_para_nombrar(tipo, capacidad) for sid, tipo, capacidad in
+                   Servicio.objects.filter(id__in=ids)
+                   .values_list('id', 'tipo_servicio', 'capacidad_maxima')}
     return [tipo_por_id[sd['servicio_id']] for sd in (servicios_data or [])
             if sd.get('servicio_id') in tipo_por_id]
 
