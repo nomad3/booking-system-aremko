@@ -363,6 +363,11 @@ class CategoriaServicio(models.Model):
         return self.nombre
 
 
+# Cuántos pares faq_N_pregunta / faq_N_respuesta tiene SEOContent. get_faqs() recorre
+# hasta acá: subir el número sin agregar los campos no rompe, pero no muestra nada nuevo.
+FAQ_ESPACIOS = 8
+
+
 class SEOContent(models.Model):
     """
     Modelo para gestionar contenido SEO para cada categoría de servicio.
@@ -415,6 +420,13 @@ class SEOContent(models.Model):
     faq_5_respuesta = models.TextField(blank=True)
     faq_6_pregunta = models.CharField(max_length=200, blank=True)
     faq_6_respuesta = models.TextField(blank=True)
+    # faq_7 y faq_8 (17-09-2026): alojamientos tenía los 6 espacios ocupados y Jorge
+    # pidió sumar «¿Debo pagar por late check-out?» al final. Columnas creadas por la
+    # migración 0138, que se desplegó ANTES que estos campos (ver su docstring).
+    faq_7_pregunta = models.CharField(max_length=200, blank=True)
+    faq_7_respuesta = models.TextField(blank=True)
+    faq_8_pregunta = models.CharField(max_length=200, blank=True)
+    faq_8_respuesta = models.TextField(blank=True)
 
     # Keywords para Schema.org
     keywords = models.CharField(
@@ -437,7 +449,7 @@ class SEOContent(models.Model):
     def get_faqs(self):
         """Retorna las FAQs como una lista de diccionarios para facilitar el uso en templates."""
         faqs = []
-        for i in range(1, 7):
+        for i in range(1, FAQ_ESPACIOS + 1):
             pregunta = getattr(self, f'faq_{i}_pregunta', '')
             respuesta = getattr(self, f'faq_{i}_respuesta', '')
             if pregunta and respuesta:

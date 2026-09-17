@@ -2506,6 +2506,8 @@ class SEOContentAdmin(admin.ModelAdmin):
                 ('faq_4_pregunta', 'faq_4_respuesta'),
                 ('faq_5_pregunta', 'faq_5_respuesta'),
                 ('faq_6_pregunta', 'faq_6_respuesta'),
+                ('faq_7_pregunta', 'faq_7_respuesta'),
+                ('faq_8_pregunta', 'faq_8_respuesta'),
             ),
             'description': 'Agrega entre 4-6 preguntas frecuentes para mejorar el SEO'
         }),

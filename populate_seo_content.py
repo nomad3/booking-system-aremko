@@ -114,6 +114,8 @@ Perfectas para lunas de miel, aniversarios o simplemente para reconectar con tu 
         'faq_5_respuesta': 'Para mantener los estándares de higiene y considerando posibles alergias de futuros huéspedes, no admitimos mascotas en las cabañas.',
         'faq_6_pregunta': '¿Hay servicio de spa en las cabañas?',
         'faq_6_respuesta': 'Sí, ofrecemos servicio de masajes y tratamientos de spa directamente en tu cabaña. Reserva con anticipación para garantizar disponibilidad.',
+        'faq_7_pregunta': '¿Debo pagar por late check-out?',
+        'faq_7_respuesta': 'Sí. El check-out es hasta las 11:00 hrs. Si quieres quedarte más tiempo, cada hora adicional tiene un valor de $20.000 por cabaña y está sujeta a disponibilidad. Coordínalo con recepción o por WhatsApp antes de tu salida.',
         'keywords': 'cabañas puerto varas, alojamiento con tina caliente, cabañas románticas, hotel boutique, spa resort, cabañas con hot tub'
     }
 
