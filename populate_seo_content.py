@@ -109,7 +109,7 @@ Perfectas para lunas de miel, aniversarios o simplemente para reconectar con tu 
         'faq_3_pregunta': '¿Puedo solicitar decoración especial para ocasiones románticas?',
         'faq_3_respuesta': 'Absolutamente. Ofrecemos paquetes románticos con decoración especial, pétalos de rosa, velas, champagne y chocolates. Consulta opciones al reservar.',
         'faq_4_pregunta': '¿A qué hora es el check-in y check-out?',
-        'faq_4_respuesta': 'Check-in desde las 15:00 hrs y check-out hasta las 12:00 hrs. Podemos coordinar horarios especiales según disponibilidad.',
+        'faq_4_respuesta': 'Check-in desde las 16:00 hrs y check-out hasta las 11:00 hrs. Podemos coordinar horarios especiales según disponibilidad.',
         'faq_5_pregunta': '¿Admiten mascotas en las cabañas?',
         'faq_5_respuesta': 'Para mantener los estándares de higiene y considerando posibles alergias de futuros huéspedes, no admitimos mascotas en las cabañas.',
         'faq_6_pregunta': '¿Hay servicio de spa en las cabañas?',
