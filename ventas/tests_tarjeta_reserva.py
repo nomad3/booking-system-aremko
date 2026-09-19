@@ -466,12 +466,23 @@ class ApiDelCalendario(TestCase):
             tipo_servicio='tina', activo=True, max_servicios_simultaneos=2)
         cls.url = reverse('ventas:agregar_servicio_reserva')
 
+    @staticmethod
+    def _fecha_futura():
+        """Una fecha que SIEMPRE está en el futuro. Acá había un '2026-09-10' fijo: era
+        futuro cuando se escribió la prueba y pasó a ser pasado. El API rechaza fechas
+        pasadas con 400, y tres pruebas empezaron a fallar solas el 11-09-2026 sin que
+        nadie tocara el código."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+        return timezone.localdate() + timedelta(days=7)
+
     def _post(self, **datos):
         import json as _json
 
         self.client.force_login(self.staff)
         base = {'reserva_id': self.venta.pk, 'servicio_nombre': 'Tina Osorno',
-                'fecha': '2026-09-10', 'hora': '19:00', 'cantidad': 1}
+                'fecha': self._fecha_futura().isoformat(), 'hora': '19:00', 'cantidad': 1}
         base.update(datos)
         return self.client.post(self.url, _json.dumps(base),
                                 content_type='application/json')
@@ -493,7 +504,7 @@ class ApiDelCalendario(TestCase):
         from ventas.models import ServicioSlotBloqueo
 
         ServicioSlotBloqueo.objects.create(servicio=self.tina, activo=True,
-                                           fecha='2026-09-10', hora_slot='19:00',
+                                           fecha=self._fecha_futura(), hora_slot='19:00',
                                            motivo='mantención')
         r = self._post()
         self.assertEqual(r.status_code, 409)
