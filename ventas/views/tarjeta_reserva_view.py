@@ -38,6 +38,7 @@ import logging
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -417,6 +418,20 @@ def tarjeta_agregar_producto(request, venta_id):
         return JsonResponse({'ok': False, 'mensaje': 'No se pudo agregar el producto. '
                              'Inténtalo desde el admin.'}, status=400)
 
+    # La MISMA regla que corre al guardar la reserva en el admin: si el producto
+    # es de cocina y ninguna comanda lo cubre, nace una comanda Pendiente. Sin esto
+    # el producto quedaba vendido y cobrado pero cocina no se enteraba (reserva
+    # 6859, 19-09-2026). Defensivo: un fallo acá no puede deshacer la venta.
+    comanda = None
+    try:
+        from ventas.services.comanda_productos import asegurar_comanda_de_productos
+        with transaction.atomic():
+            comanda = asegurar_comanda_de_productos(venta, usuario=request.user,
+                                                    origen='Tarjeta')
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] el producto %s quedó en la reserva %s pero NO se '
+                         'pudo crear su comanda: %s', producto.pk, venta_id, exc)
+
     venta.refresh_from_db()
     return JsonResponse({
         'ok': True,
@@ -428,6 +443,7 @@ def tarjeta_agregar_producto(request, venta_id):
             'cantidad': cantidad,
             'subtotal': int(linea.precio_unitario_venta * cantidad),
         },
+        'comanda': {'id': comanda.id} if comanda is not None else None,
     })
 
 

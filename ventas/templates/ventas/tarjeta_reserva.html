@@ -782,8 +782,9 @@ internas y se reconocen entre sí.
         if (vacio) { vacio.remove(); }
         form.reset();
         caja.classList.add('oculto');
-        abrir.textContent = '✓ Producto agregado';
-        setTimeout(function () { abrir.textContent = '🛒 Agregar producto'; }, 2600);
+        abrir.textContent = d.comanda ? ('✓ Agregado · comanda #' + d.comanda.id + ' a cocina')
+                                      : '✓ Producto agregado';
+        setTimeout(function () { abrir.textContent = '🛒 Agregar producto'; }, 3200);
       })
       .catch(function () {
         error.textContent = 'Sin conexión. Inténtalo de nuevo.';

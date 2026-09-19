@@ -504,46 +504,11 @@ from django.utils.html import format_html as _format_html_masaje
 MASAJE_BASE_URL = "https://www.aremko.cl"
 
 
-def _se_prepara_en_cocina(producto):
-    """¿Este "producto" es algo que alguien tiene que preparar y entregar?
-
-    Se destapó cerrando las 83 comandas viejas (Jorge, 2026-08-03): entre los
-    pedidos había **316 "Gift Cards"**, un "Producto temporal para pago
-    giftcard" y líneas de "Descuento -1000". Nada de eso se prepara en cocina.
-    Ensuciaba dos cosas a la vez: la agenda —pedidos que nadie debe atender— y
-    el inventario, porque al cerrarlas se descontaba stock de algo que no existe
-    físicamente.
-
-    Se reutiliza `CATEGORIAS_PRODUCTO_INTERNAS` (la misma lista de H-088 que ya
-    filtra el catálogo de la bandeja) en vez de escribir otra: dos listas de lo
-    mismo se desincronizan siempre, y la primera vez que pase nadie se va a dar
-    cuenta.
-    """
-    from ventas.views.luna_api_views import CATEGORIAS_PRODUCTO_INTERNAS
-
-    if producto is None:
-        return False
-
-    categoria = getattr(getattr(producto, 'categoria', None), 'nombre', '') or ''
-    if categoria.strip() in CATEGORIAS_PRODUCTO_INTERNAS:
-        return False
-
-    # La categoría no siempre alcanza: "Producto temporal para pago giftcard"
-    # puede vivir en cualquier parte, y los descuentos a veces solo se delatan
-    # por el nombre o por venir en negativo.
-    nombre = str(producto.nombre or '').strip().lower()
-    if not nombre:
-        return False
-    if any(t in nombre for t in ('descuento', 'dto', 'giftcard', 'gift card')):
-        return False
-    if nombre.startswith('-'):
-        return False
-    try:
-        if float(producto.precio_base or 0) < 0:
-            return False
-    except (TypeError, ValueError):
-        pass
-    return True
+# `_se_prepara_en_cocina` vive ahora en ventas/services/comanda_productos.py, junto a
+# la creación automática de la comanda: la usan el admin, la tarjeta móvil y Luna.
+# Se conserva este nombre porque luna_api_views lo importa desde acá.
+from ventas.services.comanda_productos import (  # noqa: E402
+    asegurar_comanda_de_productos, se_prepara_en_cocina as _se_prepara_en_cocina)
 
 
 def _masaje_link_copiable(url, etiqueta="Copiar link"):
@@ -839,71 +804,16 @@ class VentaReservaAdmin(admin.ModelAdmin):
             ), messages.WARNING)
 
     def _asegurar_comanda_de_productos(self, request, venta):
-        if not venta or not venta.pk:
-            return
-        # Editar una reserva ya pasada no debe crear comandas (histórico).
-        ultimo = venta.reservaservicios.order_by('-fecha_agendamiento').first()
-        if ultimo and ultimo.fecha_agendamiento and ultimo.fecha_agendamiento < timezone.localdate():
-            logger.info("Comanda auto: reserva #%s omitida (último servicio %s ya pasó)",
-                        venta.pk, ultimo.fecha_agendamiento)
-            return
-        # Solo comandas REALES de cocina cubren productos — los carritos WhatsApp
-        # sin concretar (borrador/pendiente_pago/pago_fallido) y las canceladas
-        # no cuentan (mismo criterio que la columna estado_comanda del inline).
-        cubiertos = set(
-            DetalleComanda.objects
-            .filter(comanda__venta_reserva=venta)
-            .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
-            .values_list('producto_id', flat=True)
-        )
-        faltantes = []
-        for rp in venta.reservaproductos.select_related('producto', 'producto__categoria'):
-            p = rp.producto
-            if not p or rp.producto_id in cubiertos:
-                continue
-            if not _se_prepara_en_cocina(p):
-                continue
-            faltantes.append(rp)
-        if not faltantes:
-            logger.info(
-                "Comanda auto: reserva #%s sin productos por cubrir (cubiertos por comanda: %s)",
-                venta.pk, sorted(cubiertos) or 'ninguno — la reserva no tiene productos de cocina',
+        """Envoltorio: la regla vive en ventas/services/comanda_productos.py, para que
+        el admin y la tarjeta móvil hagan EXACTAMENTE lo mismo (19-09-2026)."""
+        comanda = asegurar_comanda_de_productos(venta, usuario=request.user, origen='Admin')
+        if comanda is not None:
+            self.message_user(
+                request,
+                f'📦 Comanda #{comanda.id} creada automáticamente (Pendiente) con '
+                f'{comanda.detalles.count()} producto(s) para cocina.',
+                messages.INFO,
             )
-            return
-
-        # Fecha objetivo: el primer servicio agendado de la reserva (si hay).
-        objetivo = None
-        primero = venta.reservaservicios.order_by('fecha_agendamiento', 'hora_inicio').first()
-        if primero and primero.fecha_agendamiento:
-            try:
-                objetivo = timezone.make_aware(datetime.strptime(
-                    f"{primero.fecha_agendamiento} {primero.hora_inicio or '12:00'}",
-                    '%Y-%m-%d %H:%M'))
-            except (ValueError, TypeError):
-                objetivo = None
-
-        comanda = Comanda.objects.create(
-            venta_reserva=venta,
-            estado='pendiente',
-            usuario_solicita=request.user if request.user.is_authenticated else None,
-            fecha_entrega_objetivo=objetivo,
-            notas_generales='[Admin] Comanda creada automáticamente por productos de la reserva',
-        )
-        for rp in faltantes:
-            DetalleComanda.objects.create(
-                comanda=comanda,
-                producto=rp.producto,
-                cantidad=rp.cantidad,
-                precio_unitario=rp.precio_unitario_venta or rp.producto.precio_base or 0,
-            )
-        logger.info("Comanda auto: creada #%s para reserva #%s con %s producto(s)",
-                    comanda.id, venta.pk, len(faltantes))
-        self.message_user(
-            request,
-            f'📦 Comanda #{comanda.id} creada automáticamente (Pendiente) con '
-            f'{len(faltantes)} producto(s) para cocina.',
-            messages.INFO,
-        )
 
     # Eliminar con registro de movimiento
     def delete_model(self, request, obj):
