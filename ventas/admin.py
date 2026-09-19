@@ -205,28 +205,27 @@ class ReservaProductoInline(admin.TabularInline):
     entregado_el.short_description = 'Entregado el'
 
     def estado_comanda(self, obj):
-        """Estado de preparación según la comanda de cocina que contiene este
-        producto (la más reciente). El estado se cambia en la comanda (inline de
-        abajo o panel cocina), no acá — esto es solo lectura para evitar dobles
-        preparaciones."""
+        """Estado de cocina de ESTA línea, según las comandas que cubren SUS unidades.
+
+        Antes buscaba la comanda más reciente que tuviera ese producto: el segundo
+        café de una reserva aparecía «Entregado» apenas se agregaba, porque la
+        comanda del primero ya lo estaba (Jorge, 19-09-2026). Ahora sale del mismo
+        reparto por cantidad que decide qué mandar a cocina. Solo lectura: el
+        estado se cambia en la comanda, no acá.
+        """
         if not obj or not obj.pk or not obj.producto_id:
             return '—'
-        det = (
-            DetalleComanda.objects
-            .filter(comanda__venta_reserva_id=obj.venta_reserva_id, producto_id=obj.producto_id)
-            .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
-            .select_related('comanda')
-            .order_by('-comanda__fecha_solicitud')
-            .first()
-        )
-        if det is None:
-            return '🟠 Pendiente (sin comanda)'
+        from ventas.services.comanda_productos import estado_de_linea, repartir_comandas
+        item = next((it for it in repartir_comandas(obj.venta_reserva)
+                     if it['linea'].pk == obj.pk), None)
+        clave = estado_de_linea(item) if item else 'sin_comanda'
         return {
+            'sin_comanda': '🟠 Pendiente (sin comanda)',
             'pendiente': '🟠 Pendiente',
             'pago_confirmado': '🟠 Pendiente',
             'procesando': '🔵 En proceso',
             'entregada': '🟢 Entregado',
-        }.get(det.comanda.estado, det.comanda.get_estado_display())
+        }.get(clave, clave)
     estado_comanda.short_description = 'Estado'
 
     def get_formset(self, request, obj=None, **kwargs):

@@ -5695,16 +5695,21 @@ Aquí está tu link para hacer tu pedido de cafetería/bar:
             return 0
         if fecha is None:
             fecha = timezone.now().date()
+        # Solo las líneas cuyas unidades cubre ESTA comanda. Antes se marcaban todas
+        # las líneas sin entregar de ese producto en la reserva: entregar la comanda
+        # del primer café dejaba «entregado» —y descontaba del stock— también el
+        # segundo, que tenía su propia comanda pendiente (Jorge, 19-09-2026).
+        from ventas.services.comanda_productos import repartir_comandas
         marcadas = 0
-        for detalle in self.detalles.select_related('producto').all():
-            for rp in ReservaProducto.objects.filter(
-                venta_reserva=self.venta_reserva,
-                producto=detalle.producto,
-                fecha_entrega__isnull=True,
-            ):
-                rp.fecha_entrega = fecha
-                rp.save(update_fields=['fecha_entrega'])  # dispara el descuento de stock
-                marcadas += 1
+        for item in repartir_comandas(self.venta_reserva):
+            rp = item['linea']
+            if rp.fecha_entrega is not None:
+                continue
+            if not any(comanda.pk == self.pk for comanda, _ in item['cubren']):
+                continue
+            rp.fecha_entrega = fecha
+            rp.save(update_fields=['fecha_entrega'])  # dispara el descuento de stock
+            marcadas += 1
         return marcadas
 
 
