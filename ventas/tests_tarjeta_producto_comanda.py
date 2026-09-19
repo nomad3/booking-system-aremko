@@ -50,6 +50,14 @@ class _Base(TestCase):
     def setUp(self):
         self.client.force_login(self.staff)
 
+    def tearDown(self):
+        # ThreadLocalMiddleware guarda el usuario de la última petición y nadie lo
+        # limpia: tras el rollback queda apuntando a un usuario borrado, y la suite
+        # que corre después revienta con «usuario_id no existe en auth_user».
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().tearDown()
+
     def _venta(self, dia=None, hora='21:30'):
         v = VentaReserva.objects.create(cliente=self.cliente)
         v.reservaservicios.create(servicio=self.tina,

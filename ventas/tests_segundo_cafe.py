@@ -54,6 +54,14 @@ class _Base(TestCase):
             servicio=self.tina, fecha_agendamiento=timezone.localdate(), hora_inicio='21:30',
             cantidad_personas=2, precio_unitario_venta=Decimal('30000'))
 
+    def tearDown(self):
+        # ThreadLocalMiddleware guarda el usuario de la última petición y nadie lo
+        # limpia: tras el rollback queda apuntando a un usuario borrado, y la suite
+        # que corre después revienta con «usuario_id no existe en auth_user».
+        from ventas import middleware
+        middleware._thread_locals.user = None
+        super().tearDown()
+
     def _agregar(self, producto, cantidad=1):
         r = self.client.post(reverse('ventas:tarjeta_agregar_producto', args=[self.venta.pk]),
                              {'producto_id': producto.pk, 'cantidad': cantidad})

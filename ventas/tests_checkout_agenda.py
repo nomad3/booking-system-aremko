@@ -58,9 +58,11 @@ class _BaseCheckout(TestCase):
         cls.cat_tinas = CategoriaServicio.objects.create(id=9102, nombre='Tinas')
         cls.cabana = Servicio.objects.create(
             id=9111, nombre='Cabaña Torre', categoria=cls.cat_cab, tipo_servicio='cabana',
+            capacidad_maxima=2,   # una cabaña de verdad: la agenda filtra por capacidad ≥ 2 desde el 15-08
             precio_base=Decimal('80000'), duracion=60, activo=True)
         cls.cabana2 = Servicio.objects.create(
             id=9112, nombre='Cabaña Río', categoria=cls.cat_cab, tipo_servicio='cabana',
+            capacidad_maxima=2,   # una cabaña de verdad: la agenda filtra por capacidad ≥ 2 desde el 15-08
             precio_base=Decimal('90000'), duracion=60, activo=True)
         cls.tina = Servicio.objects.create(
             id=9113, nombre='Tina Hornopirén', categoria=cls.cat_tinas, tipo_servicio='tina',
