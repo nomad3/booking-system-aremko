@@ -153,6 +153,21 @@ def es_alojamiento(reserva_servicio):
                 and (s.capacidad_maxima or 0) >= CAPACIDAD_MINIMA_ALOJAMIENTO)
 
 
+def _estados_de_lineas(venta):
+    """{id de ReservaProducto: estado de cocina} para pintar la agenda.
+
+    'sin_comanda' y 'pago_confirmado' se muestran como 'pendiente': para quien
+    entrega, las dos cosas significan «todavía nadie lo preparó».
+    """
+    from ..services.comanda_productos import estado_de_linea, repartir_comandas
+    estados = {}
+    for item in repartir_comandas(venta):
+        clave = estado_de_linea(item)
+        estados[item['linea'].pk] = ('pendiente' if clave in ('sin_comanda', 'pago_confirmado')
+                                     else clave)
+    return estados
+
+
 def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):
     """Reservas que hacen checkout hoy + las que salieron antes debiendo.
 
@@ -593,23 +608,13 @@ def agenda_operativa(request):
             # Determinar si el servicio actual es de desayuno
             es_servicio_desayuno = servicio.servicio and 'desayuno' in servicio.servicio.nombre.lower()
 
-            # Estado de preparación por producto: cruza con las comandas de la
-            # reserva (la fuente de verdad del flujo cocina). Si hay varias
-            # comandas con el mismo producto, gana la más reciente. Sin comanda
-            # → 'pendiente' (nadie lo ha preparado).
-            estado_por_producto = {}
-            detalles_comanda = DetalleComanda.objects.filter(
-                comanda__venta_reserva=servicio.venta_reserva,
-            ).exclude(
-                # borrador/pendiente_pago/pago_fallido son carritos WhatsApp sin
-                # concretar; cancelada no se prepara.
-                comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'),
-            ).select_related('comanda').order_by('comanda__fecha_solicitud')
-            for det in detalles_comanda:
-                est = det.comanda.estado
-                if est == 'pago_confirmado':
-                    est = 'pendiente'  # pagada por el cliente pero aún sin preparar
-                estado_por_producto[det.producto_id] = est  # la más reciente pisa
+            # Estado de preparación de CADA LÍNEA, según las comandas que cubren SUS
+            # unidades (reparto por cantidad, el mismo del admin y de la entrega).
+            # Antes era por producto y «la comanda más reciente pisa»: con dos cafés
+            # en la reserva, entregar el primero y pedir otro dejaba a LOS DOS en
+            # Pendiente, porque la comanda más nueva con café era la del segundo
+            # (Jorge, reserva 6859, 19-09-2026). Sin comanda → 'pendiente'.
+            estado_por_linea = _estados_de_lineas(servicio.venta_reserva)
 
             # Obtener productos de la reserva que NO sean descuentos
             # y que no hayan sido entregados en días anteriores
@@ -661,8 +666,7 @@ def agenda_operativa(request):
 
                         # Si pasó todos los filtros, agregar el producto con su
                         # estado de preparación (para el badge en el template).
-                        producto.estado_comanda = estado_por_producto.get(
-                            producto.producto_id, 'pendiente')
+                        producto.estado_comanda = estado_por_linea.get(producto.pk, 'pendiente')
                         productos_a_entregar.append(producto)
                 except Exception:
                     # En caso de error, no incluir el producto
@@ -1213,24 +1217,25 @@ def producto_marcar_entregado_api(request):
         return JsonResponse({'success': False, 'error': 'Producto de reserva no encontrado'}, status=404)
 
     try:
+        from ..services.comanda_productos import repartir_comandas
         with transaction.atomic():
-            det = (
-                DetalleComanda.objects
-                .filter(comanda__venta_reserva_id=rp.venta_reserva_id, producto_id=rp.producto_id)
-                .exclude(comanda__estado__in=('cancelada', 'borrador', 'pendiente_pago', 'pago_fallido'))
-                .select_related('comanda')
-                .order_by('-comanda__fecha_solicitud')
-                .first()
-            )
-            if det:
-                comanda = det.comanda
-                if comanda.estado != 'entregada':
-                    comanda.estado = 'entregada'
-                    comanda.fecha_entrega = timezone.now()
-                    if not comanda.usuario_procesa:
-                        comanda.usuario_procesa = request.user
-                    comanda.save()  # save() propaga fecha_entrega a ReservaProducto
-            else:
+            # Las comandas que cubren ESTA línea, no «la más reciente que tenga ese
+            # producto»: con dos cafés, el botón del primero entregaba la comanda del
+            # segundo (19-09-2026).
+            item = next((it for it in repartir_comandas(rp.venta_reserva)
+                         if it['linea'].pk == rp.pk), None)
+            cubren = item['cubren'] if item else []
+            sin_cubrir = item['sin_cubrir'] if item else (rp.cantidad or 0)
+            comanda = None
+            for c, _unidades in cubren:
+                comanda = c
+                if c.estado != 'entregada':
+                    c.estado = 'entregada'
+                    c.fecha_entrega = timezone.now()
+                    if not c.usuario_procesa:
+                        c.usuario_procesa = request.user
+                    c.save()  # save() propaga fecha_entrega a las líneas que ESA comanda cubre
+            if sin_cubrir > 0:
                 comanda = Comanda.objects.create(
                     venta_reserva=rp.venta_reserva,
                     estado='entregada',
@@ -1242,9 +1247,13 @@ def producto_marcar_entregado_api(request):
                 DetalleComanda.objects.create(
                     comanda=comanda,
                     producto=rp.producto,
-                    cantidad=rp.cantidad,
+                    cantidad=sin_cubrir,
                     precio_unitario=rp.precio_unitario_venta or rp.producto.precio_base or 0,
                 )
+                # Una comanda que NACE entregada no pasa por el cambio de estado que
+                # descuenta el stock: hay que pedirlo. Antes estas entregas de un
+                # click no bajaban el inventario nunca.
+                comanda.entregar_inventario()
         return JsonResponse({'success': True, 'comanda_id': comanda.id, 'estado': 'entregada'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
