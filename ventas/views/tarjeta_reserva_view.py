@@ -167,6 +167,7 @@ def tarjeta_reserva(request, venta_id):
                          venta.pk)
         for linea in list(servicios) + list(productos):
             linea.es_descuento = False
+    _marcar_estado_de_cocina(venta, productos)
     pagos = list(venta.pagos.order_by('fecha_pago'))
     # Cada pago con su boleta, para que Deborah la vea sin salir de la tarjeta
     # (Jorge, 04-09-2026). Los que todavía nadie resolvió llevan la marca para
@@ -442,6 +443,9 @@ def tarjeta_agregar_producto(request, venta_id):
             'nombre': producto.nombre,
             'cantidad': cantidad,
             'subtotal': int(linea.precio_unitario_venta * cantidad),
+            # Recién agregado y con comanda nueva: está Pendiente. Sin comanda es
+            # algo que no se prepara, y va sin etiqueta.
+            'estado': 'pendiente' if comanda is not None else None,
         },
         'comanda': {'id': comanda.id} if comanda is not None else None,
     })
@@ -477,6 +481,30 @@ def _etiqueta_descuento(nombre):
         if limpio.lower() == f'descuento {sobra}'.lower():
             return 'Descuento'
     return limpio or 'Descuento'
+
+
+ETIQUETAS_ESTADO = {'pendiente': 'Pendiente', 'procesando': 'En proceso',
+                    'entregada': 'Entregado'}
+
+
+def _marcar_estado_de_cocina(venta, productos):
+    """Le pone a cada producto su estado de cocina (Jorge, 19-09-2026: «sería
+    conveniente que en la ficha se vea el estado de cada producto»).
+
+    Es el MISMO reparto por cantidad que usan la agenda, el admin y la entrega:
+    la tarjeta no puede decir una cosa y la agenda otra. Lo que no se prepara
+    (gift cards, descuentos) queda sin etiqueta.
+    """
+    from ventas.services.comanda_productos import estados_para_mostrar
+    try:
+        estados = estados_para_mostrar(venta, solo_cocina=True)
+    except Exception:  # noqa: BLE001 — una etiqueta no puede tumbar la tarjeta
+        logger.exception('[tarjeta] no se pudo calcular el estado de cocina de la reserva %s',
+                         venta.pk)
+        estados = {}
+    for linea in productos:
+        linea.estado_cocina = estados.get(linea.pk)
+        linea.estado_cocina_label = ETIQUETAS_ESTADO.get(linea.estado_cocina, '')
 
 
 def _marcar_descuentos(lineas, campo_item, campo_cantidad):

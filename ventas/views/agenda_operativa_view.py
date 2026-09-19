@@ -154,18 +154,10 @@ def es_alojamiento(reserva_servicio):
 
 
 def _estados_de_lineas(venta):
-    """{id de ReservaProducto: estado de cocina} para pintar la agenda.
-
-    'sin_comanda' y 'pago_confirmado' se muestran como 'pendiente': para quien
-    entrega, las dos cosas significan «todavía nadie lo preparó».
-    """
-    from ..services.comanda_productos import estado_de_linea, repartir_comandas
-    estados = {}
-    for item in repartir_comandas(venta):
-        clave = estado_de_linea(item)
-        estados[item['linea'].pk] = ('pendiente' if clave in ('sin_comanda', 'pago_confirmado')
-                                     else clave)
-    return estados
+    """{id de ReservaProducto: estado de cocina} para pintar la agenda. La regla
+    vive en el servicio, compartida con la tarjeta móvil."""
+    from ..services.comanda_productos import estados_para_mostrar
+    return estados_para_mostrar(venta)
 
 
 def salidas_para_checkout(hoy, dias_rezagados=DIAS_REZAGADOS_CHECKOUT):

@@ -42,6 +42,12 @@ internas y se reconocen entre sí.
         padding:8px 0;border-bottom:1px solid var(--line)}
   .fila:last-child{border-bottom:none}
   .fila .cuando{color:var(--hint);font-size:13px;white-space:nowrap}
+  /* Estado de cocina de cada producto: el mismo de la agenda. */
+  .est{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;
+       font-size:11.5px;font-weight:600;vertical-align:middle;white-space:nowrap}
+  .est-pendiente{background:#fdf0dc;color:#9a5b08}
+  .est-procesando{background:#e1ecf7;color:#2b5b8a}
+  .est-entregada{background:#e2f2e4;color:#1e6b2a}
   .vacio{color:var(--hint);font-size:14px}
   .btn{display:block;width:100%;text-align:center;padding:15px;border:0;
        border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;
@@ -180,7 +186,8 @@ internas y se reconocen entre sí.
         <span class="desc-linea">{{ r.etiqueta }}</span>
         <span class="desc-monto">{{ r.monto_descuento }}</span>
         {% else %}
-        <span>{{ r.cantidad }}× {{ r.producto.nombre }}</span>
+        <span>{{ r.cantidad }}× {{ r.producto.nombre }}{% if r.estado_cocina %}
+          <span class="est est-{{ r.estado_cocina }}">{{ r.estado_cocina_label }}</span>{% endif %}</span>
         <span class="cuando">{{ r.mostrar_valor_total }}</span>
         {% endif %}
       </div>
@@ -774,6 +781,11 @@ internas y se reconocen entre sí.
         var fila = document.createElement('div'); fila.className = 'fila';
         var s1 = document.createElement('span');
         s1.textContent = d.producto.cantidad + '× ' + d.producto.nombre;
+        if (d.producto.estado === 'pendiente') {
+          var est = document.createElement('span');
+          est.className = 'est est-pendiente'; est.textContent = 'Pendiente';
+          s1.appendChild(document.createTextNode(' ')); s1.appendChild(est);
+        }
         var s2 = document.createElement('span'); s2.className = 'cuando';
         s2.textContent = fmt(d.producto.subtotal);
         fila.appendChild(s1); fila.appendChild(s2);

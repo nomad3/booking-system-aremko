@@ -145,6 +145,27 @@ def estado_de_linea(item):
     return min(conocidos, key=ORDEN_ESTADOS.index)
 
 
+def estados_para_mostrar(venta, solo_cocina=False):
+    """{id de ReservaProducto: 'pendiente' | 'procesando' | 'entregada'} para pintar.
+
+    La agenda y la tarjeta móvil muestran lo mismo: 'sin_comanda' y
+    'pago_confirmado' se ven como 'pendiente' —para quien entrega, las dos cosas
+    significan «todavía nadie lo preparó»—.
+
+    Con `solo_cocina=True` se omite lo que no se prepara (gift cards,
+    descuentos): en la tarjeta, una gift card con la etiqueta «Pendiente» haría
+    pensar que cocina le debe algo al cliente.
+    """
+    estados = {}
+    for item in repartir_comandas(venta):
+        rp = item['linea']
+        if solo_cocina and not se_prepara_en_cocina(rp.producto):
+            continue
+        clave = estado_de_linea(item)
+        estados[rp.pk] = 'pendiente' if clave in ('sin_comanda', 'pago_confirmado') else clave
+    return estados
+
+
 def asegurar_comanda_de_productos(venta, usuario=None, origen='Admin'):
     """Si la reserva tiene productos de cocina que ninguna comanda cubre, crea UNA
     comanda Pendiente con ellos. Devuelve la comanda creada, o None si no hizo falta.
