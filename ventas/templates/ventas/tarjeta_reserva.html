@@ -634,6 +634,7 @@ internas y se reconocen entre sí.
   var abrir = document.getElementById('btnAbrirPago');
   var caja = document.getElementById('formPago');
   var form = document.getElementById('fPago');
+  var botonPago = form.querySelector('button[type=submit]');
   var monto = document.getElementById('pagoMonto');
   var error = document.getElementById('pagoError');
 
@@ -675,13 +676,28 @@ internas y se reconocen entre sí.
       error.style.display = 'block';
       return;
     }
+    // UN clic, UN pago. El botón se bloquea apenas se aprieta y dice qué está
+    // pasando: un cobro con boleta tarda hasta 9 segundos (habla con el SII) y,
+    // sin señal en pantalla, quien cobra aprieta de nuevo. El 20-09-2026 eso dejó
+    // $58.000 registrados dos veces (reserva 6869) y dos boletas reales por el
+    // mismo cobro (6865). El servidor también se defiende; esto evita llegar ahí.
+    if (botonPago.disabled) { return; }
+    botonPago.disabled = true;
+    botonPago.textContent = 'Registrando…';
+    function soltarPago() { botonPago.disabled = false; botonPago.textContent = 'Guardar pago'; }
+    function mostrarError(texto) {
+      error.textContent = texto; error.style.display = 'block'; soltarPago();
+    }
     fetch("{% url 'ventas:tarjeta_agregar_pago' venta.pk %}",
           {method: 'POST', body: new FormData(form)})
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        // Pago repetido: se pregunta UNA vez y quien cobra decide. Nació de un
-        // cobro que quedó registrado dos veces con 6 segundos de diferencia
-        // (reserva 6742), y que además emitió DOS boletas por la misma venta.
+        // Pago calcado a segundos del anterior: el servidor NO lo guardó. Se avisa,
+        // sin preguntar nada (una pregunta se acepta por reflejo).
+        if (d.duplicado) { mostrarError(d.mensaje); return; }
+        // Pago repetido pero no inmediato: se pregunta UNA vez y quien cobra decide.
+        // Nació de un cobro que quedó registrado dos veces con 6 segundos de
+        // diferencia (reserva 6742), y que además emitió DOS boletas por la misma venta.
         if (d.repetido) {
           if (confirm(d.mensaje)) {
             var datos = new FormData(form);
@@ -691,19 +707,15 @@ internas y se reconocen entre sí.
               .then(function (r) { return r.json(); })
               .then(function (d2) {
                 if (d2.ok) { location.reload(); }
-                else {
-                  error.textContent = d2.mensaje || 'No se pudo guardar.';
-                  error.style.display = 'block';
-                }
-              });
+                else { mostrarError(d2.mensaje || 'No se pudo guardar.'); }
+              })
+              .catch(function () { mostrarError('Sin conexión. Inténtalo de nuevo.'); });
+          } else {
+            soltarPago();
           }
           return;
         }
-        if (!d.ok) {
-          error.textContent = d.mensaje || 'No se pudo guardar.';
-          error.style.display = 'block';
-          return;
-        }
+        if (!d.ok) { mostrarError(d.mensaje || 'No se pudo guardar.'); return; }
         // Totales frescos, del servidor — la tarjeta nunca suma por su cuenta.
         document.getElementById('valTotal').textContent = fmt(d.total);
         document.getElementById('valPagado').textContent = fmt(d.pagado);
@@ -734,13 +746,11 @@ internas y se reconocen entre sí.
         // primero (cobras con tarjeta, después en efectivo, y no te pregunta).
         refrescarPregunta();
         caja.classList.add('oculto');
+        soltarPago();
         abrir.textContent = '✓ Pago guardado';
         setTimeout(function () { abrir.textContent = '💰 Agregar pago'; }, 2600);
       })
-      .catch(function () {
-        error.textContent = 'Sin conexión. Inténtalo de nuevo.';
-        error.style.display = 'block';
-      });
+      .catch(function () { mostrarError('Sin conexión. Inténtalo de nuevo.'); });
   });
 })();
 
@@ -760,13 +770,21 @@ internas y se reconocen entre sí.
     caja.classList.add('oculto'); error.style.display = 'none';
   });
 
+  var botonProd = form.querySelector('button[type=submit]');
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
     error.style.display = 'none';
+    // UN clic, UN producto: cada doble clic dejaba dos líneas iguales y, para
+    // cocina, una comanda con el doble de unidades (reserva 6865, 20-09-2026).
+    if (botonProd.disabled) { return; }
+    botonProd.disabled = true;
+    botonProd.textContent = 'Agregando…';
+    function soltarProd() { botonProd.disabled = false; botonProd.textContent = 'Agregar producto'; }
     fetch("{% url 'ventas:tarjeta_agregar_producto' venta.pk %}",
           {method: 'POST', body: new FormData(form)})
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        soltarProd();
         if (!d.ok) {
           error.textContent = d.mensaje || 'No se pudo agregar.';
           error.style.display = 'block';
@@ -799,6 +817,7 @@ internas y se reconocen entre sí.
         setTimeout(function () { abrir.textContent = '🛒 Agregar producto'; }, 3200);
       })
       .catch(function () {
+        soltarProd();
         error.textContent = 'Sin conexión. Inténtalo de nuevo.';
         error.style.display = 'block';
       });

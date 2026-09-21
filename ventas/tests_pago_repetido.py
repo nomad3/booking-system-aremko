@@ -44,6 +44,12 @@ class AvisaAntesDeRepetirUnPago(TestCase):
         datos.update(extra)
         return self.client.post(self.url, datos)
 
+    def _pasan(self, segundos):
+        """Hace que el pago ya registrado tenga `segundos` de antigüedad. Desde el
+        21-09-2026 un pago calcado a menos de 30 s se RECHAZA sin preguntar (es un
+        doble clic); la pregunta «¿es un pago distinto?» queda para después."""
+        Pago.objects.update(fecha_pago=timezone.now() - datetime.timedelta(seconds=segundos))
+
     def test_el_primer_pago_pasa_sin_preguntar(self):
         r = self._cobrar()
         self.assertTrue(r.json()['ok'])
@@ -52,6 +58,7 @@ class AvisaAntesDeRepetirUnPago(TestCase):
     def test_el_segundo_igual_avisa_y_NO_lo_guarda(self):
         # Esto es exactamente lo que pasó en la reserva 6742.
         self._cobrar()
+        self._pasan(120)
         r = self._cobrar()
         self.assertFalse(r.json()['ok'])
         self.assertTrue(r.json()['repetido'])
@@ -59,6 +66,7 @@ class AvisaAntesDeRepetirUnPago(TestCase):
 
     def test_el_aviso_dice_a_que_hora_fue_el_anterior(self):
         self._cobrar()
+        self._pasan(120)
         mensaje = self._cobrar().json()['mensaje']
         self.assertIn('60.000', mensaje)
         self.assertIn(timezone.localtime(Pago.objects.first().fecha_pago)
@@ -67,6 +75,7 @@ class AvisaAntesDeRepetirUnPago(TestCase):
     def test_confirmando_SI_lo_guarda(self):
         # Dos personas pagando lo mismo en efectivo: caso legítimo.
         self._cobrar()
+        self._pasan(120)
         r = self._cobrar(confirmar_repetido='1')
         self.assertTrue(r.json()['ok'])
         self.assertEqual(Pago.objects.count(), 2)

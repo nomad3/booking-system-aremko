@@ -35,6 +35,8 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import time
+from contextlib import contextmanager
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
@@ -99,6 +101,78 @@ def staff_required(view_func):
 # pero 10 minutos cubre también al que se distrae. No bloquea: dos personas
 # pagando $20.000 cada una en efectivo es normal — solo pregunta.
 MINUTOS_PAGO_REPETIDO = 10
+
+
+# Un pago idéntico a menos de esto NO se pregunta: se rechaza. Nadie cobra dos
+# veces lo mismo, con el mismo medio, en medio minuto; un doble clic sí.
+SEGUNDOS_PAGO_CALCADO = 30
+
+
+# Espacio propio para los candados de la tarjeta (primer entero de pg_advisory_lock),
+# para no chocar con ningún otro uso. El segundo entero es el id de la reserva.
+ESPACIO_CANDADO_TARJETA = 20260921
+ESPERA_MAXIMA_CANDADO = 20.0      # segundos; un cobro con boleta al SII tarda ~9
+
+
+@contextmanager
+def _reserva_en_exclusiva(venta_id):
+    """Un solo pedido a la vez por reserva.
+
+    El servidor corre con 3 procesos en paralelo. Un doble clic manda dos pedidos
+    con décimas de segundo de diferencia y cada proceso toma uno: los dos
+    preguntaban «¿hay un pago igual reciente?» ANTES de que el otro guardara el
+    suyo, y los dos guardaban (reserva 6869, 20-09-2026: $58.000 dos veces en el
+    mismo segundo). Con los productos pasaba lo mismo con la comanda (6865: dos
+    comandas gemelas en el mismo segundo).
+
+    Es un candado CONSULTIVO de Postgres (`pg_advisory_lock`), de sesión, y NO una
+    transacción con `select_for_update`, a propósito. La primera versión fue una
+    transacción y la prueba contra Postgres real la tumbó antes de salir: al
+    guardar un pago corre una cadena de señales que se traga varios errores de
+    base —el aviso de «pago completo» de un cliente sin correo falla con un NOT
+    NULL y sigue—. Fuera de una transacción eso es inofensivo; adentro, el primer
+    error deja la transacción inválida y el PAGO se pierde. Habría impedido cobrarle
+    a cualquier cliente sin correo.
+
+    Nunca impide cobrar: si en 20 segundos no consigue el candado, sigue sin él. Para
+    entonces el otro pedido ya guardó su pago y la guarda lo ve igual. En sqlite
+    (pruebas) no hay candados ni procesos paralelos: no hace nada.
+    """
+    from django.db import connection
+
+    if connection.vendor != 'postgresql':
+        yield
+        return
+
+    clave = [ESPACIO_CANDADO_TARJETA, int(venta_id)]
+    tomado = False
+    try:
+        fin = time.monotonic() + ESPERA_MAXIMA_CANDADO
+        while True:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT pg_try_advisory_lock(%s, %s)', clave)
+                tomado = bool(cursor.fetchone()[0])
+            if tomado or time.monotonic() >= fin:
+                break
+            time.sleep(0.15)
+        if not tomado:
+            logger.warning('[tarjeta] no se consiguió el candado de la reserva %s en %.0f s; '
+                           'se sigue sin él', venta_id, ESPERA_MAXIMA_CANDADO)
+    except Exception:  # noqa: BLE001 — un candado que falla no puede impedir un cobro
+        logger.exception('[tarjeta] no se pudo tomar el candado de la reserva %s', venta_id)
+    try:
+        yield
+    finally:
+        if tomado:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('SELECT pg_advisory_unlock(%s, %s)', clave)
+            except Exception:  # noqa: BLE001
+                # La conexión es persistente: si no se suelta acá, el candado viviría
+                # hasta que la conexión se cierre. Se cierra para soltarlo seguro.
+                logger.exception('[tarjeta] no se pudo soltar el candado de la reserva %s; '
+                                 'se cierra la conexión', venta_id)
+                connection.close()
 
 
 def _pago_igual_reciente(venta, monto, metodo):
@@ -265,29 +339,49 @@ def tarjeta_agregar_pago(request, venta_id):
         return JsonResponse({'ok': False, 'mensaje': 'Método de pago no válido.'},
                             status=400)
 
-    # Aviso de repetido: se pregunta UNA vez y quien cobra decide. Bloquear
-    # de plano dejaría sin registrar dos pagos iguales legítimos.
-    if not request.POST.get('confirmar_repetido'):
-        # Envuelto también acá, no solo dentro: quien está al otro lado es
-        # Deborah con un cliente al frente, y un aviso que revienta sería peor
-        # que el duplicado que intenta evitar.
-        try:
-            anterior = _pago_igual_reciente(venta, monto, metodo)
-        except Exception:  # noqa: BLE001
-            logger.warning('[tarjeta] no se pudo revisar si el pago se repite')
-            anterior = None
-        if anterior is not None:
-            hace = timezone.localtime(anterior.fecha_pago).strftime('%H:%M')
-            return JsonResponse({
-                'ok': False,
-                'repetido': True,
-                'mensaje': (f'Ya hay un pago de ${monto:,} con este mismo medio '
-                            f'a las {hace}. ¿Es un pago DISTINTO?'.replace(',', '.')),
-            }, status=409)
-
+    # La guarda y el alta van JUNTAS y bajo candado: separadas, dos pedidos
+    # simultáneos pasaban los dos la guarda antes de que ninguno guardara.
+    confirmado = bool(request.POST.get('confirmar_repetido'))
     try:
-        pago = Pago.objects.create(venta_reserva=venta, monto=monto,
-                                   metodo_pago=metodo, usuario=request.user)
+        with _reserva_en_exclusiva(venta_id):
+            # Envuelto: quien está al otro lado es Deborah con un cliente al frente, y
+            # un aviso que revienta sería peor que el duplicado que intenta evitar.
+            try:
+                anterior = _pago_igual_reciente(venta, monto, metodo)
+            except Exception:  # noqa: BLE001
+                logger.warning('[tarjeta] no se pudo revisar si el pago se repite')
+                anterior = None
+            if anterior is not None:
+                segundos = (timezone.now() - anterior.fecha_pago).total_seconds()
+                monto_str = f'${monto:,}'.replace(',', '.')
+                if segundos < SEGUNDOS_PAGO_CALCADO:
+                    # Calcado y recién hecho: es un doble clic, o alguien que apretó de
+                    # nuevo porque la boleta tardaba. NO se pregunta —el 20-09 Ernesto
+                    # aceptó la pregunta sin leerla y salieron dos boletas reales,
+                    # folios 69078 y 69079— y tampoco vale haber confirmado.
+                    logger.warning('[tarjeta] pago calcado rechazado: reserva %s, %s %s, '
+                                   'a %.1f s del pago %s', venta_id, monto_str, metodo,
+                                   segundos, anterior.pk)
+                    return JsonResponse({
+                        'ok': False,
+                        'duplicado': True,
+                        'mensaje': (f'Ese pago de {monto_str} ya quedó registrado hace '
+                                    f'{int(segundos)} segundos. No se guardó otra vez. Si de '
+                                    'verdad es OTRO pago igual, espera un momento y guárdalo '
+                                    'de nuevo.'),
+                    }, status=409)
+                if not confirmado:
+                    # Aviso de repetido: se pregunta UNA vez y quien cobra decide.
+                    # Bloquear de plano dejaría sin registrar dos pagos iguales legítimos.
+                    hace = timezone.localtime(anterior.fecha_pago).strftime('%H:%M')
+                    return JsonResponse({
+                        'ok': False,
+                        'repetido': True,
+                        'mensaje': (f'Ya hay un pago de {monto_str} con este mismo medio '
+                                    f'a las {hace}. ¿Es un pago DISTINTO?'),
+                    }, status=409)
+            pago = Pago.objects.create(venta_reserva=venta, monto=monto,
+                                       metodo_pago=metodo, usuario=request.user)
     except Exception as exc:  # noqa: BLE001
         logger.exception('[tarjeta] no se pudo crear el pago de $%s (%s) para la '
                          'reserva %s: %s', monto, metodo, venta_id, exc)
@@ -364,6 +458,21 @@ def _resolver_boleta_del_pago(pago, request):
     return f'Boleta {boleta.folio or "(en proceso)"}: {mensaje}{aviso}'
 
 
+def _comanda_del_producto(venta, producto, usuario, venta_id):
+    """La MISMA regla que corre al guardar la reserva en el admin: si el producto es
+    de cocina y ninguna comanda lo cubre, nace una comanda Pendiente (reserva 6859,
+    19-09-2026). Defensivo y con su propio savepoint: un fallo acá no puede deshacer
+    la venta del producto, que ya quedó en la cuenta."""
+    try:
+        from ventas.services.comanda_productos import asegurar_comanda_de_productos
+        with transaction.atomic():
+            return asegurar_comanda_de_productos(venta, usuario=usuario, origen='Tarjeta')
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] el producto %s quedó en la reserva %s pero NO se '
+                         'pudo crear su comanda: %s', producto.pk, venta_id, exc)
+        return None
+
+
 @staff_required
 @require_POST
 def tarjeta_agregar_producto(request, venta_id):
@@ -408,30 +517,23 @@ def tarjeta_agregar_producto(request, venta_id):
                                      f'de {producto.nombre}.'},
             status=400)
 
+    comanda = None
     try:
-        linea = ReservaProducto.objects.create(
-            venta_reserva=venta, producto=producto, cantidad=cantidad,
-            precio_unitario_venta=producto.precio_base)
-        venta.calcular_total()
+        # Bajo candado: dos pedidos simultáneos (un doble clic) creaban dos líneas y,
+        # desde que cada producto genera su comanda, dos comandas gemelas o una con el
+        # doble de unidades (reserva 6865, 20-09-2026). En fila, el segundo ve lo que
+        # hizo el primero.
+        with _reserva_en_exclusiva(venta_id):
+            linea = ReservaProducto.objects.create(
+                venta_reserva=venta, producto=producto, cantidad=cantidad,
+                precio_unitario_venta=producto.precio_base)
+            venta.calcular_total()
+            comanda = _comanda_del_producto(venta, producto, request.user, venta_id)
     except Exception as exc:  # noqa: BLE001
         logger.exception('[tarjeta] no se pudo agregar %sx producto %s a la '
                          'reserva %s: %s', cantidad, producto.pk, venta_id, exc)
         return JsonResponse({'ok': False, 'mensaje': 'No se pudo agregar el producto. '
                              'Inténtalo desde el admin.'}, status=400)
-
-    # La MISMA regla que corre al guardar la reserva en el admin: si el producto
-    # es de cocina y ninguna comanda lo cubre, nace una comanda Pendiente. Sin esto
-    # el producto quedaba vendido y cobrado pero cocina no se enteraba (reserva
-    # 6859, 19-09-2026). Defensivo: un fallo acá no puede deshacer la venta.
-    comanda = None
-    try:
-        from ventas.services.comanda_productos import asegurar_comanda_de_productos
-        with transaction.atomic():
-            comanda = asegurar_comanda_de_productos(venta, usuario=request.user,
-                                                    origen='Tarjeta')
-    except Exception as exc:  # noqa: BLE001
-        logger.exception('[tarjeta] el producto %s quedó en la reserva %s pero NO se '
-                         'pudo crear su comanda: %s', producto.pk, venta_id, exc)
 
     venta.refresh_from_db()
     return JsonResponse({
