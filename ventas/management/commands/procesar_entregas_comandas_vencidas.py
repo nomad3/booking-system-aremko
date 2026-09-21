@@ -15,7 +15,13 @@ busca comandas confirmadas y vencidas, y setea fecha_entrega en sus
 ReservaProducto pendientes, lo que dispara el descuento de stock vía signal.
 
 Idempotente: solo toca ReservaProducto con fecha_entrega NULL; los ya descontados
-se omiten. Correr a diario (p. ej. dentro de send_communication_triggers).
+se omiten. Correr a diario (cron-job.org, 06:30, desde el 21-09-2026).
+
+Y CIERRA la comanda como 'entregada' (21-09-2026). Hasta entonces solo descontaba
+el stock y dejaba la comanda 'pendiente': nunca había corrido en producción, y
+la primera pasada real (37 comandas acumuladas desde agosto) las descontó y las
+dejó todas pendientes, para volver a encontrarlas al día siguiente y para que
+cocina y la agenda las siguieran mostrando como si faltara prepararlas.
 
 Uso:
     python manage.py procesar_entregas_comandas_vencidas
@@ -74,15 +80,23 @@ class Command(BaseCommand):
                 total_comandas += 1
                 continue
             marcadas = comanda.entregar_inventario(fecha=hoy)
-            if marcadas:
-                total_comandas += 1
-                total_lineas += marcadas
-                self.stdout.write(
-                    f"  Comanda #{comanda.id}: {marcadas} línea(s) descontadas de inventario"
-                )
+            # Cerrarla igual que el botón de la agenda: entregada, con su hora. Va por
+            # `.update()` a propósito: pasar por Comanda.save() volvería a llamar a
+            # entregar_inventario() (inofensivo, pero es trabajo doble). El stock ya se
+            # movió arriba, línea por línea, con el reparto por cantidad.
+            Comanda.objects.filter(pk=comanda.pk).update(
+                estado='entregada', fecha_entrega=ahora,
+                notas_generales=((comanda.notas_generales or '').rstrip() +
+                                 f"\n[{timezone.localtime(ahora):%d/%m/%Y %H:%M}] Dada por entregada "
+                                 "automáticamente: su hora objetivo pasó y nadie la marcó.").strip())
+            total_comandas += 1
+            total_lineas += marcadas
+            self.stdout.write(
+                f"  Comanda #{comanda.id}: cerrada; {marcadas} línea(s) descontadas de inventario"
+            )
 
         modo = ' (DRY-RUN)' if dry_run else ''
         self.stdout.write(self.style.SUCCESS(
             f"✓ Entregas por vencimiento procesadas{modo}: "
-            f"{total_comandas} comanda(s), {total_lineas} línea(s)."
+            f"{total_comandas} comanda(s) cerradas, {total_lineas} línea(s) descontadas."
         ))
