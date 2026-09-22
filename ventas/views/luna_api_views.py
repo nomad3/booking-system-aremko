@@ -508,12 +508,13 @@ def validar_disponibilidad(request):
                 })
                 continue
 
-            # Calcular capacidad ocupada en ese slot
-            reservas_existentes = ReservaServicio.objects.filter(
+            # Calcular capacidad ocupada en ese slot (solo líneas vigentes:
+            # excluye las dos marcas de cancelación, no solo la del pago)
+            from ventas.services.ocupacion import lineas_vigentes
+            reservas_existentes = lineas_vigentes().filter(
                 servicio=servicio,
                 fecha_agendamiento=fecha,
                 hora_inicio=hora_str,
-                venta_reserva__estado_pago__in=['pendiente', 'pagado', 'parcial']
             )
 
             # Calcular cuántas veces se ha reservado el servicio en ese slot

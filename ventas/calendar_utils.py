@@ -60,8 +60,10 @@ def verificar_disponibilidad(servicio, fecha_propuesta, hora_propuesta, cantidad
             print(f"DEBUG: Slot {hora_propuesta_str} no definido en {slots_for_day} para {day_name}")
             return False # Slot no definido para este día
 
-        # 2. Check for conflicts based on provider for massages
-        query = ReservaServicio.objects.filter(
+        # 2. Check for conflicts based on provider for massages.
+        # Solo las líneas vigentes: una reserva cancelada no ocupa el horario.
+        from ventas.services.ocupacion import lineas_vigentes
+        query = lineas_vigentes().filter(
             servicio=servicio,
             fecha_agendamiento=fecha_propuesta,
             hora_inicio=hora_propuesta_str # Filter using the string time

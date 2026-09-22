@@ -343,10 +343,9 @@ def validar_hora_es_slot(servicio_id, fecha, hora):
 
 def _hay_masaje_agendado_hoy(f):
     """True si ya hay al menos un masaje agendado (no cancelado) ese día → masajistas en sitio."""
-    from ventas.models import ReservaServicio
-    return (ReservaServicio.objects
+    from ventas.services.ocupacion import lineas_vigentes
+    return (lineas_vigentes()
             .filter(servicio__tipo_servicio='masaje', fecha_agendamiento=f)
-            .exclude(venta_reserva__estado_pago='cancelado')
             .exists())
 
 
@@ -592,7 +591,9 @@ def disponibilidad_alojamiento_multinoche(fecha_llegada, personas=1, noches=None
         resultado = []
         for cabana in cabanas:
             # Contar ocupaciones en cualquiera de las noches del rango
-            ocupadas_en_rango = ReservaServicio.objects.filter(
+            # (solo líneas vigentes: una reserva cancelada no ocupa la cabaña)
+            from ventas.services.ocupacion import lineas_vigentes
+            ocupadas_en_rango = lineas_vigentes().filter(
                 servicio=cabana,
                 fecha_agendamiento__gte=f_llegada,
                 fecha_agendamiento__lt=f_salida,

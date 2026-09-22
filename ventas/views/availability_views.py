@@ -3,6 +3,7 @@ from datetime import datetime
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from ..models import Servicio, ReservaServicio, ServicioBloqueo # Relative imports
+from ..services.ocupacion import lineas_vigentes
 
 def _hhmm(valor):
     """'16:00:00' / time(16,0) / '16:00' → '16:00'. '' si no se puede."""
@@ -61,7 +62,8 @@ def is_slot_available(servicio, fecha, hora):
         return False
 
     # Check if there are any existing reservations for this service, date and time
-    existing_reservas = ReservaServicio.objects.filter(
+    # (solo las vigentes: una reserva cancelada no ocupa el horario)
+    existing_reservas = lineas_vigentes().filter(
         servicio=servicio,
         fecha_agendamiento=fecha,
         hora_inicio=hora
@@ -107,8 +109,9 @@ def get_available_hours(request):
              return JsonResponse({'success': True, 'horas_disponibles': []})
 
         # --- Get existing reservations for this service on this date ---
+        # (solo las vigentes: una reserva cancelada no ocupa el horario)
         from django.db.models import Count
-        reservas_por_hora = ReservaServicio.objects.filter(
+        reservas_por_hora = lineas_vigentes().filter(
             servicio=servicio,
             fecha_agendamiento=fecha_obj
         ).values('hora_inicio').annotate(cantidad=Count('id'))
@@ -242,13 +245,11 @@ def get_slots_disponibles_para_bloquear(request):
                 'mensaje': 'Este servicio no tiene horarios configurados para este día'
             })
 
-        # 3. Obtener reservas existentes
+        # 3. Obtener reservas existentes (vigentes: misma regla que la vitrina)
         from django.db.models import Count
-        reservas_por_hora = ReservaServicio.objects.filter(
+        reservas_por_hora = lineas_vigentes().filter(
             servicio=servicio,
             fecha_agendamiento=fecha_obj
-        ).exclude(
-            venta_reserva__estado_reserva='cancelada'
         ).values('hora_inicio').annotate(cantidad=Count('id'))
 
         slots_ocupados = {r['hora_inicio']: r['cantidad'] for r in reservas_por_hora}

@@ -23,6 +23,7 @@ from ..models import (
     VentaReserva,
 )
 from ..signals import validar_disponibilidad_admin
+from .ocupacion import lineas_vigentes
 from whatsapp_agent.prompt import nombre_presentable
 
 
@@ -78,7 +79,8 @@ def validar_disponibilidad_carrito(cart_data):
         if servicio_obj.precio_base is not None and servicio_obj.precio_base < 0:
             continue
 
-        if ReservaServicio.objects.filter(
+        # Solo las líneas vigentes: una reserva cancelada no ocupa el horario.
+        if lineas_vigentes().filter(
             servicio=servicio_obj,
             fecha_agendamiento=fecha,
             hora_inicio=hora,

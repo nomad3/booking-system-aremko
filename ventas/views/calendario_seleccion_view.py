@@ -327,9 +327,10 @@ def agregar_servicio_a_reserva(request):
         # Determinar cantidad de personas por defecto
         cantidad_personas = obtener_personas_por_defecto(servicio.nombre)
 
-        # Verificar capacidad disponible (cantidad de servicios simultáneos)
-        from django.db.models import Count
-        reservas_existentes = ReservaServicio.objects.filter(
+        # Verificar capacidad disponible (cantidad de servicios simultáneos).
+        # Solo las líneas vigentes: una reserva cancelada no ocupa el horario.
+        from ventas.services.ocupacion import lineas_vigentes
+        reservas_existentes = lineas_vigentes().filter(
             servicio=servicio,
             fecha_agendamiento=fecha,
             hora_inicio=hora_str
