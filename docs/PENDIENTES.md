@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-08-31_
+_Última revisión: 2026-09-22_
 
 ## Web y marketing
 
@@ -20,6 +20,21 @@ _Última revisión: 2026-08-31_
 6. **P-06 · GiftCards F2/F3** — Entrega programada, canje conversacional con Luna,
    bonus estacional y campañas de email de giftcards.
 
+43. **P-43 · Equipo de terreno para empresas (Cristián): 3 decisiones de Jorge** —
+    El material de venta ya está armado (memoria «Equipo de terreno empresas»).
+    Falta: (1) los códigos de atribución de Cristián y su compañero, para saber qué
+    venta vino de quién — sin eso la comisión se discute en tres meses; (2) cómo se
+    les paga (fijo, comisión o mezcla); (3) la lista de empresas de Puerto Montt
+    (salmoneras, clínicas, colegios, retail), que Claude arma cuando Jorge diga.
+44. **P-44 · Correo semanal (H-111): falta el lado Datamatic y la primera campaña
+    real** — Django está listo desde el 14-09 (endpoint
+    `POST /marketing/api/campana-semanal/`, remitente comunicaciones@aremko.cl con
+    respuestas a ventas@, baja con un clic en el pie, un lote de 50 cada 5 min).
+    Falta que Datamatic llame al endpoint sin `segmento`, muestre `revisar_en` y
+    recién ahí `instalar_aremko`; el recordatorio de Google de los jueves tampoco
+    tiene endpoint HTTP aún. Cuando llegue la primera campaña: nace en Borrador y
+    Jorge/Deborah la pasan a «Lista para envío» en el admin — nada sale solo.
+
 ## Pagos y conciliador
 
 7. **P-07 · Activar auto-aplicar del Conciliador** — Tras ~2 semanas de calibración
@@ -31,50 +46,17 @@ _Última revisión: 2026-08-31_
    carrito público migra a Mercado Pago (cuotas también en la web).
 10. **P-10 · Reserva de prueba #6221** — Anular/reembolsar desde el panel MP los
     $2.500 reales del test de cuotas, para no ensuciar métricas.
-16. **P-16 · Boletas electrónicas SII automáticas** — **F1 DESPLEGADA 2026-07-11**
-    (criterio giftcard aclarado: la venta de giftcard es un producto más — boletea
-    según el medio de pago de la compra; el canje nunca boletea)
-    (app `facturacion/` en ambiente simulado: MedioPago con switch genera_boleta,
-    emisor idempotente vía SimpleAPI, acción "Emitir boleta" en Pagos, página
-    pública /boletas/consulta/, diagnóstico --smoke). Detalle y runbook completo:
-    `docs/BRIEF_P-16_boletas_sii.md`. **Pasos de Jorge COMPLETADOS 2026-07-12**:
-    API key SimpleAPI ✓, certificado .pfx en Render ✓ (verificado con
-    `--exigir-credenciales`), certificado instalado en Llavero ✓, POSTULACIÓN
-    ACEPTADA en el SII (solo Boleta Electrónica afecta; software "AREMKO BOOKING
-    SYSTEM") ✓, set de pruebas descargado ✓ (5 casos —
-    `docs/certificacion_sii/Set_Prueba_BE.txt`; multi-ítem, ítem exento en
-    CASO-4, unidad Kg en CASO-5, referencia SET/CASO-N obligatoria).
-    El SII CONFIRMÓ la exclusividad: al AUTORIZARSE se pierde el sistema
-    gratuito (solo al final; antes del switch: respaldar documentos del portal
-    + OK del contador). **CERTIFICACIÓN 2026-07-12 PM**: CAF cert 1-50 cargado
-    vía API + las 5 BOLETAS DEL SET TIMBRADAS (folios 1-5, exento y Kg OK).
-    **✅ CERTIFICACIÓN APROBADA — 2026-09-02.** «Ud cuenta con el V°B° en el
-    proceso de Certificación de Boletas Electrónicas». Set 4949774, sobre
-    0257251130 (folios 29-33), consumo de folios 0257269154.
-    Los cinco muros: (1) el 500 de julio era propagación del SII; (2) la
-    referencia iba con forma de FACTURA —en boleta solo NroLinRef+CodRef+RazonRef,
-    y `TipoDocumento` hay que mandarlo en null EXPLÍCITO; (3) los permisos de
-    firma de certificación viven en maullin, separados de palena; (4) **el
-    validador del set NO ve los envíos por API** —el mismo sobre subido por el
-    formulario web (`maullin.sii.cl/cgi_dte/UPL/DTEauth?1`) sí lo encontró—;
-    (5) faltaba el consumo de folios, y su reparo caía siempre en el ÚLTIMO
-    folio del lote (no era el CASO-5). La firma del COF la hace `signxml`, no
-    código propio.
-
-    **AHORA — antes de declarar cumplimiento (ojo, es irreversible):** al
-    declarar, la obligación de emitir boleta electrónica empieza ESE día y se
-    pierde el sistema gratuito del SII. Antes hay que tener: (a) **F2, la cola
-    automática de emisión** —hoy solo existe el botón manual, así que cada venta
-    exigiría emitir a mano—; (b) respaldo de los documentos del portal gratuito;
-    (c) OK del contador. La declaración va en
-    `www4.sii.cl/certBolElectDteInternet/` (sin parámetro) con: 9 requisitos,
-    link de consulta `https://www.aremko.cl/boletas/consulta/`, y proveedor de
-    software = **Aremko misma** (76485192-7), decidido por Jorge.
-    F3 (notas de crédito) después del switch.
-    F1: app `facturacion/` + tabla `MedioPago` con flag `genera_boleta` (siembra de
-    los 21 métodos, editable en admin; pedido por Jorge para evitar dobles boleteos)
-    + botón manual. F2: señal post_save(Pago) + cola (patrón conciliador) + candado
-    1-a-1 boleta↔pago. F3: notas de crédito + cuadratura mensual.
+16. **P-16 · Boletas electrónicas SII — lo que queda** — 🟢 **En producción desde el
+    03-09-2026** (certificación aprobada 02-09, Declaración de Cumplimiento hecha,
+    CAF real 69012+, F2 con pregunta al cobrar en la tarjeta, envío al cliente por
+    WhatsApp en 3 fases, 3 crons SII en cron-job.org). Historia completa en git y en
+    `docs/BRIEF_P-16_boletas_sii.md`. Queda: **(a)** el medio genérico `mercadopago`
+    (~$7,8M en 66 pagos por 60 días) está marcado «no boletea» — si son transferencias
+    y no links de pago, hay que boletearlos; no se cambió sin decisión de Jorge para no
+    duplicar boletas. **(b)** Confirmar con el contador `unidad_sii` y la dirección que
+    el SII tiene registrada (solo afecta la impresión). **(c)** Decidir qué hacer con la
+    deuda histórica que mostró el listado al encender: 41 pagos por $3.721.000 sin
+    boleta. F3 (notas de crédito) NO se construye: van a mano en el sistema gratuito.
 
 22. **P-22 · Jornada de orden contable: plan de cuentas + registro mensual de
     ingresos y gastos** — Pedido de Jorge 2026-08-06 tras el diagnóstico de correos.
@@ -184,6 +166,35 @@ _Última revisión: 2026-08-31_
     cola es peor de lo que se ve. **Bloquea saber si P-22 tiene que ocuparse también
     de los ingresos o solo de los egresos.** Detalle en `[[project_aremko_conciliacion_pagos]]`.
 
+39. **P-39 · Reserva 6742: el pago repetido del 04-09** — Deborah registró el mismo
+    cobro dos veces con 6 segundos de diferencia (quedó $120.000 pagado sobre un
+    total de $60.000) y salieron DOS boletas (69014 y 69015) por la misma venta. Fue
+    el caso que originó las defensas de la tarjeta móvil. Falta confirmar que el
+    pago sobrante se anuló y qué se hizo con la 69015 (si se frenó antes de
+    transmitir o va con nota de crédito a mano en el SII).
+40. **P-40 · El admin de Django no tiene protección de doble clic** — La tarjeta
+    móvil ya tiene las tres capas (21-09: botón bloqueado mientras responde, candado
+    consultivo `pg_try_advisory_lock` por reserva, rechazo de un pago idéntico en
+    30 s). El admin (`VentaReservaAdmin` con sus inlines de pagos y productos) no
+    tiene ninguna: desde ahí todavía se duplica un pago o un producto con dos clics
+    en «Guardar». Caso real: reserva 6869 (pagos 8692/8696, 21-09).
+
+## Operación e inventario
+
+37. **P-37 · Stock: 76 productos vendidos sin comanda + 2 extras de giftcard de 2021** —
+    (a) 76 líneas de producto de ventas históricas nunca tuvieron comanda, así que su
+    stock nunca se descontó (desde el 21-09 toda venta genera comanda: admin, tarjeta
+    y agenda). Decidir si se ajusta el inventario a mano o se da por perdido.
+    (b) Las 2 comandas con fecha de relleno 02-02-2021 son extras de giftcards sin
+    canjear: la prueba del cron del 21-09 las dio por entregadas y descontó su stock.
+    Decidir si se devuelve.
+38. **P-38 · Correos de clientes por corregir** — De la limpieza del 21-09 (17 correos
+    inválidos que trababan las campañas) queda el cliente 2692 (`noemimunoz@live.c`,
+    Noemí Muñoz — probablemente `.cl`) y 3 clientes que quedaron SIN correo porque el
+    campo tenía un nombre en vez de un correo (2841 Felipe Silva, 20793 Carolina
+    Barrientos y uno más; la lista está en el log del job del 21-09). Deborah les pide
+    el correo en la próxima visita.
+
 ## Infraestructura y Luna
 
 11. **P-11 · Logging de errores 500 en Render** — Agregar handler para el logger
@@ -207,6 +218,13 @@ _Última revisión: 2026-08-31_
     contra prod. **OJO:** `makemigrations ventas --check` también reporta drift
     preexistente (índices como `producto_comanda_idx` de la 0082 que el modelo no
     declara) — NO generarlas a ciegas: borrarían índices vivos.
+    **Addendum 2026-09-22:** los tests SÍ corren, con dos shims locales que NO se
+    commitean (se recrean cada sesión y se borran antes del commit):
+    `aremko_project/test_settings.py` (sqlite en memoria, migraciones desactivadas
+    con un dict `_SinMigraciones`, `DEFAULT_FILE_STORAGE`, `STATICFILES_STORAGE`
+    plano, hasher MD5) y `aremko_project/test_settings_pg.py` (Postgres del
+    docker-compose, para probar concurrencia real con hilos). El drift sigue ahí:
+    el shim lo esquiva, no lo arregla. Decidir si se commitean los shims.
 25. **P-25 · El editor «Corregir cotización» no sabe de gift cards** — En la bandeja
     (repo `aremko-cli`) no se puede corregir una cotización de gift card: exige ≥1
     servicio en las tres capas (`CotizacionCajon.tsx`, `luna.go`, `editar_propuesta`
@@ -247,6 +265,13 @@ _Última revisión: 2026-08-31_
     con `git stash` en árbol limpio; 12-13 si se corre después de `whatsapp_agent`,
     por interferencia entre suites). Probablemente verdes bajo Postgres, que es
     contra lo que se escribieron — no atribuirlas a cambios nuevos.
+    **Addendum 2026-09-22:** la interferencia entre suites tiene causa conocida:
+    `ThreadLocalMiddleware._thread_locals.user` queda seteado por una suite y
+    contamina la siguiente. Las suites nuevas limpian en `tearDown`
+    (`middleware._thread_locals.user = None`); faltan 5 suites antiguas. Las fallas
+    por fecha fija ('2026-09-10') y por cabañas con capacidad 1 contra el filtro ≥2
+    se arreglaron el 21-09 (`tests_tarjeta_reserva`, `tests_checkout_agenda`,
+    `tests_pago_repetido`).
 <!-- P-33 (recordatorios de Luna, H-109) CERRADO 2026-08-20: runner Go + migración +
      env + cron recordatorios_luna operativos; 2 recordatorios reales enviados y
      verificados E2E. Detalle en docs/HANDOFFS.md fila H-109. -->
@@ -303,6 +328,30 @@ _Última revisión: 2026-08-31_
     atención de Deborah y Alda). SIN auth: `/health` y los webhooks de Meta (validan HMAC).
     Env var en el proyecto Vercel `aremko-cli-frontend`, NO en el duplicado `aremko-cli`.
     Brief: `docs/BRIEF_H-110_auth_backend_go.md` · fila H-110 en `docs/HANDOFFS.md`.
+
+41. **P-41 · Las reservas canceladas siguen bloqueando horarios** —
+    `verificar_disponibilidad` (`ventas/calendar_utils.py`) suma las `ReservaServicio`
+    del slot sin mirar `venta_reserva.estado_reserva`: una reserva cancelada cuenta
+    como ocupada. Lo usan Luna (`whatsapp_agent/availability.py`), el checkout web
+    (`serializers.py`, `api_views.py`), la tarjeta móvil y la señal `pre_save`.
+    Efecto: se rechazan horas que en realidad están libres. Arreglo: excluir
+    `venta_reserva__estado_reserva='cancelada'` en esa consulta y revisar si la agenda
+    y el calendario público usan otra ruta con el mismo defecto.
+42. **P-42 · Borrar el workflow de GitHub «Build and Deploy to GKE»** —
+    `.github/workflows/deploy.yml` corre en cada push a `main`/`dev`, intenta desplegar
+    a un clúster de Google que nunca existió (placeholders «TODO: update to your
+    cluster name») y falla siempre → correo de error a Jorge por cada deploy. Render
+    despliega por su cuenta; el archivo sobra. Un commit de borrado.
+45. **P-45 · Vigilar la primera semana de los 3 crons creados el 21-09** — En
+    cron-job.org: entregas de comandas vencidas 06:30, seguimientos de masaje 10:00,
+    boletas pendientes por WhatsApp 11:00. **22-09:** 06:30 ✓ (cerró las 37
+    acumuladas; stock intacto, no descontó de nuevo) · 10:00 ✓ (25 seguimientos
+    enviados, 0 errores) · 11:00 por ver. Los «Fallido (timeout 30 s)» del panel son
+    cosméticos: vale el log de Render («✅ Cron … ejecutado vía HTTP»); ojo con el
+    auto-deshabilitado tras fallos. De pasada quedaron suspendidos los 3 crons de
+    Render de la rama `dev` (reminders/surveys/reactivation, duplicaban a
+    cron-job.org) y apagado «Aremko-Email-Campaign» (drenaba la misma cola dos veces).
+    Cerrar este ítem el 28-09 si todo corrió.
 
 ## Asistente de Publicaciones (community manager)
 
