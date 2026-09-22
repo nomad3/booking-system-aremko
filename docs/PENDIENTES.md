@@ -195,6 +195,21 @@ _Última revisión: 2026-09-22_
     Barrientos y uno más; la lista está en el log del job del 21-09). Deborah les pide
     el correo en la próxima visita.
 
+46. **P-46 · Cancelar una reserva hoy es borrarla, sin rastro** — Hallazgo del 22-09
+    al cerrar P-41: en toda la base hay UNA venta marcada cancelada (la 6859 de
+    prueba); todas las demás cancelaciones se hicieron eliminando la reserva o sus
+    servicios desde el admin. No hay botón «Cancelar» ni estado «cancelada» en el
+    desplegable (`ESTADO_RESERVA_CHOICES` = pendiente/checkin/checkout) y el registro
+    de eliminaciones en `MovimientoCliente` está comentado en `main_signals.py`.
+    Efecto: si una clienta pagó y cancela, su pago desaparece del sistema junto con
+    la reserva; no se pueden medir cancelaciones ni auditarlas. Qué construir: acción
+    «Cancelar reserva» (admin y tarjeta) que marque `estado_reserva='cancelada'`, deje
+    nota y usuario, conserve pagos y servicios y devuelva el stock de las comandas no
+    entregadas. Desde el 22-09 (commit `2c47a1b1`) los caminos de disponibilidad ya
+    respetan esa marca (`ventas/services/ocupacion.py`): una reserva cancelada deja de
+    ocupar su hora sin borrarla. Decidir también qué pasa con el pago: devolución,
+    giftcard o crédito.
+
 ## Infraestructura y Luna
 
 11. **P-11 · Logging de errores 500 en Render** — Agregar handler para el logger
@@ -329,14 +344,6 @@ _Última revisión: 2026-09-22_
     Env var en el proyecto Vercel `aremko-cli-frontend`, NO en el duplicado `aremko-cli`.
     Brief: `docs/BRIEF_H-110_auth_backend_go.md` · fila H-110 en `docs/HANDOFFS.md`.
 
-41. **P-41 · Las reservas canceladas siguen bloqueando horarios** —
-    `verificar_disponibilidad` (`ventas/calendar_utils.py`) suma las `ReservaServicio`
-    del slot sin mirar `venta_reserva.estado_reserva`: una reserva cancelada cuenta
-    como ocupada. Lo usan Luna (`whatsapp_agent/availability.py`), el checkout web
-    (`serializers.py`, `api_views.py`), la tarjeta móvil y la señal `pre_save`.
-    Efecto: se rechazan horas que en realidad están libres. Arreglo: excluir
-    `venta_reserva__estado_reserva='cancelada'` en esa consulta y revisar si la agenda
-    y el calendario público usan otra ruta con el mismo defecto.
 42. **P-42 · Borrar el workflow de GitHub «Build and Deploy to GKE»** —
     `.github/workflows/deploy.yml` corre en cada push a `main`/`dev`, intenta desplegar
     a un clúster de Google que nunca existió (placeholders «TODO: update to your
