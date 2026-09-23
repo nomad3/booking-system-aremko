@@ -169,9 +169,13 @@ _Última revisión: 2026-09-23_
 39. **P-39 · Reserva 6742: el pago repetido del 04-09** — Deborah registró el mismo
     cobro dos veces con 6 segundos de diferencia (quedó $120.000 pagado sobre un
     total de $60.000) y salieron DOS boletas (69014 y 69015) por la misma venta. Fue
-    el caso que originó las defensas de la tarjeta móvil. Falta confirmar que el
-    pago sobrante se anuló y qué se hizo con la 69015 (si se frenó antes de
-    transmitir o va con nota de crédito a mano en el SII).
+    el caso que originó las defensas de la tarjeta móvil. **23-09: Jorge emitió la
+    nota de crédito de la 69015 en el SII.** Falta reflejarlo en el sistema (propuesta
+    esperando su OK): boleta 69015 → estado `anulada`; el pago 8549 no se puede borrar
+    (la boleta lo protege, `on_delete=PROTECT`), así que se deja en $0 con nota en la
+    reserva y en `MovimientoCliente` → la 6742 queda pagado $60.000 y la verificación de
+    Mercado Pago del 05-09 cuadra. Aparte: el Pase y la consulta pública muestran las
+    boletas `anulada` como si fueran vigentes (solo excluyen pendiente/error/simulada).
 40. **P-40 · El admin de Django no tiene protección de doble clic** — La tarjeta
     móvil ya tiene las tres capas (21-09: botón bloqueado mientras responde, candado
     consultivo `pg_try_advisory_lock` por reserva, rechazo de un pago idéntico en
@@ -216,8 +220,8 @@ _Última revisión: 2026-09-23_
     proceso de tareas de preparación (`gen_preparacion_servicios`, cada 15 min) falla
     en esa reserva desde el 12-09. Hay 40 líneas históricas con horas mal escritas
     ('16.00', '1630', '9:30', '16;30'). Arreglo: validar formato HH:MM al guardar
-    `ReservaServicio` (admin y API) y normalizar las 40 existentes. Antes, corregir a
-    mano la 6818 (`16:00`) — pendiente del OK de Jorge.
+    `ReservaServicio` (admin y API) y normalizar las 40 existentes. **La 6818 la corrigió
+    Jorge el 23-09 (~12:20): el error dejó de aparecer desde la pasada de las 12:30.**
 48. **P-48 · El cajón de cotizaciones acepta cualquier RUT** — El 23-09 una cotización
     salió del cajón de la bandeja (repo `aremko-cli`) con el RUT de ejemplo
     `12345678-9` (dígito verificador malo) y el cliente vio «Datos de cliente
@@ -377,24 +381,32 @@ _Última revisión: 2026-09-23_
     cron-job.org) y apagado «Aremko-Email-Campaign» (drenaba la misma cola dos veces).
     Cerrar este ítem el 28-09 si todo corrió.
 
-49. **P-49 · Luna responde «error interno» a clientes que YA compraron** — 4 veces en
-    la semana del 16 al 23-09 (19-09 21:52, 22-09 15:08 ×2 y 21:10). La clave
-    anti-duplicados de `preparar_reserva` es fija por cliente + experiencia
-    (`gc-<tel>-<experiencia>-<n>`, `ritual-<tel>-<fecha>`); una vez que la propuesta
-    pasa a `creada`, cualquier reintento en la misma conversación choca con la
-    `unique` de `idempotency_key` (IntegrityError) y el cliente recibe
-    «Error al preparar reserva: duplicate key…». Casos: Claudia Carrasco (giftcard
-    6878, pagada) y Sergio Contreras (Ritual 25-09, reserva 6874). No se perdieron
-    ventas, pero un cliente que acaba de pagar y recibe «error interno» se asusta.
-    Arreglo (Django, `whatsapp_agent/reserva_service.py`): si la clave existe y la
-    propuesta está `creada`, responder «esa reserva ya está hecha, es la #N» con sus
-    datos; si está expirada/descartada, crear con clave derivada; y atrapar el
-    IntegrityError como última red. Que Deborah revise esas dos conversaciones.
+<!-- P-49 (Luna «error interno» por clave repetida) CERRADO 2026-09-23, commit 686fd46b:
+     whatsapp_agent/idempotencia.py decide antes de crear (reintento → la misma; pedido ya
+     convertido en reserva <24 h → «ya está creada»; otro caso → clave libre carrito-N#2).
+     De paso revivió «agregar a mi reserva» (H-060), que no había creado NUNCA una propuesta
+     por la fila con clave vacía del 19-06. Verificado en prod dentro de transacciones que se
+     deshacen. Seguimiento de las primeras adiciones reales en P-51. -->
 50. **P-50 · DeepSeek sin saldo (402 Payment Required)** — Desde al menos el 21-09.
     Lo usa `control_gestion/ai_client.py` para los reportes diarios
     (`gen_daily_reports`, 09:05 y 18:00): con la cuenta vacía caen a «modo mock» y
     salen con texto de relleno. Se arregla recargando saldo en platform.deepseek.com
     (Jorge) o cambiando `LLM_PROVIDER`. No afecta a Luna ni a las boletas.
+    **23-09 12:45:** Jorge dijo «listo», pero la clave que usa Render (termina en
+    …19f2) sigue con saldo −0,72 USD e `is_available: false` (consulta de solo lectura a
+    `api.deepseek.com/user/balance`). Revisar que la recarga haya ido a la cuenta dueña
+    de esa clave.
+
+51. **P-51 · Vigilar las primeras propuestas de «agregar a una reserva»** — Desde el
+    23-09 (P-49) Luna vuelve a poder proponer agregar servicios o productos a una
+    reserva ya creada (H-060). Esa propuesta nunca había existido en producción, así que
+    su aprobación (`crear_reserva` con `reserva_existente_id` → `agregar_items_a_reserva`)
+    tampoco se ha ejecutado nunca con datos reales. Mirar la primera de punta a punta: que
+    Deborah la vea bien en la bandeja, que al aprobarla se sume a la reserva correcta con
+    el precio correcto, y que el total y el Pase se actualicen. Hipótesis sin confirmar,
+    anotada al revisar: si el cliente tiene una cotización pendiente viva y confirma de
+    nuevo el carrito CAMBIADO, se le devuelve la cotización vieja (comportamiento previo,
+    no tocado por P-49).
 
 ## Asistente de Publicaciones (community manager)
 
