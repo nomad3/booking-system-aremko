@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.db import transaction
 
 from whatsapp_agent.grounding import formatear_precio
+from whatsapp_agent import idempotencia
 from whatsapp_agent.models import PropuestaReserva
 from ventas.models import Servicio, VentaReserva
 
@@ -139,21 +140,32 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
         servicios_data = payload.get('servicios', [])
         productos_data = payload.get('productos', [])  # tablas, jugos, etc. (opcional)
 
-        # Si tiene idempotency_key, buscar propuesta existente
-        if idempotency_key:
-            try:
-                propuesta = PropuestaReserva.objects.get(idempotency_key=idempotency_key)
-                if propuesta.esta_vigente():
-                    logger.info(f'[Luna] Propuesta duplicada (idempotent): {idempotency_key[:16]}')
-                    return {
-                        'success': True,
-                        'propuesta_id': propuesta.propuesta_id,
-                        'resumen_texto': propuesta.resumen_texto,
-                        'total': int(propuesta.total),
-                        'duplicada': True
-                    }
-            except PropuestaReserva.DoesNotExist:
-                pass
+        # La clave decide si esto es un reintento (devolver lo que ya existe), un
+        # pedido que ya es reserva (decirlo) o uno nuevo (crear con una clave
+        # libre). Antes una clave ya usada terminaba en «duplicate key» y el
+        # cliente recibía un error interno (P-49). Ver whatsapp_agent/idempotencia.py.
+        propuesta_id = str(uuid.uuid4())
+
+        def _resolver():
+            return idempotencia.resolver(idempotency_key, payload, canal=canal,
+                                         external_id=external_id, propuesta_id=propuesta_id)
+
+        def _ya_existe(decision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuesta_ya_creada(decision.propuesta)
+            previa = decision.propuesta
+            logger.info(f'[Luna] Propuesta duplicada (idempotent): {previa.idempotency_key[:16]}')
+            return {
+                'success': True,
+                'propuesta_id': previa.propuesta_id,
+                'resumen_texto': previa.resumen_texto,
+                'total': int(previa.total),
+                'duplicada': True
+            }
+
+        decision = _resolver()
+        if decision.tipo != 'nueva':
+            return _ya_existe(decision)
 
         # 1. Validar cliente_data obligatorio
         nombre = cliente_data.get('nombre', '').strip()
@@ -205,11 +217,10 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
             except _PropuestaCalcError as e:
                 return {'success': False, 'error': e.error, 'mensaje': e.mensaje}
 
-            # 5. Guardar PropuestaReserva
-            propuesta_id = str(uuid.uuid4())
-            propuesta = PropuestaReserva.objects.create(
+            # 5. Guardar PropuestaReserva (con la clave libre que eligió _resolver)
+            propuesta = idempotencia.crear(
+                decision.clave,
                 propuesta_id=propuesta_id,
-                idempotency_key=idempotency_key or '',
                 canal=canal,
                 external_id=external_id,
                 payload=payload,  # Guarda el payload completo para crear_reserva()
@@ -224,6 +235,10 @@ def preparar_reserva(canal, external_id, payload, idempotency_key=None):
                 # aprobar, así que extender el TTL es seguro: no hay doble-booking.
                 expires_at=timezone.now() + timedelta(hours=24)
             )
+            if propuesta is None:
+                # Otra llamada simultánea tomó la clave: devolver la que ganó.
+                otra = _resolver()
+                return _ya_existe(otra) if otra.tipo != 'nueva' else dict(idempotencia.RESPUESTA_EN_CURSO)
 
             logger.info(
                 f'[Luna] Propuesta {propuesta_id[:8]} preparada para {external_id}: '
@@ -616,22 +631,36 @@ def preparar_adicion_a_reserva(canal, external_id, reserva_id, servicios_data=No
             return {'success': False, 'error': 'validation_error',
                     'mensaje': 'Debe incluir al menos un servicio o producto'}
 
-        # Idempotencia (mismo criterio que preparar_reserva).
-        if idempotency_key:
-            try:
-                propuesta = PropuestaReserva.objects.get(idempotency_key=idempotency_key)
-                if propuesta.esta_vigente():
-                    logger.info(f'[Luna] Propuesta de adición duplicada (idempotent): {idempotency_key[:16]}')
-                    return {
-                        'success': True,
-                        'propuesta_id': propuesta.propuesta_id,
-                        'resumen_texto': propuesta.resumen_texto,
-                        'total': int(propuesta.total),
-                        'reserva_id': reserva_id,
-                        'duplicada': True,
-                    }
-            except PropuestaReserva.DoesNotExist:
-                pass
+        # Idempotencia (mismo criterio que preparar_reserva). Las herramientas de
+        # Luna no mandan clave: el reintento se reconoce por el pedido mismo.
+        # Antes se guardaba la clave vacía y, como la base deja existir UNA sola,
+        # esta función no había creado ninguna propuesta desde que nació (P-49).
+        propuesta_id = str(uuid.uuid4())
+        pedido = {'servicios': servicios_data, 'productos': productos_data}
+
+        def _resolver():
+            return idempotencia.resolver(idempotency_key, pedido, canal=canal,
+                                         external_id=external_id,
+                                         reserva_existente_id=reserva_id,
+                                         propuesta_id=propuesta_id)
+
+        def _ya_existe(decision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuesta_ya_creada(decision.propuesta)
+            previa = decision.propuesta
+            logger.info(f'[Luna] Propuesta de adición duplicada (idempotent): {previa.propuesta_id[:8]}')
+            return {
+                'success': True,
+                'propuesta_id': previa.propuesta_id,
+                'resumen_texto': previa.resumen_texto,
+                'total': int(previa.total),
+                'reserva_id': reserva_id,
+                'duplicada': True,
+            }
+
+        decision = _resolver()
+        if decision.tipo != 'nueva':
+            return _ya_existe(decision)
 
         with transaction.atomic():
             try:
@@ -648,11 +677,10 @@ def preparar_adicion_a_reserva(canal, external_id, reserva_id, servicios_data=No
                 'servicios': servicios_data,
                 'productos': productos_data,
             }
-            propuesta_id = str(uuid.uuid4())
             resumen_completo = f'AGREGAR a Reserva RES-{reserva_id}:\n{resumen_texto}'
-            propuesta = PropuestaReserva.objects.create(
+            propuesta = idempotencia.crear(
+                decision.clave,
                 propuesta_id=propuesta_id,
-                idempotency_key=idempotency_key or '',
                 canal=canal,
                 external_id=external_id,
                 payload=payload,
@@ -664,6 +692,9 @@ def preparar_adicion_a_reserva(canal, external_id, reserva_id, servicios_data=No
                 reserva_existente_id=reserva_id,
                 expires_at=timezone.now() + timedelta(hours=24),
             )
+            if propuesta is None:
+                otra = _resolver()
+                return _ya_existe(otra) if otra.tipo != 'nueva' else dict(idempotencia.RESPUESTA_EN_CURSO)
 
             logger.info(
                 f'[Luna] Propuesta de adición {propuesta_id[:8]} preparada para {external_id} '

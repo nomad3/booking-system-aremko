@@ -2332,6 +2332,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if not resultado.get('success'):
                     logger.error('[confirmar_reserva_carrito] preparar_reserva falló: %s', resultado)
                     return resultado
+                if resultado.get('ya_creada'):
+                    # El mismo pedido ya es una reserva (P-49): decirlo, no cotizar de nuevo.
+                    return resultado
 
                 logger.info('[confirmar_reserva_carrito] propuesta %s creada para %s ($%s)',
                             resultado.get('propuesta_id', '')[:8], external_id, resultado.get('total'))
@@ -2422,6 +2425,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 )
                 if not resultado.get('success'):
                     logger.error('[confirmar_ritual] preparar_reserva falló: %s', resultado)
+                    return resultado
+                if resultado.get('ya_creada'):
+                    # El mismo pedido ya es una reserva (P-49): decirlo, no cotizar de nuevo.
                     return resultado
 
                 # Ya quedaron dentro de la propuesta recién creada — limpiar del carrito
@@ -2523,6 +2529,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 )
                 if not resultado.get('success'):
                     logger.error('[confirmar_dia] preparar_reserva falló: %s', resultado)
+                    return resultado
+                if resultado.get('ya_creada'):
+                    # El mismo pedido ya es una reserva (P-49): decirlo, no cotizar de nuevo.
                     return resultado
 
                 # La noche anterior se bloquea AQUÍ y no al cotizar: la cabaña
@@ -2647,6 +2656,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 )
                 if not resultado.get('success'):
                     logger.error('[confirmar_refugio] preparar_reserva falló: %s', resultado)
+                    return resultado
+                if resultado.get('ya_creada'):
+                    # El mismo pedido ya es una reserva (P-49): decirlo, no cotizar de nuevo.
                     return resultado
 
                 if productos_carrito:
@@ -2902,6 +2914,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                                     f'-{args.get("cantidad", 1)}',
                 )
                 if not resultado.get('success'):
+                    return resultado
+                if resultado.get('ya_creada'):
+                    # El mismo pedido ya es una reserva (P-49): decirlo, no cotizar de nuevo.
                     return resultado
                 total = resultado.get('total', 0)
                 # El detalle con el precio REAL va en el mensaje al cliente a

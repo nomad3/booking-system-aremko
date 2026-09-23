@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from whatsapp_agent import idempotencia
 from whatsapp_agent.models import PropuestaReserva
 
 logger = logging.getLogger(__name__)
@@ -453,17 +454,29 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
         # gift card?» por segunda vez, con el dato en pantalla dos mensajes más
         # arriba. Preguntar algo que ya está guardado no es prudencia, es un
         # loop: la propuesta vigente YA tiene esas respuestas.
+        propuesta_id = str(uuid.uuid4())
+
+        def _ya_existe(decision):
+            if decision.tipo == 'creada':
+                return idempotencia.respuesta_ya_creada(decision.propuesta)
+            previa = decision.propuesta
+            logger.info('[Luna] Propuesta giftcard duplicada (idempotente): %s',
+                        (previa.idempotency_key or '')[:24])
+            return {'success': True, 'propuesta_id': previa.propuesta_id,
+                    'resumen_texto': previa.resumen_texto,
+                    # El total sale de la propuesta, así que incluye lo que
+                    # se le sumó después (la tabla): $70.000, no $50.000.
+                    'total': int(previa.total), 'duplicada': True}
+
         if idempotency_key:
-            previa = PropuestaReserva.objects.filter(
-                idempotency_key=idempotency_key).first()
-            if previa and previa.esta_vigente():
-                logger.info('[Luna] Propuesta giftcard duplicada (idempotente): %s',
-                            idempotency_key[:24])
-                return {'success': True, 'propuesta_id': previa.propuesta_id,
-                        'resumen_texto': previa.resumen_texto,
-                        # El total sale de la propuesta, así que incluye lo que
-                        # se le sumó después (la tabla): $70.000, no $50.000.
-                        'total': int(previa.total), 'duplicada': True}
+            # Acá solo importa si hay una pendiente viva (para no volver a
+            # preguntar lo que ya está guardado). Si la compra ya se hizo o es
+            # nueva se decide abajo, con las cartas ya armadas (P-49).
+            decision = idempotencia.resolver(idempotency_key, {'giftcards': giftcards_data},
+                                             canal=canal, external_id=external_id,
+                                             propuesta_id=propuesta_id)
+            if decision.tipo == 'vigente':
+                return _ya_existe(decision)
 
         primera = giftcards_data[0] or {}
         destinatario = (primera.get('destinatario_nombre') or '').strip()
@@ -587,9 +600,14 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
                                 'grandes lo ve el equipo directamente.')}
 
         resumen = '🎁 ' + '\n🎁 '.join(lineas)
-        propuesta = PropuestaReserva.objects.create(
-            propuesta_id=str(uuid.uuid4()),
-            idempotency_key=idempotency_key or '',
+        pedido = {'servicios': [], 'giftcards': items}
+        decision = idempotencia.resolver(idempotency_key, pedido, canal=canal,
+                                         external_id=external_id, propuesta_id=propuesta_id)
+        if decision.tipo != 'nueva':
+            return _ya_existe(decision)
+        propuesta = idempotencia.crear(
+            decision.clave,
+            propuesta_id=propuesta_id,
             canal=canal,
             external_id=external_id,
             payload={'cliente': cliente_data, 'servicios': [],
@@ -603,6 +621,10 @@ def preparar_giftcard(canal, external_id, cliente_data, giftcards_data,
             # una propuesta vencida solo obliga a cotizar de nuevo.
             expires_at=timezone.now() + timedelta(hours=24),
         )
+        if propuesta is None:
+            otra = idempotencia.resolver(idempotency_key, pedido, canal=canal,
+                                         external_id=external_id, propuesta_id=propuesta_id)
+            return _ya_existe(otra) if otra.tipo != 'nueva' else dict(idempotencia.RESPUESTA_EN_CURSO)
         logger.info('[Luna] Propuesta GIFTCARD %s para %s: %s cartas, $%s',
                     propuesta.propuesta_id[:8], external_id, n_cartas, f'{total:,}')
         return {'success': True, 'propuesta_id': propuesta.propuesta_id,
