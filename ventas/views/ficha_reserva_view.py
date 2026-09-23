@@ -844,22 +844,61 @@ def _cotizacion_lineas_total(propuesta):
     return lineas, _clp(total), giftcards
 
 
+def _motivo_email(email):
+    """Por qué este correo no sirve, en palabras del cliente; '' si sirve."""
+    from .luna_api_views import validar_email
+    email = (email or '').strip()
+    if not email:
+        return 'Necesitamos un correo válido para enviarte la reserva.'
+    ok, _ = validar_email(email)
+    return '' if ok else f'El correo {email} no parece válido. Escríbelo de nuevo.'
+
+
+def _motivo_rut(rut):
+    """Por qué este RUT no sirve, en palabras del cliente; '' si sirve."""
+    from .luna_api_views import validar_rut_chileno
+    rut = (rut or '').strip()
+    if not rut:
+        return 'Necesitamos tu RUT para emitir la boleta.'
+    ok, motivo, _ = validar_rut_chileno(rut)
+    if ok:
+        return ''
+    if 'formato' in (motivo or '').lower():
+        return f'El RUT {rut} no tiene el formato 12.345.678-9. Escríbelo de nuevo.'
+    return f'El RUT {rut} no es válido: el dígito verificador no calza. Escríbelo de nuevo.'
+
+
+def _datos_por_corregir(cliente):
+    """Correo y RUT que faltan O están mal escritos, con el motivo de cada uno.
+
+    Se valida con las MISMAS reglas que usa la creación de la reserva
+    (`validar_datos_cliente`). Si acá pasara algo que allá se rechaza, el
+    cliente vería «Datos de cliente inválidos» sin ningún campo que corregir:
+    un botón que no hace nada (pasó el 23-09-2026 con un RUT de ejemplo).
+    """
+    problemas = {}
+    motivo = _motivo_email(cliente.get('email'))
+    if motivo:
+        problemas['email'] = motivo
+    motivo = _motivo_rut(cliente.get('documento_identidad'))
+    if motivo:
+        problemas['documento_identidad'] = motivo
+    return problemas
+
+
 def _faltan_datos_del_cliente(propuesta):
-    """Qué datos le faltan a la propuesta para poder convertirse en reserva.
+    """Qué datos hay que pedirle al cliente para poder convertir la cotización en reserva.
 
     Una cotización armada a mano en el cajón puede nacer solo con el nombre
     (el cliente todavía no daba su correo ni su RUT). La reserva sí los
     necesita —para la boleta y para escribirle—, así que se piden en la propia
     cotización, al aprobar: es el momento en que el cliente se compromete, y
-    los escribe él en vez de dictarlos por teléfono.
+    los escribe él en vez de dictarlos por teléfono. Un dato MAL escrito
+    (un RUT con el dígito cambiado, un correo sin punto) cuenta igual que uno
+    que falta: también se pide de nuevo.
     """
     cliente = (propuesta.payload or {}).get('cliente', {}) or {}
-    faltan = []
-    if '@' not in (cliente.get('email') or ''):
-        faltan.append('email')
-    if not (cliente.get('documento_identidad') or '').strip():
-        faltan.append('documento_identidad')
-    return faltan
+    return sorted(_datos_por_corregir(cliente))
 
 
 def cotizacion_cliente(request, token):
@@ -888,8 +927,14 @@ def cotizacion_cliente(request, token):
         'solo_giftcards': solo_gc,
         'vigente': propuesta.esta_vigente(),
         'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
-        'faltan_datos': _faltan_datos_del_cliente(propuesta),
     }
+    problemas = _datos_por_corregir(cliente_data)
+    context['faltan_datos'] = sorted(problemas)
+    if problemas:
+        # Lo que tenemos se muestra tal cual para que el cliente vea qué está mal.
+        context['errores_datos'] = problemas
+        context['email_previo'] = cliente_data.get('email') or ''
+        context['rut_previo'] = cliente_data.get('documento_identidad') or ''
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 
 
@@ -920,18 +965,20 @@ def aprobar_cotizacion(request, token):
     if faltan:
         email = (request.POST.get('email') or '').strip()
         rut = (request.POST.get('documento_identidad') or '').strip()
-        errores = []
-        if 'email' in faltan and '@' not in email:
-            errores.append('Necesitamos un correo válido para enviarte la reserva.')
-        if 'documento_identidad' in faltan and not rut:
-            errores.append('Necesitamos tu RUT para emitir la boleta.')
+        # Lo que escribe se valida con las mismas reglas que la creación de la
+        # reserva: si pasa acá, pasa allá.
+        errores = {}
+        if 'email' in faltan and _motivo_email(email):
+            errores['email'] = _motivo_email(email)
+        if 'documento_identidad' in faltan and _motivo_rut(rut):
+            errores['documento_identidad'] = _motivo_rut(rut)
         if errores:
             lineas, total_str, giftcards_cot = _cotizacion_lineas_total(propuesta)
             return render(request, 'ventas/ficha_reserva_cliente.html', {
-                'es_cotizacion': True, 'error_aprobar': ' '.join(errores),
+                'es_cotizacion': True, 'error_aprobar': ' '.join(errores.values()),
                 'lineas': lineas, 'total_str': total_str,
                 'giftcards': giftcards_cot, 'aprobar_url': aprobar_url,
-                'faltan_datos': faltan,
+                'faltan_datos': faltan, 'errores_datos': errores,
                 'email_previo': email, 'rut_previo': rut,
             }, status=400)
         payload = propuesta.payload or {}
@@ -963,14 +1010,32 @@ def aprobar_cotizacion(request, token):
             return redirect('ventas:ficha_reserva_cliente',
                             token=token_para_reserva(reserva_id))
 
-    logger.error('[cotización] Aprobar falló para propuesta %s: %s',
-                 propuesta.propuesta_id[:8], data.get('mensaje'))
+    logger.error('[cotización] Aprobar falló para propuesta %s: %s %s',
+                 propuesta.propuesta_id[:8], data.get('mensaje'), data.get('errores') or '')
     lineas, total_str, giftcards_cot = _cotizacion_lineas_total(propuesta)
-    return render(request, 'ventas/ficha_reserva_cliente.html', {
+    contexto = {
         'es_cotizacion': True,
         'error_aprobar': data.get('mensaje') or 'No se pudo crear la reserva. Te contactamos a la brevedad.',
         'lineas': lineas,
         'total_str': total_str,
         'giftcards': giftcards_cot,
         'aprobar_url': aprobar_url,
-    }, status=400)
+    }
+    if data.get('error') == 'validation_error':
+        # «Datos de cliente inválidos» no le dice nada al cliente. Si lo que
+        # falló es correo o RUT, se le muestra el campo con el motivo para que
+        # lo corrija; si es otra cosa (teléfono, nombre), no puede arreglarlo
+        # desde acá y lo toma Deborah.
+        cliente = (propuesta.payload or {}).get('cliente', {}) or {}
+        problemas = _datos_por_corregir(cliente)
+        if problemas:
+            contexto.update({
+                'error_aprobar': ' '.join(problemas.values()),
+                'faltan_datos': sorted(problemas), 'errores_datos': problemas,
+                'email_previo': cliente.get('email') or '',
+                'rut_previo': cliente.get('documento_identidad') or '',
+            })
+        else:
+            contexto['error_aprobar'] = ('No pudimos generar tu reserva con los datos que '
+                                         'tenemos. Te contactamos a la brevedad para confirmarla.')
+    return render(request, 'ventas/ficha_reserva_cliente.html', contexto, status=400)
