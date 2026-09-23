@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-09-22_
+_Última revisión: 2026-09-23_
 
 ## Web y marketing
 
@@ -210,6 +210,23 @@ _Última revisión: 2026-09-22_
     ocupar su hora sin borrarla. Decidir también qué pasa con el pago: devolución,
     giftcard o crédito.
 
+47. **P-47 · El admin acepta cualquier texto como hora de un servicio** — Hallazgo del
+    23-09: la reserva 6818 (Booking, Cabaña Laurel 28-09) tiene una línea «Comisión
+    Booking» con hora `20900` (se escribió el monto en el campo de la hora) y el
+    proceso de tareas de preparación (`gen_preparacion_servicios`, cada 15 min) falla
+    en esa reserva desde el 12-09. Hay 40 líneas históricas con horas mal escritas
+    ('16.00', '1630', '9:30', '16;30'). Arreglo: validar formato HH:MM al guardar
+    `ReservaServicio` (admin y API) y normalizar las 40 existentes. Antes, corregir a
+    mano la 6818 (`16:00`) — pendiente del OK de Jorge.
+48. **P-48 · El cajón de cotizaciones acepta cualquier RUT** — El 23-09 una cotización
+    salió del cajón de la bandeja (repo `aremko-cli`) con el RUT de ejemplo
+    `12345678-9` (dígito verificador malo) y el cliente vio «Datos de cliente
+    inválidos» al aprobar. Django ya se defiende (commit `0ad036c5`: pide el dato de
+    nuevo con el motivo), pero lo ideal es que el cajón avise al escribirlo. Toca el
+    front de aremko-cli (validar dígito verificador antes de enviar) y, de paso, el
+    endpoint Django que recibe la cotización del cajón podría rechazar un RUT
+    inválido con mensaje claro.
+
 ## Infraestructura y Luna
 
 11. **P-11 · Logging de errores 500 en Render** — Agregar handler para el logger
@@ -359,6 +376,25 @@ _Última revisión: 2026-09-22_
     Render de la rama `dev` (reminders/surveys/reactivation, duplicaban a
     cron-job.org) y apagado «Aremko-Email-Campaign» (drenaba la misma cola dos veces).
     Cerrar este ítem el 28-09 si todo corrió.
+
+49. **P-49 · Luna responde «error interno» a clientes que YA compraron** — 4 veces en
+    la semana del 16 al 23-09 (19-09 21:52, 22-09 15:08 ×2 y 21:10). La clave
+    anti-duplicados de `preparar_reserva` es fija por cliente + experiencia
+    (`gc-<tel>-<experiencia>-<n>`, `ritual-<tel>-<fecha>`); una vez que la propuesta
+    pasa a `creada`, cualquier reintento en la misma conversación choca con la
+    `unique` de `idempotency_key` (IntegrityError) y el cliente recibe
+    «Error al preparar reserva: duplicate key…». Casos: Claudia Carrasco (giftcard
+    6878, pagada) y Sergio Contreras (Ritual 25-09, reserva 6874). No se perdieron
+    ventas, pero un cliente que acaba de pagar y recibe «error interno» se asusta.
+    Arreglo (Django, `whatsapp_agent/reserva_service.py`): si la clave existe y la
+    propuesta está `creada`, responder «esa reserva ya está hecha, es la #N» con sus
+    datos; si está expirada/descartada, crear con clave derivada; y atrapar el
+    IntegrityError como última red. Que Deborah revise esas dos conversaciones.
+50. **P-50 · DeepSeek sin saldo (402 Payment Required)** — Desde al menos el 21-09.
+    Lo usa `control_gestion/ai_client.py` para los reportes diarios
+    (`gen_daily_reports`, 09:05 y 18:00): con la cuenta vacía caen a «modo mock» y
+    salen con texto de relleno. Se arregla recargando saldo en platform.deepseek.com
+    (Jorge) o cambiando `LLM_PROVIDER`. No afecta a Luna ni a las boletas.
 
 ## Asistente de Publicaciones (community manager)
 
