@@ -35,12 +35,14 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import re
 import time
 from contextlib import contextmanager
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -242,7 +244,7 @@ def tarjeta_reserva(request, venta_id):
         for linea in list(servicios) + list(productos):
             linea.es_descuento = False
     _marcar_estado_de_cocina(venta, productos)
-    pagos = list(venta.pagos.order_by('fecha_pago'))
+    pagos = list(venta.pagos.select_related('giftcard').order_by('fecha_pago'))
     # Cada pago con su boleta, para que Deborah la vea sin salir de la tarjeta
     # (Jorge, 04-09-2026). Los que todavía nadie resolvió llevan la marca para
     # decidir ahí mismo — hasta ahora eso solo se veía en el listado aparte,
@@ -456,6 +458,232 @@ def _resolver_boleta_del_pago(pago, request):
         logger.warning('[tarjeta] fallo al avisar de la boleta %s: %s',
                        getattr(boleta, 'folio', None), exc)
     return f'Boleta {boleta.folio or "(en proceso)"}: {mensaje}{aviso}'
+
+
+# ---------------------------------------------------------------------------
+# Canje de gift card (Jorge, 24-09-2026, «paso 1»). La tarjeta ya creaba la
+# reserva, sumaba servicios, descuentos y pagos: faltaba justo lo que distingue
+# a un canje, pagar con la gift card, y cada vez había que salir al admin a
+# buscarla (23 canjes en 90 días, 22 a mano). Se busca por código —o por el
+# nombre de quien la recibió—, se VE antes de usarla y se aplica con un toque
+# por lo que falte pagar. El canje no boletea: la boleta se emitió al venderla.
+# ---------------------------------------------------------------------------
+
+MAX_RESULTADOS_GIFTCARD = 6
+
+
+def _pesos(n):
+    return f'${int(n or 0):,}'.replace(',', '.')
+
+
+def _codigo_limpio(texto):
+    """Los códigos son 12 letras y números en mayúscula; el cliente los dicta
+    con espacios, guiones o en minúscula."""
+    return re.sub(r'[^0-9A-Za-z]', '', texto or '').upper()
+
+
+def _compra_sin_pagar(gc):
+    """¿La venta donde se compró esta gift card todavía debe plata?
+
+    No se lee del campo `estado`, que significa dos cosas según quién lo
+    escribió: «compra sin pagar» (la venta por Luna o la web la crea así y la
+    pasa a «cobrado» al pagarse) y «vigente, con saldo por usar» (el canje
+    parcial y el ajuste de saldo la dejan «por_cobrar»). La venta de origen no
+    tiene esa ambigüedad. Una gift card no ligada a ninguna venta —vendida a
+    mano en el admin— no se puede comprobar y se da por pagada: así se venden.
+    En prod, 24-09-2026: de 121 vigentes ligadas, 3 con la venta debiendo, y 4
+    ya pagadas marcadas «por_cobrar».
+    """
+    venta = gc.venta_reserva if gc.venta_reserva_id else None
+    return venta is not None and int(venta.saldo_pendiente or 0) > 0
+
+
+def estado_giftcard(gc, hoy=None):
+    """El estado en palabras, para quien la tiene en la mano. El campo `estado`
+    no sirve para esto (ver _compra_sin_pagar): se deriva del saldo, el
+    vencimiento y la venta donde se compró."""
+    hoy = hoy or timezone.localdate()
+    saldo = int(gc.monto_disponible or 0)
+    if gc.fecha_vencimiento and gc.fecha_vencimiento < hoy:
+        return 'Vencida'
+    if saldo <= 0:
+        return 'Usada'
+    if _compra_sin_pagar(gc):
+        return 'Por cobrar'
+    if saldo < int(gc.monto_inicial or 0):
+        return f'Le quedan {_pesos(saldo)}'
+    return 'Lista para usar'
+
+
+def _nombre_experiencia(gc):
+    from ventas.models import GiftCardExperiencia
+    clave = (gc.servicio_asociado or '').strip()
+    if not clave:
+        return 'Gift card de monto libre'
+    nombre = (GiftCardExperiencia.objects.filter(id_experiencia=clave)
+              .values_list('nombre', flat=True).first())
+    if nombre:
+        return nombre
+    legible = clave.replace('_', ' ')
+    return legible[:1].upper() + legible[1:]
+
+
+def _ficha_giftcard(gc, venta):
+    """Lo que hay que ver ANTES de usarla, y cuánto se aplicaría a esta reserva.
+
+    `problema` impide aplicarla; `aviso` pide confirmar. Una compra sin pagar
+    no se bloquea —quien cobra puede saber que se pagó por fuera—, pero se
+    pregunta, y se le recuerda dónde registrar ese pago.
+    """
+    hoy = timezone.localdate()
+    saldo = int(gc.monto_disponible or 0)
+    pendiente = int(venta.saldo_pendiente or 0)
+    problema, aviso = '', ''
+    if gc.venta_reserva_id == venta.pk:
+        problema = 'Esta gift card se vendió en ESTA reserva: no puede pagarse a sí misma.'
+    elif gc.fecha_vencimiento and gc.fecha_vencimiento < hoy:
+        problema = f'Venció el {gc.fecha_vencimiento:%d-%m-%Y}.'
+    elif saldo <= 0:
+        uso = (Pago.objects.filter(giftcard=gc, metodo_pago='giftcard')
+               .order_by('-fecha_pago').values_list('venta_reserva_id', flat=True).first())
+        problema = 'Ya fue usada' + (f' en la reserva #{uso}' if uso else '') + '.'
+    elif pendiente <= 0:
+        problema = 'Esta reserva no tiene saldo por pagar: agrega primero los servicios.'
+    elif _compra_sin_pagar(gc):
+        aviso = (f'La venta donde se compró esta gift card (reserva #{gc.venta_reserva_id}) '
+                 f'todavía debe {_pesos(gc.venta_reserva.saldo_pendiente)}. Si ya se pagó, '
+                 'registra ese pago en esa reserva. ¿La aplico igual?')
+    comprador = gc.comprador_nombre or (
+        gc.cliente_comprador.nombre if gc.cliente_comprador_id else '')
+    para = gc.destinatario_nombre or (
+        gc.cliente_destinatario.nombre if gc.cliente_destinatario_id else '')
+    return {
+        'id': gc.pk,
+        'codigo': gc.codigo,
+        'experiencia': _nombre_experiencia(gc),
+        'para': (para or '').strip(),
+        'compro': (comprador or '').strip(),
+        'monto_inicial': int(gc.monto_inicial or 0),
+        'saldo': saldo,
+        'vence': gc.fecha_vencimiento.strftime('%d-%m-%Y') if gc.fecha_vencimiento else '',
+        'vendida_en': gc.venta_reserva_id,
+        'estado': estado_giftcard(gc, hoy),
+        'aplicar': 0 if problema else min(saldo, pendiente),
+        'problema': problema,
+        'aviso': aviso,
+    }
+
+
+@staff_required
+def tarjeta_buscar_giftcard(request, venta_id):
+    """Busca la gift card a canjear en esta reserva. Solo mira; no toca nada.
+
+    Por código (exacto, o su comienzo si el cliente dicta una parte) y, si no
+    aparece, por el nombre de quien la recibió o la compró — entre las que
+    todavía se pueden usar.
+    """
+    from ventas.models import GiftCard
+
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+    texto = (request.GET.get('q') or '').strip()
+    if len(texto) < 3:
+        return JsonResponse({'ok': False, 'mensaje': 'Escribe el código de la gift card '
+                             '(o al menos 3 letras del nombre).'}, status=400)
+    base = GiftCard.objects.select_related('cliente_comprador', 'cliente_destinatario',
+                                          'venta_reserva')
+    codigo = _codigo_limpio(texto)
+    encontradas = []
+    if len(codigo) >= 6:
+        exacta = base.filter(codigo__iexact=codigo).first()
+        encontradas = ([exacta] if exacta else
+                       list(base.filter(codigo__istartswith=codigo)
+                            .order_by('-id')[:MAX_RESULTADOS_GIFTCARD]))
+    if not encontradas and re.search(r'[^\W\d_]{3,}', texto):
+        encontradas = list(
+            base.filter(fecha_vencimiento__gte=timezone.localdate(), monto_disponible__gt=0)
+            .filter(Q(destinatario_nombre__icontains=texto)
+                    | Q(comprador_nombre__icontains=texto)
+                    | Q(cliente_destinatario__nombre__icontains=texto)
+                    | Q(cliente_comprador__nombre__icontains=texto))
+            .order_by('fecha_vencimiento')[:MAX_RESULTADOS_GIFTCARD])
+    if not encontradas:
+        return JsonResponse({'ok': False, 'mensaje': f'No encontré una gift card con «{texto}». '
+                             'Revisa el código con el cliente.'}, status=404)
+    return JsonResponse({'ok': True,
+                         'giftcards': [_ficha_giftcard(gc, venta) for gc in encontradas]})
+
+
+@staff_required
+@require_POST
+def tarjeta_aplicar_giftcard(request, venta_id):
+    """Paga la reserva con la gift card: lo que falte pagar, hasta su saldo.
+
+    Mismo camino que un pago normal: el candado de la reserva y
+    `Pago.objects.create`, cuyas validaciones del modelo (vencimiento, saldo) y
+    `GiftCard.usar()` descuentan el saldo. Sin transacción que lo envuelva, a
+    propósito (ver _reserva_en_exclusiva). Todo se relee DENTRO del candado: el
+    saldo de la reserva y el de la gift card pueden haber cambiado desde que se
+    buscó, y un segundo clic encuentra la gift card ya usada o la reserva pagada.
+    """
+    from ventas.models import GiftCard
+
+    venta = get_object_or_404(VentaReserva, pk=venta_id)
+    try:
+        gc_id = int(request.POST.get('giftcard_id') or 0)
+    except (TypeError, ValueError):
+        gc_id = 0
+    confirmado = bool(request.POST.get('confirmar_por_cobrar'))
+    try:
+        with _reserva_en_exclusiva(venta_id):
+            venta.refresh_from_db()
+            gc = (GiftCard.objects.select_related('cliente_comprador', 'cliente_destinatario',
+                                                  'venta_reserva')
+                  .filter(pk=gc_id).first())
+            if gc is None:
+                return JsonResponse({'ok': False, 'mensaje': 'No encontré esa gift card. '
+                                     'Búscala de nuevo.'}, status=404)
+            ficha = _ficha_giftcard(gc, venta)
+            if ficha['problema']:
+                return JsonResponse({'ok': False, 'mensaje': ficha['problema']}, status=400)
+            if ficha['aviso'] and not confirmado:
+                return JsonResponse({'ok': False, 'confirmar': True,
+                                     'mensaje': ficha['aviso']}, status=409)
+            monto = ficha['aplicar']
+            pago = Pago.objects.create(venta_reserva=venta, monto=monto, metodo_pago='giftcard',
+                                       giftcard=gc, usuario=request.user)
+            if ficha['aviso']:
+                # No se toca el estado de la gift card (ver _compra_sin_pagar): el
+                # pago que falta va en la reserva donde se vendió. Queda quién decidió.
+                logger.warning('[tarjeta] gift card %s canjeada en la reserva %s con su venta '
+                               '(#%s) debiendo; lo confirmó %s', gc.codigo, venta_id,
+                               gc.venta_reserva_id, request.user)
+    except ValidationError as exc:
+        mensaje = ' '.join(getattr(exc, 'messages', None) or [str(exc)])
+        return JsonResponse({'ok': False, 'mensaje': mensaje or 'La gift card no se pudo usar.'},
+                            status=400)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] no se pudo aplicar la gift card %s a la reserva %s: %s',
+                         gc_id, venta_id, exc)
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo aplicar la gift card. '
+                             'Inténtalo desde el admin.'}, status=400)
+
+    venta.refresh_from_db()
+    gc.refresh_from_db()
+    falta = int(venta.saldo_pendiente or 0)
+    mensaje = f'Gift card aplicada: {_pesos(monto)}.'
+    if int(gc.monto_disponible or 0) > 0:
+        mensaje += f' A la gift card le quedan {_pesos(gc.monto_disponible)}.'
+    if falta > 0:
+        mensaje += (f' Faltan {_pesos(falta)} por pagar: cóbralos aparte o, si el precio de '
+                    'la experiencia subió, usa «Aplicar descuento».')
+    return JsonResponse({
+        'ok': True,
+        'mensaje': mensaje,
+        'pago_id': pago.pk,
+        'total': int(venta.total or 0),
+        'pagado': int(venta.pagado or 0),
+        'saldo': falta,
+    })
 
 
 def _comanda_del_producto(venta, producto, usuario, venta_id):

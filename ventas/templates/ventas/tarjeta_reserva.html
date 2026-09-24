@@ -71,6 +71,14 @@ internas y se reconocen entre sí.
           background:#FFF8E1;border-left:4px solid #FB8C00;border-radius:6px;
           padding:8px 10px}
   .btn-pago{background:var(--ok);color:#fff;margin-bottom:10px}
+  .btn-gc{background:#6d4c7d;color:#fff;margin-bottom:10px}
+  .gc-ficha{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;font-size:15px}
+  .gc-ficha>div{margin-bottom:4px}
+  .gc-tit{font-weight:600}
+  .gc-cod{font-family:ui-monospace,Menlo,monospace;letter-spacing:1px;color:var(--hint)}
+  .gc-mal{color:var(--debe);margin-top:6px}
+  .gc-aviso{color:#8a6d3b;margin-top:6px}
+  .gc-ficha .btn{margin:10px 0 0}
   .oculto{display:none}
   .campo{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);
          border-radius:10px;margin-bottom:10px;background:#fff;font-family:inherit;
@@ -201,7 +209,7 @@ internas y se reconocen entre sí.
     <div id="listaPagos">
     {% for p in pagos %}
       <div class="fila">
-        <span>${{ p.monto|floatformat:"0g" }} · {{ p.get_metodo_pago_display|default:p.metodo_pago }}
+        <span>${{ p.monto|floatformat:"0g" }} · {{ p.get_metodo_pago_display|default:p.metodo_pago }}{% if p.giftcard_id %} <span class="cuando">{{ p.giftcard.codigo }}</span>{% endif %}
           {% if p.boleta %}<br>
           <a class="cuando" style="color:#1e7d32;text-decoration:none"
              href="{% url 'facturacion:boleta_impresa_por_token' p.boleta.token_consulta %}"
@@ -337,6 +345,28 @@ internas y se reconocen entre sí.
       <button type="submit" class="btn btn-pago">Guardar pago</button>
       <button type="button" class="btn btn-admin" id="pagoCancelar">Cancelar</button>
     </form>
+  </div>
+
+  {% comment %}
+  Canje de gift card (24-09-2026). Buscar por código —o por el nombre de quien
+  la recibió—, VER la gift card antes de usarla y aplicarla con un toque por lo
+  que falte pagar. El servidor decide todo (saldo, vencimiento, si ya se usó);
+  acá solo se muestra. No boletea: la boleta se emitió al venderla.
+  {% endcomment %}
+  <button type="button" class="btn btn-gc" id="btnAbrirGc">🎁 Pagar con gift card</button>
+
+  <div class="card oculto" id="formGc">
+    <h2>Pagar con gift card</h2>
+    <form id="fGc">
+      <input class="campo" name="q" id="gcTexto" type="text" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" placeholder="Código de la gift card">
+      <div class="pista" style="font-size:14px;color:var(--hint);margin:-6px 0 10px">Si el
+        cliente no tiene el código, escribe el nombre de quien la recibió.</div>
+      <div class="err" id="gcError"></div>
+      <button type="submit" class="btn btn-gc">Buscar</button>
+      <button type="button" class="btn btn-admin" id="gcCancelar">Cancelar</button>
+    </form>
+    <div id="gcResultados"></div>
   </div>
 
   {% comment %}
@@ -751,6 +781,98 @@ internas y se reconocen entre sí.
         setTimeout(function () { abrir.textContent = '💰 Agregar pago'; }, 2600);
       })
       .catch(function () { mostrarError('Sin conexión. Inténtalo de nuevo.'); });
+  });
+})();
+
+(function () {
+  // Canje de gift card: buscar, VER antes de usar y aplicar con un toque.
+  // Todo lo que se pinta va con textContent: los nombres los escribió gente.
+  var abrir = document.getElementById('btnAbrirGc');
+  var caja = document.getElementById('formGc');
+  var form = document.getElementById('fGc');
+  var texto = document.getElementById('gcTexto');
+  var error = document.getElementById('gcError');
+  var res = document.getElementById('gcResultados');
+  var buscar = form.querySelector('button[type=submit]');
+  function fmt(n) { return '$' + Number(n).toLocaleString('es-CL'); }
+  function mostrarError(t) { error.textContent = t; error.style.display = 'block'; }
+  function linea(padre, t, clase) {
+    var d = document.createElement('div');
+    if (clase) { d.className = clase; }
+    d.textContent = t;
+    padre.appendChild(d);
+  }
+
+  abrir.addEventListener('click', function () {
+    caja.classList.toggle('oculto');
+    if (!caja.classList.contains('oculto')) { texto.focus(); }
+  });
+  document.getElementById('gcCancelar').addEventListener('click', function () {
+    caja.classList.add('oculto'); error.style.display = 'none'; res.textContent = '';
+  });
+
+  function aplicar(gc, boton, confirmado) {
+    // UN clic, UN canje: el botón se bloquea apenas se aprieta. El servidor
+    // también se defiende (un segundo pedido encuentra la gift card ya usada).
+    if (boton.disabled && !confirmado) { return; }
+    boton.disabled = true; boton.textContent = 'Aplicando…';
+    function soltar() { boton.disabled = false; boton.textContent = 'Aplicar ' + fmt(gc.aplicar); }
+    var datos = new FormData();
+    datos.append('giftcard_id', gc.id);
+    if (confirmado) { datos.append('confirmar_por_cobrar', '1'); }
+    fetch("{% url 'ventas:tarjeta_aplicar_giftcard' venta.pk %}",
+          {method: 'POST', body: datos, headers: {'X-CSRFToken': '{{ csrf_token }}'}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.confirmar) {
+          if (confirm(d.mensaje)) { aplicar(gc, boton, true); } else { soltar(); }
+          return;
+        }
+        if (!d.ok) { mostrarError(d.mensaje || 'No se pudo aplicar.'); soltar(); return; }
+        alert(d.mensaje);
+        location.reload();
+      })
+      .catch(function () { mostrarError('Sin conexión. Inténtalo de nuevo.'); soltar(); });
+  }
+
+  function pintar(gc) {
+    var ficha = document.createElement('div');
+    ficha.className = 'gc-ficha';
+    linea(ficha, '🎁 ' + gc.experiencia, 'gc-tit');
+    linea(ficha, gc.codigo, 'gc-cod');
+    if (gc.para) { linea(ficha, 'Para: ' + gc.para); }
+    if (gc.compro) { linea(ficha, 'La compró: ' + gc.compro); }
+    linea(ficha, 'Saldo ' + fmt(gc.saldo) + ' de ' + fmt(gc.monto_inicial) +
+                 (gc.vence ? ' · vence ' + gc.vence : ''));
+    linea(ficha, gc.estado + (gc.vendida_en ? ' · vendida en la reserva #' + gc.vendida_en : ''));
+    if (gc.problema) {
+      linea(ficha, '⛔ ' + gc.problema, 'gc-mal');
+    } else {
+      if (gc.aviso) { linea(ficha, '⚠️ ' + gc.aviso, 'gc-aviso'); }
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn btn-gc';
+      b.textContent = 'Aplicar ' + fmt(gc.aplicar);
+      b.addEventListener('click', function () { aplicar(gc, b, false); });
+      ficha.appendChild(b);
+    }
+    res.appendChild(ficha);
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error.style.display = 'none'; res.textContent = '';
+    var q = (texto.value || '').trim();
+    if (q.length < 3) { mostrarError('Escribe el código de la gift card.'); return; }
+    buscar.disabled = true; buscar.textContent = 'Buscando…';
+    function soltar() { buscar.disabled = false; buscar.textContent = 'Buscar'; }
+    fetch("{% url 'ventas:tarjeta_buscar_giftcard' venta.pk %}?q=" + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        soltar();
+        if (!d.ok) { mostrarError(d.mensaje || 'No se encontró.'); return; }
+        d.giftcards.forEach(pintar);
+      })
+      .catch(function () { soltar(); mostrarError('Sin conexión. Inténtalo de nuevo.'); });
   });
 })();
 
