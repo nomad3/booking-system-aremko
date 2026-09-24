@@ -39,8 +39,14 @@ def enviar_por_whatsapp(giftcard, telefono, nombre_comprador, experiencia):
     saludo = f'Hola {nombre}, ' if nombre else 'Hola, '
     para = (giftcard.destinatario_nombre or '').strip()
     vence = giftcard.fecha_vencimiento
+    saldo, inicial = int(giftcard.monto_disponible or 0), int(giftcard.monto_inicial or 0)
+    # Usada en parte: el PDF muestra la carta original, así que el mensaje dice
+    # cuánto queda de verdad.
+    queda = (f' Le quedan ${saldo:,} por usar.'.replace(',', '.')
+             if 0 < saldo < inicial else '')
     caption = (f'{saludo}acá está tu gift card de Aremko: {experiencia}'
                + (f' para {para}' if para else '') + ' 🎁'
+               + queda
                + (f' Vale hasta el {vence:%d-%m-%Y}.' if vence else ''))
     enviado, motivo = enviar_documento(
         telefono, pdf, f'giftcard-{giftcard.codigo}.pdf', caption)

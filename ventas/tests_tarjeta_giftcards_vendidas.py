@@ -217,3 +217,59 @@ class ReenviarPorEmail(_Base):
             r = self._email(venta, gc)
         self.assertEqual(r.status_code, 400)
         enviar.assert_not_called()
+
+
+class UsadasYVencidasNoSeReenvian(_Base):
+    """Prueba real del 24-09-2026: la gift card de Alda, ya canjeada, salió por
+    WhatsApp con «Vale hasta el 06-01-2027». Quien la recibe cree que tiene un
+    regalo. El código se sigue pudiendo copiar: sirve para buscarla."""
+
+    def _usada(self, venta, gc, saldo=0):
+        GiftCard.objects.filter(pk=gc.pk).update(monto_disponible=saldo)
+        gc.refresh_from_db()
+        return gc
+
+    def test_una_usada_no_ofrece_envios_pero_si_copiar(self):
+        venta, [gc] = self._venta_de_giftcard()
+        self._usada(venta, gc)
+        html = self._tarjeta(venta)
+        self.assertIn(gc.codigo, html)
+        self.assertIn('Copiar código', html)
+        self.assertNotIn('Enviar PDF por WhatsApp', html)
+        self.assertNotIn('Reenviar por email', html)
+        self.assertIn('Ya se usó entera', html)
+
+    def test_una_vencida_tampoco(self):
+        venta, [gc] = self._venta_de_giftcard()
+        GiftCard.objects.filter(pk=gc.pk).update(
+            fecha_vencimiento=timezone.localdate() - datetime.timedelta(days=1))
+        html = self._tarjeta(venta)
+        self.assertNotIn('Enviar PDF por WhatsApp', html)
+        self.assertIn('Venció el', html)
+
+    def test_el_servidor_tampoco_las_envia(self):
+        venta, [gc] = self._venta_de_giftcard()
+        self._usada(venta, gc)
+        with mock.patch(VENTANA, return_value=True), mock.patch('requests.post') as post, \
+             mock.patch(EMAIL, return_value=True) as email:
+            r1 = self._whatsapp(venta, gc)
+            r2 = self._email(venta, gc)
+        self.assertEqual((r1.status_code, r2.status_code), (400, 400))
+        self.assertIn('Ya se usó entera', r1.json()['mensaje'])
+        post.assert_not_called()
+        email.assert_not_called()
+
+    def test_enviar_todas_cuenta_solo_las_que_se_pueden_enviar(self):
+        venta, cartas = self._venta_de_giftcard(n=2)
+        self._usada(venta, cartas[0])
+        self.assertNotIn('Enviar todas por WhatsApp', self._tarjeta(venta))
+
+    def test_una_usada_en_parte_se_envia_y_el_mensaje_dice_cuanto_queda(self):
+        venta, [gc] = self._venta_de_giftcard()
+        self._usada(venta, gc, saldo=30000)
+        with mock.patch(VENTANA, return_value=True), \
+             mock.patch(GENERAR_PDF, return_value=PDF), \
+             mock.patch('requests.post', return_value=_respuesta()) as post:
+            r = self._whatsapp(venta, gc)
+        self.assertTrue(r.json()['ok'], r.json())
+        self.assertIn('Le quedan $30.000 por usar', post.call_args.kwargs['data']['caption'])

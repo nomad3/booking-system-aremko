@@ -284,6 +284,8 @@ def tarjeta_reserva(request, venta_id):
     # son de esas ciudades y así se resuelve con un toque, sin buscar entre 346.
     from ventas.models import Comuna
 
+    giftcards_vendidas = _giftcards_vendidas(venta)
+
     return render(request, 'ventas/tarjeta_reserva.html', {
         'venta': venta,
         'servicios': servicios,
@@ -295,7 +297,8 @@ def tarjeta_reserva(request, venta_id):
         'fecha_sugerida': _fecha_del_descuento(venta),
         'productos': productos,
         'pagos': pagos,
-        'giftcards_vendidas': _giftcards_vendidas(venta),
+        'giftcards_vendidas': giftcards_vendidas,
+        'giftcards_enviables': sum(1 for g in giftcards_vendidas if g['enviable'] and g['telefono']),
         'mensaje_pase': mensaje_pase(venta),
         'debe': int(venta.saldo_pendiente or 0) > 0,
         'metodos_pago': _metodos_pago_visibles(),
@@ -712,6 +715,21 @@ def _codigo_liberado(gc):
     return not _compra_sin_pagar(gc) or bool(gc.enviado_email)
 
 
+def _motivo_no_se_reenvia(gc, hoy=None):
+    """Por qué esta gift card NO se vuelve a enviar, o '' si se puede.
+
+    Una usada entera o vencida se ve vigente en el PDF —monto original, «vale
+    hasta»— y quien la recibe cree que tiene un regalo (prueba del 24-09-2026:
+    la de Alda, ya canjeada, salió con «Vale hasta el 06-01-2027»). El código
+    se sigue pudiendo copiar: sirve para buscarla."""
+    hoy = hoy or timezone.localdate()
+    if gc.fecha_vencimiento and gc.fecha_vencimiento < hoy:
+        return f'Venció el {gc.fecha_vencimiento:%d-%m-%Y}: no se reenvía.'
+    if int(gc.monto_disponible or 0) <= 0:
+        return 'Ya se usó entera: no se reenvía.'
+    return ''
+
+
 def _giftcards_vendidas(venta):
     try:
         cartas = list(venta.giftcards.select_related('cliente_comprador', 'venta_reserva')
@@ -723,6 +741,7 @@ def _giftcards_vendidas(venta):
     for gc in cartas:
         telefono, email, _ = _contacto_comprador(gc, venta)
         liberado = _codigo_liberado(gc)
+        no_se_reenvia = _motivo_no_se_reenvia(gc) if liberado else ''
         filas.append({
             'id': gc.pk,
             'experiencia': _nombre_experiencia(gc),
@@ -731,6 +750,8 @@ def _giftcards_vendidas(venta):
             'vence': gc.fecha_vencimiento,
             'estado': estado_giftcard(gc),
             'liberado': liberado,
+            'enviable': liberado and not no_se_reenvia,
+            'no_se_reenvia': no_se_reenvia,
             'codigo': gc.codigo if liberado else '',
             'enviado_email': bool(gc.enviado_email),
             'enviado_whatsapp': bool(gc.enviado_whatsapp),
@@ -770,6 +791,9 @@ def tarjeta_enviar_giftcard_whatsapp(request, venta_id):
         if not _codigo_liberado(gc):
             return JsonResponse({'ok': False, 'mensaje': 'La compra todavía no está pagada: '
                                  'registra el pago y después envíala.'}, status=400)
+        motivo_no = _motivo_no_se_reenvia(gc)
+        if motivo_no:
+            return JsonResponse({'ok': False, 'mensaje': motivo_no}, status=400)
         telefono, _, nombre = _contacto_comprador(gc, venta)
         if not telefono:
             return JsonResponse({'ok': False, 'mensaje': 'El comprador no tiene teléfono '
@@ -813,6 +837,9 @@ def tarjeta_reenviar_giftcard_email(request, venta_id):
     if not _codigo_liberado(gc):
         return JsonResponse({'ok': False, 'mensaje': 'La compra todavía no está pagada: '
                              'registra el pago y después envíala.'}, status=400)
+    motivo_no = _motivo_no_se_reenvia(gc)
+    if motivo_no:
+        return JsonResponse({'ok': False, 'mensaje': motivo_no}, status=400)
     _, email, nombre = _contacto_comprador(gc, venta)
     if not email:
         return JsonResponse({'ok': False, 'mensaje': 'El comprador no tiene correo registrado.'},

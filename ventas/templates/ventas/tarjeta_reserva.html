@@ -226,15 +226,19 @@ internas y se reconocen entre sí.
         {% if g.liberado %}
           <div class="gc-cod">{{ g.codigo }}</div>
           <button type="button" class="btn btn-gc gc-copiar" data-codigo="{{ g.codigo }}">📋 Copiar código</button>
-          {% if g.telefono %}<button type="button" class="btn btn-pago gc-whatsapp">📲 Enviar PDF por WhatsApp</button>{% endif %}
-          {% if g.email %}<button type="button" class="btn btn-admin gc-email">✉️ Reenviar por email</button>{% endif %}
+          {% if g.enviable %}
+            {% if g.telefono %}<button type="button" class="btn btn-pago gc-whatsapp">📲 Enviar PDF por WhatsApp</button>{% endif %}
+            {% if g.email %}<button type="button" class="btn btn-admin gc-email">✉️ Reenviar por email</button>{% endif %}
+          {% else %}
+            <div class="gc-aviso">{{ g.no_se_reenvia }}</div>
+          {% endif %}
         {% else %}
           <div class="gc-aviso">🔒 El código se muestra cuando se registre el pago de la compra.</div>
         {% endif %}
         <div class="err gc-err"></div>
       </div>
       {% endfor %}
-      {% if giftcards_vendidas|length > 1 %}
+      {% if giftcards_enviables > 1 %}
       <button type="button" class="btn btn-pago" id="gcEnviarTodas" style="margin-top:12px">📲 Enviar todas por WhatsApp</button>
       {% endif %}
     </div>
