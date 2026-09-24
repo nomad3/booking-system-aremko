@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-09-23_
+_Última revisión: 2026-09-24_
 
 ## Web y marketing
 
@@ -407,6 +407,30 @@ _Última revisión: 2026-09-23_
     anotada al revisar: si el cliente tiene una cotización pendiente viva y confirma de
     nuevo el carrito CAMBIADO, se le devuelve la cotización vieja (comportamiento previo,
     no tocado por P-49).
+
+52. **P-52 · Gift cards: venta visible y canje sin enredos (pasos 2 y 3)** — Plan
+    aprobado por Jorge el 23-09. **Paso 1 EN PROD 24-09 (commit `5fbdee12`):** pagar
+    con gift card desde la tarjeta móvil (buscar por código o nombre, verla antes de
+    usarla, «Aplicar $X» por lo que falte). Falta:
+    **Paso 2 ·** en la tarjeta de una reserva que VENDIÓ gift cards (web o Luna),
+    «🎁 Ver gift cards»: experiencia, para quién, monto, vence, estado, **copiar
+    código** y **enviar el PDF por WhatsApp al comprador** (mismo mecanismo que las
+    boletas: directo si el cliente escribió en las últimas 24 h; si no, reenviar por
+    email). Solo si la compra está pagada. **Paso 3 ·** Luna ayuda con el canje: pide
+    código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
+    `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
+    la reserva (reemplaza las reservas con fecha de relleno 02/02, caso 6873) y
+    anotar qué servicios incluye cada experiencia (hoy lo sabe Deborah de memoria).
+    **Deudas del modelo encontradas el 24-09 (sin arreglar):** (a) el campo `estado`
+    significa dos cosas —«compra sin pagar» (venta por Luna/web) y «vigente con saldo»
+    (canje parcial, «Ajustar saldo»)—; la tarjeta ya no lo lee, deriva «¿se pagó?» de
+    la venta de origen. (b) La señal `verificar_saldo_giftcard_post_pago` recalcula
+    el saldo como «monto inicial − canjes» en CADA canje (su condición de
+    inconsistencia es siempre verdadera) y deja «por_cobrar» a toda gift card con
+    saldo: pisaría el saldo de una gift card ajustada con «Ajustar saldo» (que sube
+    el disponible sin tocar el inicial) y podría dejarlo negativo. Hoy no muerde: las
+    496 cuadran. (c) `Pago.save()` llama a `usar()` también al EDITAR un pago con
+    gift card ya guardado: editarlo en el admin descuenta el saldo dos veces.
 
 ## Asistente de Publicaciones (community manager)
 
