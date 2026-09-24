@@ -411,12 +411,13 @@ _Última revisión: 2026-09-24_
 52. **P-52 · Gift cards: venta visible y canje sin enredos (pasos 2 y 3)** — Plan
     aprobado por Jorge el 23-09. **Paso 1 EN PROD 24-09 (commit `5fbdee12`):** pagar
     con gift card desde la tarjeta móvil (buscar por código o nombre, verla antes de
-    usarla, «Aplicar $X» por lo que falte). Falta:
-    **Paso 2 ·** en la tarjeta de una reserva que VENDIÓ gift cards (web o Luna),
-    «🎁 Ver gift cards»: experiencia, para quién, monto, vence, estado, **copiar
-    código** y **enviar el PDF por WhatsApp al comprador** (mismo mecanismo que las
-    boletas: directo si el cliente escribió en las últimas 24 h; si no, reenviar por
-    email). Solo si la compra está pagada. **Paso 3 ·** Luna ayuda con el canje: pide
+    usarla, «Aplicar $X» por lo que falte). **Paso 2 EN PROD 24-09 (commit
+    `5b454e26`):** «🎁 Gift cards vendidas» en la tarjeta: ver, copiar código, PDF por
+    WhatsApp al comprador (ventana 24 h) o reenvío por email; código oculto hasta que
+    la compra esté pagada (decisión de Jorge). Falta la prueba real de Jorge con la
+    gift card 314 (reserva 4448, él es el comprador). Falta: **2b ·** que el PDF salga
+    solo por WhatsApp al registrarse el pago si el cliente está conversando (como la
+    boleta) — Jorge: «ok», en un deploy aparte. **Paso 3 ·** Luna ayuda con el canje: pide
     código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
     `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
     la reserva (reemplaza las reservas con fecha de relleno 02/02, caso 6873) y
