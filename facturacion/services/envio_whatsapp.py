@@ -74,6 +74,26 @@ def _nombre_de(boleta):
     return nombre.split(' ')[0] if nombre else ''
 
 
+def enviar_documento(telefono, contenido, nombre_archivo, caption):
+    """Manda un PDF por WhatsApp vía el backend Go. Devuelve (enviado, motivo).
+
+    Lo usan la boleta y la gift card (P-52). El nombre del archivo tiene que
+    terminar en .pdf y no llevar otros puntos: WhatsApp lee lo que viene
+    después del último punto como extensión y rechaza con #546. No revisa la
+    ventana de 24 horas: eso lo decide quien llama.
+    """
+    import requests
+
+    resp = requests.post(
+        f'{_base_url()}/api/v1/whatsapp/send-media',
+        data={'to': telefono, 'caption': caption},
+        files={'file': (nombre_archivo, contenido, 'application/pdf')},
+        timeout=60)
+    if resp.status_code != 200:
+        return False, f'el backend respondió {resp.status_code}: {resp.text[:200]}'
+    return True, 'enviado'
+
+
 def enviar_pdf_al_cliente(boleta, forzar=False):
     """Manda el PDF de la boleta por WhatsApp. Devuelve (enviado, motivo).
 
@@ -103,19 +123,14 @@ def enviar_pdf_al_cliente(boleta, forzar=False):
         if pdf is None:
             return False, f'no se pudo generar el PDF: {error}'
 
-        import requests
-
         nombre = _nombre_de(boleta)
         saludo = f'Hola {nombre}, ' if nombre else 'Hola, '
-        resp = requests.post(
-            f'{_base_url()}/api/v1/whatsapp/send-media',
-            data={'to': telefono,
-                  'caption': (f'{saludo}acá está tu boleta electrónica '
-                              f'N° {boleta.folio} de Aremko. ¡Gracias por tu visita!')},
-            files={'file': (f'boleta-{boleta.folio}.pdf', pdf, 'application/pdf')},
-            timeout=60)
-        if resp.status_code != 200:
-            return False, f'el backend respondió {resp.status_code}: {resp.text[:200]}'
+        enviado, motivo = enviar_documento(
+            telefono, pdf, f'boleta-{boleta.folio}.pdf',
+            (f'{saludo}acá está tu boleta electrónica '
+             f'N° {boleta.folio} de Aremko. ¡Gracias por tu visita!'))
+        if not enviado:
+            return False, motivo
 
         boleta.enviada_cliente_at = timezone.now()
         boleta.save(update_fields=['enviada_cliente_at', 'actualizada_at'])

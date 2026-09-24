@@ -52,6 +52,12 @@ urlpatterns = [
          name='tarjeta_buscar_giftcard'),
     path('reserva/<int:venta_id>/tarjeta/giftcard/aplicar/', tarjeta_reserva_view.tarjeta_aplicar_giftcard,
          name='tarjeta_aplicar_giftcard'),
+    path('reserva/<int:venta_id>/tarjeta/giftcard/whatsapp/',
+         tarjeta_reserva_view.tarjeta_enviar_giftcard_whatsapp,
+         name='tarjeta_enviar_giftcard_whatsapp'),
+    path('reserva/<int:venta_id>/tarjeta/giftcard/email/',
+         tarjeta_reserva_view.tarjeta_reenviar_giftcard_email,
+         name='tarjeta_reenviar_giftcard_email'),
     # Servicio elegido de una lista, sin pasar por el calendario
     path('reserva/<int:venta_id>/tarjeta/servicio-lista/',
          tarjeta_reserva_view.tarjeta_agregar_servicio_lista,

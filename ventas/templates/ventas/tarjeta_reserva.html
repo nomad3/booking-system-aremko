@@ -204,6 +204,43 @@ internas y se reconocen entre sí.
     {% if not productos %}<div class="vacio" id="productosVacio">Sin productos.</div>{% endif %}
   </div>
 
+  {% comment %}
+  Gift cards VENDIDAS en esta reserva (24-09-2026, paso 2): verlas, copiar el
+  código y mandarle el PDF al comprador. El código y los envíos solo aparecen
+  con la compra pagada (la misma regla del email automático).
+  {% endcomment %}
+  {% if giftcards_vendidas %}
+  <div class="card" id="giftcards">
+    <h2>🎁 Gift cards vendidas ({{ giftcards_vendidas|length }})</h2>
+    <button type="button" class="btn btn-gc" id="btnVerGc">Ver gift cards</button>
+    <div class="oculto" id="listaGc">
+      {% for g in giftcards_vendidas %}
+      <div class="gc-ficha" data-id="{{ g.id }}" data-telefono="{{ g.telefono }}"
+           data-email="{{ g.email }}" data-para="{{ g.para }}">
+        <div class="gc-tit">{{ g.experiencia }}</div>
+        {% if g.para %}<div>Para {{ g.para }}</div>{% endif %}
+        <div>${{ g.monto|floatformat:"0g" }}{% if g.vence %} · vence {{ g.vence|date:"d-m-Y" }}{% endif %} · {{ g.estado }}</div>
+        {% if g.enviado_email or g.enviado_whatsapp %}
+        <div class="cuando">{% if g.enviado_email %}✉️ Enviada por email{% endif %}{% if g.enviado_email and g.enviado_whatsapp %} · {% endif %}{% if g.enviado_whatsapp %}📲 Enviada por WhatsApp{% endif %}</div>
+        {% endif %}
+        {% if g.liberado %}
+          <div class="gc-cod">{{ g.codigo }}</div>
+          <button type="button" class="btn btn-gc gc-copiar" data-codigo="{{ g.codigo }}">📋 Copiar código</button>
+          {% if g.telefono %}<button type="button" class="btn btn-pago gc-whatsapp">📲 Enviar PDF por WhatsApp</button>{% endif %}
+          {% if g.email %}<button type="button" class="btn btn-admin gc-email">✉️ Reenviar por email</button>{% endif %}
+        {% else %}
+          <div class="gc-aviso">🔒 El código se muestra cuando se registre el pago de la compra.</div>
+        {% endif %}
+        <div class="err gc-err"></div>
+      </div>
+      {% endfor %}
+      {% if giftcards_vendidas|length > 1 %}
+      <button type="button" class="btn btn-pago" id="gcEnviarTodas" style="margin-top:12px">📲 Enviar todas por WhatsApp</button>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card" id="pagos">
     <h2>Pagos</h2>
     <div id="listaPagos">
@@ -874,6 +911,128 @@ internas y se reconocen entre sí.
       })
       .catch(function () { soltar(); mostrarError('Sin conexión. Inténtalo de nuevo.'); });
   });
+})();
+
+(function () {
+  // Gift cards vendidas: ver, copiar el código y mandar el PDF al comprador.
+  var ver = document.getElementById('btnVerGc');
+  if (!ver) { return; }
+  var lista = document.getElementById('listaGc');
+  ver.addEventListener('click', function () {
+    lista.classList.toggle('oculto');
+    ver.textContent = lista.classList.contains('oculto') ? 'Ver gift cards' : 'Ocultar gift cards';
+  });
+
+  function copiar(texto, boton) {
+    var antes = boton.textContent;
+    function listo() {
+      boton.textContent = '✓ Código copiado';
+      setTimeout(function () { boton.textContent = antes; }, 2000);
+    }
+    // Respaldo para navegadores sin clipboard API (o sin HTTPS).
+    function aLaAntigua() {
+      var area = document.createElement('textarea');
+      area.value = texto; area.setAttribute('readonly', '');
+      area.style.position = 'fixed'; area.style.opacity = '0';
+      document.body.appendChild(area); area.select();
+      try { document.execCommand('copy'); listo(); } catch (e) { alert('Código: ' + texto); }
+      document.body.removeChild(area);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(listo, aLaAntigua);
+    } else { aLaAntigua(); }
+  }
+
+  function post(url, datos) {
+    return fetch(url, {method: 'POST', body: datos, headers: {'X-CSRFToken': '{{ csrf_token }}'}})
+      .then(function (r) { return r.json(); });
+  }
+  function mostrarError(ficha, texto) {
+    var err = ficha.querySelector('.gc-err');
+    err.textContent = texto; err.style.display = 'block';
+  }
+
+  // Un PDF por gift card. `alTerminar` sirve para «Enviar todas», que las
+  // manda de a una, esperando cada respuesta.
+  function enviarWhatsapp(ficha, boton, reenviar, alTerminar) {
+    ficha.querySelector('.gc-err').style.display = 'none';
+    var antes = boton.textContent;
+    boton.disabled = true; boton.textContent = 'Enviando…';
+    var datos = new FormData();
+    datos.append('giftcard_id', ficha.dataset.id);
+    if (reenviar) { datos.append('reenviar', '1'); }
+    function fin() { if (alTerminar) { alTerminar(); } }
+    post("{% url 'ventas:tarjeta_enviar_giftcard_whatsapp' venta.pk %}", datos)
+      .then(function (d) {
+        boton.disabled = false; boton.textContent = antes;
+        if (d.ya_enviada) {
+          if (confirm(d.mensaje)) { enviarWhatsapp(ficha, boton, true, alTerminar); } else { fin(); }
+          return;
+        }
+        if (!d.ok) { mostrarError(ficha, d.mensaje || 'No se pudo enviar.'); fin(); return; }
+        boton.textContent = '✓ Enviada por WhatsApp';
+        fin();
+      })
+      .catch(function () {
+        boton.disabled = false; boton.textContent = antes;
+        mostrarError(ficha, 'Sin conexión. Inténtalo de nuevo.'); fin();
+      });
+  }
+
+  Array.prototype.forEach.call(lista.querySelectorAll('.gc-ficha'), function (ficha) {
+    var bc = ficha.querySelector('.gc-copiar');
+    if (bc) { bc.addEventListener('click', function () { copiar(bc.dataset.codigo, bc); }); }
+
+    var bw = ficha.querySelector('.gc-whatsapp');
+    if (bw) {
+      bw.addEventListener('click', function () {
+        if (bw.disabled) { return; }
+        var para = ficha.dataset.para ? ' de ' + ficha.dataset.para : '';
+        if (!confirm('¿Enviar la gift card' + para + ' por WhatsApp al ' + ficha.dataset.telefono + '?')) { return; }
+        enviarWhatsapp(ficha, bw, false);
+      });
+    }
+
+    var be = ficha.querySelector('.gc-email');
+    if (be) {
+      be.addEventListener('click', function () {
+        if (be.disabled) { return; }
+        if (!confirm('¿Reenviar la gift card por email a ' + ficha.dataset.email + '?')) { return; }
+        ficha.querySelector('.gc-err').style.display = 'none';
+        var antes = be.textContent;
+        be.disabled = true; be.textContent = 'Enviando…';
+        var datos = new FormData();
+        datos.append('giftcard_id', ficha.dataset.id);
+        post("{% url 'ventas:tarjeta_reenviar_giftcard_email' venta.pk %}", datos)
+          .then(function (d) {
+            be.disabled = false; be.textContent = antes;
+            if (!d.ok) { mostrarError(ficha, d.mensaje || 'No se pudo enviar.'); return; }
+            be.textContent = '✓ Reenviada por email';
+          })
+          .catch(function () {
+            be.disabled = false; be.textContent = antes;
+            mostrarError(ficha, 'Sin conexión. Inténtalo de nuevo.');
+          });
+      });
+    }
+  });
+
+  var todas = document.getElementById('gcEnviarTodas');
+  if (todas) {
+    todas.addEventListener('click', function () {
+      var fichas = Array.prototype.filter.call(lista.querySelectorAll('.gc-ficha'),
+        function (f) { return f.querySelector('.gc-whatsapp'); });
+      if (!fichas.length || todas.disabled) { return; }
+      if (!confirm('¿Enviar las ' + fichas.length + ' gift cards por WhatsApp al ' +
+                   fichas[0].dataset.telefono + '?')) { return; }
+      todas.disabled = true; todas.textContent = 'Enviando…';
+      (function siguiente(i) {
+        if (i >= fichas.length) { todas.disabled = false; todas.textContent = '✓ Listo'; return; }
+        enviarWhatsapp(fichas[i], fichas[i].querySelector('.gc-whatsapp'), false,
+                       function () { siguiente(i + 1); });
+      })(0);
+    });
+  }
 })();
 
 (function () {

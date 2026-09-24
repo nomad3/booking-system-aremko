@@ -295,6 +295,7 @@ def tarjeta_reserva(request, venta_id):
         'fecha_sugerida': _fecha_del_descuento(venta),
         'productos': productos,
         'pagos': pagos,
+        'giftcards_vendidas': _giftcards_vendidas(venta),
         'mensaje_pase': mensaje_pase(venta),
         'debe': int(venta.saldo_pendiente or 0) > 0,
         'metodos_pago': _metodos_pago_visibles(),
@@ -684,6 +685,151 @@ def tarjeta_aplicar_giftcard(request, venta_id):
         'pagado': int(venta.pagado or 0),
         'saldo': falta,
     })
+
+
+# ---------------------------------------------------------------------------
+# Gift cards VENDIDAS en esta reserva (Jorge, 24-09-2026, «paso 2»): verlas,
+# copiar el código y mandarle el PDF al comprador por WhatsApp o de nuevo por
+# email. La tarjeta de una venta de gift card se veía vacía («sin servicios,
+# sin productos») y los PDF se mandaban a mano desde la bandeja.
+# ---------------------------------------------------------------------------
+
+def _contacto_comprador(gc, venta):
+    """(teléfono, email, nombre) de quien COMPRÓ la gift card."""
+    comprador = gc.cliente_comprador if gc.cliente_comprador_id else venta.cliente
+    telefono = ((getattr(comprador, 'telefono', '') or '') or (venta.cliente.telefono or '')
+                or (gc.comprador_telefono or '')).strip()
+    email = ((getattr(comprador, 'email', '') or '') or (venta.cliente.email or '')
+             or (gc.comprador_email or '')).strip()
+    nombre = ((getattr(comprador, 'nombre', '') or '') or (gc.comprador_nombre or '')).strip()
+    return telefono, email, nombre
+
+
+def _codigo_liberado(gc):
+    """El código se muestra y se envía solo con la compra pagada (Jorge,
+    24-09-2026: «sí»), la misma regla del email automático: no regalar una gift
+    card sin cobrarla. Si ese email ya salió, esconderlo acá no protege nada."""
+    return not _compra_sin_pagar(gc) or bool(gc.enviado_email)
+
+
+def _giftcards_vendidas(venta):
+    try:
+        cartas = list(venta.giftcards.select_related('cliente_comprador', 'venta_reserva')
+                      .order_by('id'))
+    except Exception:  # noqa: BLE001 — la tarjeta abre igual sin esto
+        logger.exception('[tarjeta] no se pudieron leer las gift cards de la venta %s', venta.pk)
+        return []
+    filas = []
+    for gc in cartas:
+        telefono, email, _ = _contacto_comprador(gc, venta)
+        liberado = _codigo_liberado(gc)
+        filas.append({
+            'id': gc.pk,
+            'experiencia': _nombre_experiencia(gc),
+            'para': (gc.destinatario_nombre or '').strip(),
+            'monto': int(gc.monto_inicial or 0),
+            'vence': gc.fecha_vencimiento,
+            'estado': estado_giftcard(gc),
+            'liberado': liberado,
+            'codigo': gc.codigo if liberado else '',
+            'enviado_email': bool(gc.enviado_email),
+            'enviado_whatsapp': bool(gc.enviado_whatsapp),
+            'telefono': telefono,
+            'email': email,
+        })
+    return filas
+
+
+def _giftcard_de_la_venta(request, venta_id):
+    """La gift card pedida, SOLO si se vendió en esta reserva."""
+    from ventas.models import GiftCard
+    try:
+        gc_id = int(request.POST.get('giftcard_id') or 0)
+    except (TypeError, ValueError):
+        return None
+    return (GiftCard.objects.select_related('cliente_comprador', 'venta_reserva')
+            .filter(pk=gc_id, venta_reserva_id=venta_id).first())
+
+
+@staff_required
+@require_POST
+def tarjeta_enviar_giftcard_whatsapp(request, venta_id):
+    """Manda el PDF de la gift card al comprador por WhatsApp.
+
+    Solo con la compra pagada y dentro de la ventana de 24 horas (regla de
+    Meta: fuera de ella un archivo no llega y el sistema creería que sí). Si ya
+    se había enviado, pregunta antes de repetir. Bajo el candado de la reserva
+    y releyendo la gift card: un doble clic encuentra la marca de «enviada».
+    """
+    venta = get_object_or_404(VentaReserva.objects.select_related('cliente'), pk=venta_id)
+    with _reserva_en_exclusiva(venta_id):
+        gc = _giftcard_de_la_venta(request, venta_id)
+        if gc is None:
+            return JsonResponse({'ok': False, 'mensaje': 'Esa gift card no es de esta reserva.'},
+                                status=404)
+        if not _codigo_liberado(gc):
+            return JsonResponse({'ok': False, 'mensaje': 'La compra todavía no está pagada: '
+                                 'registra el pago y después envíala.'}, status=400)
+        telefono, _, nombre = _contacto_comprador(gc, venta)
+        if not telefono:
+            return JsonResponse({'ok': False, 'mensaje': 'El comprador no tiene teléfono '
+                                 'registrado.'}, status=400)
+        if gc.enviado_whatsapp and not request.POST.get('reenviar'):
+            return JsonResponse({'ok': False, 'ya_enviada': True,
+                                 'mensaje': 'Esta gift card ya se envió por WhatsApp. '
+                                            '¿Enviarla de nuevo?'}, status=409)
+        from facturacion.services.envio_whatsapp import ventana_abierta
+        if not ventana_abierta(telefono):
+            return JsonResponse({'ok': False, 'fuera_de_ventana': True,
+                                 'mensaje': 'El cliente no ha escrito en las últimas 24 horas y '
+                                            'WhatsApp no deja enviarle archivos. Usa «Reenviar '
+                                            'por email», o pídele que escriba y vuelve a '
+                                            'intentarlo.'}, status=400)
+        try:
+            from ventas.services.giftcard_envio import enviar_por_whatsapp
+            enviado, motivo = enviar_por_whatsapp(gc, telefono, nombre, _nombre_experiencia(gc))
+        except Exception as exc:  # noqa: BLE001
+            logger.exception('[tarjeta] falló el envío por WhatsApp de la gift card %s: %s',
+                             gc.codigo, exc)
+            enviado, motivo = False, str(exc)
+    if not enviado:
+        logger.warning('[tarjeta] gift card %s no se envió por WhatsApp: %s', gc.codigo, motivo)
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo enviar por WhatsApp. Inténtalo de '
+                             'nuevo o usa «Reenviar por email».'}, status=400)
+    logger.info('[tarjeta] gift card %s enviada por WhatsApp a %s por %s', gc.codigo,
+                telefono, request.user)
+    return JsonResponse({'ok': True, 'mensaje': f'Gift card enviada por WhatsApp al {telefono}.'})
+
+
+@staff_required
+@require_POST
+def tarjeta_reenviar_giftcard_email(request, venta_id):
+    """Vuelve a mandar el email de la gift card al comprador."""
+    venta = get_object_or_404(VentaReserva.objects.select_related('cliente'), pk=venta_id)
+    gc = _giftcard_de_la_venta(request, venta_id)
+    if gc is None:
+        return JsonResponse({'ok': False, 'mensaje': 'Esa gift card no es de esta reserva.'},
+                            status=404)
+    if not _codigo_liberado(gc):
+        return JsonResponse({'ok': False, 'mensaje': 'La compra todavía no está pagada: '
+                             'registra el pago y después envíala.'}, status=400)
+    _, email, nombre = _contacto_comprador(gc, venta)
+    if not email:
+        return JsonResponse({'ok': False, 'mensaje': 'El comprador no tiene correo registrado.'},
+                            status=400)
+    try:
+        from ventas.services.giftcard_envio import reenviar_por_email
+        ok = reenviar_por_email(gc, email, nombre)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('[tarjeta] falló el reenvío por email de la gift card %s: %s',
+                         gc.codigo, exc)
+        ok = False
+    if not ok:
+        return JsonResponse({'ok': False, 'mensaje': 'No se pudo enviar el correo. Inténtalo de '
+                             'nuevo en un rato.'}, status=400)
+    logger.info('[tarjeta] gift card %s reenviada por email a %s por %s', gc.codigo, email,
+                request.user)
+    return JsonResponse({'ok': True, 'mensaje': f'Gift card reenviada por email a {email}.'})
 
 
 def _comanda_del_producto(venta, producto, usuario, venta_id):
