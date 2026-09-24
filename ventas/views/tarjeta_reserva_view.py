@@ -486,6 +486,30 @@ def _codigo_limpio(texto):
     return re.sub(r'[^0-9A-Za-z]', '', texto or '').upper()
 
 
+# Letras y números que se confunden al leer o dictar un código: los códigos
+# mezclan las 26 letras con los 10 dígitos, y la fuente de la carta dibuja la O
+# igual que el cero (prueba del 24-09-2026: «OGEFH03K7B2J» empieza con la LETRA
+# O y en el PDF y en la tarjeta se ve como un cero). Para buscar, se compara
+# todo en una forma donde O=0 e I=1.
+PARES_AMBIGUOS = (('O', '0'), ('I', '1'))
+
+
+def _forma_canonica(codigo):
+    for letra, numero in PARES_AMBIGUOS:
+        codigo = codigo.replace(letra, numero)
+    return codigo
+
+
+def _codigo_canonico_sql():
+    from django.db.models import Value
+    from django.db.models.functions import Replace, Upper
+
+    expr = Upper('codigo')
+    for letra, numero in PARES_AMBIGUOS:
+        expr = Replace(expr, Value(letra), Value(numero))
+    return expr
+
+
 def _compra_sin_pagar(gc):
     """¿La venta donde se compró esta gift card todavía debe plata?
 
@@ -599,9 +623,15 @@ def tarjeta_buscar_giftcard(request, venta_id):
     encontradas = []
     if len(codigo) >= 6:
         exacta = base.filter(codigo__iexact=codigo).first()
-        encontradas = ([exacta] if exacta else
-                       list(base.filter(codigo__istartswith=codigo)
-                            .order_by('-id')[:MAX_RESULTADOS_GIFTCARD]))
+        if exacta:
+            encontradas = [exacta]
+        else:
+            # Leído con cero por O o con uno por I; completo o solo el comienzo.
+            canon = _forma_canonica(codigo)
+            con_canon = base.annotate(canon=_codigo_canonico_sql())
+            encontradas = (list(con_canon.filter(canon=canon)[:MAX_RESULTADOS_GIFTCARD])
+                           or list(con_canon.filter(canon__startswith=canon)
+                                   .order_by('-id')[:MAX_RESULTADOS_GIFTCARD]))
     if not encontradas and re.search(r'[^\W\d_]{3,}', texto):
         encontradas = list(
             base.filter(fecha_vencimiento__gte=timezone.localdate(), monto_disponible__gt=0)

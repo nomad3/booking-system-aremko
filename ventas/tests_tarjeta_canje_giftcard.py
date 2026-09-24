@@ -87,6 +87,31 @@ class Buscar(_Base):
         [ficha] = self._buscar(gc.codigo[:7]).json()['giftcards']
         self.assertEqual(ficha['id'], gc.pk)
 
+    def test_dictado_con_cero_donde_va_la_letra_o(self):
+        # El caso real del 24-09: empieza con la LETRA O, y en el PDF se ve cero.
+        gc = self._giftcard(codigo='OGEFH03K7B2J')
+        [ficha] = self._buscar('0GEFH03K7B2J').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+
+    def test_y_al_reves_letra_o_donde_va_el_cero(self):
+        gc = self._giftcard(codigo='OGEFH03K7B2J')
+        [ficha] = self._buscar('OGEFHO3K7B2J').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+
+    def test_uno_donde_va_la_letra_i_y_viceversa(self):
+        gc = self._giftcard(codigo='KI7XA1BCDEF2')
+        [ficha] = self._buscar('K17XAIBCDEF2').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+
+    def test_tambien_con_el_comienzo_del_codigo(self):
+        gc = self._giftcard(codigo='OGEFH03K7B2J')
+        [ficha] = self._buscar('0gefh0').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+
+    def test_un_codigo_distinto_no_se_confunde(self):
+        self._giftcard(codigo='OGEFH03K7B2J')
+        self.assertEqual(self._buscar('0GEFH03K7B2X').status_code, 404)
+
     def test_por_el_nombre_de_quien_la_recibio(self):
         gc = self._giftcard()
         [ficha] = self._buscar('natalia').json()['giftcards']
