@@ -414,8 +414,11 @@ _Última revisión: 2026-09-24_
     usarla, «Aplicar $X» por lo que falte). **Paso 2 EN PROD 24-09 (commit
     `5b454e26`):** «🎁 Gift cards vendidas» en la tarjeta: ver, copiar código, PDF por
     WhatsApp al comprador (ventana 24 h) o reenvío por email; código oculto hasta que
-    la compra esté pagada (decisión de Jorge). Falta la prueba real de Jorge con la
-    gift card 314 (reserva 4448, él es el comprador). Falta: **2b ·** que el PDF salga
+    la compra esté pagada (decisión de Jorge). **Prueba real OK 24-09 19:28:** el PDF
+    de la gift card 314 (reserva 4448) le llegó a Jorge por WhatsApp. De esa prueba
+    salieron dos ajustes, ya en prod: una gift card usada o vencida no ofrece reenvío
+    (`011e2064`; el PDF la mostraba vigente) y la búsqueda del canje acepta cero por O
+    y uno por I (`e971f66e`; la fuente de la carta dibuja la O como cero). Falta: **2b ·** que el PDF salga
     solo por WhatsApp al registrarse el pago si el cliente está conversando (como la
     boleta) — Jorge: «ok», en un deploy aparte. **Paso 3 ·** Luna ayuda con el canje: pide
     código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
