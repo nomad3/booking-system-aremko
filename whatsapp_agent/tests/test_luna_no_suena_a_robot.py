@@ -23,7 +23,8 @@ from django.test import SimpleTestCase, TestCase
 from destino_puerto_varas.services.llm.openrouter_provider import LLMResult
 from whatsapp_agent import agent, prompt
 from whatsapp_agent.agent import (_con_tipo_de_tina, _corregir_hora_que_no_existe,
-                                  _nombres_del_cliente, _sin_repetir_apertura,
+                                  _nombres_del_cliente, _preferencia_hidromasaje,
+                                  _sin_repetir_apertura,
                                   _sin_sonar_a_robot, _tool_alternativas_experiencia,
                                   _ultima_hora_ofrecida, _veces_mas_tarde, quitar_arranque,
                                   quitar_nombre, repite_apertura)
@@ -313,14 +314,17 @@ class EnElTurnoCompleto(TestCase):
         self.assertEqual(args['despues_de'], '16:30')
 
     def test_tambien_por_la_consulta_general(self):
+        pregunta = '¿Qué hora te acomoda? Ese día hay hasta las 21:30.'
         with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
                         return_value={'success': True}) as herramienta, \
-                mock.patch(GENERATE, return_value=_llm('¿Qué hora te acomoda?')):
-            _turno('mas tarde', HISTORIAL, '¿Qué hora te acomoda?',
+                mock.patch(GENERATE, return_value=_llm(pregunta)):
+            _turno('mas tarde', HISTORIAL, pregunta,
                    llamadas=[('consultar_disponibilidad',
                               {'personas': 2, 'fecha': 'lunes', 'tipo': 'tina',
-                               'despues_de': '16:30'}),
-                             ('consultar_disponibilidad',
+                               'despues_de': '16:30'})])
+            _turno('tipo 19', f'{HISTORIAL}\n[Cliente]: mas tarde\n[Aremko]: {pregunta}',
+                   'A las 19:00 queda una con hidromasaje.',
+                   llamadas=[('consultar_disponibilidad',
                               {'personas': 2, 'fecha': 'lunes', 'tipo': 'tina', 'hora': '19:00'})])
         primera, segunda = [c.args[0] for c in herramienta.call_args_list]
         self.assertTrue(primera['preguntar_hora'])
@@ -471,3 +475,83 @@ class LaHoraQueNoExisteEnElTurno(TestCase):
         self.assertIn('17:00', d['texto'])
         gen.assert_not_called()
 
+
+
+
+# La prueba de Jorge de las 17:22: pidió «sin hidromasaje» y al «más tarde» le volvieron a
+# ofrecer una con hidromasaje; después, la de las 14:30 que ya había rechazado.
+LUNES = [('Tina Hidromasaje Villarrica', '14:00'), ('Tina Tronador', '14:30'),
+         ('Tina Hidromasaje Villarrica', '16:30'), ('Tina Hornopiren', '17:00'),
+         ('Tina Hidromasaje Villarrica', '19:00'), ('Tina Hornopiren', '19:30')]
+HIST_SIN_HIDRO = (
+    '[Cliente]: quiero tina para el lunes para 2 personas\n'
+    '[Aremko]: Perfecto. Para el lunes, tenemos disponible la Tina Hidromasaje Villarrica a las '
+    '14:00 hrs para 2 personas, con un valor de $60.000. ¿Te gustaría reservar esa?\n'
+    '[Cliente]: quiero sin hidromasaje\n'
+    '[Aremko]: Para el lunes, tenemos la Tina Tronador, una tina clásica (sin hidromasaje), a las '
+    '14:30 hrs para 2 personas, con un valor de $50.000. ¿Te gustaría reservar esa?')
+
+
+def _mixtas(pares):
+    return [{'titulo': f'{n} · {h}', 'precio_total': 60000 if 'Hidromasaje' in n else 50000,
+             'precio_con_descuento': 60000 if 'Hidromasaje' in n else 50000,
+             'hay_descuento': False, 'texto_sugerido': h,
+             'itinerario': [{'servicio': n, 'hora': h}]} for n, h in pares]
+
+
+class SinHidromasajeSeRespeta(SimpleTestCase):
+    def test_lo_que_dijo_el_cliente(self):
+        self.assertIs(_preferencia_hidromasaje('quiero sin hidromasaje', ''), False)
+        self.assertIs(_preferencia_hidromasaje('mas tarde', HIST_SIN_HIDRO), False)
+        self.assertIs(_preferencia_hidromasaje('¿y con hidromasaje?', HIST_SIN_HIDRO), True)
+        self.assertIs(_preferencia_hidromasaje('la clásica', ''), False)
+        self.assertIs(_preferencia_hidromasaje('no quiero hidromasaje', ''), False)
+        # Lo que dice Luna no cuenta: solo lo que dijo el cliente.
+        self.assertIsNone(_preferencia_hidromasaje(
+            'mas tarde', '[Aremko]: la Tina Hidromasaje Villarrica a las 14:00'))
+
+    def test_la_herramienta_filtra_tambien_el_respaldo(self):
+        out = MasTardeConCriterio._luna(self, _mixtas(LUNES), despues_de='14:30',
+                                        hidromasaje=False)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 17:00')
+        self.assertFalse(any('Hidromasaje' in o['titulo'] for o in out['otras_alternativas']))
+        self.assertIn('clásica (sin hidromasaje)', out['instruccion'])
+
+    def test_con_hidromasaje_solo_las_de_hidromasaje(self):
+        out = MasTardeConCriterio._luna(self, _mixtas(LUNES), despues_de='14:00',
+                                        hidromasaje=True)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hidromasaje Villarrica · 16:30')
+
+    def test_si_no_hay_del_tipo_pedido_se_dice(self):
+        solo_hidro = [(n, h) for n, h in LUNES if 'Hidromasaje' in n]
+        out = MasTardeConCriterio._luna(self, _mixtas(solo_hidro), hidromasaje=False)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hidromasaje Villarrica · 14:00')
+        self.assertIn('no hay de ese tipo', out['instruccion'])
+
+
+class SinHidromasajeEnElTurno(TestCase):
+    def _args(self, mensaje, historial, args_del_modelo):
+        with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
+                        return_value={'success': True}) as herramienta, \
+                mock.patch(GENERATE, return_value=_llm('', ok=False)):
+            _turno(mensaje, historial, 'A las 17:00 queda la clásica Hornopiren.',
+                   llamadas=[('alternativas_experiencia', dict(
+                       {'tipo': 'tina_sola', 'fecha': 'lunes', 'personas': 2}, **args_del_modelo))])
+        return herramienta.call_args.args[0]
+
+    def test_mas_tarde_tras_pedir_sin_hidromasaje(self):
+        # El modelo pasó `despues_de` 14:00 y `hora` «mas tarde»: manda lo que dijo el cliente.
+        args = self._args('mas tarde', HIST_SIN_HIDRO, {'despues_de': '14:00', 'hora': 'mas tarde'})
+        self.assertIs(args['hidromasaje'], False)
+        self.assertEqual(args['despues_de'], '14:30')
+        self.assertNotIn('hora', args)
+
+    def test_una_hora_que_el_cliente_no_dijo_no_cuenta(self):
+        args = self._args('dije sin hidromasaje', HIST_SIN_HIDRO,
+                          {'despues_de': '14:30', 'hora': '16:30'})
+        self.assertNotIn('hora', args)
+        self.assertIs(args['hidromasaje'], False)
+
+    def test_la_hora_que_si_dijo_se_queda(self):
+        args = self._args('tipo 19', HIST_SIN_HIDRO, {'hora': '19:00'})
+        self.assertEqual(args['hora'], '19:00')

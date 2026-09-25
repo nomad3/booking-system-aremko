@@ -1797,6 +1797,12 @@ def _hora_de_la_tina(alt):
     return tina.get('hora'), tina.get('servicio') or ''
 
 
+def _tina_del_tipo(alt, con_hidro):
+    """¿La tina de la opción es del tipo pedido? Una opción sin tina (masaje) siempre sirve."""
+    nombre = _normalizar_txt(_hora_de_la_tina(alt)[1])
+    return not nombre.startswith('tina') or (('hidromasaje' in nombre) == bool(con_hidro))
+
+
 def _con_tipo_de_tina(alt):
     """La opción con `tina_tipo` («con hidromasaje» / «clásica»). «Tronador» no le dice
     nada al cliente, y sin el tipo Luna no puede explicar por qué el precio sube y
@@ -1877,12 +1883,49 @@ def _ultima_hora_ofrecida(historial):
     return None
 
 
+_RE_SIN_HIDRO = re.compile(r'\bsin\s+(el\s+)?hidro|\bclasic[ao]s?\b|\btinas?\s+normal(es)?\b|'
+                           r'\bno\b[^.?!]{0,25}\bhidro')
+_RE_HORA_EN_PALABRAS = re.compile(r'\d|\b(una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|'
+                                  r'once|doce|mediodia)\b')
+
+
+def _preferencia_hidromasaje(mensaje, historial):
+    """True (con hidromasaje), False (sin: «clásica») o None, según lo ÚLTIMO que dijo el
+    cliente al respecto. Jorge, 25-09-2026: pidió «sin hidromasaje» y al primer «más
+    tarde» Luna le ofreció una con hidromasaje; el dato no viaja de un mensaje a otro
+    (el historial solo lleva textos) y la herramienta no filtraba por tipo."""
+    del_cliente = [mensaje] + [linea[len('[Cliente]:'):]
+                               for linea in reversed((historial or '').splitlines())
+                               if linea.startswith('[Cliente]:')]
+    for texto in del_cliente:
+        t = _normalizar_txt(texto)
+        if _RE_SIN_HIDRO.search(t):
+            return False
+        if 'hidro' in t:
+            return True
+    return None
+
+
 def _mas_tarde_con_criterio(args, mensaje, historial):
-    """«Más tarde» seguidos (Jorge, 25-09-2026). Al segundo, se pregunta la hora. Desde
-    el tercero se sigue desde la última hora OFRECIDA: probado en prod, el modelo
-    tomaba el «hasta las 19:30» de la pregunta como `despues_de` y contestaba «no
-    hay más tarde» sin haber ofrecido nada entre medio."""
+    """Lo que el cliente ya dijo, aplicado por el código (Jorge, 25-09-2026).
+
+    - El tipo de tina que pidió (con / sin hidromasaje) viaja como `hidromasaje`.
+    - Una `hora` que el cliente no escribió no cuenta: el modelo pasaba «mas tarde» o la
+      hora que el cliente acababa de rechazar, y volvía a ofrecerla.
+    - «Más tarde» parte de la última hora OFRECIDA (tina o masaje solos).
+    - Al segundo «más tarde» seguido se pregunta la hora; desde el tercero se sigue de a
+      una (el modelo tomaba el «hasta las 19:30» de la pregunta como `despues_de`)."""
     args = dict(args or {})
+    tipo = str(args.get('tipo') or '').strip().lower()
+    if args.get('hidromasaje') is None:
+        preferencia = _preferencia_hidromasaje(mensaje, historial)
+        if preferencia is not None:
+            args['hidromasaje'] = preferencia
+    if args.get('hora') and (_pide_mas_tarde(mensaje)
+                             or not _RE_HORA_EN_PALABRAS.search(_normalizar_txt(mensaje))):
+        args.pop('hora')
+    if tipo in ('tina_sola', 'masaje_solo') and _pide_mas_tarde(mensaje):
+        args['despues_de'] = _ultima_hora_ofrecida(historial) or args.get('despues_de')
     if not args.get('despues_de'):
         return args
     veces = _veces_mas_tarde(mensaje, historial)
@@ -2014,6 +2057,22 @@ def _tool_alternativas_experiencia(args):
     def _minuto(a):
         return _hhmm_a_min_seguro(_hora_de_la_tina(a)[0]) or 0
 
+    # El tipo de tina que pidió el cliente (Jorge, 25-09-2026: «quiero sin hidromasaje»
+    # y al «más tarde» le volvían a ofrecer una con hidromasaje). Se filtran también
+    # las de respaldo, para que el modelo no tenga de dónde sacar la otra.
+    aviso_tipo = ''
+    quiere_hidro = args.get('hidromasaje')
+    if quiere_hidro is not None:
+        todas = alts
+        alts = [a for a in alts if _tina_del_tipo(a, quiere_hidro)]
+        tipo_txt = 'con hidromasaje' if quiere_hidro else 'clásica (sin hidromasaje)'
+        aviso_tipo = (f'El cliente pidió tina {tipo_txt}: las opciones ya vienen solo de ese '
+                      f'tipo. ')
+        if not alts and todas:
+            alts = todas
+            aviso_tipo = (f'El cliente pidió tina {tipo_txt} y ese día no hay de ese tipo: '
+                          f'díselo antes de ofrecer la `recomendada`. ')
+
     pedida = _hhmm_a_min_seguro(args.get('hora'))
     despues = _hhmm_a_min_seguro(args.get('despues_de'))
     no_hay_a_esa_hora = {}
@@ -2047,6 +2106,7 @@ def _tool_alternativas_experiencia(args):
                 'recomendada': None, 'otras_alternativas': [],
                 'ultima_hora': f'{ultima // 60:02d}:{ultima % 60:02d}',
                 'instruccion': (
+                    aviso_tipo +
                     'El cliente ya pidió «más tarde» dos veces: NO ofrezcas otra hora todavía. '
                     'Pregúntale en una frase qué hora le acomoda y dile que ese día hay horarios '
                     f'hasta las {ultima // 60:02d}:{ultima % 60:02d}. Cuando te diga una hora, '
@@ -2063,11 +2123,12 @@ def _tool_alternativas_experiencia(args):
             'total_alternativas': 0,
             'recomendada': None,
             'otras_alternativas': [],
-            'instruccion': (('No queda un horario más tarde ese día: la que ya ofreciste era la '
-                             'última. Dilo así y ofrece otra fecha. NUNCA inventes horarios.')
-                            if despues is not None else
-                            ('No hay disponibilidad ese día para esta experiencia: dilo con '
-                             'calidez y ofrece consultar otra fecha. NUNCA inventes horarios.')),
+            'instruccion': aviso_tipo + (
+                'No queda un horario más tarde ese día: la que ya ofreciste era la última. '
+                'Dilo así y ofrece otra fecha. NUNCA inventes horarios.'
+                if despues is not None else
+                'No hay disponibilidad ese día para esta experiencia: dilo con calidez y '
+                'ofrece consultar otra fecha. NUNCA inventes horarios.'),
         }
     return {
         'success': True,
@@ -2083,7 +2144,7 @@ def _tool_alternativas_experiencia(args):
             if tipo in _TIPOS_DESDE_LA_PRIMERA_HORA
             else _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL))],
         **{k: v for k, v in no_hay_a_esa_hora.items() if k != 'aviso'},
-        'instruccion': (no_hay_a_esa_hora.get('aviso', '') +
+        'instruccion': (aviso_tipo + no_hay_a_esa_hora.get('aviso', '') +
                         # Probado en prod (25-09-2026): con «más tarde» ya aplicado, la frase
                         # «si pide más tarde, ofrece otra de `otras_alternativas`» le hacía
                         # saltarse la recomendada (Tronador 14:30 → Villarrica 16:30).
