@@ -5,7 +5,7 @@ ELIMINA de la lista (git guarda la historia); los IDs `P-xx` son estables y no s
 reutilizan. Para agregar: "agrega a pendientes: …". Para cerrar: "listo el P-xx".
 Claude la revisa al inicio de sesión y en cada wrapup.
 
-_Última revisión: 2026-09-24_
+_Última revisión: 2026-09-25_
 
 ## Web y marketing
 
@@ -468,6 +468,19 @@ _Última revisión: 2026-09-24_
     el disponible sin tocar el inicial) y podría dejarlo negativo. Hoy no muerde: las
     496 cuadran. (c) `Pago.save()` llama a `usar()` también al EDITAR un pago con
     gift card ya guardado: editarlo en el admin descuenta el saldo dos veces.
+
+53. **P-53 · Luna: que no suene a robot (lo que queda)** — Jorge el 25-09: «¿estás
+    conversando con un robot?». Las cuatro partes aprobadas están EN PROD 25-09
+    (commits `1872ded3`, `276825d8`, `3964d3c8`): tono en prompt y herramienta,
+    «más tarde» con criterio (al segundo pregunta la hora; con una hora, la más
+    cercana; las olitas no cambian), freno en código contra aperturas repetidas, y
+    `tina_tipo` en cada opción. Probado en prod con el modelo real: muletillas de 9 a
+    3 en 12 mensajes, cero jerga. **Falta:** (1) Jorge decide el texto nuevo de la
+    configuración de Luna (admin → tono y conocimiento): hoy dice «usar
+    "Perfecto/Excelente" y "¿Te gustaría?"» y le gana al prompt. (2) Re-medir con
+    tráfico real desde el 26-09 contra la línea base de 30 días: 53% de borradores
+    empieza con «Perfecto», 11% de mensajes seguidos repite las 3 primeras palabras,
+    14% dice «te gustaría reservar».
 
 ## Asistente de Publicaciones (community manager)
 
