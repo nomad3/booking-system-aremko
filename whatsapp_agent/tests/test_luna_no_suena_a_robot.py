@@ -22,9 +22,11 @@ from django.test import SimpleTestCase, TestCase
 
 from destino_puerto_varas.services.llm.openrouter_provider import LLMResult
 from whatsapp_agent import agent, prompt
-from whatsapp_agent.agent import (_con_tipo_de_tina, _sin_repetir_apertura,
-                                  _tool_alternativas_experiencia, _ultima_hora_ofrecida,
-                                  _veces_mas_tarde, quitar_arranque, repite_apertura)
+from whatsapp_agent.agent import (_con_tipo_de_tina, _corregir_hora_que_no_existe,
+                                  _nombres_del_cliente, _sin_repetir_apertura,
+                                  _sin_sonar_a_robot, _tool_alternativas_experiencia,
+                                  _ultima_hora_ofrecida, _veces_mas_tarde, quitar_arranque,
+                                  quitar_nombre, repite_apertura)
 
 GENERATE = 'destino_puerto_varas.services.llm.openrouter_provider.OpenRouterProvider.generate'
 PROVIDER = ('destino_puerto_varas.services.llm.openrouter_provider.'
@@ -238,8 +240,12 @@ def _turno(mensaje, historial, texto_modelo, llamadas=()):
     visto = {}
 
     def generate_with_tools(self, messages, tools, tool_executor, **kwargs):
-        visto['resultados'] = [tool_executor(n, a) for n, a in llamadas]
-        return LLMResult(texto_modelo, 'google/gemini-2.5-flash', 100, 20, 900)
+        # Como el proveedor real: cada herramienta queda en `tool_calls_executed`.
+        ejecutadas = [{'name': n, 'arguments': a, 'result': tool_executor(n, a)}
+                      for n, a in llamadas]
+        visto['resultados'] = [e['result'] for e in ejecutadas]
+        return LLMResult(texto_modelo, 'google/gemini-2.5-flash', 100, 20, 900,
+                         tool_calls_executed=ejecutadas)
 
     with mock.patch(PROVIDER, generate_with_tools):
         d = agent._producir_borrador_inner(agent.get_config(), mensaje, historial,
@@ -307,3 +313,148 @@ class EnElTurnoCompleto(TestCase):
         self.assertTrue(primera['preguntar_hora'])
         self.assertEqual(segunda['hora'], '19:00')
         self.assertNotIn('preguntar_hora', segunda)
+
+
+# La prueba de Jorge en su WhatsApp (25-09-2026, 16:38), textos tal cual salieron.
+SALUDO_REAL = '¡Hola, Jorge! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.'
+REALES = [
+    ('quiero tina para 2 para el lunes',
+     'Perfecto, Jorge. Para el lunes, tenemos disponible la Tina Hidromasaje Villarrica a las '
+     '14:00 hrs para 2 personas, con un valor de $60.000. ¿Te gustaría reservar esa?'),
+    ('mas tarde',
+     'Jorge, para el lunes, un poco más tarde tenemos la Tina Tronador a las 14:30 hrs para 2 '
+     'personas, con un valor de $50.000. ¿Te gustaría esa opción?'),
+    ('mas tarde',
+     'Perfecto, Jorge. Para el lunes, tenemos horarios disponibles hasta las 19:30 hrs. ¿Qué '
+     'hora te acomoda?'),
+    ('a las 18:00 horas',
+     'Jorge, para el lunes a las 18:00 hrs, la Tina Hornopiren está disponible. Es una tina '
+     'clásica sin hidromasaje, para 2 personas, con un valor de $50.000. ¿Deseas reservar esta '
+     'opción?'),
+]
+
+
+class SinNombreNiPerfectoRepetido(SimpleTestCase):
+    def test_el_nombre_como_vocativo_se_va(self):
+        self.assertTrue(quitar_nombre(REALES[0][1], ['Jorge']).startswith(
+            'Perfecto. Para el lunes, tenemos disponible'))
+        self.assertTrue(quitar_nombre(REALES[1][1], ['Jorge']).startswith('Para el lunes, un poco'))
+        self.assertEqual(quitar_nombre('¿Te acomoda, Jorge?', ['Jorge']), '¿Te acomoda?')
+        self.assertEqual(quitar_nombre('¡Perfecto, Jorge! Te la dejo.', ['Jorge']),
+                         '¡Perfecto! Te la dejo.')
+
+    def test_lo_que_no_es_el_nombre_no_se_toca(self):
+        texto = 'Jorgelina, la tina es para dos.'
+        self.assertEqual(quitar_nombre(texto, ['Jorge']), texto)
+        self.assertEqual(quitar_nombre(REALES[1][1], []), REALES[1][1])
+
+    def test_los_nombres_salen_del_saludo_y_de_la_ficha(self):
+        self.assertEqual(_nombres_del_cliente('Jorge', {'nombre': 'Jorge Aguilera'}), ['Jorge'])
+        self.assertEqual(_nombres_del_cliente('', {'nombre': 'maría josé'}), ['María'])
+        self.assertEqual(_nombres_del_cliente('', None), [])
+
+    def test_excelente_eleccion_no_es_muletilla(self):
+        texto = 'Excelente elección: la tina clásica sale $50.000.'
+        self.assertEqual(quitar_arranque(texto), texto)
+
+    def test_la_conversacion_real_sin_nombre_y_con_un_solo_perfecto(self):
+        historial = f'[Cliente]: hola\n[Aremko]: {SALUDO_REAL}'
+        salidas = []
+        with mock.patch(GENERATE, return_value=_llm('', ok=False)):
+            for mensaje, borrador in REALES:
+                historial += f'\n[Cliente]: {mensaje}'
+                texto, _ = _sin_sonar_a_robot(borrador, historial, 'm', nombres=['Jorge'],
+                                              en_conversacion=True)
+                salidas.append(texto)
+                historial += f'\n[Aremko]: {texto}'
+        self.assertFalse(any('Jorge' in t for t in salidas), salidas)
+        self.assertEqual(sum(t.startswith('Perfecto') for t in salidas), 1, salidas)
+        self.assertIn('14:00', salidas[0])
+        self.assertIn('19:30', salidas[2])
+
+    def test_una_sola_muletilla_por_conversacion(self):
+        # «Perfecto» dos mensajes atrás, y el de ahora no repite las 3 primeras palabras
+        # del anterior: igual se va (Jorge: «Perfecto Jorge ya sale dos veces»).
+        historial = ('[Aremko]: Perfecto. A las 14:00 hay una con hidromasaje.\n'
+                     '[Cliente]: mas tarde\n[Aremko]: La siguiente es a las 14:30.\n'
+                     '[Cliente]: y a las 16:30?')
+        with mock.patch(GENERATE) as gen:
+            texto, _ = _sin_sonar_a_robot('Perfecto. Te cuento que a las 16:30 hay otra.',
+                                          historial, 'm', en_conversacion=True)
+        self.assertEqual(texto, 'Te cuento que a las 16:30 hay otra.')
+        gen.assert_not_called()
+        primera, _ = _sin_sonar_a_robot('Perfecto. A las 14:00 hay una.', '[Cliente]: hola\n'
+                                        '[Aremko]: ¡Hola! Te saluda Luna.', 'm',
+                                        en_conversacion=True)
+        self.assertEqual(primera, 'Perfecto. A las 14:00 hay una.')
+
+    def test_la_reescritura_que_nombra_al_cliente_se_descarta(self):
+        nueva = 'Jorge, a las 17:00 queda la clásica Hornopiren, sale $50.000. ¿Te sirve?'
+        with mock.patch(GENERATE, return_value=_llm(nueva)):
+            texto, _ = _sin_repetir_apertura(BORRADOR, HISTORIAL, 'm', nombres=['Jorge'])
+        self.assertEqual(texto, quitar_arranque(BORRADOR))
+
+    def test_en_el_saludo_el_nombre_se_queda(self):
+        texto, _ = _sin_sonar_a_robot(SALUDO_REAL, '', 'm', nombres=['Jorge'],
+                                      en_conversacion=False)
+        self.assertEqual(texto, SALUDO_REAL)
+
+
+def _res_18(itinerario=None):
+    return {'success': True, 'tipo': 'tina_sola', 'personas': 2, 'hora_pedida': '18:00',
+            'hay_a_la_hora_pedida': False,
+            'recomendada': {'titulo': 'Tina Hornopiren · 17:00', 'precio_total': 50000,
+                            'precio_con_descuento': 50000, 'tina_tipo': 'clásica (sin hidromasaje)',
+                            'itinerario': itinerario or [{'servicio': 'Tina Hornopiren',
+                                                          'hora': '17:00'}]}}
+
+
+class LaHoraQueNoExiste(SimpleTestCase):
+    def test_la_herramienta_lo_dice(self):
+        out = MasTardeConCriterio._luna(self, MasTardeConCriterio._alts(
+            self, '14:00', '17:00', '19:00'), hora='18:00')
+        self.assertEqual(out['hora_pedida'], '18:00')
+        self.assertIs(out['hay_a_la_hora_pedida'], False)
+        self.assertIn('a las 18:00 no hay', out['instruccion'])
+        self.assertIn('a las 17:00', out['instruccion'])
+
+    def test_si_la_hora_existe_no_hay_aviso(self):
+        out = MasTardeConCriterio._luna(self, MasTardeConCriterio._alts(
+            self, '14:00', '17:00', '19:00'), hora='19:00')
+        self.assertNotIn('hora_pedida', out)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina · 19:00')
+
+    def test_el_borrador_que_ofrece_las_18_lo_reescribe_el_codigo(self):
+        texto, motivo = _corregir_hora_que_no_existe(REALES[3][1], [{'result': _res_18()}])
+        self.assertEqual(motivo, '')
+        self.assertEqual(texto, 'A las 18:00 no tenemos tinas; la más cercana es la tina clásica '
+                                'Hornopiren, a las 17:00: $50.000 para 2 personas. ¿Te acomoda?')
+
+    def test_si_dice_la_hora_real_no_se_toca(self):
+        bueno = 'A las 18:00 no hay; la más cercana es la clásica Hornopiren a las 17:00.'
+        self.assertEqual(_corregir_hora_que_no_existe(bueno, [{'result': _res_18()}]), (bueno, ''))
+        sin_hora = '¿Te acomoda la tina clásica Hornopiren?'
+        self.assertEqual(_corregir_hora_que_no_existe(sin_hora, [{'result': _res_18()}]),
+                         (sin_hora, ''))
+
+    def test_una_experiencia_de_varias_lineas_pasa_a_deborah(self):
+        varias = [{'servicio': 'Tina Hornopiren', 'hora': '17:00'},
+                  {'servicio': 'Masaje', 'hora': '19:45'}]
+        texto, motivo = _corregir_hora_que_no_existe('Tu tina a las 18:00.',
+                                                     [{'result': _res_18(varias)}])
+        self.assertIn('18:00', motivo)
+        self.assertIn('17:00', motivo)
+
+
+class LaHoraQueNoExisteEnElTurno(TestCase):
+    def test_en_el_turno_completo(self):
+        with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
+                        return_value=_res_18()), mock.patch(GENERATE) as gen:
+            d, _ = _turno('a las 18:00 horas', HISTORIAL, REALES[3][1],
+                          llamadas=[('alternativas_experiencia',
+                                     {'tipo': 'tina_sola', 'fecha': 'lunes', 'personas': 2,
+                                      'hora': '18:00'})])
+        self.assertTrue(d['texto'].startswith('A las 18:00 no tenemos tinas'))
+        self.assertIn('17:00', d['texto'])
+        gen.assert_not_called()
+

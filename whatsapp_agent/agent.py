@@ -1997,9 +1997,24 @@ def _tool_alternativas_experiencia(args):
 
     pedida = _hhmm_a_min_seguro(args.get('hora'))
     despues = _hhmm_a_min_seguro(args.get('despues_de'))
+    no_hay_a_esa_hora = {}
     if pedida is not None:
         # El cliente dijo una hora («tipo 19»): la más cercana a esa hora primero.
         alts = sorted(alts, key=lambda a: (abs(_minuto(a) - pedida), _minuto(a)))
+        if alts and _minuto(alts[0]) != pedida:
+            # Jorge, 25-09-2026: pidió «a las 18:00» (no es un horario) y Luna escribió
+            # «a las 18:00» con la tina que la herramienta daba a las 17:00. Se le dice
+            # con todas las letras; y si igual lo escribe, el código lo corrige
+            # (`_corregir_hora_que_no_existe`).
+            p = f'{pedida // 60:02d}:{pedida % 60:02d}'
+            r_ = _hora_de_la_tina(alts[0])[0]
+            no_hay_a_esa_hora = {
+                'hora_pedida': p, 'hay_a_la_hora_pedida': False,
+                'aviso': (f'El cliente pidió las {p} y a esa hora NO hay (los horarios son '
+                          f'fijos). Dile en una frase que a las {p} no hay y ofrécele la '
+                          f'`recomendada`, a las {r_}. La hora de la oferta es {r_}: NUNCA '
+                          f'escribas {p} como si hubiera. '),
+            }
     elif despues is not None:
         alts = sorted((a for a in alts if _minuto(a) > despues), key=_minuto)
         horas_mas_tarde = sorted({_minuto(a) for a in alts})
@@ -2048,7 +2063,9 @@ def _tool_alternativas_experiencia(args):
             _otras_por_hora(alts[1:], _MAX_ALTERNATIVAS_TOOL)
             if tipo in _TIPOS_DESDE_LA_PRIMERA_HORA
             else _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL))],
-        'instruccion': ('Ofrece SOLO la `recomendada` en 1-2 frases naturales, con su hora y '
+        **{k: v for k, v in no_hay_a_esa_hora.items() if k != 'aviso'},
+        'instruccion': (no_hay_a_esa_hora.get('aviso', '') +
+                        'Ofrece SOLO la `recomendada` en 1-2 frases naturales, con su hora y '
                         'precio EXACTOS (el `texto_sugerido` es referencia de datos: no lo '
                         'copies). Si trae `tina_tipo`, nombra la tina por ese tipo («la tina '
                         'clásica», «una con hidromasaje»). '
@@ -3487,10 +3504,16 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
 
-    # Jorge (25-09-2026): «¿estás conversando con un robot?». El freno va en el código:
-    # si el borrador arranca igual que el mensaje anterior de Luna, se reescribe. Va
-    # ANTES de los controles de abajo para que revisen el texto que de verdad sale.
-    texto, extra = _sin_repetir_apertura(texto, historial, modelo)
+    # Jorge (25-09-2026): «¿estás conversando con un robot?». El freno va en el código.
+    # Va ANTES de los controles de abajo para que revisen el texto que de verdad sale.
+    # 1) Una hora que no existe («a las 18:00») no se ofrece nunca.
+    texto, motivo_hora = _corregir_hora_que_no_existe(texto, resultado.tool_calls_executed)
+    if motivo_hora:
+        return _borrador_escala(motivo_hora, modelo=modelo, tokens=tokens)
+    # 2) Sin el nombre del cliente ni «Perfecto» repetido, y sin arrancar igual que antes.
+    texto, extra = _sin_sonar_a_robot(
+        texto, historial, modelo, nombres=_nombres_del_cliente(saludo_nombre, datos_cliente),
+        en_conversacion=(saludo_estado == 'en_conversacion'))
     tokens = (tokens[0] + extra[0], tokens[1] + extra[1], tokens[2] + extra[2])
 
     # H-097: una tool avisó que su pregunta ya se hizo y la respuesta no sirvió.
@@ -3553,11 +3576,11 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
 
 _ARRANQUES_DE_RELLENO = ('perfecto', 'excelente', 'genial', 'claro', 'listo', 'buenisimo',
                          'super')
-# La muletilla (sin mayúsculas/minúsculas) y, si viene, el nombre propio que la sigue
-# («Perfecto, Jorge.»); una palabra en minúscula tras la coma no es un nombre.
+_MULETILLAS = r'perfecto|excelente|genial|claro|listo|buen[ií]simo|s[uú]per'
+# La muletilla (sin mayúsculas/minúsculas), si viene el nombre propio que la sigue
+# («Perfecto, Jorge.»), y SIEMPRE un signo después: «Excelente elección» no es muletilla.
 _RE_ARRANQUE = re.compile(
-    r'^\s*¡?\s*(?i:perfecto|excelente|genial|claro|listo|buen[ií]simo|s[uú]per)\s*'
-    r'(,\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s*[.!,]*\s*')
+    rf'^\s*¡?\s*(?i:{_MULETILLAS})(\s*,?\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s*[.!,]+\s*')
 _RE_SALUDO = re.compile(r'^\W*(hola|buen[oa]s)\b', re.IGNORECASE)
 # Lo que el tono de Aremko prohíbe (config de Luna: «jamás chilenismos ni jerga»).
 _RE_JERGA = re.compile(r'\b(tinca|bac[aá]n|cach[aá]i|filete|la raja|po)\b', re.IGNORECASE)
@@ -3573,16 +3596,21 @@ def _ultimo_de_aremko(historial):
     return ''
 
 
+def _empieza_con_muletilla(texto):
+    palabra = re.findall(r'[a-zñ]+', _normalizar_txt(texto))[:1]
+    return bool(palabra) and palabra[0] in _ARRANQUES_DE_RELLENO
+
+
 def repite_apertura(texto, anterior):
-    """¿El borrador arranca igual que el mensaje anterior de Luna? Mismas 3 primeras
-    palabras, o una muletilla tras otra («¡Súper!» tras «Perfecto…» también: probado
-    en prod, la reescritura solo cambiaba una por otra)."""
-    a = re.findall(r'[a-zñ]+', _normalizar_txt(texto))[:3]
-    b = re.findall(r'[a-zñ]+', _normalizar_txt(anterior))[:3]
-    if not a or not b:
-        return False
-    return ((a[0] in _ARRANQUES_DE_RELLENO and b[0] in _ARRANQUES_DE_RELLENO)
-            or (len(a) == 3 and a == b))
+    """¿El borrador arranca igual que el mensaje anterior de Luna? Una muletilla tras
+    otra («¡Súper!» tras «Perfecto…»: probado en prod, la reescritura solo cambiaba una
+    por otra), o las mismas 3 primeras palabras sin contar la muletilla («Perfecto,
+    Jorge. Para el lunes…» y «Para el lunes…» arrancan igual)."""
+    if _empieza_con_muletilla(texto) and _empieza_con_muletilla(anterior):
+        return True
+    a = re.findall(r'[a-zñ]+', _normalizar_txt(quitar_arranque(texto)))[:3]
+    b = re.findall(r'[a-zñ]+', _normalizar_txt(quitar_arranque(anterior)))[:3]
+    return len(a) == 3 and a == b
 
 
 def quitar_arranque(texto):
@@ -3591,6 +3619,43 @@ def quitar_arranque(texto):
     if not nuevo:
         return texto
     return nuevo[:1].upper() + nuevo[1:]
+
+
+def _nombres_del_cliente(saludo_nombre, datos_cliente):
+    """El nombre de pila con que Luna puede nombrar al cliente (saludo y ficha)."""
+    nombres = []
+    for crudo in (saludo_nombre, (datos_cliente or {}).get('nombre')):
+        nombre = prompt_mod.saneo_nombre(crudo or '')
+        if nombre and nombre not in nombres:
+            nombres.append(nombre)
+    return nombres
+
+
+def quitar_nombre(texto, nombres):
+    """Sin el nombre del cliente como vocativo: «Perfecto, Jorge.» → «Perfecto.»,
+    «Jorge, para el lunes…» → «Para el lunes…», «¿Te acomoda, Jorge?» → «¿Te acomoda?».
+
+    Jorge, 25-09-2026: «No encuentro sentido que después de la primera respuesta siga
+    nombrando el nombre del cliente». Luna lo nombraba en los 4 mensajes: se ancla en
+    su propio saludo («¡Hola, Jorge!») y en la ficha. Solo con la conversación en curso."""
+    nuevo = texto or ''
+    for nombre in nombres or ():
+        n = re.escape(nombre)
+        nuevo = re.sub(rf'^(\s*¡?\s*(?:{_MULETILLAS}))\s*,?\s*{n}\b\s*([.!,]*)', r'\1\2',
+                       nuevo, count=1, flags=re.IGNORECASE)
+        nuevo = re.sub(rf'^\s*¡?\s*{n}\b\s*[,.!:]+\s*', '', nuevo, count=1, flags=re.IGNORECASE)
+        nuevo = re.sub(rf',\s*{n}\b(?=\s*[.,!?;:])', '', nuevo, flags=re.IGNORECASE)
+    nuevo = nuevo.strip()
+    if not nuevo:
+        return texto
+    return nuevo[:1].upper() + nuevo[1:]
+
+
+def _uso_muletilla_antes(historial, ultimos=4):
+    """¿Alguno de los últimos mensajes de Luna ya arrancó con muletilla?"""
+    suyos = [linea[len('[Aremko]:'):] for linea in (historial or '').splitlines()
+             if linea.startswith('[Aremko]:')]
+    return any(_empieza_con_muletilla(t) for t in suyos[-ultimos:])
 
 
 _RE_NARRACION = re.compile(r'\b(despu[eé]s|antes|desde|hasta)\s+de\s+(las\s+)?\d{1,2}:\d{2}|'
@@ -3604,7 +3669,19 @@ def _datos_del_texto(texto):
     return {d.replace(' ', '').rstrip('.,;:!?)»"').lower() for d in _RE_DATOS.findall(limpio)}
 
 
-def _sin_repetir_apertura(texto, historial, modelo):
+def _sin_sonar_a_robot(texto, historial, modelo, nombres=(), en_conversacion=False):
+    """(texto, tokens extra). Lo que una persona de Aremko no hace (Jorge, 25-09-2026):
+    con la conversación en curso, nombrar al cliente en cada mensaje y volver a abrir
+    con «Perfecto» —va sin nombre y con UNA muletilla por conversación—, y arrancar
+    igual que el mensaje anterior (`_sin_repetir_apertura`)."""
+    if en_conversacion:
+        texto = quitar_nombre(texto, nombres)
+        if _empieza_con_muletilla(texto) and _uso_muletilla_antes(historial):
+            texto = quitar_arranque(texto)
+    return _sin_repetir_apertura(texto, historial, modelo, nombres=nombres)
+
+
+def _sin_repetir_apertura(texto, historial, modelo, nombres=()):
     """(texto, tokens extra). Si el borrador arranca igual que el mensaje anterior de
     Luna, se pide una reescritura con las mismas horas, precios y links. Si la
     reescritura cambia un dato, afirma una reserva que el borrador no afirmaba,
@@ -3613,7 +3690,7 @@ def _sin_repetir_apertura(texto, historial, modelo):
     controles salían «¡Súper!», «¿Te tinca?» y un «¡Hola!» a mitad de conversación).
     Nunca rompe el borrador."""
     from .canje_giftcard import afirma_reserva
-    anterior = _ultimo_de_aremko(historial)
+    anterior = quitar_nombre(_ultimo_de_aremko(historial), nombres)
     if not anterior or not repite_apertura(texto, anterior):
         return texto, (0, 0, 0)
     try:
@@ -3624,18 +3701,19 @@ def _sin_repetir_apertura(texto, historial, modelo):
              'EXACTAS las horas, los precios y los nombres de servicios; si la fecha ya se dijo en '
              'el mensaje anterior, puedes omitirla. Tono formal y cordial, trato de tú, breve, '
              'sin chilenismos ni jerga (nada de «súper», «te tinca», «bacán», «po»). No saludes: '
-             'la conversación ya empezó. No empieces con muletillas («Perfecto», «Excelente», '
-             '«Súper», «Genial», «Claro», «Listo»): ve directo a lo nuevo. '
-             'Devuelve SOLO el mensaje nuevo, sin comillas.'),
+             'la conversación ya empezó. No nombres al cliente. No empieces con muletillas '
+             '(«Perfecto», «Excelente», «Súper», «Genial», «Claro», «Listo»): ve directo a lo '
+             'nuevo. Devuelve SOLO el mensaje nuevo, sin comillas.'),
             f'Mensaje anterior de Luna: «{anterior[:300]}»\nMensaje a reescribir: «{texto}»',
             model=modelo, max_tokens=400, temperature=0.4)
         nuevo = escalation.sanear_salida((r.text or '').strip().strip('«»"'))
         extra = (r.input_tokens or 0, r.output_tokens or 0, r.latency_ms or 0)
         if (r.ok and nuevo and _datos_del_texto(texto) == _datos_del_texto(nuevo)
                 and (afirma_reserva(texto) or not afirma_reserva(nuevo))
-                and not _RE_ARRANQUE.match(nuevo)
+                and not _empieza_con_muletilla(nuevo)
                 and (_RE_SALUDO.match(texto) or not _RE_SALUDO.match(nuevo))
                 and (_RE_JERGA.search(texto) or not _RE_JERGA.search(nuevo))
+                and quitar_nombre(nuevo, nombres) == nuevo
                 and not repite_apertura(nuevo, anterior) and len(nuevo) <= len(texto) * 1.6 + 40):
             return nuevo, extra
         logger.info('[Agente WA] reescritura sin repetir descartada; se quita la muletilla')
@@ -3643,6 +3721,60 @@ def _sin_repetir_apertura(texto, historial, modelo):
     except Exception:  # noqa: BLE001 — sin reescritura, al menos sin la muletilla
         logger.exception('[Agente WA] no se pudo reescribir el borrador repetido')
         return quitar_arranque(texto), (0, 0, 0)
+
+
+def _hhmm_normal(h, m):
+    return f'{int(h):02d}:{m}'
+
+
+def _frase_hora_mas_cercana(res):
+    """La oferta que escribe el código cuando la hora pedida no existe, o None si la
+    opción tiene más de una línea (Ritual, Noche…): esa la redacta una persona."""
+    from .grounding import formatear_precio
+    rec = res['recomendada']
+    if len(rec.get('itinerario') or []) != 1:
+        return None
+    hora, servicio = _hora_de_la_tina(rec)
+    personas = res.get('personas') or 0
+    para = f" para {personas} persona{'s' if personas > 1 else ''}" if personas else ''
+    precio = formatear_precio(rec.get('precio_con_descuento') or rec.get('precio_total'))
+    tipo = rec.get('tina_tipo') or ''
+    if tipo:
+        corto = re.sub(r'(?i)^tina\s+(hidromasaje\s+)?', '', servicio).strip()
+        cual = 'clásica' if tipo.startswith('clásica') else 'con hidromasaje'
+        return (f"A las {res['hora_pedida']} no tenemos tinas; la más cercana es la tina {cual} "
+                f"{corto}, a las {hora}: {precio}{para}. ¿Te acomoda?")
+    return (f"A las {res['hora_pedida']} no tenemos horario; lo más cercano es {servicio}, a las "
+            f"{hora}: {precio}{para}. ¿Te acomoda?")
+
+
+def _corregir_hora_que_no_existe(texto, tool_calls):
+    """(texto, motivo para derivar o ''). El cliente pidió una hora que no existe y el
+    borrador la ofrece como si hubiera, sin la hora real: el mensaje lo escribe el código.
+
+    Jorge, 25-09-2026: pidió «a las 18:00», la herramienta dio la Hornopiren a las
+    17:00 y Luna escribió «a las 18:00 hrs, la Tina Hornopiren está disponible»
+    (repetido en prod con el modelo real: 1 de 2 veces). Es «sustituye en silencio»:
+    el modelo repite la hora del cliente."""
+    for tc in reversed(tool_calls or []):
+        res = tc.get('result')
+        if not (isinstance(res, dict) and res.get('hay_a_la_hora_pedida') is False
+                and res.get('recomendada')):
+            continue
+        pedida = res.get('hora_pedida')
+        real = _hora_de_la_tina(res['recomendada'])[0] or ''
+        real = _hhmm_normal(*real.split(':')) if ':' in real else real
+        horas = {_hhmm_normal(h, m) for h, m in _RE_HORA.findall(texto or '')}
+        if pedida not in horas or real in horas:
+            return texto, ''
+        logger.warning('[Agente WA] el borrador ofrecía las %s, que no existe; va la de las %s',
+                       pedida, real)
+        frase = _frase_hora_mas_cercana(res)
+        if frase:
+            return frase, ''
+        return texto, (f'el borrador ofrecía las {pedida}, que no es un horario; lo más '
+                       f'cercano es a las {real}')
+    return texto, ''
 
 
 def sumar_pase_si_pregunta(texto, mensaje_cliente, phone):
