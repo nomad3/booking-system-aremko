@@ -822,14 +822,47 @@ def _historial_texto(phone, antes_de_ts, window):
         .order_by('-timestamp')[:window]
     )
     msgs.reverse()
+    fotos_leidas = _fotos_de_canje_leidas(msgs)
     lineas = []
     for m in msgs:
         cuerpo = (m.body or '').strip()
+        if m.wa_message_id in fotos_leidas:
+            cuerpo = f'{cuerpo} (foto: {fotos_leidas[m.wa_message_id]})'.strip()
         if not cuerpo:
             cuerpo = f'({m.msg_type})'
         quien = 'Cliente' if m.direction == 'in' else 'Aremko'
         lineas.append(f'[{quien}]: {cuerpo}')
     return '\n'.join(lineas)
+
+
+def _fotos_de_canje_leidas(msgs):
+    """P-52 paso 3: {wa_message_id: lo que dice la foto} para las fotos de gift
+    card o voucher ya leídas; así Luna ve «(foto: Pausa junto al río · código …)»
+    en vez de «(image)». Nunca lee fotos nuevas acá."""
+    ids = [m.wa_message_id for m in msgs if m.direction == 'in' and m.media_file]
+    if not ids:
+        return {}
+    try:
+        from .lector_giftcard import lecturas_de
+        return lecturas_de(ids)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _canje_por_foto(phone):
+    """P-52 paso 3 (25-09-2026): si en este turno el cliente mandó la foto de una
+    gift card o de un voucher antiguo, el motivo con la tarjeta ya identificada
+    para Deborah; si no, None. Jamás rompe la sugerencia."""
+    try:
+        from . import lector_giftcard
+        lecturas = lector_giftcard.fotos_de_canje_pendientes(phone)
+        if not lecturas:
+            return None
+        return {'motivo': lector_giftcard.motivo_para_deborah(lecturas),
+                'modelo': f'lector de fotos · {lector_giftcard.MODELO_VISION}'}
+    except Exception:  # noqa: BLE001 — sin lector, Luna sigue como antes
+        logger.exception('[lector] falló la revisión de fotos de %s', phone)
+        return None
 
 
 def _estado_estructurado(canal, external_id):
@@ -3146,6 +3179,14 @@ def generar_sugerencia(phone, *, forzar=False):
     # agente no manda nada; aremko-cli solo precarga el cajón si está vacío).
     if config.modo != 'borrador' and _conversacion_pausada(phone, config.pausa_horas_tras_humano):
         return None
+
+    # P-52 paso 3: el cliente manda la foto de la gift card (a veces sin una
+    # palabra). Se lee y el canje pasa a Deborah con la tarjeta ya identificada:
+    # no le pide el código al cliente. Luna todavía no conversa el canje.
+    canje = _canje_por_foto(phone)
+    if canje is not None:
+        return _guardar(entrante, escalar=True, motivo=canje['motivo'], modo=config.modo,
+                        modelo=canje['modelo'])
 
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)
     saludo_estado, saludo_nombre = _contexto_saludo(entrante)

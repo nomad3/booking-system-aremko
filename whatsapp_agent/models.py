@@ -500,3 +500,40 @@ class RecordatorioLuna(models.Model):
 
     def __str__(self):
         return f'[{self.tipo}/{self.estado}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class LecturaImagen(models.Model):
+    """Lo que el lector vio en una foto que mandó un cliente por WhatsApp (P-52).
+
+    Jorge (25-09-2026): «normalmente el cliente solo manda la foto» de su gift
+    card. Luna no veía imágenes: le llegaban como «(image)». Se lee UNA vez con
+    un modelo con visión y se guarda acá, para no volver a leerla en cada turno
+    y para que Luna y Deborah vean lo mismo en los mensajes siguientes.
+    """
+    TIPOS = [
+        ('giftcard_aremko', 'Gift card de Aremko'),
+        ('voucher_antiguo', 'Voucher antiguo (R ####)'),
+        ('comprobante', 'Comprobante de pago'),
+        ('otro', 'Otra imagen'),
+    ]
+    wa_message_id = models.CharField(max_length=128, unique=True, db_index=True)
+    phone = models.CharField(max_length=20, db_index=True)
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    codigo = models.CharField(max_length=40, blank=True, help_text='Tal como lo leyó el modelo.')
+    giftcard_id = models.IntegerField(null=True, blank=True, help_text='La gift card con que calzó.')
+    forma = models.CharField(max_length=20, blank=True,
+                             help_text='Cómo calzó: exacto, o_por_cero, tolerancia, comienzo.')
+    voucher = models.IntegerField(null=True, blank=True, help_text='Número de reserva de un voucher R ####.')
+    resumen = models.CharField(max_length=200, blank=True, help_text='Lo que ven Luna y Deborah.')
+    modelo = models.CharField(max_length=120, blank=True)
+    tokens = models.PositiveIntegerField(default=0)
+    latency_ms = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Lectura de imagen'
+        verbose_name_plural = 'Lecturas de imágenes'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} · {self.resumen[:60]}'

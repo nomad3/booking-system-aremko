@@ -421,11 +421,26 @@ _Última revisión: 2026-09-24_
     parcial). Al aplicarlo no había ninguna venta de gift card a medio pagar. Quedan
     vivas 3 ventas de gift card de nov-2025 NUNCA pagadas (#3987, #4007, #4008; gift
     cards 229, 232, 233, vencen nov-2026): revisar con Deborah si se anulan.
-    **Paso 3 · (propuesta presentada a Jorge el 25-09, esperando su OK)**  Luna ayuda con el canje: pide
-    código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
-    `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
-    la reserva (reemplaza las reservas con fecha de relleno 02/02, caso 6873) y
-    anotar qué servicios incluye cada experiencia (hoy lo sabe Deborah de memoria).
+    **Paso 3 · aprobado por Jorge el 25-09 («Dale»), en dos deploys.** Jorge: «normalmente
+    el cliente solo manda la foto». Prueba real (68 fotos, 90 días, Gemini 2.5 Flash):
+    10/10 códigos exactos, 1 manuscrito con 1 carácter mal (gc 471), 4 vouchers
+    «R ####» (= id de la reserva), 34 comprobantes y 19 otras bien descartadas;
+    ~2 s y US$0,0007 por foto. Jorge aprobó mandar TODAS las fotos entrantes al lector.
+    **Deploy 1 (25-09) · Luna ve la foto:** `whatsapp_agent/lector_giftcard.py` lee las
+    fotos del turno sin responder (máx. 3, últimos 7 días; cada una UNA vez, queda en
+    `LecturaImagen`); si hay gift card o voucher, la sugerencia pasa a Deborah con la
+    tarjeta ya identificada en el motivo («Canje de gift card · Tina para dos · código
+    … · lista para usar ($X) · vence …»), sin gastar el borrador; el historial de Luna
+    muestra «(foto: …)» en vez de «(image)». Búsqueda compartida con la tarjeta
+    (`ventas/services/giftcard_estado.py`): exacto, O=0/I=1, 1–2 caracteres mal con
+    una sola candidata (la tarjeta avisa «Lo escrito tiene N carácter distinto»), y
+    «R 5602» avisa que es un voucher antiguo de la reserva #5602. Migración
+    `whatsapp_agent 0014` (tabla nueva): la corre Jorge; sin ella el lector lee igual
+    pero sin guardar. **Deploy 2 (pendiente):** Luna conversa el canje (fecha, hora,
+    disponibilidad según la experiencia; tabla experiencia→servicios armada con los 23
+    canjes, la revisa Deborah) y deja el resumen a Deborah; Luna nunca confirma la
+    reserva. Opcionales: botón «Vender gift card» ligado a la reserva (reemplaza las
+    reservas con fecha de relleno 02/02, caso 6873).
     **Deudas del modelo encontradas el 24-09 (sin arreglar):** (a) el campo `estado`
     significa dos cosas —«compra sin pagar» (venta por Luna/web) y «vigente con saldo»
     (canje parcial, «Ajustar saldo»)—; la tarjeta ya no lo lee, deriva «¿se pagó?» de

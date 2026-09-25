@@ -50,6 +50,11 @@ from django.views.decorators.http import require_POST
 
 from ventas.models import Cliente, Pago, Producto, ReservaProducto, VentaReserva
 from ventas.views.ficha_reserva_view import mensaje_pase
+# Reglas de la gift card compartidas con el lector de fotos de Luna.
+from ventas.services.giftcard_estado import (buscar_por_codigo, caracteres_distintos,
+                                             estado_giftcard, numero_de_voucher)
+from ventas.services.giftcard_estado import compra_sin_pagar as _compra_sin_pagar
+from ventas.services.giftcard_estado import pesos as _pesos
 # Las mismas que usa el envío automático al pagarse: una sola definición.
 from ventas.services.giftcard_envio import contacto_comprador as _contacto_comprador
 from ventas.services.giftcard_envio import nombre_experiencia as _nombre_experiencia
@@ -479,73 +484,6 @@ def _resolver_boleta_del_pago(pago, request):
 MAX_RESULTADOS_GIFTCARD = 6
 
 
-def _pesos(n):
-    return f'${int(n or 0):,}'.replace(',', '.')
-
-
-def _codigo_limpio(texto):
-    """Los códigos son 12 letras y números en mayúscula; el cliente los dicta
-    con espacios, guiones o en minúscula."""
-    return re.sub(r'[^0-9A-Za-z]', '', texto or '').upper()
-
-
-# Letras y números que se confunden al leer o dictar un código: los códigos
-# mezclan las 26 letras con los 10 dígitos, y la fuente de la carta dibuja la O
-# igual que el cero (prueba del 24-09-2026: «OGEFH03K7B2J» empieza con la LETRA
-# O y en el PDF y en la tarjeta se ve como un cero). Para buscar, se compara
-# todo en una forma donde O=0 e I=1.
-PARES_AMBIGUOS = (('O', '0'), ('I', '1'))
-
-
-def _forma_canonica(codigo):
-    for letra, numero in PARES_AMBIGUOS:
-        codigo = codigo.replace(letra, numero)
-    return codigo
-
-
-def _codigo_canonico_sql():
-    from django.db.models import Value
-    from django.db.models.functions import Replace, Upper
-
-    expr = Upper('codigo')
-    for letra, numero in PARES_AMBIGUOS:
-        expr = Replace(expr, Value(letra), Value(numero))
-    return expr
-
-
-def _compra_sin_pagar(gc):
-    """¿La venta donde se compró esta gift card todavía debe plata?
-
-    No se lee del campo `estado`, que significa dos cosas según quién lo
-    escribió: «compra sin pagar» (la venta por Luna o la web la crea así y la
-    pasa a «cobrado» al pagarse) y «vigente, con saldo por usar» (el canje
-    parcial y el ajuste de saldo la dejan «por_cobrar»). La venta de origen no
-    tiene esa ambigüedad. Una gift card no ligada a ninguna venta —vendida a
-    mano en el admin— no se puede comprobar y se da por pagada: así se venden.
-    En prod, 24-09-2026: de 121 vigentes ligadas, 3 con la venta debiendo, y 4
-    ya pagadas marcadas «por_cobrar».
-    """
-    venta = gc.venta_reserva if gc.venta_reserva_id else None
-    return venta is not None and int(venta.saldo_pendiente or 0) > 0
-
-
-def estado_giftcard(gc, hoy=None):
-    """El estado en palabras, para quien la tiene en la mano. El campo `estado`
-    no sirve para esto (ver _compra_sin_pagar): se deriva del saldo, el
-    vencimiento y la venta donde se compró."""
-    hoy = hoy or timezone.localdate()
-    saldo = int(gc.monto_disponible or 0)
-    if gc.fecha_vencimiento and gc.fecha_vencimiento < hoy:
-        return 'Vencida'
-    if saldo <= 0:
-        return 'Usada'
-    if _compra_sin_pagar(gc):
-        return 'Por cobrar'
-    if saldo < int(gc.monto_inicial or 0):
-        return f'Le quedan {_pesos(saldo)}'
-    return 'Lista para usar'
-
-
 def _ficha_giftcard(gc, venta):
     """Lo que hay que ver ANTES de usarla, y cuánto se aplicaría a esta reserva.
 
@@ -609,19 +547,9 @@ def tarjeta_buscar_giftcard(request, venta_id):
                              '(o al menos 3 letras del nombre).'}, status=400)
     base = GiftCard.objects.select_related('cliente_comprador', 'cliente_destinatario',
                                           'venta_reserva')
-    codigo = _codigo_limpio(texto)
-    encontradas = []
-    if len(codigo) >= 6:
-        exacta = base.filter(codigo__iexact=codigo).first()
-        if exacta:
-            encontradas = [exacta]
-        else:
-            # Leído con cero por O o con uno por I; completo o solo el comienzo.
-            canon = _forma_canonica(codigo)
-            con_canon = base.annotate(canon=_codigo_canonico_sql())
-            encontradas = (list(con_canon.filter(canon=canon)[:MAX_RESULTADOS_GIFTCARD])
-                           or list(con_canon.filter(canon__startswith=canon)
-                                   .order_by('-id')[:MAX_RESULTADOS_GIFTCARD]))
+    # Exacto, con cero por O / uno por I, con 1 o 2 caracteres mal (una sola
+    # candidata), o solo el comienzo. Ver ventas/services/giftcard_estado.py.
+    encontradas, forma = buscar_por_codigo(texto, base=base, limite=MAX_RESULTADOS_GIFTCARD)
     if not encontradas and re.search(r'[^\W\d_]{3,}', texto):
         encontradas = list(
             base.filter(fecha_vencimiento__gte=timezone.localdate(), monto_disponible__gt=0)
@@ -631,10 +559,24 @@ def tarjeta_buscar_giftcard(request, venta_id):
                     | Q(cliente_comprador__nombre__icontains=texto))
             .order_by('fecha_vencimiento')[:MAX_RESULTADOS_GIFTCARD])
     if not encontradas:
+        voucher = numero_de_voucher(texto)
+        if voucher and VentaReserva.objects.filter(pk=voucher).exists():
+            return JsonResponse({'ok': False, 'mensaje': f'«{texto}» es un voucher antiguo: está en '
+                                 f'la reserva #{voucher}. Se canjea en esa misma reserva.'},
+                                status=404)
         return JsonResponse({'ok': False, 'mensaje': f'No encontré una gift card con «{texto}». '
                              'Revisa el código con el cliente.'}, status=404)
-    return JsonResponse({'ok': True,
-                         'giftcards': [_ficha_giftcard(gc, venta) for gc in encontradas]})
+    fichas = [_ficha_giftcard(gc, venta) for gc in encontradas]
+    if forma == 'tolerancia':
+        # Calzó con 1 o 2 caracteres distintos (letra manuscrita, foto borrosa):
+        # es casi seguro esa, pero quien cobra lo confirma.
+        for ficha in fichas:
+            n = caracteres_distintos(texto, ficha['codigo'])
+            ficha['calce'] = (f'Lo escrito tiene {n} carácter distinto a este código: confírmalo '
+                              'con el cliente.' if n == 1 else
+                              f'Lo escrito tiene {n} caracteres distintos a este código: '
+                              'confírmalo con el cliente.')
+    return JsonResponse({'ok': True, 'giftcards': fichas})
 
 
 @staff_required

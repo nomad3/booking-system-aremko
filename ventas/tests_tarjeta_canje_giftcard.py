@@ -109,8 +109,47 @@ class Buscar(_Base):
         self.assertEqual(ficha['id'], gc.pk)
 
     def test_un_codigo_distinto_no_se_confunde(self):
+        # Desde el 25-09 se toleran 1 o 2 caracteres mal leídos; 3 ya es otro código.
         self._giftcard(codigo='OGEFH03K7B2J')
-        self.assertEqual(self._buscar('0GEFH03K7B2X').status_code, 404)
+        self.assertEqual(self._buscar('0GEFH03K7XXX').status_code, 404)
+
+    def test_un_caracter_mal_copiado_la_encuentra_y_lo_avisa(self):
+        # Caso real (20-09-2026): el código copiado a mano en una tarjeta de
+        # cumpleaños, con un carácter mal; era la gift card 471.
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        r = self._buscar('N7LTQ4ZX9PKB')
+        self.assertEqual(r.status_code, 200)
+        [ficha] = r.json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+        self.assertIn('1 carácter distinto', ficha['calce'])
+
+    def test_dos_caracteres_mal_tambien(self):
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        [ficha] = self._buscar('N7LTQ4ZX9PBB').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+        self.assertIn('2 caracteres distintos', ficha['calce'])
+
+    def test_el_calce_exacto_no_trae_aviso(self):
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        [ficha] = self._buscar(gc.codigo).json()['giftcards']
+        self.assertNotIn('calce', ficha)
+
+    def test_si_dos_quedan_igual_de_cerca_no_elige(self):
+        self._giftcard(codigo='N7LTQ4ZX9PKA')
+        self._giftcard(codigo='N7LTQ4ZX9PBB')
+        self.assertEqual(self._buscar('N7LTQ4ZX9PKB').status_code, 404)
+
+    def test_un_voucher_antiguo_dice_en_que_reserva_esta(self):
+        antigua = VentaReserva.objects.create(id=5602, cliente=self.cliente)
+        r = self._buscar('R 5602')
+        self.assertEqual(r.status_code, 404)
+        self.assertIn(f'reserva #{antigua.pk}', r.json()['mensaje'])
+        self.assertIn('voucher antiguo', r.json()['mensaje'])
+
+    def test_un_voucher_sin_reserva_es_un_no_encontrado_normal(self):
+        r = self._buscar('R 9876')
+        self.assertEqual(r.status_code, 404)
+        self.assertIn('No encontré', r.json()['mensaje'])
 
     def test_por_el_nombre_de_quien_la_recibio(self):
         gc = self._giftcard()

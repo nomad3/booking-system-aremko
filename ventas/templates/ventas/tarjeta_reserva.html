@@ -881,6 +881,7 @@ internas y se reconocen entre sí.
     ficha.className = 'gc-ficha';
     linea(ficha, '🎁 ' + gc.experiencia, 'gc-tit');
     linea(ficha, gc.codigo, 'gc-cod');
+    if (gc.calce) { linea(ficha, '🔎 ' + gc.calce, 'gc-aviso'); }
     if (gc.para) { linea(ficha, 'Para: ' + gc.para); }
     if (gc.compro) { linea(ficha, 'La compró: ' + gc.compro); }
     linea(ficha, 'Saldo ' + fmt(gc.saldo) + ' de ' + fmt(gc.monto_inicial) +
