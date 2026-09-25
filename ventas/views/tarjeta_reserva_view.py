@@ -50,6 +50,9 @@ from django.views.decorators.http import require_POST
 
 from ventas.models import Cliente, Pago, Producto, ReservaProducto, VentaReserva
 from ventas.views.ficha_reserva_view import mensaje_pase
+# Las mismas que usa el envío automático al pagarse: una sola definición.
+from ventas.services.giftcard_envio import contacto_comprador as _contacto_comprador
+from ventas.services.giftcard_envio import nombre_experiencia as _nombre_experiencia
 
 logger = logging.getLogger(__name__)
 
@@ -543,19 +546,6 @@ def estado_giftcard(gc, hoy=None):
     return 'Lista para usar'
 
 
-def _nombre_experiencia(gc):
-    from ventas.models import GiftCardExperiencia
-    clave = (gc.servicio_asociado or '').strip()
-    if not clave:
-        return 'Gift card de monto libre'
-    nombre = (GiftCardExperiencia.objects.filter(id_experiencia=clave)
-              .values_list('nombre', flat=True).first())
-    if nombre:
-        return nombre
-    legible = clave.replace('_', ' ')
-    return legible[:1].upper() + legible[1:]
-
-
 def _ficha_giftcard(gc, venta):
     """Lo que hay que ver ANTES de usarla, y cuánto se aplicaría a esta reserva.
 
@@ -726,17 +716,6 @@ def tarjeta_aplicar_giftcard(request, venta_id):
 # email. La tarjeta de una venta de gift card se veía vacía («sin servicios,
 # sin productos») y los PDF se mandaban a mano desde la bandeja.
 # ---------------------------------------------------------------------------
-
-def _contacto_comprador(gc, venta):
-    """(teléfono, email, nombre) de quien COMPRÓ la gift card."""
-    comprador = gc.cliente_comprador if gc.cliente_comprador_id else venta.cliente
-    telefono = ((getattr(comprador, 'telefono', '') or '') or (venta.cliente.telefono or '')
-                or (gc.comprador_telefono or '')).strip()
-    email = ((getattr(comprador, 'email', '') or '') or (venta.cliente.email or '')
-             or (gc.comprador_email or '')).strip()
-    nombre = ((getattr(comprador, 'nombre', '') or '') or (gc.comprador_nombre or '')).strip()
-    return telefono, email, nombre
-
 
 def _codigo_liberado(gc):
     """El código se muestra y se envía solo con la compra pagada (Jorge,

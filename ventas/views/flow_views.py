@@ -328,6 +328,9 @@ def flow_confirmation(request):
                         comprador_nombre=materializada.cliente.nombre,
                         giftcards_data=giftcards_data,
                     )
+                    # 2b: y por WhatsApp si el comprador está conversando (nunca lanza).
+                    from ..services.giftcard_envio import enviar_al_pagarse
+                    enviar_al_pagarse(materializada.id, [gc.pk for gc in giftcards_lista])
                 return HttpResponse("Payment Confirmed", status=200)
 
             elif flow_status in (3, 4):

@@ -17,6 +17,31 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def nombre_experiencia(gc):
+    """Nombre de la experiencia de la gift card, para mostrar y para el mensaje."""
+    from ventas.models import GiftCardExperiencia
+    clave = (gc.servicio_asociado or '').strip()
+    if not clave:
+        return 'Gift card de monto libre'
+    nombre = (GiftCardExperiencia.objects.filter(id_experiencia=clave)
+              .values_list('nombre', flat=True).first())
+    if nombre:
+        return nombre
+    legible = clave.replace('_', ' ')
+    return legible[:1].upper() + legible[1:]
+
+
+def contacto_comprador(gc, venta):
+    """(teléfono, email, nombre) de quien COMPRÓ la gift card."""
+    comprador = gc.cliente_comprador if gc.cliente_comprador_id else venta.cliente
+    telefono = ((getattr(comprador, 'telefono', '') or '') or (venta.cliente.telefono or '')
+                or (gc.comprador_telefono or '')).strip()
+    email = ((getattr(comprador, 'email', '') or '') or (venta.cliente.email or '')
+             or (gc.comprador_email or '')).strip()
+    nombre = ((getattr(comprador, 'nombre', '') or '') or (gc.comprador_nombre or '')).strip()
+    return telefono, email, nombre
+
+
 def _primer_nombre(texto):
     partes = (texto or '').strip().split()
     return partes[0] if partes else ''
@@ -65,3 +90,56 @@ def reenviar_por_email(giftcard, email, nombre_comprador):
     if ok:
         type(giftcard).objects.filter(pk=giftcard.pk).update(enviado_email=True)
     return bool(ok)
+
+
+def enviar_al_pagarse(venta_id, giftcard_ids):
+    """El PDF sale solo por WhatsApp al registrarse el pago (2b; Jorge, 24-09-2026).
+
+    Igual que la boleta: si el comprador conversó en las últimas 24 horas, se le
+    manda el PDF sin que nadie apriete nada. Es justo cuando más sirve: el caso
+    de Claudia (22-09) fue un «Me llegó la confirmación pero no gift» minutos
+    después de pagar, con la gift card en spam.
+
+    Solo con la venta pagada ENTERA —la regla que Jorge fijó para el código en
+    la tarjeta—, aunque el email automático salga también con un pago parcial.
+    Fuera de la ventana no se hace nada: queda el email y el botón de la
+    tarjeta. Se llama después de confirmado el pago y NUNCA puede voltearlo:
+    todo va envuelto y solo deja registro. Devuelve cuántas envió.
+    """
+    enviadas = 0
+    try:
+        from django.utils import timezone
+
+        from facturacion.services.envio_whatsapp import ventana_abierta
+        from ventas.models import GiftCard, VentaReserva
+
+        venta = VentaReserva.objects.select_related('cliente').get(pk=venta_id)
+        if int(venta.saldo_pendiente or 0) > 0:
+            logger.info('[giftcard] venta %s con saldo pendiente: el PDF no sale solo por '
+                        'WhatsApp todavía', venta_id)
+            return 0
+        hoy = timezone.localdate()
+        cartas = (GiftCard.objects.select_related('cliente_comprador')
+                  .filter(pk__in=list(giftcard_ids), venta_reserva_id=venta_id).order_by('id'))
+        for gc in cartas:
+            if gc.enviado_whatsapp or int(gc.monto_disponible or 0) <= 0 or (
+                    gc.fecha_vencimiento and gc.fecha_vencimiento < hoy):
+                continue
+            telefono, _, nombre = contacto_comprador(gc, venta)
+            if not telefono or not ventana_abierta(telefono):
+                logger.info('[giftcard] %s: el comprador no conversó en 24 h, queda el email',
+                            gc.codigo)
+                continue
+            try:
+                ok, motivo = enviar_por_whatsapp(gc, telefono, nombre, nombre_experiencia(gc))
+            except Exception as exc:  # noqa: BLE001
+                ok, motivo = False, str(exc)
+            if ok:
+                enviadas += 1
+                logger.info('[giftcard] %s enviada sola por WhatsApp a %s al pagarse la venta %s',
+                            gc.codigo, telefono, venta_id)
+            else:
+                logger.warning('[giftcard] %s no salió sola por WhatsApp: %s', gc.codigo, motivo)
+    except Exception:  # noqa: BLE001 — avisar jamás puede tumbar un cobro
+        logger.exception('[giftcard] falló el envío automático de la venta %s', venta_id)
+    return enviadas

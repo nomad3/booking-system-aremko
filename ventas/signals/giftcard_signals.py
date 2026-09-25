@@ -68,6 +68,16 @@ def enviar_giftcards_al_registrar_pago(sender, instance, created, **kwargs):
             # Enviar email con las GiftCards
             enviar_email_giftcards(venta_reserva, list(giftcards_pendientes))
 
+            # 2b (24-09-2026): y el PDF por WhatsApp si el comprador está
+            # conversando. DESPUÉS de confirmado el pago y fuera de su
+            # transacción: subir un archivo a Meta tarda, y nada de eso puede
+            # voltear el cobro.
+            from django.db import transaction
+
+            from ..services.giftcard_envio import enviar_al_pagarse
+            venta_id, ids = venta_reserva.pk, [g.pk for g in giftcards_pendientes]
+            transaction.on_commit(lambda: enviar_al_pagarse(venta_id, ids))
+
         except Exception as e:
             logger.error(f"Error al procesar GiftCards de VentaReserva #{venta_reserva.id}: {str(e)}", exc_info=True)
 
