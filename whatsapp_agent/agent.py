@@ -3613,10 +3613,11 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
     texto, motivo_hora = _corregir_hora_que_no_existe(texto, resultado.tool_calls_executed)
     if motivo_hora:
         return _borrador_escala(motivo_hora, modelo=modelo, tokens=tokens)
-    # 2) Sin el nombre del cliente ni «Perfecto» repetido, y sin arrancar igual que antes.
+    # 2) Sin el nombre del cliente, sin un segundo «¡Hola!» ni «Perfecto» repetido, y sin
+    #    arrancar igual que antes.
     texto, extra = _sin_sonar_a_robot(
         texto, historial, modelo, nombres=_nombres_del_cliente(saludo_nombre, datos_cliente),
-        en_conversacion=(saludo_estado == 'en_conversacion'))
+        en_conversacion=(saludo_estado == 'en_conversacion'), mensaje=mensaje)
     tokens = (tokens[0] + extra[0], tokens[1] + extra[1], tokens[2] + extra[2])
 
     # H-097: una tool avisó que su pregunta ya se hizo y la respuesta no sirvió.
@@ -3772,13 +3773,39 @@ def _datos_del_texto(texto):
     return {d.replace(' ', '').rstrip('.,;:!?)»"').lower() for d in _RE_DATOS.findall(limpio)}
 
 
-def _sin_sonar_a_robot(texto, historial, modelo, nombres=(), en_conversacion=False):
+_RE_SALUDO_AL_INICIO = re.compile(r'^\s*¡?\s*(hola|buenas\s+(tardes|noches)|buenos\s+d[ií]as|'
+                                  r'buenas)\s*[!.,]+\s*', re.IGNORECASE)
+
+
+def _ya_saludo(historial, ultimos=4):
+    """¿Alguno de los últimos mensajes de Luna ya fue un saludo?"""
+    suyos = [linea[len('[Aremko]:'):].strip() for linea in (historial or '').splitlines()
+             if linea.startswith('[Aremko]:')]
+    return any(_RE_SALUDO.match(t) for t in suyos[-ultimos:])
+
+
+def quitar_saludo(texto):
+    """Sin el «¡Hola!» del comienzo: «¡Hola! Para el lunes…» → «Para el lunes…»."""
+    nuevo = _RE_SALUDO_AL_INICIO.sub('', texto or '', count=1).strip()
+    if not nuevo:
+        return texto
+    return nuevo[:1].upper() + nuevo[1:]
+
+
+def _sin_sonar_a_robot(texto, historial, modelo, nombres=(), en_conversacion=False, mensaje=''):
     """(texto, tokens extra). Lo que una persona de Aremko no hace (Jorge, 25-09-2026):
-    con la conversación en curso, nombrar al cliente en cada mensaje y volver a abrir
-    con «Perfecto» —va sin nombre y con UNA muletilla por conversación—, y arrancar
-    igual que el mensaje anterior (`_sin_repetir_apertura`)."""
+    con la conversación en curso, nombrar al cliente en cada mensaje, volver a saludar
+    y volver a abrir con «Perfecto» —va sin nombre, sin un segundo «¡Hola!» (salvo que
+    el cliente vuelva a saludar) y con UNA muletilla por conversación—, y arrancar igual
+    que el mensaje anterior (`_sin_repetir_apertura`).
+
+    El segundo «¡Hola!» apareció al cambiar el tono de la configuración (sin «usa
+    Perfecto»): tras el saludo del código, el modelo abría con «¡Hola!» (3 de 3 en prod)."""
     if en_conversacion:
         texto = quitar_nombre(texto, nombres)
+        if (_RE_SALUDO.match(texto) and not _RE_SALUDO.match(mensaje or '')
+                and _ya_saludo(historial)):
+            texto = quitar_saludo(texto)
         if _empieza_con_muletilla(texto) and _uso_muletilla_antes(historial):
             texto = quitar_arranque(texto)
     return _sin_repetir_apertura(texto, historial, modelo, nombres=nombres)

@@ -27,7 +27,7 @@ from whatsapp_agent.agent import (_con_tipo_de_tina, _corregir_hora_que_no_exist
                                   _sin_repetir_apertura,
                                   _sin_sonar_a_robot, _tool_alternativas_experiencia,
                                   _ultima_hora_ofrecida, _veces_mas_tarde, quitar_arranque,
-                                  quitar_nombre, repite_apertura)
+                                  quitar_nombre, quitar_saludo, repite_apertura)
 
 GENERATE = 'destino_puerto_varas.services.llm.openrouter_provider.OpenRouterProvider.generate'
 PROVIDER = ('destino_puerto_varas.services.llm.openrouter_provider.'
@@ -555,3 +555,38 @@ class SinHidromasajeEnElTurno(TestCase):
     def test_la_hora_que_si_dijo_se_queda(self):
         args = self._args('tipo 19', HIST_SIN_HIDRO, {'hora': '19:00'})
         self.assertEqual(args['hora'], '19:00')
+
+
+class UnSoloSaludo(SimpleTestCase):
+    """Tras el cambio de tono (sin «usa Perfecto»), el modelo abría el segundo mensaje con
+    «¡Hola!», justo después del saludo del código: 3 de 3 en prod (25-09-2026)."""
+    HIST = f'[Cliente]: hola\n[Aremko]: {SALUDO_REAL}'
+
+    def test_el_segundo_hola_se_va(self):
+        texto, _ = _sin_sonar_a_robot(
+            '¡Hola! Para el lunes 28 de septiembre, tenemos disponible la Tina Hidromasaje '
+            'Villarrica a las 14:00 hrs.', self.HIST, 'm', nombres=['Jorge'],
+            en_conversacion=True, mensaje='quiero tina para el lunes para 2 personas')
+        self.assertTrue(texto.startswith('Para el lunes 28 de septiembre'), texto)
+
+    def test_con_el_nombre_tambien(self):
+        texto, _ = _sin_sonar_a_robot('¡Hola, Jorge! A las 14:00 hay una.', self.HIST, 'm',
+                                      nombres=['Jorge'], en_conversacion=True,
+                                      mensaje='quiero tina para el lunes')
+        self.assertEqual(texto, 'A las 14:00 hay una.')
+
+    def test_si_el_cliente_vuelve_a_saludar_se_le_responde(self):
+        texto, _ = _sin_sonar_a_robot('¡Hola! Sí, aquí estoy.', self.HIST, 'm',
+                                      en_conversacion=True, mensaje='hola, sigues ahí?')
+        self.assertEqual(texto, '¡Hola! Sí, aquí estoy.')
+
+    def test_si_luna_no_habia_saludado_se_queda(self):
+        historial = '[Cliente]: quiero tina\n[Aremko]: ¿Para qué día?'
+        texto, _ = _sin_sonar_a_robot('¡Hola! A las 14:00 hay una.', historial, 'm',
+                                      en_conversacion=True, mensaje='el lunes')
+        self.assertEqual(texto, '¡Hola! A las 14:00 hay una.')
+
+    def test_quitar_saludo(self):
+        self.assertEqual(quitar_saludo('Hola, para el lunes hay una.'), 'Para el lunes hay una.')
+        self.assertEqual(quitar_saludo('¡Buenas tardes! A las 14:00.'), 'A las 14:00.')
+        self.assertEqual(quitar_saludo('Holanda no queda cerca.'), 'Holanda no queda cerca.')
