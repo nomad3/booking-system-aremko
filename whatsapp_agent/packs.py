@@ -481,7 +481,8 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
     # `alternativas`: cada cabaña con cada tina. Una entrada por par, usando el horario
     # MÁS TARDE de esa tina — varios slots de la misma tina serían ruido, no opciones.
     # Orden: hora desc (la regla de Jorge sigue mandando, ahora como criterio de ORDEN y
-    # no como filtro), luego precio y nombre para que sea determinístico.
+    # no como filtro), luego precio y, a igual precio, el sorteo de cabañas de la fecha
+    # (25-09-2026; antes el nombre, y ganaba siempre Acantilado). Determinístico igual.
     alternativas = []
     if todas:
         for c in cabanas:
@@ -511,8 +512,10 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
                     'precio_con_descuento': max(0, precio_total - desc),
                     'hay_descuento': desc > 0,
                 })
+        from .availability import clave_sorteo_cabana
         alternativas.sort(key=lambda o: (-(hhmm_a_min(o['tina']['hora']) or 0),
-                                         o['precio_total'], o['cabana']['nombre']))
+                                         o['precio_total'],
+                                         clave_sorteo_cabana(o['cabana']['nombre'], f)))
 
     nota = ''
     if tina is None:
@@ -593,13 +596,13 @@ def router_disponibilidad(servicios, fecha, personas=2):
     if aloj and masaje:                                # Alojamiento + Masaje (gap): ofrece ambos + sugiere Ritual
         return {
             'rama': 'alojamiento_masaje',
-            'cabanas': disponibilidad(fecha, personas, 'cabana'),
+            'cabanas': disponibilidad(fecha, personas, 'cabana', limite=None),
             'masajes': disponibilidad(fecha, personas, 'masaje'),
             'sugerencia': 'Si suma una tina, queda el Ritual del Río completo '
                           '(alojamiento + tina + masaje + desayuno) por $240.000.',
         }
     if aloj:                                           # Cabaña sola (+desayuno)
-        return dict(disponibilidad(fecha, personas, 'cabana'), rama='alojamiento')
+        return dict(disponibilidad(fecha, personas, 'cabana', limite=None), rama='alojamiento')
     if tina and masaje:                                # Tina + Masaje
         return dict(disponibilidad_pack_tina_masaje(fecha, personas), rama='tina_masaje')
     if tina:                                           # Tina sola

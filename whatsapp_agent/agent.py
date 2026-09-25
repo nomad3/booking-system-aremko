@@ -1681,6 +1681,63 @@ def ruta_una_recomendacion(tipo, fecha):
     return _TIPO_A_EXPERIENCIA.get((str(tipo or '')).strip().lower())
 
 
+# Jorge (25-09-2026): «Luna debería ofrecer solo una opción y de las disponibles
+# aleatoriamente, no siempre por orden alfabético». El orden ya viene sorteado por
+# fecha (availability.clave_sorteo_cabana, Torre al final); acá se deja la primera
+# y las demás quedan de respaldo por si el cliente pide otra.
+_INSTRUCCION_UNA_CABANA = (
+    'Ofrece SOLO esta cabaña: la eligió el sistema entre las libres. No listes otras ni '
+    'preguntes cuál prefiere. Si el cliente pide otra o pregunta por una en particular, '
+    'ofrece UNA de `otras_cabanas_libres`; si no está ahí, no está libre.')
+
+
+def _una_cabana_servicios(resultado):
+    """`servicios` con una sola cabaña (consulta de cabaña, rama alojamiento)."""
+    if not isinstance(resultado, dict) or not isinstance(resultado.get('servicios'), list):
+        return resultado
+    cabanas = [sv for sv in resultado['servicios'] if sv.get('tipo') == 'cabana']
+    if len(cabanas) <= 1:
+        return resultado
+    r = dict(resultado)
+    r['servicios'] = [sv for sv in resultado['servicios']
+                      if sv.get('tipo') != 'cabana' or sv is cabanas[0]]
+    r['otras_cabanas_libres'] = [{'nombre': c.get('nombre'), 'precio_total': c.get('precio_total')}
+                                 for c in cabanas[1:]]
+    r['instruccion_cabana'] = _INSTRUCCION_UNA_CABANA
+    return r
+
+
+def _una_cabana_opciones(resultado, fecha):
+    """`opciones` (cabaña + tina) con una sola cabaña; las otras libres de respaldo."""
+    if not isinstance(resultado, dict) or not resultado.get('opciones'):
+        return resultado
+    r = dict(resultado)
+    elegida = resultado['opciones'][0]
+    r['opciones'] = [elegida]
+    from .availability import disponibilidad
+    libres = disponibilidad(resultado.get('fecha') or fecha, 2, 'cabana',
+                            limite=None).get('servicios', [])
+    nombre = (elegida.get('cabana') or {}).get('nombre')
+    r['otras_cabanas_libres'] = [{'nombre': c.get('nombre'), 'precio_total': c.get('precio_total')}
+                                 for c in libres if c.get('nombre') != nombre]
+    r['instruccion_cabana'] = _INSTRUCCION_UNA_CABANA
+    return r
+
+
+def _una_cabana_multinoche(resultado):
+    """`cabanas` de varias noches con una sola; las demás de respaldo."""
+    if not isinstance(resultado, dict) or not isinstance(resultado.get('cabanas'), list):
+        return resultado
+    if len(resultado['cabanas']) <= 1:
+        return resultado
+    r = dict(resultado)
+    r['cabanas'] = resultado['cabanas'][:1]
+    r['otras_cabanas_libres'] = [{'nombre': c.get('nombre'), 'total_estadia': c.get('total_estadia')}
+                                 for c in resultado['cabanas'][1:]]
+    r['instruccion_cabana'] = _INSTRUCCION_UNA_CABANA
+    return r
+
+
 def _otras_variadas(alts, tope):
     """Las alternativas de respaldo de Luna, turnando los grupos de precio (una
     sin hidromasaje, una con, …): desde que el motor entrega TODAS las opciones
@@ -1945,6 +2002,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if tipo_exp:
                     return _tool_alternativas_experiencia(
                         {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas})
+                if args.get('tipo') == 'cabana':
+                    return _una_cabana_servicios(
+                        disponibilidad(fecha, personas, 'cabana', limite=None))
                 return disponibilidad(fecha, personas, args.get('tipo'))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool disponibilidad falló: %s', exc)
@@ -1961,7 +2021,15 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if personas < 1:
                     return {'error': 'falta_personas',
                             'mensaje': 'Antes de consultar, pregúntale al cliente para cuántas personas será. NO asumas 1.'}
-                return router_disponibilidad(args.get('servicios'), args.get('fecha'), personas)
+                resultado = router_disponibilidad(args.get('servicios'), args.get('fecha'), personas)
+                rama = resultado.get('rama') if isinstance(resultado, dict) else None
+                if rama == 'alojamiento':
+                    return _una_cabana_servicios(resultado)
+                if rama == 'alojamiento_tina':
+                    return _una_cabana_opciones(resultado, args.get('fecha'))
+                if rama == 'alojamiento_masaje':
+                    return dict(resultado, cabanas=_una_cabana_servicios(resultado.get('cabanas')))
+                return resultado
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool combo falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad'}
@@ -1979,19 +2047,21 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         if name == 'consultar_disponibilidad_pack_cabana':
             from .packs import disponibilidad_pack_cabana_tina
             try:
-                return disponibilidad_pack_cabana_tina((args or {}).get('fecha'))
+                return _una_cabana_opciones(
+                    disponibilidad_pack_cabana_tina((args or {}).get('fecha')),
+                    (args or {}).get('fecha'))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool pack cabaña falló: %s', exc)
                 return {'error': 'no se pudo componer el pack de cabaña'}
         if name == 'consultar_disponibilidad_alojamiento_multinoche':
             from .availability import disponibilidad_alojamiento_multinoche
             try:
-                return disponibilidad_alojamiento_multinoche(
+                return _una_cabana_multinoche(disponibilidad_alojamiento_multinoche(
                     (args or {}).get('fecha_llegada'),
                     (args or {}).get('personas', 1),
                     noches=(args or {}).get('noches'),
                     fecha_salida=(args or {}).get('fecha_salida'),
-                )
+                ))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool alojamiento multinoche falló: %s', exc)
                 return {'error': 'no se pudo consultar disponibilidad de alojamiento'}

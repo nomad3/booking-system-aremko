@@ -99,6 +99,38 @@ def _termino_relativo(expr_norm):
     return None
 
 
+def clave_sorteo_cabana(nombre, fecha):
+    """Orden de las cabañas «al azar por fecha» (Jorge, 25-09-2026).
+
+    Antes salían por nombre y con tope de 2: en 60 días, de 580 borradores de Luna
+    con cabañas, el 52% ofrecía primero Acantilado y el 30% Arrayán. Ahora el
+    orden sale de un sorteo con la fecha como semilla: el mismo día da siempre el
+    mismo orden —el cliente que pregunta por el sábado y después dice «sí» recibe
+    la cabaña que se le ofreció, y el Ritual arma la misma—, y cada fecha reparte
+    distinto. Es un hash por cabaña y no un barajado de la lista, para que si una
+    cabaña se ocupa entre dos mensajes las demás no cambien de lugar. La Torre va
+    siempre al final (Jorge: fuera del sorteo; es la más cara y el Ritual ya la
+    evita): se ofrece solo si es la única libre o si el cliente la pide.
+    """
+    import hashlib
+
+    es_torre = 'torre' in (nombre or '').lower()
+    sorteo = hashlib.sha256(f'{fecha.isoformat()}|{nombre or ""}'.encode()).hexdigest()
+    return (es_torre, sorteo)
+
+
+def ordenar_cabanas(servicios, fecha):
+    """Las cabañas de `servicios` (dicts con 'tipo' y 'nombre') en el orden del
+    sorteo de `fecha`; los demás servicios quedan donde estaban."""
+    posiciones = [i for i, sv in enumerate(servicios) if sv.get('tipo') == 'cabana']
+    cabanas = sorted((servicios[i] for i in posiciones),
+                     key=lambda sv: clave_sorteo_cabana(sv.get('nombre'), fecha))
+    ordenados = list(servicios)
+    for i, sv in zip(posiciones, cabanas):
+        ordenados[i] = sv
+    return ordenados
+
+
 _FECHA_ISO = re.compile(r'\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b')
 _FECHA_DMA = re.compile(r'\b(\d{1,2})[-/](\d{1,2})[-/](\d{4}|\d{2})\b')
 _FECHA_DM = re.compile(r'(?<![\d/])(\d{1,2})/(\d{1,2})(?![\d/])')
@@ -551,6 +583,9 @@ def disponibilidad(fecha=None, personas=1, tipo=None, limite=2, incluir_slots_pr
             'slots_libres': libres,
         })
 
+    # Cabañas en el orden del sorteo de la fecha (Torre al final), no por nombre.
+    servicios = ordenar_cabanas(servicios, f or timezone.localdate())
+
     # Limitar opciones para no abrumar al LLM, PERO con variedad de tipos:
     # - Si el cliente pidió un tipo concreto (ej. "una tina"): hasta `limite` de ese tipo.
     # - Si es consulta general: 1 representante de CADA tipo disponible (tina + masaje +
@@ -681,12 +716,11 @@ def disponibilidad_alojamiento_multinoche(fecha_llegada, personas=1, noches=None
                 'total_estadia': int(total_estadia) if total_estadia == int(total_estadia) else total_estadia,
             })
 
-        # Ordenar por precio y guardar el total ANTES de limitar
-        resultado_ordenado = sorted(resultado, key=lambda x: x['total_estadia'])
-        total_disponibles = len(resultado_ordenado)
-
-        # Limitar a máximo 2 cabañas (las 2 más económicas, por total_estadia)
-        resultado = resultado_ordenado[:2]
+        # Torre al final y el resto por el sorteo de la fecha de llegada (antes: por
+        # precio y nombre, y solo las 2 primeras). Van todas las libres: la herramienta
+        # de Luna ofrece UNA y deja las demás de respaldo.
+        resultado = sorted(resultado, key=lambda x: clave_sorteo_cabana(x['nombre'], f_llegada))
+        total_disponibles = len(resultado)
 
         return {
             'fecha_llegada': f_llegada.isoformat(),
