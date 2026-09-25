@@ -209,6 +209,18 @@ class EnElTurnoCompleto(TestCase):
                                'despues_de': '16:30'})])
         self.assertTrue(herramienta.call_args.args[0]['preguntar_hora'])
 
+    def test_al_tercer_mas_tarde_no_vuelve_a_preguntar(self):
+        ya_pregunto = (f'{HISTORIAL}\n[Cliente]: mas tarde\n'
+                       '[Aremko]: ¿Qué hora te acomoda? Ese día hay hasta las 21:30.')
+        with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
+                        return_value={'success': True}) as herramienta, \
+                mock.patch(GENERATE, return_value=_llm('A las 17:00 hay una clásica.')):
+            _turno('mas tarde', ya_pregunto, 'A las 17:00 hay una clásica, sale $50.000.',
+                   llamadas=[('alternativas_experiencia',
+                              {'tipo': 'tina_sola', 'fecha': 'lunes', 'personas': 2,
+                               'despues_de': '16:30'})])
+        self.assertNotIn('preguntar_hora', herramienta.call_args.args[0])
+
     def test_tambien_por_la_consulta_general(self):
         with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
                         return_value={'success': True}) as herramienta, \

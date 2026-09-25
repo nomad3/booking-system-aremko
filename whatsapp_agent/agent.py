@@ -1810,7 +1810,11 @@ def _pide_mas_tarde(texto):
 
 
 def _veces_mas_tarde(mensaje, historial):
-    """Cuántos «más tarde» seguidos lleva el cliente, contando este mensaje."""
+    """Cuántos «más tarde» seguidos lleva el cliente, contando este mensaje.
+
+    Al SEGUNDO (== 2, no >= 2) Luna pregunta qué hora le acomoda; si el cliente
+    contesta otro «más tarde», se le ofrece la siguiente: preguntarle lo mismo
+    dos veces sería justo lo robótico que se quiere evitar."""
     if not _pide_mas_tarde(mensaje):
         return 0
     veces = 1
@@ -2169,7 +2173,7 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                         {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas,
                          'despues_de': args.get('despues_de'), 'hora': args.get('hora'),
                          'preguntar_hora': bool(args.get('despues_de'))
-                         and _veces_mas_tarde(mensaje, historial) >= 2})
+                         and _veces_mas_tarde(mensaje, historial) == 2})
                 if args.get('tipo') == 'cabana':
                     return _una_cabana_servicios(
                         disponibilidad(fecha, personas, 'cabana', limite=None))
@@ -2391,7 +2395,7 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
             # H-078: cotizador oficial — el motor arma las opciones, el modelo solo las presenta.
             try:
                 args = dict(args or {})
-                if args.get('despues_de') and _veces_mas_tarde(mensaje, historial) >= 2:
+                if args.get('despues_de') and _veces_mas_tarde(mensaje, historial) == 2:
                     args['preguntar_hora'] = True
                 return _tool_alternativas_experiencia(args)
             except Exception as exc:  # noqa: BLE001
