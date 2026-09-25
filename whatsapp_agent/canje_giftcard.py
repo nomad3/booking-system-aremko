@@ -139,21 +139,27 @@ def _hhmm_min(hora):
 
 
 def _primera_hora(op):
+    """La hora de la tina de la opción (la de la primera línea si no hay tina)."""
     itin = op.get('itinerario') or []
-    return (_hhmm_min(itin[0].get('hora')) if itin else None) or 0
+    linea = next((l for l in itin if _es_tina(l.get('servicio'))), itin[0] if itin else {})
+    return _hhmm_min(linea.get('hora')) or 0
 
 
-def _elegir(opciones, hora_preferida):
-    """UNA opción, con la regla de la casa de cuando Luna vende (H-081): la más
-    barata y, a igual precio, la más tarde (deja el día libre). Si el cliente
-    pidió una hora, la más cercana a esa hora."""
+def _elegir(opciones, hora_preferida, tipo=''):
+    """UNA opción, con la misma regla con que Luna vende (Jorge, 25-09-2026): en
+    tina sola y Pausa, la primera hora libre; en la Noche, la tina más tarde. Las
+    dos vienen ya ordenadas así por el motor (y a igual hora, por el sorteo del
+    día). En masaje solo sigue H-081: la más barata y, a igual precio, la más
+    tarde. Si el cliente pidió una hora, la más cercana a esa hora."""
     if not opciones:
         return None
     pref = _hhmm_min(hora_preferida)
     if pref is not None:
         return min(opciones, key=lambda op: (abs(_primera_hora(op) - pref), -_primera_hora(op)))
-    return min(opciones, key=lambda op: (op.get('precio_con_descuento') or 0,
-                                         op.get('precio_total') or 0, -_primera_hora(op)))
+    if tipo == 'masaje_solo':
+        return min(opciones, key=lambda op: (op.get('precio_con_descuento') or 0,
+                                             op.get('precio_total') or 0, -_primera_hora(op)))
+    return opciones[0]
 
 
 def fecha_larga(fecha):
@@ -282,7 +288,7 @@ def opcion_de_canje(gc, ficha, args, hoy=None):
     if res.get('error'):
         return _fallo('sin_horario', f"No pude revisar ese día: {res['error']}. Pregúntale por otro día.")
     opciones = [op for op in res.get('alternativas', []) if _cumple(ficha, op.get('itinerario', []))]
-    op = _elegir(opciones, args.get('hora'))
+    op = _elegir(opciones, args.get('hora'), ficha.tipo)
     if op is None:
         return _fallo('sin_horario',
                       f'El {fecha_larga(fecha)} no queda horario para lo que incluye la gift card. '

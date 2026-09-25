@@ -99,6 +99,14 @@ def _termino_relativo(expr_norm):
     return None
 
 
+def clave_sorteo(nombre, fecha):
+    """Lugar de un servicio en el sorteo de `fecha`: un hash estable de (fecha,
+    nombre). Desempata tinas y cabañas sin el alfabeto (25-09-2026)."""
+    import hashlib
+
+    return hashlib.sha256(f'{fecha.isoformat()}|{nombre or ""}'.encode()).hexdigest()
+
+
 def clave_sorteo_cabana(nombre, fecha):
     """Orden de las cabañas «al azar por fecha» (Jorge, 25-09-2026).
 
@@ -112,11 +120,8 @@ def clave_sorteo_cabana(nombre, fecha):
     siempre al final (Jorge: fuera del sorteo; es la más cara y el Ritual ya la
     evita): se ofrece solo si es la única libre o si el cliente la pide.
     """
-    import hashlib
-
     es_torre = 'torre' in (nombre or '').lower()
-    sorteo = hashlib.sha256(f'{fecha.isoformat()}|{nombre or ""}'.encode()).hexdigest()
-    return (es_torre, sorteo)
+    return (es_torre, clave_sorteo(nombre, fecha))
 
 
 def ordenar_cabanas(servicios, fecha):

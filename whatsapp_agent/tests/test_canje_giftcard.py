@@ -105,17 +105,18 @@ class ElHorarioDelCanje(_Base):
         with _resuelve(fecha), _agenda(*opciones):
             return opcion_de_canje(self.gc, ficha, {'fecha': 'el sábado', **args})
 
-    def test_ofrece_una_tina_sin_hidromasaje_la_mas_tarde(self):
+    def test_ofrece_una_tina_sin_hidromasaje_desde_la_primera_hora(self):
+        # Solo tina (Jorge, 25-09-2026): la primera hora libre de lo que cubre.
         sabado = _proximo(5)
         r = self._opcion(self.SIN_HIDRO, sabado,
-                         _op(('Tina Hidromasaje Llaima', '18:00'), precio=60000),
+                         _op(('Tina Hidromasaje Llaima', '14:00'), precio=60000),
                          _op(('Tina Tronador', '18:00')),
                          _op(('Tina Hornopiren', '20:00')))
         self.assertTrue(r['success'])
-        self.assertEqual(r['itinerario'], [{'servicio': 'Tina Hornopiren', 'hora': '20:00',
+        self.assertEqual(r['itinerario'], [{'servicio': 'Tina Tronador', 'hora': '18:00',
                                             'servicio_id': 1}])
         self.assertTrue(r['opcion'].startswith('sábado '), r['opcion'])
-        self.assertTrue(r['opcion'].endswith(': Tina Hornopiren a las 20:00'), r['opcion'])
+        self.assertTrue(r['opcion'].endswith(': Tina Tronador a las 18:00'), r['opcion'])
         self.assertNotIn('$', r['opcion'])
 
     def test_si_pide_una_hora_ofrece_la_mas_cercana(self):
@@ -130,11 +131,11 @@ class ElHorarioDelCanje(_Base):
                          _op(('Tina Hidromasaje Villarrica', '16:30'), precio=60000))
         self.assertIn('Tina Hidromasaje Villarrica a las 16:30', r['opcion'])
 
-    def test_la_de_cualquier_tina_prefiere_la_mas_economica(self):
+    def test_la_de_cualquier_tina_ofrece_la_primera_hora_sea_cual_sea(self):
         r = self._opcion(FICHAS['tina_para_dos'], _proximo(5),
-                         _op(('Tina Hidromasaje Llaima', '21:00'), precio=60000),
+                         _op(('Tina Hidromasaje Llaima', '11:30'), precio=60000),
                          _op(('Tina Tronador', '17:00')))
-        self.assertIn('Tina Tronador a las 17:00', r['opcion'])
+        self.assertIn('Tina Hidromasaje Llaima a las 11:30', r['opcion'])
 
     def test_si_no_queda_lo_que_cubre_lo_dice(self):
         r = self._opcion(self.SIN_HIDRO, _proximo(5),

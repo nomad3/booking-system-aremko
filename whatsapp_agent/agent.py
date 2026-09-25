@@ -130,25 +130,23 @@ _TOOLS = [{
     'function': {
         'name': 'consultar_disponibilidad_pack',
         'description': (
-            'Propone itinerarios de TINA + MASAJE el mismo día (pack). Úsala cuando el '
-            'cliente quiere tina Y masaje juntos. Devuelve `opciones` (hasta 2: una "con '
-            'hidromasaje" de mayor valor y otra "sin hidromasaje" más económica), cada una con '
-            'la tina y el masaje YA compuestos (sin solaparse; el masaje queda cerca de los '
-            'masajes ya reservados ese día) y con precio real y precio con descuento de pack '
-            '(`hay_descuento`/`precio_con_descuento`). Ofrece las opciones tal cual. Requiere '
-            'fecha y personas. '
-            'Si el cliente YA recibió opciones para esa fecha y pregunta "¿más tarde?" / "¿algo '
-            'después?" / "¿no hay otro horario?", vuelve a llamar esta misma tool con '
-            'mas_tarde=true en vez de repetir la respuesta anterior o decir que no hay más — '
-            'trae la alternativa MÁS TARDE siguiente si existe (nunca inventes ni asumas que no '
-            'hay; deja que la tool te lo confirme).'
+            'Propone la Pausa (TINA + MASAJE el mismo día). Úsala cuando el cliente quiere '
+            'tina Y masaje juntos. Devuelve `opciones` con UNA opción: la del PRIMER horario '
+            'libre del día, con o sin hidromasaje, con la tina y el masaje YA compuestos (sin '
+            'solaparse) y con precio real y con descuento de pack (`hay_descuento`/'
+            '`precio_con_descuento`). Ofrécela tal cual. Requiere fecha y personas. '
+            'Si el cliente pregunta "¿más tarde?" / "¿algo después?" / "¿no hay otro horario?", '
+            'vuelve a llamarla con `despues_de` = la hora de la tina que ya ofreciste: trae el '
+            'SIGUIENTE horario, de a uno. Si vuelve sin opciones, esa era la última del día '
+            '(nunca inventes ni asumas que no hay; deja que la herramienta te lo confirme).'
         ),
         'parameters': {
             'type': 'object',
             'properties': {
                 'fecha': {'type': 'string', 'description': 'PASÁ EL TEXTO LITERAL del cliente ("próximo lunes", "el sábado", "25 de junio"); NO calcules el día ni lo conviertas a YYYY-MM-DD, la herramienta lo resuelve.'},
                 'personas': {'type': 'integer', 'description': 'Cantidad de personas'},
-                'mas_tarde': {'type': 'boolean', 'description': 'true SOLO si el cliente ya vio opciones para esta fecha y pidió algo más tarde. Trae la siguiente alternativa cronológica (no la primera). Default false.'},
+                'despues_de': {'type': 'string', 'description': 'Hora de la tina que ya ofreciste (HH:MM), SOLO si el cliente pidió algo más tarde: trae el siguiente horario.'},
+                'mas_tarde': {'type': 'boolean', 'description': 'Obsoleto: usa `despues_de`. Si viene sin `despues_de`, trae el horario siguiente al primero.'},
             },
             'required': ['fecha', 'personas'],
         },
@@ -1738,6 +1736,76 @@ def _una_cabana_multinoche(resultado):
     return r
 
 
+_TIPOS_DESDE_LA_PRIMERA_HORA = ('tina_sola', 'pausa')
+_NOTA_DE_ORDEN = {
+    'tina_sola': (' La `recomendada` es el PRIMER horario libre del día; `otras_alternativas` '
+                  'van de la más temprana a la más tardía: si pide más tarde, ofrece la '
+                  'siguiente, de a una.'),
+    'pausa': (' La `recomendada` es el PRIMER horario libre del día; `otras_alternativas` '
+              'van de la más temprana a la más tardía: si pide más tarde, ofrece la '
+              'siguiente, de a una.'),
+    'noche_aguas_calientes': ' La `recomendada` trae la tina MÁS TARDE disponible esa noche.',
+}
+_TIPOS_EN_ORDEN_DEL_MOTOR = _TIPOS_DESDE_LA_PRIMERA_HORA + ('noche_aguas_calientes',)
+
+
+def _hora_de_la_tina(alt):
+    """La hora de la tina de una alternativa (la primera línea si no hay tina)."""
+    itin = alt.get('itinerario') or [{}]
+    tina = next((l for l in itin if _normalizar_txt(l.get('servicio') or '').startswith('tina')),
+                itin[0])
+    return tina.get('hora'), tina.get('servicio') or ''
+
+
+def _otras_por_hora(alts, tope):
+    """Respaldo de «solo tina» y Pausa (25-09-2026), para ofrecer de a una desde la
+    primera hora hasta la última: una opción por horario, de la más temprana a la
+    más tardía, y siempre al menos una con y una sin hidromasaje, para que
+    «¿más tarde?», «¿más temprano?» y «¿con hidromasaje?» tengan qué ofrecer."""
+    otras, horas = [], set()
+    for a in alts:
+        hora, _ = _hora_de_la_tina(a)
+        if hora not in horas:
+            horas.add(hora)
+            otras.append(a)
+    otras = otras[:tope]
+    for con_hidro in (True, False):
+        if not any(('hidromasaje' in _normalizar_txt(_hora_de_la_tina(o)[1])) == con_hidro
+                   for o in otras):
+            extra = next((a for a in alts
+                          if ('hidromasaje' in _normalizar_txt(_hora_de_la_tina(a)[1])) == con_hidro),
+                         None)
+            if extra is not None:
+                otras.append(extra)
+    return otras
+
+
+def _pausa_de_a_una(resultado, despues_de=None, mas_tarde=False):
+    """La Pausa de a una (Jorge, 25-09-2026): `opciones` trae SOLO el primer horario
+    libre, con o sin hidromasaje; con `despues_de` (la hora de la tina ya ofrecida),
+    el siguiente. Antes traía dos (una con y otra sin hidromasaje) y «¿más tarde?»
+    saltaba a la última del día. La lista completa no viaja al modelo: la listaría."""
+    if not isinstance(resultado, dict) or resultado.get('error'):
+        return resultado
+    from .packs import hhmm_a_min
+    alternativas = resultado.get('alternativas') or []
+    r = {k: v for k, v in resultado.items() if k != 'alternativas'}
+    if not alternativas:
+        return r
+    desde = hhmm_a_min(despues_de) if despues_de else None
+    if desde is None and mas_tarde:
+        desde = hhmm_a_min(alternativas[0]['tina']['hora'])
+    siguientes = [a for a in alternativas
+                  if desde is None or (hhmm_a_min(a['tina']['hora']) or 0) > desde]
+    if not siguientes:
+        r['opciones'] = []
+        r['nota'] = ('No queda un horario más tarde ese día: díselo así (esa era la última) y '
+                     'ofrece otra fecha.')
+        return r
+    r['opciones'] = [siguientes[0]]
+    return r
+
+
 def _otras_variadas(alts, tope):
     """Las alternativas de respaldo de Luna, turnando los grupos de precio (una
     sin hidromasaje, una con, …): desde que el motor entrega TODAS las opciones
@@ -1797,18 +1865,25 @@ def _tool_alternativas_experiencia(args):
         return {'success': False, 'error': 'alternativas_invalidas', 'mensaje': res['error']}
 
     # H-081 (decisión de Jorge 2026-07-30): Luna ofrece UNA sola opción a la vez — las
-    # listas de 3-4 combos con asteriscos se ven "de robot". Orden determinista: la MÁS
-    # BARATA primero (precio final, luego precio normal) y, a igual precio, el horario
-    # MÁS TARDE (regla de la casa: deja el día libre). Las demás viajan como respaldo
-    # para cuando el cliente pida "otro horario" / "otra tina".
-    alts = sorted(
-        list(res.get('alternativas') or []),
-        key=lambda a: (
-            a.get('precio_con_descuento') or 0,
-            a.get('precio_total') or 0,
-            -_hora_itinerario_min(a),
-        ),
-    )
+    # listas de 3-4 combos con asteriscos se ven "de robot". Cuál va primero:
+    # - Solo tina y Pausa (Jorge, 25-09-2026): la PRIMERA hora libre, sea cual sea la
+    #   tina; a igual hora, el sorteo del día. Es el orden del motor.
+    # - Noche (con alojamiento): la tina MÁS TARDE; empate, la más económica y el
+    #   sorteo. También es el orden del motor.
+    # - El resto (masaje solo, Ritual, Refugio, Día): la MÁS BARATA y, a igual precio,
+    #   el horario MÁS TARDE, como antes.
+    # Las demás viajan como respaldo para cuando el cliente pida "otro horario" / "otra tina".
+    if tipo in _TIPOS_EN_ORDEN_DEL_MOTOR:
+        alts = list(res.get('alternativas') or [])
+    else:
+        alts = sorted(
+            list(res.get('alternativas') or []),
+            key=lambda a: (
+                a.get('precio_con_descuento') or 0,
+                a.get('precio_total') or 0,
+                -_hora_itinerario_min(a),
+            ),
+        )
     if not alts:
         return {
             'success': True,
@@ -1832,7 +1907,9 @@ def _tool_alternativas_experiencia(args):
         'personas': personas,
         'total_alternativas': len(alts),
         'recomendada': alts[0],
-        'otras_alternativas': _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL),
+        'otras_alternativas': (_otras_por_hora(alts[1:], _MAX_ALTERNATIVAS_TOOL)
+                               if tipo in _TIPOS_DESDE_LA_PRIMERA_HORA
+                               else _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL)),
         'instruccion': ('Ofrece SOLO la `recomendada`, redactada NATURAL en 1-2 frases (usa su '
                         '`texto_sugerido` como base, con sus horas y precios EXACTOS, '
                         'mencionando para cuántas personas es, y el '
@@ -1841,7 +1918,8 @@ def _tool_alternativas_experiencia(args):
                         'otro horario u otra tina. Si el cliente pide algo distinto (más '
                         'tarde, más temprano, con/sin hidromasaje), ofrece UNA sola de '
                         '`otras_alternativas` — la que mejor calce con lo pedido — nunca la '
-                        'lista completa. Si ninguna calza, dilo y ofrece otra fecha.'),
+                        'lista completa. Si ninguna calza, dilo y ofrece otra fecha.'
+                        + _NOTA_DE_ORDEN.get(tipo, '')),
     }
 
 
@@ -2023,6 +2101,14 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                             'mensaje': 'Antes de consultar, pregúntale al cliente para cuántas personas será. NO asumas 1.'}
                 resultado = router_disponibilidad(args.get('servicios'), args.get('fecha'), personas)
                 rama = resultado.get('rama') if isinstance(resultado, dict) else None
+                if rama == 'tina' and args.get('fecha'):
+                    return dict(_tool_alternativas_experiencia(
+                        {'tipo': 'tina_sola', 'fecha': args.get('fecha'), 'personas': personas}),
+                        rama='tina')
+                if rama == 'tina_masaje':
+                    from .packs import disponibilidad_pack_tina_masaje
+                    return dict(_pausa_de_a_una(disponibilidad_pack_tina_masaje(
+                        args.get('fecha'), personas, todas=True)), rama='tina_masaje')
                 if rama == 'alojamiento':
                     return _una_cabana_servicios(resultado)
                 if rama == 'alojamiento_tina':
@@ -2036,11 +2122,11 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         if name == 'consultar_disponibilidad_pack':
             from .packs import disponibilidad_pack_tina_masaje
             try:
-                return disponibilidad_pack_tina_masaje(
-                    (args or {}).get('fecha'),
-                    (args or {}).get('personas', 2),
-                    mas_tarde=bool((args or {}).get('mas_tarde', False)),
-                )
+                args = args or {}
+                return _pausa_de_a_una(
+                    disponibilidad_pack_tina_masaje(args.get('fecha'), args.get('personas', 2),
+                                                    todas=True),
+                    despues_de=args.get('despues_de'), mas_tarde=bool(args.get('mas_tarde')))
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool pack falló: %s', exc)
                 return {'error': 'no se pudo componer el pack'}

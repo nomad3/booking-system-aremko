@@ -132,10 +132,12 @@ class ToolAlternativasExperienciaTests(TestCase):
         m_alts.return_value = {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2,
                                'nombre_experiencia': 'Pausa junto al río',
                                'alternativas': [alternativa] * 12}
+        # Masaje solo: sigue la regla H-081 (tina sola y Pausa van por la primera hora,
+        # 25-09-2026, ver test_tinas_primera_hora).
         out = _tool_alternativas_experiencia(
-            {'tipo': 'pausa', 'fecha': 'el próximo miércoles', 'personas': 2})
+            {'tipo': 'masaje_solo', 'fecha': 'el próximo miércoles', 'personas': 2})
         self.assertTrue(out['success'])
-        m_alts.assert_called_once_with('pausa', '2026-08-05', 2)
+        m_alts.assert_called_once_with('masaje_solo', '2026-08-05', 2)
         self.assertEqual(out['dia_semana'], 'miércoles')
         self.assertEqual(out['total_alternativas'], 12)
         # H-081: UNA recomendada + respaldo topeado (contexto acotado).
@@ -156,18 +158,19 @@ class ToolAlternativasExperienciaTests(TestCase):
                     'texto_sugerido': f'{nombre} {hora}',
                     'itinerario': [{'servicio': nombre, 'hora': hora}]}
 
-        cara_temprano = alt('Tina Hidromasaje Llaima', '14:00', 140000, 110000)
-        barata_temprano = alt('Tina Hornopiren', '14:30', 130000, 110000)
-        barata_tarde = alt('Tina Hornopiren', '17:00', 130000, 110000)
-        m_alts.return_value = {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2,
-                               'nombre_experiencia': 'Pausa junto al río',
+        # Sigue valiendo para masaje solo (tina sola y Pausa: primera hora, 25-09-2026).
+        cara_temprano = alt('Masaje Piedras Calientes', '14:00', 140000, 110000)
+        barata_temprano = alt('Masaje Relajación', '14:30', 130000, 110000)
+        barata_tarde = alt('Masaje Relajación', '17:00', 130000, 110000)
+        m_alts.return_value = {'tipo': 'masaje_solo', 'fecha': '2026-08-05', 'personas': 2,
+                               'nombre_experiencia': 'Masaje',
                                'alternativas': [cara_temprano, barata_temprano, barata_tarde]}
         out = _tool_alternativas_experiencia(
-            {'tipo': 'pausa', 'fecha': '2026-08-05', 'personas': 2})
+            {'tipo': 'masaje_solo', 'fecha': '2026-08-05', 'personas': 2})
         # Más barata (precio normal 130k) y, entre las dos baratas, la MÁS TARDE (17:00).
-        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 17:00')
+        self.assertEqual(out['recomendada']['titulo'], 'Masaje Relajación · 17:00')
         self.assertEqual([a['titulo'] for a in out['otras_alternativas']],
-                         ['Tina Hornopiren · 14:30', 'Tina Hidromasaje Llaima · 14:00'])
+                         ['Masaje Relajación · 14:30', 'Masaje Piedras Calientes · 14:00'])
 
     @mock.patch('whatsapp_agent.alternativas.construir_alternativas')
     @mock.patch('whatsapp_agent.availability.resolver_fecha')

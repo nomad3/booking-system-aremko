@@ -74,22 +74,28 @@ def _slots_compatibles(slots_masaje_min, tina_ini_min, tina_dur, masaje_dur):
 TINA_PISO_CABANA_MIN = 16 * 60  # 16:00
 
 
-def elegir_tina_mas_tarde(tinas_serv, piso_min=TINA_PISO_CABANA_MIN):
+def elegir_tina_mas_tarde(tinas_serv, piso_min=TINA_PISO_CABANA_MIN, fecha=None):
     """(tina_dict, 'HH:MM') de la tina disponible en el horario MÁS TARDE >= piso_min.
 
     Regla fundamental del combo cabaña+tina: prioridad al horario más tarde, con o sin
-    hidromasaje. Empate de hora -> la más económica (precio_total), luego nombre, para
-    ser determinístico. Devuelve (None, None) si ninguna tina tiene slot >= piso_min.
+    hidromasaje (Jorge lo reafirmó el 25-09-2026: con alojamiento, la tina más tarde).
+    Empate de hora -> la más económica (precio_total), luego el sorteo del día si hay
+    `fecha` (antes el nombre: ganaba siempre Hornopiren) o el nombre. Devuelve
+    (None, None) si ninguna tina tiene slot >= piso_min.
     """
-    candidatos = []  # (slot_min, precio_total, nombre, tina, 'HH:MM')
+    from .availability import clave_sorteo
+
+    candidatos = []  # (slot_min, precio_total, desempate, tina, 'HH:MM')
     for t in (tinas_serv or []):
+        nombre = t.get('nombre') or ''
+        desempate = clave_sorteo(nombre, fecha) if fecha else nombre
         for s in (t.get('slots_libres') or []):
             m = hhmm_a_min(s)
             if m is not None and m >= piso_min:
-                candidatos.append((m, t.get('precio_total') or 0, t.get('nombre') or '', t, s))
+                candidatos.append((m, t.get('precio_total') or 0, desempate, t, s))
     if not candidatos:
         return None, None
-    candidatos.sort(key=lambda c: (-c[0], c[1], c[2]))  # hora desc, precio asc, nombre asc
+    candidatos.sort(key=lambda c: (-c[0], c[1], c[2]))  # hora desc, precio asc, sorteo
     mejor = candidatos[0]
     return mejor[3], mejor[4]
 
@@ -280,8 +286,11 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
     if f is None:
         return {'error': 'fecha inválida (usa YYYY-MM-DD)'}
 
-    # 1) Tinas con cupo para el grupo.
-    tinas = disponibilidad(f, personas, 'tina').get('servicios', [])
+    # 1) Tinas con cupo para el grupo. TODAS (25-09-2026): con el tope por defecto de
+    # `disponibilidad` solo entraban 2 —la primera estándar y la primera de hidromasaje
+    # por nombre, Hornopiren y Llaima—, y Tronador, Puntiagudo, Puyehue y Villarrica
+    # nunca formaban una Pausa, ni en la oferta de Luna ni en las olitas.
+    tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
     if not tinas:
         return {'fecha': f.isoformat(), 'personas': personas, 'opciones': [],
                 'nota': 'no hay tinas con cupo ese día para esa cantidad de personas'}
@@ -345,7 +354,12 @@ def disponibilidad_pack_tina_masaje(fecha, personas=2, buffer_max=BUFFER_CIUDAD_
                 'nombre_experiencia': 'Pausa junto al río',  # el pack tina+masaje tiene nombre propio
                 'nota': nota, 'nota_upsell': nota_upsell}
     if todas:
-        alternativas_todas.sort(key=lambda o: hhmm_a_min(o['tina']['hora']))
+        # De la primera hora a la última; a igual hora de tina, la del masaje y
+        # después el sorteo del día (no el nombre).
+        from .availability import clave_sorteo
+        alternativas_todas.sort(key=lambda o: (hhmm_a_min(o['tina']['hora']) or 0,
+                                               hhmm_a_min(o['masaje']['hora']) or 0,
+                                               clave_sorteo(o['tina']['nombre'], f)))
         resultado['alternativas'] = alternativas_todas
     return resultado
 
@@ -435,7 +449,7 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
     # Tina del día del alojamiento: la más tarde disponible >= 16:00 (con o sin hidromasaje).
     # limite=None: el tope de 2 podía dejar fuera las tinas con slot >=16:00 (mismo bug del Ritual).
     tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
-    tina, tina_hora = elegir_tina_mas_tarde(tinas)
+    tina, tina_hora = elegir_tina_mas_tarde(tinas, fecha=f)
 
     opciones = []
     for c in cabanas:
@@ -512,10 +526,11 @@ def disponibilidad_pack_cabana_tina(fecha, personas=2, todas=False):
                     'precio_con_descuento': max(0, precio_total - desc),
                     'hay_descuento': desc > 0,
                 })
-        from .availability import clave_sorteo_cabana
+        from .availability import clave_sorteo, clave_sorteo_cabana
         alternativas.sort(key=lambda o: (-(hhmm_a_min(o['tina']['hora']) or 0),
                                          o['precio_total'],
-                                         clave_sorteo_cabana(o['cabana']['nombre'], f)))
+                                         clave_sorteo_cabana(o['cabana']['nombre'], f),
+                                         clave_sorteo(o['tina']['nombre'], f)))
 
     nota = ''
     if tina is None:
@@ -669,7 +684,7 @@ def _es_tina_hidromasaje(nombre):
     return 'hidromasaje' in (nombre or '').lower()
 
 
-def _elegir_tina_ritual(tinas, preferir_hidromasaje=False):
+def _elegir_tina_ritual(tinas, preferir_hidromasaje=False, fecha=None):
     """Prefiere una tina ESTÁNDAR (sin hidromasaje, para no gatillar descuento); si
     solo hay hidromasaje, la usa. Con `preferir_hidromasaje=True` (solo verificación/forzado)
     elige hidromasaje si hay. Dentro del tipo elegido, la más tarde >=16:00.
@@ -678,7 +693,7 @@ def _elegir_tina_ritual(tinas, preferir_hidromasaje=False):
     hidro = [t for t in tinas if _es_tina_hidromasaje(t.get('nombre', ''))]
     orden = ((hidro, True), (estandar, False)) if preferir_hidromasaje else ((estandar, False), (hidro, True))
     for grupo, es_hidro in orden:
-        t, hora = elegir_tina_mas_tarde(grupo)
+        t, hora = elegir_tina_mas_tarde(grupo, fecha=fecha)
         if t is not None:
             return t, hora, es_hidro
     return None, None, False
@@ -718,7 +733,8 @@ def disponibilidad_ritual(fecha, preferir_premium=False):
     # alfabético) dejaba fuera las que SÍ tienen slot >=16:00 (p.ej. Puntiagudo/Tronador) y
     # podía elegir 2 cuyos únicos slots eran <16:00 → falso "no hay tina desde las 16:00".
     tinas = disponibilidad(f, personas, 'tina', limite=None).get('servicios', [])
-    tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas, preferir_hidromasaje=preferir_premium)
+    tina, tina_hora, es_hidromasaje = _elegir_tina_ritual(tinas, preferir_hidromasaje=preferir_premium,
+                                                          fecha=f)
     if tina is None:
         return {'fecha': f.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible desde las 16:00 esa noche; ofrece otra fecha'}
@@ -886,12 +902,14 @@ def disponibilidad_refugio(fecha, preferir_premium=False):
 
     # UNA tina CADA día (las dos noches) + UN masaje la primera noche.
     tinas1 = disponibilidad(f1, personas, 'tina', limite=None).get('servicios', [])
-    tina1, tina1_hora, es_hidro1 = _elegir_tina_ritual(tinas1, preferir_hidromasaje=preferir_premium)
+    tina1, tina1_hora, es_hidro1 = _elegir_tina_ritual(tinas1, preferir_hidromasaje=preferir_premium,
+                                                       fecha=f1)
     if tina1 is None:
         return {'fecha': f1.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible la primera noche; ofrece otra fecha'}
     tinas2 = disponibilidad(f2, personas, 'tina', limite=None).get('servicios', [])
-    tina2, tina2_hora, es_hidro2 = _elegir_tina_ritual(tinas2, preferir_hidromasaje=preferir_premium)
+    tina2, tina2_hora, es_hidro2 = _elegir_tina_ritual(tinas2, preferir_hidromasaje=preferir_premium,
+                                                       fecha=f2)
     if tina2 is None:
         return {'fecha': f1.isoformat(), 'disponible': False,
                 'nota': 'no hay tina disponible la segunda noche; ofrece otra fecha'}
@@ -1098,12 +1116,16 @@ def _servicio_con_hora(servicios, hora):
     return None
 
 
-def _tina_con_hora(tinas, hora, preferir_hidromasaje=False):
+def _tina_con_hora(tinas, hora, preferir_hidromasaje=False, fecha=None):
     """Tina con esa hora libre, prefiriendo la ESTÁNDAR.
 
     Misma razón que en el Ritual: la de hidromasaje cuesta más y comerse ese
-    margen sin necesidad no tiene sentido cuando el precio es plano.
+    margen sin necesidad no tiene sentido cuando el precio es plano. Entre las
+    del mismo tipo, el sorteo del día si hay `fecha` (25-09-2026; antes el nombre).
     """
+    if fecha is not None:
+        from .availability import clave_sorteo
+        tinas = sorted(tinas, key=lambda t: clave_sorteo(t.get('nombre'), fecha))
     estandar = [t for t in tinas if not _es_tina_hidromasaje(t.get('nombre', ''))]
     hidro = [t for t in tinas if _es_tina_hidromasaje(t.get('nombre', ''))]
     orden = ((hidro, True), (estandar, False)) if preferir_hidromasaje \
@@ -1173,7 +1195,7 @@ def disponibilidad_dia(fecha, preferir_premium=False):
         if masaje is None:
             continue
         tina, es_hidro = _tina_con_hora(tinas, tina_hora,
-                                        preferir_hidromasaje=preferir_premium)
+                                        preferir_hidromasaje=preferir_premium, fecha=f)
         if tina is None:
             continue
         return {

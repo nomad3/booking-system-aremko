@@ -91,7 +91,9 @@ def _alt(nombre, hora, precio):
             'itinerario': [{'servicio': nombre, 'hora': hora}]}
 
 
-class LunaVeLaTarde(SimpleTestCase):
+class LunaOfreceDesdeLaPrimeraHora(SimpleTestCase):
+    """Solo tina (Jorge, 25-09-2026): la primera hora libre, sea cual sea la tina;
+    el respaldo, un horario por opción hasta el último."""
     def _tool(self, alts):
         with mock.patch('whatsapp_agent.availability.resolver_fecha',
                         return_value={'fecha_iso': '2026-09-26', 'dia_semana': 'sábado',
@@ -102,17 +104,19 @@ class LunaVeLaTarde(SimpleTestCase):
             return _tool_alternativas_experiencia(
                 {'tipo': 'tina_sola', 'fecha': 'el sábado', 'personas': 2})
 
-    def test_la_recomendada_es_de_verdad_la_mas_tarde(self):
+    def test_la_recomendada_es_la_primera_hora_libre(self):
         baratas = [_alt(t, h, 50000) for h in HORAS for t in ('Tina Tronador', 'Tina Hornopiren')]
         out = self._tool(baratas)
-        self.assertEqual(out['recomendada']['itinerario'][0]['hora'], '21:30')
+        self.assertEqual(out['recomendada']['itinerario'][0]['hora'], '11:30')
+        horas = [a['itinerario'][0]['hora'] for a in out['otras_alternativas']]
+        self.assertEqual(horas[-1], '21:30')                  # el respaldo llega a la última
 
     def test_el_respaldo_trae_hidromasaje_aunque_haya_muchas_baratas(self):
         baratas = [_alt(t, h, 50000) for h in HORAS for t in ('Tina Tronador', 'Tina Hornopiren')]
         hidro = [_alt('Tina Hidromasaje Llaima', h, 60000) for h in HORAS]
         out = self._tool(baratas + hidro)
         nombres = [a['itinerario'][0]['servicio'] for a in out['otras_alternativas']]
-        self.assertEqual(len(nombres), 8)
+        self.assertLessEqual(len(nombres), 10)
         self.assertIn('Tina Hidromasaje Llaima', nombres)
         self.assertTrue({'Tina Tronador', 'Tina Hornopiren'} & set(nombres), nombres)
 

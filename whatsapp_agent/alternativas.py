@@ -33,7 +33,7 @@ Nota de negocio (confirmada por Jorge 2026-07-06):
   Programa Ritual/Refugio.
 - Tina: se consulta con las personas reales (la tina debe tener cupo para el grupo).
 """
-from .availability import disponibilidad, _parse_fecha, MASAJE_SLOTS_PROGRAMA_MIN
+from .availability import disponibilidad, _parse_fecha, clave_sorteo, MASAJE_SLOTS_PROGRAMA_MIN
 from .grounding import formatear_precio
 from . import packs
 
@@ -95,12 +95,15 @@ def _alt(titulo, precio_total, precio_con_descuento, hay_descuento, texto_sugeri
     }
 
 
-def _por_hora(alt):
-    """De la primera hora a la última (en minutos: «9:30» va antes que «11:00»); a
-    igual hora, por nombre. Una hora ilegible va al final en vez de romper el orden."""
+def _por_hora(alt, fecha=None):
+    """De la primera hora a la última (en minutos: «9:30» va antes que «11:00»). A
+    igual hora, el sorteo del día si hay `fecha` (tinas, desde el 25-09-2026: con el
+    nombre ganaba siempre Hornopiren) o el nombre. Una hora ilegible va al final."""
     primera = alt['itinerario'][0]
     minutos = packs.hhmm_a_min(primera.get('hora'))
-    return (minutos if minutos is not None else 24 * 60, primera.get('servicio') or '')
+    nombre = primera.get('servicio') or ''
+    return (minutos if minutos is not None else 24 * 60,
+            clave_sorteo(nombre, fecha) if fecha else nombre)
 
 
 def _personas_txt(personas):
@@ -116,6 +119,7 @@ def _tina_sola(fecha, personas):
     if res.get('error'):
         return {'error': res['error']}
     alts = []
+    dia = _parse_fecha(res.get('fecha')) if res.get('fecha') else None
     for s in res.get('servicios', []):
         precio = int(s['precio_total'])  # ya viene × personas
         for hora in (s.get('slots_libres') or []):
@@ -126,7 +130,7 @@ def _tina_sola(fecha, personas):
                 precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
                 texto_sugerido=texto,
                 itinerario=[_linea(s, s['nombre'], hora)]))
-    alts.sort(key=_por_hora)
+    alts.sort(key=lambda a: _por_hora(a, dia))
     return {'fecha': res.get('fecha'), 'alternativas': alts}
 
 
