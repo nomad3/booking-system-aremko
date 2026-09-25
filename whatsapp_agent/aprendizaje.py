@@ -62,6 +62,124 @@ def es_desacuerdo_sustantivo(borrador, enviado):
     return grupo_de_la_correccion(borrador, enviado) == 'sustantivo'
 
 
+# Encargo JEV, etapa 3: el modelo de decisión (Jev) elige el tipo con su confianza; el
+# texto propuesto lo sigue redactando el camino de siempre, y solo cuando vale la pena.
+CONFIANZA_MINIMA = 0.70     # una decisión con 0,55 no es una decisión
+PARECIDO_REPETIDA = 0.75    # desde aquí, dos reglas dicen lo mismo
+PREGUNTAS_CORRECCION = {
+    'que_cambio': {
+        'type': 'choice',
+        'instructions': ('Compara el borrador que propuso el asistente con lo que la persona del '
+                         'equipo realmente envió al cliente. ¿Qué cambió?'),
+        'criteria': {
+            'hecho_catalogo': ('Cambia un precio, una disponibilidad o la existencia de un servicio '
+                               'o producto, y difiere del catálogo entregado'),
+            'regla': ('Cambia una política o el cómo: qué ofrecer, qué no, condiciones, '
+                      'aclaraciones que aplican siempre'),
+            'tono': 'La misma información, solo mejor redactada, más corta o más cálida',
+            'puntual': 'Algo específico de ese cliente, un saludo, o un typo. No generaliza',
+        },
+    },
+    'generaliza': {
+        'type': 'noul',
+        'instructions': '¿Esta corrección aplicaría igual a otro cliente que preguntara lo mismo?',
+    },
+    # Junio de 2026: el clasificador propuso «enviar un link» 7 veces y se aprobó otra vez
+    # lo que ya estaba. Lo que ya está en el Conocimiento no se vuelve a proponer.
+    'ya_esta': {
+        'type': 'noul',
+        'instructions': '¿Lo que enseña esta corrección ya está dicho en el Conocimiento actual?',
+    },
+}
+
+
+def _repetida(texto, conocimiento):
+    """Qué dice lo mismo que `texto`: una línea del Conocimiento o una sugerencia anterior
+    (pendiente, aprobada o descartada), o '' si nada. Una descartada tampoco se repite."""
+    from .models import SugerenciaAprendizaje
+
+    t = _normalizado(texto)
+    if not t:
+        return ''
+    for linea in (conocimiento or '').splitlines():
+        if linea.strip() and SequenceMatcher(None, t, _normalizado(linea)).ratio() >= PARECIDO_REPETIDA:
+            return 'ya está en el Conocimiento'
+    for s in SugerenciaAprendizaje.objects.exclude(texto_propuesto='').only(
+            'id', 'estado', 'texto_propuesto'):
+        if SequenceMatcher(None, t, _normalizado(s.texto_propuesto)).ratio() >= PARECIDO_REPETIDA:
+            return f'repite la sugerencia #{s.id} ({s.estado})'
+    return ''
+
+
+def clasificar_con_jev(config, borrador, enviado, referencia=''):
+    """Como `clasificar()` —el mismo dict, más `confianza`—, pero el tipo lo decide Jev.
+
+    - Jev sin opinión (None) → el clasificador de siempre, tal cual.
+    - Confianza < 0,70 o tipo desconocido → `error` «no concluyente»: queda sin procesar
+      para una persona. Nunca «puntual» en silencio, que es el defecto que se arregla.
+    - tono / puntual, o regla que no generaliza, o que ya está en el Conocimiento → sin
+      sugerencia y sin gastar la redacción.
+    - Si vale la pena, el texto lo redacta el camino de siempre; si repite una línea del
+      Conocimiento o una sugerencia anterior, no se propone de nuevo.
+    """
+    from . import grounding
+    from .decisiones import decidir
+
+    base = {'tipo': 'puntual', 'texto_propuesto': '', 'ref_catalogo': '', 'motivo': '',
+            'modelo': '', 'error': '', 'confianza': None}
+    if (borrador or '').strip() == (enviado or '').strip():
+        base['motivo'] = 'sin cambios'
+        return base
+    try:
+        catalogo = grounding.catalogo_vivo()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('Aprendizaje: error armando catálogo: %s', exc)
+        catalogo = '(catálogo no disponible)'
+    estado = {'catalogo': catalogo, 'conocimiento': config.conocimiento or '',
+              'borrador': borrador or '', 'enviado': enviado or ''}
+    r = decidir(estado, PREGUNTAS_CORRECCION, uso='aprendizaje.correccion',
+                referencia=str(referencia or ''))
+    if r is None:
+        logger.warning('Aprendizaje: Jev sin opinión (feedback %s); va el clasificador de siempre',
+                       referencia)
+        return clasificar(config, borrador, enviado)
+
+    tipo, confianza = r.opcion('que_cambio'), r.confianza('que_cambio')
+    base.update(modelo=r.modelo or 'jev', confianza=confianza)
+    if tipo not in TIPOS or confianza is None or confianza < CONFIANZA_MINIMA:
+        base['error'] = f'no concluyente: {tipo or "sin tipo"} con confianza {confianza or 0:.2f}'
+        return base
+    base.update(tipo=tipo, motivo=f'{tipo} (confianza {confianza:.2f})')
+    if tipo not in TIPOS_ACCIONABLES:
+        return base
+
+    generaliza, ya_esta = r.si_no('generaliza'), r.si_no('ya_esta')
+    if generaliza is not None and generaliza < 0.5:
+        base.update(tipo='puntual', motivo=f'{tipo} que no generaliza (p={generaliza:.2f})')
+        return base
+    if ya_esta is not None and ya_esta >= 0.5:
+        base.update(tipo='puntual', motivo=f'ya está en el Conocimiento (p={ya_esta:.2f})')
+        return base
+
+    redaccion = clasificar(config, borrador, enviado)   # Jev decide; no escribe
+    if redaccion.get('error'):
+        base['error'] = redaccion['error']
+        return base
+    texto = (redaccion.get('texto_propuesto') or '').strip()
+    if not texto:
+        base['error'] = f'{tipo} sin texto propuesto: que lo mire una persona'
+        return base
+    repetida = _repetida(texto, config.conocimiento)
+    if repetida:
+        base.update(tipo='puntual', motivo=repetida[:300])
+        return base
+    base.update(texto_propuesto=texto[:1000],
+                ref_catalogo=(redaccion.get('ref_catalogo') or '')[:200],
+                motivo=(redaccion.get('motivo') or base['motivo'])[:300],
+                modelo=f"{r.modelo or 'jev'} + {redaccion.get('modelo', '')}"[:120])
+    return base
+
+
 TIPOS = {'hecho_catalogo', 'regla', 'tono', 'puntual'}
 # Solo estos generan una sugerencia para aprobar (los demás son ruido).
 TIPOS_ACCIONABLES = {'hecho_catalogo', 'regla'}
@@ -148,8 +266,11 @@ def procesar_pendientes(limite=50):
     )
     procesados = creadas = errores = 0
     detalle = []
+    # Encargo JEV: con el interruptor apagado, exactamente el camino de siempre.
+    usar_jev = bool(getattr(config, 'usar_jev_en_aprendizaje', False))
     for fb in pendientes:
-        d = clasificar(config, fb.borrador, fb.enviado)
+        d = (clasificar_con_jev(config, fb.borrador, fb.enviado, referencia=fb.id) if usar_jev
+             else clasificar(config, fb.borrador, fb.enviado))
         if d.get('error'):
             errores += 1
             detalle.append({'feedback_id': fb.id, 'estado': 'error', 'error': d['error']})
