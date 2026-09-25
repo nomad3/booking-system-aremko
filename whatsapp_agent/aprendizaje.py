@@ -285,47 +285,82 @@ def parse_clasificacion(texto):
     }
 
 
-def procesar_pendientes(limite=50):
+def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dias=None,
+                        forzar_jev=False):
     """Clasifica el feedback editado sin procesar y crea las sugerencias accionables.
 
     Lo usan el comando `procesar_aprendizaje` y el endpoint (H-013). Idempotente:
     marca `procesado=True` salvo en error del LLM (para reintentar). Lote acotado.
     Devuelve {procesados, creadas, errores, detalle:[...]}.
+
+    Encargo JEV, etapa 4 (sin argumentos, todo igual que antes):
+    - `solo_sustantivos`: solo las correcciones que enseñan algo
+      (`es_desacuerdo_sustantivo`), de la más reciente a la más antigua. Procesar las
+      otras produce miles de «tono»/«puntual» y ninguna regla.
+    - `dias`: solo las de los últimos N días (Jorge, 25-09-2026: 30).
+    - `en_seco`: clasifica e informa, SIN crear sugerencias y SIN marcar procesado.
+    - `forzar_jev`: usa Jev aunque el interruptor esté apagado (la corrida en seco que Jorge
+      lee antes de prender nada).
     """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
     from .agent import get_config
     from .models import AgenteFeedback, SugerenciaAprendizaje
 
     config = get_config()
-    pendientes = list(
-        AgenteFeedback.objects.filter(editado=True, procesado=False)
-        .order_by('created_at')[:max(1, int(limite or 50))]
-    )
+    limite = max(1, int(limite or 50))
+    pendientes = AgenteFeedback.objects.filter(editado=True, procesado=False)
+    if dias:
+        pendientes = pendientes.filter(created_at__gte=timezone.now() - timedelta(days=int(dias)))
+    if solo_sustantivos:
+        elegidos = []
+        for fb in pendientes.order_by('-created_at').iterator(chunk_size=200):
+            if es_desacuerdo_sustantivo(fb.borrador, fb.enviado):
+                elegidos.append(fb)
+                if len(elegidos) >= limite:
+                    break
+        pendientes = elegidos
+    else:
+        pendientes = list(pendientes.order_by('created_at')[:limite])
     procesados = creadas = errores = 0
     detalle = []
     # Encargo JEV: con el interruptor apagado, exactamente el camino de siempre.
-    usar_jev = bool(getattr(config, 'usar_jev_en_aprendizaje', False))
+    usar_jev = forzar_jev or bool(getattr(config, 'usar_jev_en_aprendizaje', False))
     for fb in pendientes:
         d = (clasificar_con_jev(config, fb.borrador, fb.enviado, referencia=fb.id,
                                 contexto=contexto_de_la_correccion(fb)) if usar_jev
              else clasificar(config, fb.borrador, fb.enviado))
+        fila = {'feedback_id': fb.id}
+        if en_seco:
+            fila.update(fecha=fb.created_at, borrador=(fb.borrador or '')[:220],
+                        enviado=(fb.enviado or '')[:220], confianza=d.get('confianza'),
+                        motivo=d.get('motivo', ''))
         if d.get('error'):
             errores += 1
-            detalle.append({'feedback_id': fb.id, 'estado': 'error', 'error': d['error']})
-            continue  # NO marcar procesado → se reintenta
+            detalle.append(dict(fila, estado='error', error=d['error']))
+            continue  # NO marcar procesado → se reintenta (o lo mira una persona)
         if d['tipo'] in TIPOS_ACCIONABLES:
-            SugerenciaAprendizaje.objects.create(
-                feedback=fb, phone=fb.phone, tipo=d['tipo'],
-                texto_propuesto=d['texto_propuesto'], ref_catalogo=d['ref_catalogo'],
-                motivo=d['motivo'], borrador=fb.borrador, enviado=fb.enviado,
-                modelo=d.get('modelo', ''),
-            )
+            if not en_seco:
+                SugerenciaAprendizaje.objects.create(
+                    feedback=fb, phone=fb.phone, tipo=d['tipo'],
+                    texto_propuesto=d['texto_propuesto'], ref_catalogo=d['ref_catalogo'],
+                    motivo=d['motivo'], borrador=fb.borrador, enviado=fb.enviado,
+                    modelo=d.get('modelo', ''),
+                )
+                logger.info('Aprendizaje: sugerencia %s del feedback %s', d['tipo'], fb.id)
             creadas += 1
-            detalle.append({'feedback_id': fb.id, 'tipo': d['tipo'], 'texto': d['texto_propuesto'][:120]})
+            detalle.append(dict(fila, tipo=d['tipo'], texto=d['texto_propuesto'][:120]
+                                if not en_seco else d['texto_propuesto']))
         else:
-            detalle.append({'feedback_id': fb.id, 'tipo': d['tipo']})
-        fb.procesado = True
-        fb.save(update_fields=['procesado'])
+            detalle.append(dict(fila, tipo=d['tipo']))
+        if not en_seco:
+            fb.procesado = True
+            fb.save(update_fields=['procesado'])
         procesados += 1
+    logger.info('Aprendizaje: %s procesados, %s sugerencias, %s sin concluir o con error '
+                '(en seco=%s, jev=%s)', procesados, creadas, errores, en_seco, usar_jev)
     return {'procesados': procesados, 'creadas': creadas, 'errores': errores, 'detalle': detalle}
 
 

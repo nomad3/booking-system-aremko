@@ -7,9 +7,21 @@ se marca procesado sin generar ruido. No bloquea el inbound (corre por cron/manu
 
   python manage.py procesar_aprendizaje              # procesa hasta 50
   python manage.py procesar_aprendizaje --limite 10
+
+Encargo JEV, etapa 4 — la corrida en seco que Jorge lee antes de procesar nada:
+
+  python manage.py procesar_aprendizaje --solo-sustantivos --dias 30 --en-seco --jev --limite 50
+
+  --solo-sustantivos  solo las correcciones que enseñan algo, las más recientes primero
+  --dias N            solo las de los últimos N días
+  --en-seco           clasifica e imprime, SIN crear sugerencias y SIN marcar procesado
+  --jev               usa Jev aunque el interruptor de la configuración esté apagado
 """
 
+from collections import Counter
+
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 
 class Command(BaseCommand):
@@ -17,13 +29,22 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--limite', type=int, default=50)
+        parser.add_argument('--solo-sustantivos', action='store_true')
+        parser.add_argument('--dias', type=int, default=None)
+        parser.add_argument('--en-seco', action='store_true')
+        parser.add_argument('--jev', action='store_true')
 
     def handle(self, *args, **opts):
         from whatsapp_agent.aprendizaje import procesar_pendientes
 
-        res = procesar_pendientes(opts['limite'])
+        en_seco = opts['en_seco']
+        res = procesar_pendientes(opts['limite'], solo_sustantivos=opts['solo_sustantivos'],
+                                  en_seco=en_seco, dias=opts['dias'], forzar_jev=opts['jev'])
         if not res['procesados'] and not res['errores']:
             self.stdout.write(self.style.WARNING('No hay feedback editado sin procesar.'))
+            return
+        if en_seco:
+            self._en_seco(res)
             return
         for d in res['detalle']:
             if d.get('estado') == 'error':
@@ -36,3 +57,31 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING(
             f'\nProcesados: {res["procesados"]} · Sugerencias creadas: {res["creadas"]} '
             f'· Errores: {res["errores"]}'))
+
+    def _en_seco(self, res):
+        """Una ficha por corrección: qué propuso Luna, qué envió Deborah y qué decidió el
+        clasificador. Nada se guardó."""
+        escribir = self.stdout.write
+        resultados = Counter()
+        for d in res['detalle']:
+            conf = d.get('confianza')
+            conf_txt = f' · confianza {conf:.2f}' if conf is not None else ''
+            if d.get('estado') == 'error':
+                resultado = ('NO CONCLUYENTE' if 'no concluyente' in d['error']
+                             else 'ERROR')
+                detalle = d['error']
+            elif d.get('texto'):
+                resultado = f'PROPONDRÍA {d["tipo"].upper()}'
+                detalle = f'«{d["texto"]}»'
+            else:
+                resultado = d.get('tipo', '').upper()
+                detalle = d.get('motivo', '')
+            resultados[resultado.split(' ')[0] if resultado.startswith('PROPONDRÍA') else resultado] += 1
+            fecha = timezone.localtime(d['fecha']).strftime('%d-%m') if d.get('fecha') else ''
+            escribir(f'fb#{d["feedback_id"]} · {fecha} · {resultado}{conf_txt}')
+            escribir(f'   decide: {detalle}')
+            escribir(f'   Luna:    {(d.get("borrador") or "").replace(chr(10), " ")}')
+            escribir(f'   Deborah: {(d.get("enviado") or "").replace(chr(10), " ")}')
+        escribir(self.style.MIGRATE_HEADING(
+            f'\nEN SECO (nada se guardó) · {len(res["detalle"])} correcciones · '
+            + ' · '.join(f'{k}: {v}' for k, v in resultados.most_common())))
