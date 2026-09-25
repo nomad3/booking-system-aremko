@@ -422,9 +422,11 @@ _Última revisión: 2026-09-24_
     WhatsApp al registrarse el pago (señal de Pago + webhook de Flow, en on_commit),
     si la venta quedó pagada ENTERA y el comprador conversó en 24 h; una sola vez.
     Falta verlo en una venta real (buscar «enviada sola por WhatsApp» en los logs).
-    **(d) Hallazgo 25-09:** el email automático de la gift card sale con la venta
-    `pagado` O `parcial` (la señal lo dice «totalmente pagada» pero no lo hace): con un
-    abono parcial la gift card, con su código, ya se envía. Decisión de Jorge pendiente.
+    **(d) RESUELTO 25-09 (commit `ae8d7994`):** el email automático de la gift
+    card ahora espera a que la venta quede pagada ENTERA (antes salía con un abono
+    parcial). Al aplicarlo no había ninguna venta de gift card a medio pagar. Quedan
+    vivas 3 ventas de gift card de nov-2025 NUNCA pagadas (#3987, #4007, #4008; gift
+    cards 229, 232, 233, vencen nov-2026): revisar con Deborah si se anulan.
     **Paso 3 ·** Luna ayuda con el canje: pide
     código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
     `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
