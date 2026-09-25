@@ -12,8 +12,55 @@ Las funciones de prompt/parseo son puras (testeables sin DB/LLM).
 import json
 import logging
 import re
+import unicodedata
+from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
+
+# Qué correcciones de Deborah enseñan algo (encargo PROMPT_JEV_AREMKO.md, etapa 1).
+# Va en código y no en un prompt: decide qué le cuesta plata al sistema y qué puede
+# terminar tocando el Conocimiento. Los umbrales son deterministas.
+LARGO_MINIMO = 40          # «ya», «te llamo»: ningún borrador habría ganado
+PARECIDO_RETOQUE = 0.5     # desde aquí, Deborah retocó el borrador, no lo descartó
+_RE_CIFRA = re.compile(r'\b\d{1,2}:\d{2}\b|\$\s?\d[\d.]*\d')
+
+
+def _normalizado(texto):
+    """Minúsculas, sin tildes y con los espacios colapsados. Pura."""
+    t = unicodedata.normalize('NFD', (texto or '').lower())
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+    return re.sub(r'\s+', ' ', t).strip()
+
+
+def _cifras(texto):
+    return {c.replace(' ', '') for c in _RE_CIFRA.findall(texto or '')}
+
+
+def grupo_de_la_correccion(borrador, enviado):
+    """'vacio', 'corto', 'retoque_cifra', 'retoque_parecido' o 'sustantivo'. Pura.
+
+    Los criterios del encargo, en su orden: los dos textos con algo; lo enviado de al
+    menos 40 caracteres; si el borrador traía una hora o un precio y lo enviado repite
+    alguna de esas cifras, Luna acertó (retoque); si se parecen ≥ 0,5, también es un
+    retoque. Lo que queda es un desacuerdo sustantivo: Deborah descartó el borrador y
+    escribió otra cosa con contenido. Medido el 25-09: 2.281 de 4.839 en 90 días."""
+    if not (borrador or '').strip() or not (enviado or '').strip():
+        return 'vacio'
+    if len(enviado.strip()) < LARGO_MINIMO:
+        return 'corto'
+    cifras = _cifras(borrador)
+    if cifras and cifras & _cifras(enviado):
+        return 'retoque_cifra'
+    if SequenceMatcher(None, _normalizado(borrador), _normalizado(enviado)).ratio() >= PARECIDO_RETOQUE:
+        return 'retoque_parecido'
+    return 'sustantivo'
+
+
+def es_desacuerdo_sustantivo(borrador, enviado):
+    """True si esta corrección enseña algo: Deborah descartó el borrador y escribió otra
+    cosa con contenido. Pura."""
+    return grupo_de_la_correccion(borrador, enviado) == 'sustantivo'
+
 
 TIPOS = {'hecho_catalogo', 'regla', 'tono', 'puntual'}
 # Solo estos generan una sugerencia para aprobar (los demás son ruido).

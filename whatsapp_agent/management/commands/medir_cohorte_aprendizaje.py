@@ -15,40 +15,14 @@ Los sustantivos sin procesar son la cohorte que vale la pena clasificar. Medido 
   python manage.py medir_cohorte_aprendizaje            # últimos 30 días (lo que decidió Jorge)
   python manage.py medir_cohorte_aprendizaje --dias 90
 """
-import re
 from collections import Counter
 from datetime import timedelta
-from difflib import SequenceMatcher
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-_RE_CIFRA = re.compile(r'\b\d{1,2}:\d{2}\b|\$\s?\d[\d.]*\d')
-LARGO_MINIMO = 40
-PARECIDO_RETOQUE = 0.5
-
-
-def _normalizado(texto):
-    return re.sub(r'\s+', ' ', (texto or '').strip().lower())
-
-
-def _cifras(texto):
-    return {c.replace(' ', '') for c in _RE_CIFRA.findall(texto or '')}
-
-
-def grupo_de_la_correccion(borrador, enviado):
-    """'vacio', 'retoque_cifra', 'corto', 'retoque_parecido' o 'sustantivo', en el orden
-    de los criterios del encargo."""
-    if not (borrador or '').strip() or not (enviado or '').strip():
-        return 'vacio'
-    if len(enviado.strip()) < LARGO_MINIMO:
-        return 'corto'
-    cifras = _cifras(borrador)
-    if cifras and cifras & _cifras(enviado):
-        return 'retoque_cifra'
-    if SequenceMatcher(None, _normalizado(borrador), _normalizado(enviado)).ratio() >= PARECIDO_RETOQUE:
-        return 'retoque_parecido'
-    return 'sustantivo'
+# Un solo criterio: el mismo que usará el lote (`aprendizaje.es_desacuerdo_sustantivo`).
+from whatsapp_agent.aprendizaje import LARGO_MINIMO, PARECIDO_RETOQUE, grupo_de_la_correccion
 
 
 class Command(BaseCommand):

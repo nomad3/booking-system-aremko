@@ -12,7 +12,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from whatsapp_agent.management.commands.medir_cohorte_aprendizaje import grupo_de_la_correccion
+from whatsapp_agent.aprendizaje import grupo_de_la_correccion
 from whatsapp_agent.models import AgenteFeedback
 
 SUSTANTIVO = ('La tina con hidromasaje está disponible a las 14:00 por $60.000 para dos.',
