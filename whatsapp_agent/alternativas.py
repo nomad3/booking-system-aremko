@@ -56,8 +56,12 @@ NOMBRES = {
     'giftcard': 'Gift Card',
 }
 
-# Tope de alternativas por respuesta (evita abrumar la bandeja con decenas de botones).
-MAX_ALTERNATIVAS = 12
+# Sin tope para tina, masaje y Pausa (Jorge, 25-09-2026): el botón de las olitas
+# muestra las alternativas de a una y cicla por todas, «desde el primer horario en
+# adelante». Había un tope de 12 de cuando la bandeja las mostraba como botones, y
+# como se cortaba DESPUÉS de ordenar por hora, las de la tarde no llegaban nunca: el
+# 26-09, «Solo tina» para 2 tenía 20 opciones y llegaban 12 (11:30 a 16:30; nunca
+# las 17:00, 19:00 ni 21:30). Luna elegía «la más tarde» dentro de esas 12.
 # Noche de Aguas Calientes combina cabañas × tinas, así que crece rápido. Tope de
 # Jorge (2026-08-14): 6. En el cajón se muestran de a una y él o Deborah eligen
 # cuál enviar, así que el tope es para que la lista sea manejable, no para esconder.
@@ -91,6 +95,14 @@ def _alt(titulo, precio_total, precio_con_descuento, hay_descuento, texto_sugeri
     }
 
 
+def _por_hora(alt):
+    """De la primera hora a la última (en minutos: «9:30» va antes que «11:00»); a
+    igual hora, por nombre. Una hora ilegible va al final en vez de romper el orden."""
+    primera = alt['itinerario'][0]
+    minutos = packs.hhmm_a_min(primera.get('hora'))
+    return (minutos if minutos is not None else 24 * 60, primera.get('servicio') or '')
+
+
 def _personas_txt(personas):
     return f"{personas} persona" + ('s' if personas > 1 else '')
 
@@ -114,8 +126,8 @@ def _tina_sola(fecha, personas):
                 precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
                 texto_sugerido=texto,
                 itinerario=[_linea(s, s['nombre'], hora)]))
-    alts.sort(key=lambda a: a['itinerario'][0]['hora'])
-    return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
+    alts.sort(key=_por_hora)
+    return {'fecha': res.get('fecha'), 'alternativas': alts}
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +152,8 @@ def _masaje_solo(fecha, personas):
                 precio_total=precio, precio_con_descuento=precio, hay_descuento=False,
                 texto_sugerido=texto,
                 itinerario=[_linea(s, s['nombre'], hora)]))
-    alts.sort(key=lambda a: a['itinerario'][0]['hora'])
-    return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
+    alts.sort(key=_por_hora)
+    return {'fecha': res.get('fecha'), 'alternativas': alts}
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +213,7 @@ def _pausa(fecha, personas):
             hay_descuento=a['hay_descuento'], texto_sugerido=texto,
             itinerario=[_linea(tina, tina['nombre'], tina['hora']),
                         _linea(masaje, masaje['nombre'], masaje['hora'])]))
-    return {'fecha': res.get('fecha'), 'alternativas': alts[:MAX_ALTERNATIVAS]}
+    return {'fecha': res.get('fecha'), 'alternativas': alts}
 
 
 # ---------------------------------------------------------------------------

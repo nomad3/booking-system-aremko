@@ -1681,6 +1681,25 @@ def ruta_una_recomendacion(tipo, fecha):
     return _TIPO_A_EXPERIENCIA.get((str(tipo or '')).strip().lower())
 
 
+def _otras_variadas(alts, tope):
+    """Las alternativas de respaldo de Luna, turnando los grupos de precio (una
+    sin hidromasaje, una con, …): desde que el motor entrega TODAS las opciones
+    del día (25-09-2026), las 8 primeras del grupo más barato podían copar el
+    respaldo, y ante «¿con hidromasaje?» Luna habría dicho que no hay. Dentro de
+    cada grupo se respeta el orden de H-081 (de más tarde a más temprano)."""
+    grupos = {}
+    for a in alts:
+        clave = (a.get('precio_con_descuento') or 0, a.get('precio_total') or 0)
+        grupos.setdefault(clave, []).append(a)
+    colas = [list(grupos[k]) for k in sorted(grupos)]
+    otras = []
+    while len(otras) < tope and any(colas):
+        for cola in colas:
+            if cola and len(otras) < tope:
+                otras.append(cola.pop(0))
+    return otras
+
+
 def _tool_alternativas_experiencia(args):
     """Handler de la tool `alternativas_experiencia` (H-078).
 
@@ -1756,7 +1775,7 @@ def _tool_alternativas_experiencia(args):
         'personas': personas,
         'total_alternativas': len(alts),
         'recomendada': alts[0],
-        'otras_alternativas': alts[1:1 + _MAX_ALTERNATIVAS_TOOL],
+        'otras_alternativas': _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL),
         'instruccion': ('Ofrece SOLO la `recomendada`, redactada NATURAL en 1-2 frases (usa su '
                         '`texto_sugerido` como base, con sus horas y precios EXACTOS, '
                         'mencionando para cuántas personas es, y el '
