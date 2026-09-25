@@ -20,7 +20,8 @@ from django.test import SimpleTestCase, TestCase
 
 from destino_puerto_varas.services.llm.openrouter_provider import LLMResult
 from whatsapp_agent import agent, alternativas, packs
-from whatsapp_agent.agent import _pausa_de_a_una, _tool_alternativas_experiencia
+from whatsapp_agent.agent import (_pausa_de_a_una, _pidio_masaje,
+                                  _tool_alternativas_experiencia)
 from whatsapp_agent.availability import clave_sorteo
 
 DIA = datetime.date(2026, 10, 1)
@@ -44,14 +45,15 @@ def _alt(nombre, hora, precio=50000, masaje=None):
             'texto_sugerido': f'{nombre} {hora}', 'itinerario': itin}
 
 
-def _luna(tipo, alts):
+def _luna(tipo, alts, **extra):
     with mock.patch('whatsapp_agent.availability.resolver_fecha',
                     return_value={'fecha_iso': DIA.isoformat(), 'dia_semana': 'jueves',
                                   'ambiguo': False, 'error': None}), \
             mock.patch('whatsapp_agent.alternativas.construir_alternativas',
                        return_value={'tipo': tipo, 'fecha': DIA.isoformat(), 'personas': 2,
                                      'nombre_experiencia': 'x', 'alternativas': alts}):
-        return _tool_alternativas_experiencia({'tipo': tipo, 'fecha': 'el jueves', 'personas': 2})
+        return _tool_alternativas_experiencia(
+            dict({'tipo': tipo, 'fecha': 'el jueves', 'personas': 2}, **extra))
 
 
 class ElMotorDeSoloTina(SimpleTestCase):
@@ -160,7 +162,7 @@ class LaPausaConTodasLasTinas(SimpleTestCase):
         self.assertIn('la última', ultima['nota'])
 
 
-def _luna_llama(nombre, args):
+def _luna_llama(nombre, args, mensaje='hola, ¿tienen tina?', historial=''):
     visto = {}
 
     def generate_with_tools(self, messages, tools, tool_executor, **kwargs):
@@ -168,9 +170,19 @@ def _luna_llama(nombre, args):
         return LLMResult('Listo', 'google/gemini-2.5-flash', 10, 5, 100)
 
     with mock.patch(PROVIDER, generate_with_tools):
-        agent._producir_borrador_inner(agent.get_config(), 'hola, ¿tienen tina?',
+        agent._producir_borrador_inner(agent.get_config(), mensaje, historial,
                                        phone='+56911112222')
     return visto['resultado']
+
+
+# La conversación real del 25-09-2026 (Jorge probando): pidió solo tinas.
+SOLO_TINAS = '\n'.join([
+    '[Cliente]: quiero reservar tinas para el lunes',
+    '[Aremko]: Perfecto, ¿para cuántas personas sería la reserva de tinas para el lunes?',
+    '[Cliente]: para 2 personas el lubnes',
+    '[Aremko]: Perfecto, para el lunes 28 de septiembre tenemos disponible la Tina Hidromasaje '
+    'Villarrica a las 14:00 hrs para 2 personas, con un valor de $60.000.',
+])
 
 
 class LasHerramientasDeLuna(TestCase):
@@ -181,14 +193,17 @@ class LasHerramientasDeLuna(TestCase):
     def test_la_herramienta_de_la_pausa_entrega_una(self):
         with mock.patch('whatsapp_agent.packs.disponibilidad_pack_tina_masaje',
                         return_value=self.PACK) as pack:
-            r = _luna_llama('consultar_disponibilidad_pack', {'fecha': 'el jueves', 'personas': 2})
+            r = _luna_llama('consultar_disponibilidad_pack', {'fecha': 'el jueves', 'personas': 2},
+                            mensaje='queremos tina y masaje el jueves')
         self.assertTrue(pack.call_args.kwargs.get('todas'))
         self.assertEqual([o['tina']['hora'] for o in r['opciones']], ['11:30'])
 
     def test_la_pausa_mas_tarde_trae_la_siguiente(self):
         with mock.patch('whatsapp_agent.packs.disponibilidad_pack_tina_masaje', return_value=self.PACK):
             r = _luna_llama('consultar_disponibilidad_pack',
-                            {'fecha': 'el jueves', 'personas': 2, 'despues_de': '11:30'})
+                            {'fecha': 'el jueves', 'personas': 2, 'despues_de': '11:30'},
+                            mensaje='¿más tarde?',
+                            historial='[Cliente]: tina y masaje el jueves\n[Aremko]: la Pausa a las 11:30')
         self.assertEqual([o['tina']['hora'] for o in r['opciones']], ['14:00'])
 
     def test_el_enrutador_con_solo_tina_da_una_recomendacion(self):
@@ -210,3 +225,48 @@ class LasHerramientasDeLuna(TestCase):
                             {'servicios': ['tina', 'masaje'], 'fecha': 'el jueves', 'personas': 2})
         self.assertEqual([o['tina']['hora'] for o in r['opciones']], ['11:30'])
         self.assertEqual(r['rama'], 'tina_masaje')
+
+
+
+class MasTardeSinCambiarDeServicio(SimpleTestCase):
+    """Caso real (25-09-2026): pidió solo tinas, Luna ofreció la de las 14:00 y ante
+    «mas tarde tienes?» ofreció la PAUSA (tina + masaje): la única herramienta que
+    decía «más tarde» era la de la Pausa."""
+
+    def test_solo_tina_despues_de_trae_la_siguiente_tina(self):
+        alts = [_alt('Tina Hidromasaje Villarrica', '14:00', 60000), _alt('Tina Tronador', '14:00'),
+                _alt('Tina Hornopiren', '16:30'), _alt('Tina Hidromasaje Llaima', '19:00', 60000)]
+        out = _luna('tina_sola', alts, despues_de='14:00')
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 16:30')
+        self.assertEqual(out['tipo'], 'tina_sola')
+
+    def test_si_era_la_ultima_lo_dice(self):
+        out = _luna('tina_sola', [_alt('Tina Tronador', '14:00')], despues_de='14:00')
+        self.assertIsNone(out['recomendada'])
+        self.assertIn('era la última', out['instruccion'])
+
+    def test_hidromasaje_no_es_masaje(self):
+        self.assertFalse(_pidio_masaje('mas tarde tienes?', SOLO_TINAS))
+        self.assertTrue(_pidio_masaje('y un masaje también', SOLO_TINAS))
+        self.assertTrue(_pidio_masaje('¿qué tal la Pausa?', ''))
+        self.assertTrue(_pidio_masaje('', '[Aremko]: incluye un Masaje de Relajación'))
+
+
+class LaPausaSeNiegaSiNadiePidioMasaje(TestCase):
+    def test_con_solo_tinas_la_herramienta_de_la_pausa_no_arma_nada(self):
+        with mock.patch('whatsapp_agent.packs.disponibilidad_pack_tina_masaje') as pack:
+            r = _luna_llama('consultar_disponibilidad_pack',
+                            {'fecha': 'lunes', 'personas': 2, 'despues_de': '14:00'},
+                            mensaje='mas tarde tienes?', historial=SOLO_TINAS)
+        pack.assert_not_called()
+        self.assertEqual(r['error'], 'no_pidio_masaje')
+        self.assertIn('tina_sola', r['mensaje'])
+
+    def test_la_consulta_general_pasa_despues_de(self):
+        with mock.patch('whatsapp_agent.agent._tool_alternativas_experiencia',
+                        return_value={'success': True}) as una:
+            _luna_llama('consultar_disponibilidad',
+                        {'personas': 2, 'fecha': 'lunes', 'tipo': 'tina', 'despues_de': '14:00'},
+                        mensaje='mas tarde tienes?', historial=SOLO_TINAS)
+        una.assert_called_once_with({'tipo': 'tina_sola', 'fecha': 'lunes', 'personas': 2,
+                                     'despues_de': '14:00'})

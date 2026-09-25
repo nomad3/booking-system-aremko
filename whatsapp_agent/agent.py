@@ -97,6 +97,9 @@ _TOOLS = [{
                 'fecha': {'type': 'string', 'description': 'Pasá el TEXTO LITERAL del cliente tal cual ("próximo domingo", "el sábado", "25 de junio"). NO lo conviertas a YYYY-MM-DD ni calcules el día tú; la herramienta lo resuelve. Omitir si es solo precio.'},
                 'tipo': {'type': 'string', 'enum': ['tina', 'masaje', 'cabana'],
                          'description': 'Tipo de servicio (opcional; omitir para todos)'},
+                'despues_de': {'type': 'string',
+                               'description': 'Hora (HH:MM) ya ofrecida, SOLO si el cliente pidió '
+                                              'algo más tarde (tina o masaje): trae la siguiente.'},
             },
             'required': ['personas'],
         },
@@ -130,8 +133,9 @@ _TOOLS = [{
     'function': {
         'name': 'consultar_disponibilidad_pack',
         'description': (
-            'Propone la Pausa (TINA + MASAJE el mismo día). Úsala cuando el cliente quiere '
-            'tina Y masaje juntos. Devuelve `opciones` con UNA opción: la del PRIMER horario '
+            'Propone la Pausa (TINA + MASAJE el mismo día). Úsala SOLO cuando el cliente quiere '
+            'tina Y masaje juntos; si pidió solo tina, NO la uses (tampoco para "¿más tarde?": '
+            'para eso está `alternativas_experiencia` con `tina_sola` y `despues_de`). Devuelve `opciones` con UNA opción: la del PRIMER horario '
             'libre del día, con o sin hidromasaje, con la tina y el masaje YA compuestos (sin '
             'solaparse) y con precio real y con descuento de pack (`hay_descuento`/'
             '`precio_con_descuento`). Ofrécela tal cual. Requiere fecha y personas. '
@@ -214,7 +218,9 @@ _TOOLS = [{
             'de esta herramienta, NO existe. `fecha` acepta el texto literal del cliente ("el '
             'próximo miércoles"); usa SIEMPRE el `dia_semana` devuelto. ⚠️ `personas` es '
             'OBLIGATORIO: si no lo sabes, pregúntalo ANTES de llamar (NUNCA asumas 1). Ritual '
-            'y Refugio son siempre para 2.'
+            'y Refugio son siempre para 2. Si el cliente pide "¿más tarde?" sobre una hora que '
+            'ya ofreciste, vuelve a llamarla con el MISMO `tipo` y `despues_de` = esa hora: trae '
+            'la siguiente. NO cambies de tipo: si pidió solo tina, sigue siendo `tina_sola`.'
         ),
         'parameters': {
             'type': 'object',
@@ -223,6 +229,9 @@ _TOOLS = [{
                          'enum': ['pausa', 'tina_sola', 'masaje_solo',
                                   'noche_aguas_calientes', 'ritual', 'refugio'],
                          'description': 'Tipo de experiencia a cotizar.'},
+                'despues_de': {'type': 'string',
+                               'description': 'Hora (HH:MM) de la opción que ya ofreciste, SOLO '
+                                              'si el cliente pidió algo más tarde.'},
                 'fecha': {'type': 'string',
                           'description': 'Fecha TAL CUAL la dijo el cliente ("el sábado", '
                                          '"5 de agosto" o YYYY-MM-DD); se resuelve internamente.'},
@@ -1749,6 +1758,11 @@ _NOTA_DE_ORDEN = {
 _TIPOS_EN_ORDEN_DEL_MOTOR = _TIPOS_DESDE_LA_PRIMERA_HORA + ('noche_aguas_calientes',)
 
 
+def _hhmm_a_min_seguro(hora):
+    m = re.match(r'^\s*(\d{1,2})[:.](\d{2})', str(hora or ''))
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else None
+
+
 def _hora_de_la_tina(alt):
     """La hora de la tina de una alternativa (la primera línea si no hay tina)."""
     itin = alt.get('itinerario') or [{}]
@@ -1778,6 +1792,15 @@ def _otras_por_hora(alts, tope):
             if extra is not None:
                 otras.append(extra)
     return otras
+
+
+_PIDIO_MASAJE = re.compile(r'\b(masajes?|pausa)\b')
+
+
+def _pidio_masaje(mensaje, historial):
+    """¿El mensaje o la conversación hablan de masaje o de la Pausa? «Hidromasaje»
+    no cuenta (es una tina): por eso la palabra entera."""
+    return bool(_PIDIO_MASAJE.search(_normalizar_txt(f'{mensaje or ""}\n{historial or ""}')))
 
 
 def _pausa_de_a_una(resultado, despues_de=None, mas_tarde=False):
@@ -1884,6 +1907,16 @@ def _tool_alternativas_experiencia(args):
                 -_hora_itinerario_min(a),
             ),
         )
+    # «¿Más tarde?» en un mensaje nuevo (25-09-2026): las opciones de respaldo del
+    # turno anterior ya no están, así que se pide la siguiente DEL MISMO TIPO a
+    # partir de la hora ya ofrecida. Sin esto, Luna tomaba la herramienta de la
+    # Pausa —la única que sabía «más tarde»— y le ofrecía tina + masaje a quien
+    # pidió solo tina.
+    despues = _hhmm_a_min_seguro(args.get('despues_de'))
+    if despues is not None:
+        def _minuto(a):
+            return _hhmm_a_min_seguro(_hora_de_la_tina(a)[0]) or 0
+        alts = sorted((a for a in alts if _minuto(a) > despues), key=_minuto)
     if not alts:
         return {
             'success': True,
@@ -1895,8 +1928,11 @@ def _tool_alternativas_experiencia(args):
             'total_alternativas': 0,
             'recomendada': None,
             'otras_alternativas': [],
-            'instruccion': ('No hay disponibilidad ese día para esta experiencia: dilo con '
-                            'calidez y ofrece consultar otra fecha. NUNCA inventes horarios.'),
+            'instruccion': (('No queda un horario más tarde ese día: la que ya ofreciste era la '
+                             'última. Dilo así y ofrece otra fecha. NUNCA inventes horarios.')
+                            if despues is not None else
+                            ('No hay disponibilidad ese día para esta experiencia: dilo con '
+                             'calidez y ofrece consultar otra fecha. NUNCA inventes horarios.')),
         }
     return {
         'success': True,
@@ -2079,7 +2115,8 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 tipo_exp = ruta_una_recomendacion(args.get('tipo'), fecha)
                 if tipo_exp:
                     return _tool_alternativas_experiencia(
-                        {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas})
+                        {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas,
+                         'despues_de': args.get('despues_de')})
                 if args.get('tipo') == 'cabana':
                     return _una_cabana_servicios(
                         disponibilidad(fecha, personas, 'cabana', limite=None))
@@ -2123,6 +2160,14 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
             from .packs import disponibilidad_pack_tina_masaje
             try:
                 args = args or {}
+                if not _pidio_masaje(mensaje, historial):
+                    # 25-09-2026: con «¿más tarde?» sobre una tina, Luna tomaba esta
+                    # herramienta (la única que decía «más tarde») y ofrecía la Pausa.
+                    return {'success': False, 'error': 'no_pidio_masaje',
+                            'mensaje': 'El cliente pidió solo tina, no la Pausa: nadie mencionó '
+                                       'masaje. Para otro horario de tina usa '
+                                       '`alternativas_experiencia` con tipo `tina_sola` y '
+                                       '`despues_de` = la hora que ya ofreciste.'}
                 return _pausa_de_a_una(
                     disponibilidad_pack_tina_masaje(args.get('fecha'), args.get('personas', 2),
                                                     todas=True),
