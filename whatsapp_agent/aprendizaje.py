@@ -93,6 +93,38 @@ PREGUNTAS_CORRECCION = {
 }
 
 
+MENSAJES_DE_CONTEXTO = 6
+
+
+def contexto_de_la_correccion(fb, mensajes=MENSAJES_DE_CONTEXTO):
+    """La conversación hasta el mensaje del cliente que el borrador respondía, como texto
+    «[Cliente]: … / [Aremko]: …», o '' si no se encuentra. Solo lectura.
+
+    Probado en prod (25-09-2026): con solo el borrador y lo enviado, 3 de 5 correcciones
+    reales quedaron «no concluyentes» (confianza 0,29-0,46). Sin la pregunta del cliente,
+    «Los lunes cerramos a las 21:30» no se sabe si es una regla o una respuesta a ese
+    cliente. El encargo lo advertía: con fragmentos la confianza cae; con contexto, sube."""
+    from ventas.models import WhatsAppMessage
+
+    try:
+        entrante = (WhatsAppMessage.objects.filter(wa_message_id=fb.wa_message_id)
+                    .only('phone', 'timestamp').first() if fb.wa_message_id else None)
+        phone = entrante.phone if entrante else fb.phone
+        hasta = entrante.timestamp if entrante else fb.created_at
+        filas = list(WhatsAppMessage.objects.filter(phone=phone, timestamp__lte=hasta)
+                     .exclude(msg_type='reaction').order_by('-timestamp')
+                     .values_list('direction', 'body', 'msg_type')[:max(1, mensajes)])
+    except Exception:  # noqa: BLE001 — sin contexto se clasifica igual, con menos confianza
+        logger.exception('Aprendizaje: no se pudo armar el contexto del feedback %s', fb.pk)
+        return ''
+    lineas = []
+    for direccion, cuerpo, tipo in reversed(filas):
+        quien = 'Cliente' if direccion == 'in' else 'Aremko'
+        texto = (cuerpo or '').strip().replace('\n', ' ')[:300] or f'({tipo})'
+        lineas.append(f'[{quien}]: {texto}')
+    return '\n'.join(lineas)
+
+
 def _repetida(texto, conocimiento):
     """Qué dice lo mismo que `texto`: una línea del Conocimiento o una sugerencia anterior
     (pendiente, aprobada o descartada), o '' si nada. Una descartada tampoco se repite."""
@@ -111,9 +143,11 @@ def _repetida(texto, conocimiento):
     return ''
 
 
-def clasificar_con_jev(config, borrador, enviado, referencia=''):
+def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
     """Como `clasificar()` —el mismo dict, más `confianza`—, pero el tipo lo decide Jev.
 
+    - `contexto`: la conversación hasta la pregunta del cliente (`contexto_de_la_correccion`);
+      sin ella Jev clasifica a ciegas y la confianza cae.
     - Jev sin opinión (None) → el clasificador de siempre, tal cual.
     - Confianza < 0,70 o tipo desconocido → `error` «no concluyente»: queda sin procesar
       para una persona. Nunca «puntual» en silencio, que es el defecto que se arregla.
@@ -137,6 +171,8 @@ def clasificar_con_jev(config, borrador, enviado, referencia=''):
         catalogo = '(catálogo no disponible)'
     estado = {'catalogo': catalogo, 'conocimiento': config.conocimiento or '',
               'borrador': borrador or '', 'enviado': enviado or ''}
+    if contexto:
+        estado['conversacion_hasta_la_pregunta'] = contexto
     r = decidir(estado, PREGUNTAS_CORRECCION, uso='aprendizaje.correccion',
                 referencia=str(referencia or ''))
     if r is None:
@@ -269,7 +305,8 @@ def procesar_pendientes(limite=50):
     # Encargo JEV: con el interruptor apagado, exactamente el camino de siempre.
     usar_jev = bool(getattr(config, 'usar_jev_en_aprendizaje', False))
     for fb in pendientes:
-        d = (clasificar_con_jev(config, fb.borrador, fb.enviado, referencia=fb.id) if usar_jev
+        d = (clasificar_con_jev(config, fb.borrador, fb.enviado, referencia=fb.id,
+                                contexto=contexto_de_la_correccion(fb)) if usar_jev
              else clasificar(config, fb.borrador, fb.enviado))
         if d.get('error'):
             errores += 1

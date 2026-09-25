@@ -10,9 +10,13 @@ Ejecutar:
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest import mock
 
 from django.test import TestCase
+from django.utils import timezone
+
+from ventas.models import WhatsAppMessage
 
 from whatsapp_agent import aprendizaje
 from whatsapp_agent.decisiones import Respuesta
@@ -52,6 +56,13 @@ class ConJev(TestCase):
                 mock.patch(CLASIFICAR, return_value=redaccion or _redaccion()) as redactar:
             d = aprendizaje.clasificar_con_jev(self.config, BORRADOR, ENVIADO, referencia=7)
         return d, decidir, redactar
+
+    def test_la_conversacion_llega_a_jev(self):
+        with mock.patch(DECIDIR, return_value=_jev(tipo='tono')) as decidir:
+            aprendizaje.clasificar_con_jev(self.config, BORRADOR, ENVIADO,
+                                           contexto='[Cliente]: ¿hay tina el lunes a las 20?')
+        self.assertEqual(decidir.call_args.args[0]['conversacion_hasta_la_pregunta'],
+                         '[Cliente]: ¿hay tina el lunes a las 20?')
 
     def test_regla_que_vale_la_pena(self):
         d, decidir, redactar = self._clasificar(_jev())
@@ -147,3 +158,50 @@ class ElInterruptor(TestCase):
             res = aprendizaje.procesar_pendientes(10)
         viejo.assert_called_once()
         self.assertEqual((res['procesados'], res['creadas']), (1, 1))
+
+
+class ElContexto(TestCase):
+    def _msg(self, wid, phone, direction, body, minutos_atras):
+        return WhatsAppMessage.objects.create(
+            wa_message_id=wid, phone=phone, direction=direction, body=body,
+            timestamp=timezone.now() - timedelta(minutes=minutos_atras))
+
+    def test_la_conversacion_hasta_la_pregunta(self):
+        self._msg('w1', '+569111', 'in', 'hola', 30)
+        self._msg('w2', '+569111', 'out', '¡Hola! ¿En qué te ayudo?', 29)
+        self._msg('w3', '+569111', 'in', '¿hay tina el lunes a las 20?', 28)
+        self._msg('w4', '+569111', 'out', 'Los lunes cerramos a las 21:30.', 27)   # después
+        self._msg('w9', '+569999', 'in', 'otro cliente', 28.5)                      # otro teléfono, antes
+        fb = AgenteFeedback.objects.create(phone='+569111', wa_message_id='w3',
+                                           borrador=BORRADOR, enviado=ENVIADO, editado=True)
+        self.assertEqual(aprendizaje.contexto_de_la_correccion(fb),
+                         '[Cliente]: hola\n[Aremko]: ¡Hola! ¿En qué te ayudo?\n'
+                         '[Cliente]: ¿hay tina el lunes a las 20?')
+
+    def test_solo_los_ultimos_mensajes(self):
+        for i in range(10):
+            self._msg(f'm{i}', '+569111', 'in', f'mensaje {i}', 60 - i)
+        fb = AgenteFeedback.objects.create(phone='+569111', wa_message_id='m9',
+                                           borrador=BORRADOR, enviado=ENVIADO, editado=True)
+        lineas = aprendizaje.contexto_de_la_correccion(fb, mensajes=3).splitlines()
+        self.assertEqual(lineas, ['[Cliente]: mensaje 7', '[Cliente]: mensaje 8',
+                                  '[Cliente]: mensaje 9'])
+
+    def test_sin_mensaje_referenciado_usa_el_telefono(self):
+        self._msg('x1', '+569111', 'in', '¿precio de la tina?', 5)
+        fb = AgenteFeedback.objects.create(phone='+569111', wa_message_id='no-existe',
+                                           borrador=BORRADOR, enviado=ENVIADO, editado=True)
+        self.assertEqual(aprendizaje.contexto_de_la_correccion(fb), '[Cliente]: ¿precio de la tina?')
+
+    def test_el_lote_le_pasa_el_contexto(self):
+        self._msg('w3', '+569111', 'in', '¿hay tina el lunes a las 20?', 28)
+        AgenteFeedback.objects.create(phone='+569111', wa_message_id='w3', borrador=BORRADOR,
+                                      enviado=ENVIADO, editado=True)
+        config = WhatsAppAgentConfig.get_solo()
+        config.usar_jev_en_aprendizaje = True
+        config.save()
+        with mock.patch('whatsapp_agent.aprendizaje.clasificar_con_jev',
+                        return_value=dict(_redaccion(), tipo='tono')) as jev:
+            aprendizaje.procesar_pendientes(10)
+        self.assertEqual(jev.call_args.kwargs['contexto'], '[Cliente]: ¿hay tina el lunes a las 20?')
+
