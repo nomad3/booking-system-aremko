@@ -166,16 +166,10 @@ _Última revisión: 2026-09-24_
     cola es peor de lo que se ve. **Bloquea saber si P-22 tiene que ocuparse también
     de los ingresos o solo de los egresos.** Detalle en `[[project_aremko_conciliacion_pagos]]`.
 
-39. **P-39 · Reserva 6742: el pago repetido del 04-09** — Deborah registró el mismo
-    cobro dos veces con 6 segundos de diferencia (quedó $120.000 pagado sobre un
-    total de $60.000) y salieron DOS boletas (69014 y 69015) por la misma venta. Fue
-    el caso que originó las defensas de la tarjeta móvil. **23-09: Jorge emitió la
-    nota de crédito de la 69015 en el SII.** Falta reflejarlo en el sistema (propuesta
-    esperando su OK): boleta 69015 → estado `anulada`; el pago 8549 no se puede borrar
-    (la boleta lo protege, `on_delete=PROTECT`), así que se deja en $0 con nota en la
-    reserva y en `MovimientoCliente` → la 6742 queda pagado $60.000 y la verificación de
-    Mercado Pago del 05-09 cuadra. Aparte: el Pase y la consulta pública muestran las
-    boletas `anulada` como si fueran vigentes (solo excluyen pendiente/error/simulada).
+<!-- P-39 (reserva 6742, pago y boleta 69015 repetidos) CERRADO 2026-09-25 por decisión
+     de Jorge: «olvida esta duplicación». La nota de crédito de la 69015 la hizo él en el
+     SII; en el sistema quedan como están el pago 8549 y la boleta (la reserva marca $120.000
+     pagados sobre $60.000). -->
 40. **P-40 · El admin de Django no tiene protección de doble clic** — La tarjeta
     móvil ya tiene las tres capas (21-09: botón bloqueado mientras responde, candado
     consultivo `pg_try_advisory_lock` por reserva, rechazo de un pago idéntico en
@@ -427,7 +421,7 @@ _Última revisión: 2026-09-24_
     parcial). Al aplicarlo no había ninguna venta de gift card a medio pagar. Quedan
     vivas 3 ventas de gift card de nov-2025 NUNCA pagadas (#3987, #4007, #4008; gift
     cards 229, 232, 233, vencen nov-2026): revisar con Deborah si se anulan.
-    **Paso 3 ·** Luna ayuda con el canje: pide
+    **Paso 3 · (propuesta presentada a Jorge el 25-09, esperando su OK)**  Luna ayuda con el canje: pide
     código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
     `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
     la reserva (reemplaza las reservas con fecha de relleno 02/02, caso 6873) y
