@@ -470,19 +470,21 @@ _Última revisión: 2026-09-25_
     gift card ya guardado: editarlo en el admin descuenta el saldo dos veces.
 
 53. **P-53 · Luna: que no suene a robot (lo que queda)** — Jorge el 25-09: «¿estás
-    conversando con un robot?». EN PROD 25-09, todo probado en prod con el modelo real y
-    la ficha de Jorge (commits `1872ded3` → `af13512d`): tono en prompt y herramienta;
-    «más tarde» con criterio (al segundo pregunta la hora; con una hora, la más cercana;
-    las olitas no cambian); freno en código (sin el nombre del cliente después del
-    saludo, una sola muletilla por conversación, sin arrancar igual que el mensaje
-    anterior); una hora que no existe («a las 18:00») nunca se ofrece; y un «hola» solo
-    recibe el saludo, no la carta (la carta sigue para quien pregunta precios o
-    servicios). **Falta:** (1) Jorge decide el texto nuevo de la configuración de Luna
-    (admin → tono y conocimiento): hoy dice «usar "Perfecto/Excelente" y "¿Te
-    gustaría?"». (2) Re-medir con tráfico real desde el 26-09 contra la línea base de 30
-    días: 53% de borradores empieza con «Perfecto», 11% de mensajes seguidos repite las 3
-    primeras palabras, 14% dice «te gustaría reservar»; y el silencio tras un «hola» solo
-    (17% tras el saludo vs 30% tras la carta).
+    conversando con un robot?». EN PROD 25-09, cada cambio probado en prod con el modelo
+    real y la ficha de Jorge (commits `1872ded3` → `567f3f62`): tono en prompt y
+    herramienta; «más tarde» con criterio (al segundo pregunta la hora; con una hora, la
+    más cercana; al tercero, la siguiente); freno en código (sin el nombre del cliente
+    después del saludo, sin segundo «¡Hola!», una sola muletilla por conversación, sin
+    arrancar ni cerrar igual que el mensaje anterior); una hora que no existe nunca se
+    ofrece, y si la más cercana es la que acaba de ver, va la siguiente; «sin
+    hidromasaje» se respeta en toda la conversación; un «hola» solo recibe el saludo,
+    no la carta. Configuración de Luna (admin) cambiada con el OK de Jorge: tono sin
+    «usar Perfecto/¿Te gustaría?» y conocimiento de 25 a 16 líneas (fuera «máximo dos
+    alternativas más económicas», «mandar un link en vez de preguntar» y «omitir el
+    nombre Luna», y las repetidas). **Falta:** re-medir con tráfico real desde el 26-09
+    contra la línea base de 30 días —53% de borradores empieza con «Perfecto», 11% de
+    mensajes seguidos repite las 3 primeras palabras, 14% dice «te gustaría reservar»— y
+    el silencio tras un «hola» solo (17% tras el saludo vs 30% tras la carta).
 
 ## Asistente de Publicaciones (community manager)
 
