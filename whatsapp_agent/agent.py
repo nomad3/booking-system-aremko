@@ -2084,6 +2084,14 @@ def _tool_alternativas_experiencia(args):
             else _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL))],
         **{k: v for k, v in no_hay_a_esa_hora.items() if k != 'aviso'},
         'instruccion': (no_hay_a_esa_hora.get('aviso', '') +
+                        # Probado en prod (25-09-2026): con «más tarde» ya aplicado, la frase
+                        # «si pide más tarde, ofrece otra de `otras_alternativas`» le hacía
+                        # saltarse la recomendada (Tronador 14:30 → Villarrica 16:30).
+                        ('La `recomendada` YA es lo que pidió el cliente (la hora siguiente, o '
+                         'la más cercana a la que dijo): ofrécela a ELLA, aunque sea otra tina '
+                         'u otro tipo que la anterior. Usa `otras_alternativas` solo si además '
+                         'pidió algo que la recomendada no cumple (por ejemplo, con '
+                         'hidromasaje). ' if despues is not None or pedida is not None else '') +
                         'Ofrece SOLO la `recomendada` en 1-2 frases naturales, con su hora y '
                         'precio EXACTOS (el `texto_sugerido` es referencia de datos: no lo '
                         'copies). Si trae `tina_tipo`, nombra la tina por ese tipo («la tina '
@@ -2092,10 +2100,12 @@ def _tool_alternativas_experiencia(args):
                         'y para cuántas personas; en las siguientes, SOLO lo que cambia (hora, '
                         'tipo de tina, precio). PROHIBIDO listar varias opciones o usar '
                         'asteriscos/viñetas. Cierra con una pregunta corta, distinta a la del '
-                        'mensaje anterior. Si el cliente pide algo distinto (más '
-                        'tarde, más temprano, con/sin hidromasaje), ofrece UNA sola de '
-                        '`otras_alternativas` — la que mejor calce con lo pedido — nunca la '
-                        'lista completa. Si ninguna calza, dilo y ofrece otra fecha.'
+                        'mensaje anterior. ' +
+                        ('' if despues is not None or pedida is not None else
+                         'Si el cliente pide algo distinto (más tarde, más temprano, con/sin '
+                         'hidromasaje), ofrece UNA sola de `otras_alternativas` — la que mejor '
+                         'calce con lo pedido — nunca la lista completa. ') +
+                        'Si ninguna calza, dilo y ofrece otra fecha.'
                         + _NOTA_DE_ORDEN.get(tipo, '')),
     }
 

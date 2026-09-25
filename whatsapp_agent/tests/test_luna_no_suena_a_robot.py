@@ -205,6 +205,19 @@ class MasTardeConCriterio(SimpleTestCase):
         out = self._luna(self._alts('14:00', '16:30', '19:00', '21:30'), hora='19:15')
         self.assertEqual(out['recomendada']['titulo'], 'Tina · 19:00')
 
+    def test_con_mas_tarde_la_recomendada_ya_es_la_respuesta(self):
+        # Probado en prod: con «si pide más tarde, ofrece otra de `otras_alternativas`»
+        # Luna se saltaba la recomendada (Tronador 14:30) y ofrecía la Villarrica 16:30.
+        for extra in ({'despues_de': '14:00'}, {'hora': '16:00'}):
+            out = self._luna(self._alts('14:00', '14:30', '16:30'), **extra)
+            self.assertIn('La `recomendada` YA es lo que pidió', out['instruccion'], extra)
+            self.assertNotIn('Si el cliente pide algo distinto', out['instruccion'], extra)
+
+    def test_en_la_primera_oferta_sigue_la_regla_de_siempre(self):
+        out = self._luna(self._alts('14:00', '14:30', '16:30'))
+        self.assertIn('Si el cliente pide algo distinto', out['instruccion'])
+        self.assertNotIn('YA es lo que pidió', out['instruccion'])
+
     def test_la_ultima_hora_ofrecida_no_cuenta_la_de_la_pregunta(self):
         # La conversación real de prod: oferta 14:30, luego la pregunta «hasta las 19:30».
         conversacion = (
