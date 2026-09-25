@@ -269,4 +269,5 @@ class LaPausaSeNiegaSiNadiePidioMasaje(TestCase):
                         {'personas': 2, 'fecha': 'lunes', 'tipo': 'tina', 'despues_de': '14:00'},
                         mensaje='mas tarde tienes?', historial=SOLO_TINAS)
         una.assert_called_once_with({'tipo': 'tina_sola', 'fecha': 'lunes', 'personas': 2,
-                                     'despues_de': '14:00'})
+                                     'despues_de': '14:00', 'hora': None,
+                                     'preguntar_hora': False})

@@ -100,6 +100,9 @@ _TOOLS = [{
                 'despues_de': {'type': 'string',
                                'description': 'Hora (HH:MM) ya ofrecida, SOLO si el cliente pidió '
                                               'algo más tarde (tina o masaje): trae la siguiente.'},
+                'hora': {'type': 'string',
+                         'description': 'Hora que pidió el cliente (HH:MM), tina o masaje: '
+                                        '«tipo 19» = 19:00. Trae la opción más cercana.'},
             },
             'required': ['personas'],
         },
@@ -232,6 +235,10 @@ _TOOLS = [{
                 'despues_de': {'type': 'string',
                                'description': 'Hora (HH:MM) de la opción que ya ofreciste, SOLO '
                                               'si el cliente pidió algo más tarde.'},
+                'hora': {'type': 'string',
+                         'description': 'Hora que pidió el cliente (HH:MM): «tipo 19» = 19:00, '
+                                        '«en la tarde» ≈ 17:00, «en la noche» ≈ 20:00. Trae la '
+                                        'opción más cercana a esa hora.'},
                 'fecha': {'type': 'string',
                           'description': 'Fecha TAL CUAL la dijo el cliente ("el sábado", '
                                          '"5 de agosto" o YYYY-MM-DD); se resuelve internamente.'},
@@ -1794,6 +1801,28 @@ def _otras_por_hora(alts, tope):
     return otras
 
 
+_PIDE_MAS_TARDE = re.compile(r'\b(mas tarde|mas tardecito|algo despues|mas adelante|despues)\b')
+
+
+def _pide_mas_tarde(texto):
+    t = _normalizar_txt(texto)
+    return len(t.split()) <= 6 and bool(_PIDE_MAS_TARDE.search(t))
+
+
+def _veces_mas_tarde(mensaje, historial):
+    """Cuántos «más tarde» seguidos lleva el cliente, contando este mensaje."""
+    if not _pide_mas_tarde(mensaje):
+        return 0
+    veces = 1
+    for linea in reversed((historial or '').splitlines()):
+        if not linea.startswith('[Cliente]:'):
+            continue
+        if not _pide_mas_tarde(linea[len('[Cliente]:'):]):
+            break
+        veces += 1
+    return veces
+
+
 _PIDIO_MASAJE = re.compile(r'\b(masajes?|pausa)\b')
 
 
@@ -1912,11 +1941,32 @@ def _tool_alternativas_experiencia(args):
     # partir de la hora ya ofrecida. Sin esto, Luna tomaba la herramienta de la
     # Pausa —la única que sabía «más tarde»— y le ofrecía tina + masaje a quien
     # pidió solo tina.
+    def _minuto(a):
+        return _hhmm_a_min_seguro(_hora_de_la_tina(a)[0]) or 0
+
+    pedida = _hhmm_a_min_seguro(args.get('hora'))
     despues = _hhmm_a_min_seguro(args.get('despues_de'))
-    if despues is not None:
-        def _minuto(a):
-            return _hhmm_a_min_seguro(_hora_de_la_tina(a)[0]) or 0
+    if pedida is not None:
+        # El cliente dijo una hora («tipo 19»): la más cercana a esa hora primero.
+        alts = sorted(alts, key=lambda a: (abs(_minuto(a) - pedida), _minuto(a)))
+    elif despues is not None:
         alts = sorted((a for a in alts if _minuto(a) > despues), key=_minuto)
+        horas_mas_tarde = sorted({_minuto(a) for a in alts})
+        if args.get('preguntar_hora') and len(horas_mas_tarde) >= 3:
+            # Segundo «más tarde» seguido (Jorge, 25-09-2026): una persona no sigue
+            # ofreciendo de a media hora; pregunta qué hora le acomoda.
+            ultima = horas_mas_tarde[-1]
+            return {
+                'success': True, 'tipo': res.get('tipo'), 'fecha': r['fecha_iso'],
+                'dia_semana': r.get('dia_semana'), 'personas': personas,
+                'recomendada': None, 'otras_alternativas': [],
+                'ultima_hora': f'{ultima // 60:02d}:{ultima % 60:02d}',
+                'instruccion': (
+                    'El cliente ya pidió «más tarde» dos veces: NO ofrezcas otra hora todavía. '
+                    'Pregúntale en una frase qué hora le acomoda y dile que ese día hay horarios '
+                    f'hasta las {ultima // 60:02d}:{ultima % 60:02d}. Cuando te diga una hora, '
+                    'vuelve a llamar esta herramienta con `hora` = esa hora (HH:MM).'),
+            }
     if not alts:
         return {
             'success': True,
@@ -1946,12 +1996,13 @@ def _tool_alternativas_experiencia(args):
         'otras_alternativas': (_otras_por_hora(alts[1:], _MAX_ALTERNATIVAS_TOOL)
                                if tipo in _TIPOS_DESDE_LA_PRIMERA_HORA
                                else _otras_variadas(alts[1:], _MAX_ALTERNATIVAS_TOOL)),
-        'instruccion': ('Ofrece SOLO la `recomendada`, redactada NATURAL en 1-2 frases (usa su '
-                        '`texto_sugerido` como base, con sus horas y precios EXACTOS, '
-                        'mencionando para cuántas personas es, y el '
-                        '`dia_semana` devuelto). PROHIBIDO listar varias opciones o usar '
-                        'asteriscos/viñetas. Cierra preguntando si le acomoda o si prefiere '
-                        'otro horario u otra tina. Si el cliente pide algo distinto (más '
+        'instruccion': ('Ofrece SOLO la `recomendada` en 1-2 frases naturales, con su hora y '
+                        'precio EXACTOS (el `texto_sugerido` es referencia de datos: no lo '
+                        'copies). En la primera oferta di el día (usa el `dia_semana` devuelto) '
+                        'y para cuántas personas; en las siguientes, SOLO lo que cambia (hora, '
+                        'tipo de tina, precio). PROHIBIDO listar varias opciones o usar '
+                        'asteriscos/viñetas. Cierra con una pregunta corta, distinta a la del '
+                        'mensaje anterior. Si el cliente pide algo distinto (más '
                         'tarde, más temprano, con/sin hidromasaje), ofrece UNA sola de '
                         '`otras_alternativas` — la que mejor calce con lo pedido — nunca la '
                         'lista completa. Si ninguna calza, dilo y ofrece otra fecha.'
@@ -2116,7 +2167,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 if tipo_exp:
                     return _tool_alternativas_experiencia(
                         {'tipo': tipo_exp, 'fecha': fecha, 'personas': personas,
-                         'despues_de': args.get('despues_de')})
+                         'despues_de': args.get('despues_de'), 'hora': args.get('hora'),
+                         'preguntar_hora': bool(args.get('despues_de'))
+                         and _veces_mas_tarde(mensaje, historial) >= 2})
                 if args.get('tipo') == 'cabana':
                     return _una_cabana_servicios(
                         disponibilidad(fecha, personas, 'cabana', limite=None))
@@ -2337,6 +2390,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         if name == 'alternativas_experiencia':
             # H-078: cotizador oficial — el motor arma las opciones, el modelo solo las presenta.
             try:
+                args = dict(args or {})
+                if args.get('despues_de') and _veces_mas_tarde(mensaje, historial) >= 2:
+                    args['preguntar_hora'] = True
                 return _tool_alternativas_experiencia(args)
             except Exception as exc:  # noqa: BLE001
                 logger.exception('Agente WA: tool alternativas_experiencia falló: %s', exc)
@@ -3380,6 +3436,12 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return _borrador_escala('respuesta vacía del modelo', error='empty_output',
                                 modelo=modelo, tokens=tokens)
 
+    # Jorge (25-09-2026): «¿estás conversando con un robot?». El freno va en el código:
+    # si el borrador arranca igual que el mensaje anterior de Luna, se reescribe. Va
+    # ANTES de los controles de abajo para que revisen el texto que de verdad sale.
+    texto, extra = _sin_repetir_apertura(texto, historial, modelo)
+    tokens = (tokens[0] + extra[0], tokens[1] + extra[1], tokens[2] + extra[2])
+
     # H-097: una tool avisó que su pregunta ya se hizo y la respuesta no sirvió.
     # Repetirla por tercera vez es la peor cara del bot; la toma una persona.
     for _tc in (resultado.tool_calls_executed or []):
@@ -3436,6 +3498,86 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         'escalar': False, 'motivo': '', 'texto': texto, 'modelo': modelo, 'error': '',
         'input_tokens': tokens[0], 'output_tokens': tokens[1], 'latency_ms': tokens[2],
     }
+
+
+_ARRANQUES_DE_RELLENO = ('perfecto', 'excelente', 'genial', 'claro', 'listo', 'buenisimo')
+# La muletilla (sin mayúsculas/minúsculas) y, si viene, el nombre propio que la sigue
+# («Perfecto, Jorge.»); una palabra en minúscula tras la coma no es un nombre.
+_RE_ARRANQUE = re.compile(
+    r'^\s*¡?\s*(?i:perfecto|excelente|genial|claro|listo|buen[ií]simo)\s*'
+    r'(,\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s*[.!,]*\s*')
+# Lo que la reescritura NO puede perder ni inventar: horas, precios y links. La fecha
+# sí puede omitirla si ya se dijo (es justamente lo que se repetía).
+_RE_DATOS = re.compile(r'\b\d{1,2}:\d{2}\b|\$\s?\d[\d.]*\d|https?://\S+')
+
+
+def _ultimo_de_aremko(historial):
+    for linea in reversed((historial or '').splitlines()):
+        if linea.startswith('[Aremko]:'):
+            return linea[len('[Aremko]:'):].strip()
+    return ''
+
+
+def repite_apertura(texto, anterior):
+    """¿El borrador arranca igual que el mensaje anterior de Luna? Mismas 3 primeras
+    palabras, o la misma muletilla de arranque («Perfecto…» tras «Perfecto…»)."""
+    a = re.findall(r'[a-zñ]+', _normalizar_txt(texto))[:3]
+    b = re.findall(r'[a-zñ]+', _normalizar_txt(anterior))[:3]
+    if not a or not b:
+        return False
+    return (a[0] == b[0] and a[0] in _ARRANQUES_DE_RELLENO) or (len(a) == 3 and a == b)
+
+
+def quitar_arranque(texto):
+    """Sin la muletilla del comienzo: «Perfecto, Jorge. Para el lunes…» → «Para el lunes…»."""
+    nuevo = _RE_ARRANQUE.sub('', texto or '', count=1).strip()
+    if not nuevo:
+        return texto
+    return nuevo[:1].upper() + nuevo[1:]
+
+
+_RE_NARRACION = re.compile(r'\b(despu[eé]s|antes|desde|hasta)\s+de\s+las\s+\d{1,2}:\d{2}|'
+                          r'\b(desde|hasta)\s+las\s+\d{1,2}:\d{2}', re.IGNORECASE)
+
+
+def _datos_del_texto(texto):
+    """Horas y precios OFRECIDOS; no cuentan los que solo narran la búsqueda
+    («después de las 16:30»), que es justo lo que la reescritura debe poder quitar."""
+    limpio = _RE_NARRACION.sub(' ', texto or '')
+    return {d.replace(' ', '').rstrip('.,;:!?)»"').lower() for d in _RE_DATOS.findall(limpio)}
+
+
+def _sin_repetir_apertura(texto, historial, modelo):
+    """(texto, tokens extra). Si el borrador arranca igual que el mensaje anterior de
+    Luna, se pide una reescritura con las mismas horas, precios y links; si la
+    reescritura cambia un dato, afirma una reserva que el borrador no afirmaba o
+    también repite, se le quita la muletilla del comienzo. Nunca rompe el borrador."""
+    from .canje_giftcard import afirma_reserva
+    anterior = _ultimo_de_aremko(historial)
+    if not anterior or not repite_apertura(texto, anterior):
+        return texto, (0, 0, 0)
+    try:
+        from destino_puerto_varas.services.llm.openrouter_provider import OpenRouterProvider
+        r = OpenRouterProvider().generate(
+            ('Eres Luna, de Aremko Spa Boutique (Puerto Varas, Chile). Reescribe el mensaje de '
+             'WhatsApp que te paso para que NO empiece igual que el mensaje anterior. Mantén '
+             'EXACTAS las horas, los precios y los nombres de servicios; si la fecha ya se dijo en '
+             'el mensaje anterior, puedes omitirla. Español de '
+             'Chile, cálido y breve, trato de tú. No empieces con «Perfecto» ni «Excelente». '
+             'Devuelve SOLO el mensaje nuevo, sin comillas.'),
+            f'Mensaje anterior de Luna: «{anterior[:300]}»\nMensaje a reescribir: «{texto}»',
+            model=modelo, max_tokens=400, temperature=0.4)
+        nuevo = escalation.sanear_salida((r.text or '').strip().strip('«»"'))
+        extra = (r.input_tokens or 0, r.output_tokens or 0, r.latency_ms or 0)
+        if (r.ok and nuevo and _datos_del_texto(texto) == _datos_del_texto(nuevo)
+                and (afirma_reserva(texto) or not afirma_reserva(nuevo))
+                and not repite_apertura(nuevo, anterior) and len(nuevo) <= len(texto) * 1.6 + 40):
+            return nuevo, extra
+        logger.info('[Agente WA] reescritura sin repetir descartada; se quita la muletilla')
+        return quitar_arranque(texto), extra
+    except Exception:  # noqa: BLE001 — sin reescritura, al menos sin la muletilla
+        logger.exception('[Agente WA] no se pudo reescribir el borrador repetido')
+        return quitar_arranque(texto), (0, 0, 0)
 
 
 def sumar_pase_si_pregunta(texto, mensaje_cliente, phone):
