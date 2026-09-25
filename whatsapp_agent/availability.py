@@ -10,6 +10,7 @@ igual que el grounding. Capacidad estricta por `capacidad_minima/maxima`.
 """
 
 import logging
+import re
 from datetime import datetime, timedelta
 
 from django.utils import timezone
@@ -98,6 +99,44 @@ def _termino_relativo(expr_norm):
     return None
 
 
+_FECHA_ISO = re.compile(r'\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b')
+_FECHA_DMA = re.compile(r'\b(\d{1,2})[-/](\d{1,2})[-/](\d{4}|\d{2})\b')
+_FECHA_DM = re.compile(r'(?<![\d/])(\d{1,2})/(\d{1,2})(?![\d/])')
+
+
+def _fecha_numerica(texto, hoy):
+    """La fecha escrita con números: (fecha, None), (None, error) o None si no hay.
+
+    Formatos: AAAA-MM-DD (o con /), DD/MM/AAAA, DD-MM-AAAA, DD/MM/AA y DD/MM (sin
+    año: este, o el que viene si esa fecha ya pasó). DD-MM sin año NO: se confunde
+    con rangos como «2-3 personas».
+    """
+    m = _FECHA_ISO.search(texto)
+    if m:
+        año, mes, dia = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = _FECHA_DMA.search(texto)
+        if m:
+            dia, mes, año = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if año < 100:
+                año += 2000
+        else:
+            m = _FECHA_DM.search(texto)
+            if not m:
+                return None
+            dia, mes, año = int(m.group(1)), int(m.group(2)), None
+    try:
+        if año is None:
+            fecha = datetime(hoy.year, mes, dia).date()
+            if fecha < hoy:
+                fecha = datetime(hoy.year + 1, mes, dia).date()
+        else:
+            fecha = datetime(año, mes, dia).date()
+    except ValueError:
+        return None, f'fecha inválida: «{m.group(0)}»'
+    return fecha, None
+
+
 def resolver_fecha(expresion_cliente):
     """Resuelve fecha de forma DETERMINÍSTICA (sin dejar al LLM calcular día de semana).
 
@@ -134,6 +173,33 @@ def resolver_fecha(expresion_cliente):
     if not expresion:
         return {'error': 'expresión vacía', 'ambiguo': True}
     expr_norm = _sin_acentos(expresion)  # match insensible a tildes ("sabado" = "sábado")
+
+    # PATRÓN 0 (25-09-2026): fecha escrita con números. Antes caía en el patrón del
+    # número de día, que toma el PRIMER número de 1 o 2 cifras como día del mes
+    # ACTUAL: «2026-09-26» → el 09 → 2027-09-09 (la herramienta de Luna invita a
+    # mandar AAAA-MM-DD), y «26/10» → el 26 de SEPTIEMBRE. Si además nombra un día
+    # de la semana que no calza, se pregunta, como en el patrón 1.
+    numerica = _fecha_numerica(expr_norm, hoy)
+    if numerica is not None:
+        fecha, error = numerica
+        if error:
+            return {'error': error, 'ambiguo': True}
+        for i, dia_nombre in enumerate(DIAS_SEMANA_ES):
+            if re.search(_sin_acentos(dia_nombre), expr_norm) and fecha.weekday() != i:
+                return {
+                    'fecha_iso': None,
+                    'ambiguo': True,
+                    'error': (f'fecha contradictoria: el {fecha.strftime("%d-%m")} es '
+                              f'{DIAS_SEMANA_ES[fecha.weekday()]}, no {dia_nombre}. Pregúntale '
+                              'al cliente cuál de los dos quiere.'),
+                }
+        return {
+            'fecha_iso': fecha.isoformat(),
+            'dia_semana': DIAS_SEMANA_ES[fecha.weekday()],
+            'dia_numero': fecha.weekday(),
+            'ambiguo': False,
+            'error': None,
+        }
 
     def _mes_explicito():
         """Nombre de mes en TODA la expresión (no da falsos positivos, a diferencia de
