@@ -30,6 +30,9 @@ SEGUNDOS_MAXIMOS = 25
 MAX_FOTOS_POR_TURNO = 3
 # Una foto sin responder más vieja que esto ya no es «este turno».
 DIAS_DEL_TURNO = 7
+# Tras la foto, lo que el cliente escriba en estos días sigue siendo el canje.
+DIAS_CANJE_EN_CURSO = 3
+PALABRAS_MAX_TEXTO_NEUTRO = 10
 TIPOS = ('giftcard_aremko', 'voucher_antiguo', 'comprobante', 'otro')
 # Los que tocan el canje: el resto de las fotos sigue como hoy.
 DE_CANJE = ('giftcard_aremko', 'voucher_antiguo')
@@ -244,3 +247,97 @@ def lecturas_de(wa_message_ids):
                     .values_list('wa_message_id', 'resumen'))
     except Exception:  # noqa: BLE001
         return {}
+
+
+
+# --- Deploy 2a (25-09-2026): Luna da la bienvenida al canje -------------------
+# Jorge aprobó el flujo: con la foto de una gift card que se puede usar, Luna
+# saluda, confirma cuál es y pide el día; Deborah sigue confirmando todo. Lo que
+# el cliente responda después (el día, la hora) todavía lo ve Deborah: buscar el
+# horario con la ficha de cada gift card es el deploy 2b.
+
+_FECHA_U_HORA = re.compile(
+    r'\d|\b(hoy|mañana|manana|pasado|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|'
+    r'domingo|finde|fin de semana|semana|enero|febrero|marzo|abril|mayo|junio|julio|agosto|'
+    r'septiembre|setiembre|octubre|noviembre|diciembre)\b', re.IGNORECASE)
+
+_MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+          'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+# Los mismos saludos que Luna usa en el prompt (prompt.bloque_saludo).
+_SALUDOS = {
+    'primer_contacto': '¡Hola{voc}! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.',
+    'regreso': '¡Hola{voc}! 🌿 Te saluda Luna, de Aremko. ¡Qué gusto tenerte de vuelta!',
+}
+
+
+def texto_neutro(texto):
+    """¿Este mensaje se contesta bien con la bienvenida? Un saludo o «me
+    regalaron esta gift card» sí. Una fecha, una hora, una pregunta o un
+    mensaje largo no: eso lo ve Deborah."""
+    t = (texto or '').strip()
+    if not t:
+        return True
+    return ('?' not in t and '¿' not in t and not _FECHA_U_HORA.search(t)
+            and len(t.split()) <= PALABRAS_MAX_TEXTO_NEUTRO)
+
+
+def se_puede_usar(gc):
+    from ventas.services.giftcard_estado import estado_giftcard
+
+    estado = estado_giftcard(gc)
+    return estado == 'Lista para usar' or estado.startswith('Le quedan')
+
+
+def _fecha_larga(fecha):
+    return f'{fecha.day} de {_MESES[fecha.month - 1]} de {fecha.year}'
+
+
+def bienvenida_de_canje(gc, saludo_estado='', nombre=''):
+    """El borrador para quien manda la foto de una gift card que se puede usar:
+    saluda como Luna, confirma cuál es y pide el día. Texto fijo, sin modelo."""
+    from ventas.services.giftcard_envio import nombre_experiencia
+    from ventas.services.giftcard_estado import pesos
+
+    saldo = int(gc.monto_disponible or 0)
+    vence = f' hasta el {_fecha_larga(gc.fecha_vencimiento)}' if gc.fecha_vencimiento else ''
+    if (gc.servicio_asociado or '').strip() in ('', 'monto_libre'):
+        cual = f'tu gift card de {pesos(gc.monto_inicial)}'
+    else:
+        cual = f'tu gift card «{nombre_experiencia(gc)}»'
+    if saldo < int(gc.monto_inicial or 0):
+        estado = f'Le quedan {pesos(saldo)} por usar{vence}.'
+    else:
+        estado = f'Está lista para usar{vence}.'
+    partes = []
+    saludo = _SALUDOS.get(saludo_estado)
+    if saludo:
+        partes.append(saludo.format(voc=f', {nombre}' if nombre else ''))
+    partes.append(f'Recibí {cual} 🎁 {estado}')
+    partes.append('¿Qué día te gustaría venir? Te busco el horario.')
+    return '\n\n'.join(partes)
+
+
+def canje_en_curso(phone):
+    """La gift card que este cliente mandó en foto en los últimos días y que
+    todavía se puede usar, con su descripción para Deborah; o None."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+    from ventas.models import GiftCard
+
+    from .models import LecturaImagen
+
+    try:
+        lectura = (LecturaImagen.objects
+                   .filter(phone=phone, tipo='giftcard_aremko', giftcard_id__isnull=False,
+                           created_at__gte=timezone.now() - timedelta(days=DIAS_CANJE_EN_CURSO))
+                   .order_by('-created_at').first())
+    except Exception:  # noqa: BLE001 — tabla sin migrar
+        return None
+    if lectura is None:
+        return None
+    gc = GiftCard.objects.filter(pk=lectura.giftcard_id).first()
+    if gc is None or not se_puede_usar(gc):
+        return None
+    return {'giftcard': gc, 'resumen': describir_giftcard(gc, lectura.forma, lectura.codigo)}

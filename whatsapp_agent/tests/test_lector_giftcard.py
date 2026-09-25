@@ -6,6 +6,11 @@ mal leídos) y reconoce los vouchers antiguos «R ####». Si en el turno sin
 responder hay una gift card, el canje pasa a Deborah con la tarjeta ya
 identificada en el motivo, sin pedirle el código al cliente.
 
+Deploy 2a (25-09-2026, flujo aprobado por Jorge): si la gift card se puede usar
+y la foto llega sola (o con un saludo), Luna prepara la bienvenida: saluda,
+confirma cuál es y pide el día. Lo que el cliente responda después lo sigue
+viendo Deborah, con la gift card identificada, hasta el deploy 2b.
+
 El modelo nunca se llama de verdad: se reemplaza `_preguntar_al_modelo` (y
 `_bytes_de`, para no abrir archivos).
 
@@ -253,8 +258,8 @@ class LeerLaFoto(_Base):
 
 
 class LunaPasaElCanjeADeborah(_Base):
-    def test_foto_sola_de_gift_card_pasa_con_la_tarjeta_identificada(self):
-        self._giftcard('N7LTQ4ZX9PKA')
+    def test_una_gift_card_ya_usada_pasa_con_la_tarjeta_identificada(self):
+        self._giftcard('N7LTQ4ZX9PKA', saldo=0)
         foto = self._foto()
         with _lee(codigo='N7LTQ4ZX9PKA'), _borrador_normal() as borrador:
             sug = agent.generar_sugerencia(TEL)
@@ -264,7 +269,7 @@ class LunaPasaElCanjeADeborah(_Base):
         self.assertEqual(sug.texto, '')
         self.assertTrue(sug.motivo_escalar.startswith('Canje de gift card · '), sug.motivo_escalar)
         self.assertIn('código N7LTQ4ZX9PKA', sug.motivo_escalar)
-        self.assertIn('lista para usar', sug.motivo_escalar)
+        self.assertIn('ya usada', sug.motivo_escalar)
 
     def test_foto_y_despues_el_texto_tambien(self):
         self._giftcard('N7LTQ4ZX9PKA')
@@ -364,6 +369,178 @@ class LunaPasaElCanjeADeborah(_Base):
         with _lee(codigo='N7LTQ4ZX9PKA') as modelo:
             self.assertIsNone(agent.generar_sugerencia(TEL))
         modelo.assert_not_called()
+
+
+class LunaDaLaBienvenidaAlCanje(_Base):
+    def _vence(self, gc):
+        meses = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+                 'septiembre', 'octubre', 'noviembre', 'diciembre')
+        f = gc.fecha_vencimiento
+        return f'{f.day} de {meses[f.month - 1]} de {f.year}'
+
+    def _sugerencia(self, codigo='N7LTQ4ZX9PKA'):
+        with _lee(codigo=codigo), _borrador_normal() as borrador:
+            sug = agent.generar_sugerencia(TEL)
+        self.borrador = borrador
+        return sug
+
+    def test_foto_sola_trae_la_bienvenida_de_luna(self):
+        gc = self._giftcard('N7LTQ4ZX9PKA')
+        self._foto(cliente=self.cliente)
+        sug = self._sugerencia()
+        self.borrador.assert_not_called()
+        self.assertFalse(sug.escalar)
+        self.assertEqual(sug.modelo, 'lector de fotos · bienvenida')
+        self.assertEqual(sug.texto, (
+            '¡Hola, Natalia! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.\n\n'
+            f'Recibí tu gift card «Tina para dos» 🎁 Está lista para usar hasta el {self._vence(gc)}.'
+            '\n\n¿Qué día te gustaría venir? Te busco el horario.'))
+
+    def test_con_un_saludo_antes_tambien_y_se_presenta_una_vez(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._mensaje(minutos_atras=6, body='Hola buenas tardes', contact_name='Natalia')
+        self._foto(minutos_atras=5)
+        sug = self._sugerencia()
+        self.assertFalse(sug.escalar)
+        self.assertTrue(sug.texto.startswith('¡Hola, Natalia! 🌿 Te saluda Luna'), sug.texto)
+        self.assertEqual(sug.texto.count('Te saluda Luna'), 1)
+
+    def test_en_una_conversacion_en_curso_no_se_vuelve_a_presentar(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._mensaje(minutos_atras=90, pendiente=False, body='hola, consulta')
+        self._mensaje(minutos_atras=80, direction='out', pendiente=False, body='¡Hola! Cuéntame')
+        self._foto(minutos_atras=5)
+        sug = self._sugerencia()
+        self.assertTrue(sug.texto.startswith('Recibí tu gift card «Tina para dos»'), sug.texto)
+
+    def test_si_le_queda_saldo_dice_cuanto(self):
+        gc = self._giftcard('N7LTQ4ZX9PKA', saldo=30000)
+        self._foto()
+        sug = self._sugerencia()
+        self.assertIn(f'Le quedan $30.000 por usar hasta el {self._vence(gc)}.', sug.texto)
+
+    def test_la_de_monto_libre_dice_el_monto(self):
+        self._giftcard('N7LTQ4ZX9PKA', experiencia='')
+        self._foto()
+        self.assertIn('Recibí tu gift card de $90.000 🎁', self._sugerencia().texto)
+
+    def test_la_mandada_como_documento_tambien(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto(msg_type='document', mime_type='image/jpeg')
+        self.assertFalse(self._sugerencia().escalar)
+
+    def test_una_vencida_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA', vence_en=-3)
+        self._foto()
+        sug = self._sugerencia()
+        self.assertTrue(sug.escalar)
+        self.assertIn('vencida el', sug.motivo_escalar)
+
+    def test_una_con_la_compra_sin_pagar_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto()
+        with mock.patch('ventas.services.giftcard_estado.compra_sin_pagar', return_value=True):
+            sug = self._sugerencia()
+        self.assertTrue(sug.escalar)
+        self.assertIn('por cobrar', sug.motivo_escalar)
+
+    def test_si_el_codigo_no_esta_pasa_a_deborah(self):
+        self._foto()
+        sug = self._sugerencia(codigo='ZZZZ9Q8W7E6R')
+        self.assertTrue(sug.escalar)
+        self.assertIn('no está en el sistema', sug.motivo_escalar)
+
+    def test_si_trae_una_pregunta_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto(minutos_atras=6)
+        self._mensaje(minutos_atras=5, body='¿sirve para masaje?')
+        self.assertTrue(self._sugerencia().escalar)
+
+    def test_si_trae_un_audio_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto(minutos_atras=6)
+        self._mensaje(minutos_atras=5, msg_type='audio', media_file='whatsapp/nota.ogg',
+                      mime_type='audio/ogg')
+        self.assertTrue(self._sugerencia().escalar)
+
+    def test_con_otra_foto_al_lado_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto(minutos_atras=6)                       # la gift card
+        self._foto(minutos_atras=5)                       # otra cosa (se lee primero)
+        lecturas = [({'tipo': 'comprobante', 'codigo': None}, 2000, 1500),
+                    ({'tipo': 'giftcard_aremko', 'codigo': 'N7LTQ4ZX9PKA'}, 2000, 1500)]
+        with mock.patch(MODELO, side_effect=lecturas), _borrador_normal():
+            sug = agent.generar_sugerencia(TEL)
+        self.assertTrue(sug.escalar)
+        self.assertIn('código N7LTQ4ZX9PKA', sug.motivo_escalar)
+
+    def test_si_tiene_una_reserva_proxima_pasa_a_deborah(self):
+        # La gift card puede ser para pagar esa reserva.
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto()
+        with mock.patch('whatsapp_agent.agent._reserva_vigente_del_cliente', return_value=object()):
+            sug = self._sugerencia()
+        self.assertTrue(sug.escalar)
+        self.assertIn('lista para usar', sug.motivo_escalar)
+
+    def test_si_la_bienvenida_falla_pasa_a_deborah(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        self._foto()
+        with mock.patch('whatsapp_agent.lector_giftcard.bienvenida_de_canje',
+                        side_effect=RuntimeError('boom')):
+            sug = self._sugerencia()
+        self.assertTrue(sug.escalar)
+        self.assertIn('código N7LTQ4ZX9PKA', sug.motivo_escalar)
+
+
+class DespuesDeLaBienvenida(_Base):
+    """El cliente ya mandó la foto y la bienvenida salió: lo que responda (el
+    día, la hora) lo agenda Deborah, con la gift card identificada."""
+
+    def _canje_iniciado(self, **giftcard):
+        self._giftcard('N7LTQ4ZX9PKA', **giftcard)
+        foto = self._foto(minutos_atras=30)
+        with _lee(codigo='N7LTQ4ZX9PKA'):
+            lector_giftcard.leer(foto)
+        WhatsAppMessage.objects.filter(pk=foto.pk).update(requiere_atencion=False)
+        self._mensaje(minutos_atras=20, direction='out', pendiente=False,
+                      body='Recibí tu gift card. ¿Qué día te gustaría venir?')
+
+    def test_lo_que_responde_el_cliente_pasa_a_deborah_con_la_gift_card(self):
+        self._canje_iniciado()
+        self._mensaje(minutos_atras=2, body='el sábado a las 18 porfa')
+        with _lee() as modelo, _borrador_normal() as borrador:
+            sug = agent.generar_sugerencia(TEL)
+        modelo.assert_not_called()
+        borrador.assert_not_called()
+        self.assertTrue(sug.escalar)
+        self.assertTrue(sug.motivo_escalar.startswith('Canje de gift card en curso · Tina para dos'),
+                        sug.motivo_escalar)
+        self.assertIn('código N7LTQ4ZX9PKA', sug.motivo_escalar)
+
+    def test_ya_usada_luna_vuelve_a_lo_normal(self):
+        self._canje_iniciado()
+        GiftCard.objects.filter(codigo='N7LTQ4ZX9PKA').update(monto_disponible=0)
+        self._mensaje(minutos_atras=2, body='¿a qué hora es el check-in?')
+        with _borrador_normal() as borrador:
+            sug = agent.generar_sugerencia(TEL)
+        borrador.assert_called_once()
+        self.assertFalse(sug.escalar)
+
+    def test_pasados_tres_dias_luna_vuelve_a_lo_normal(self):
+        self._canje_iniciado()
+        LecturaImagen.objects.update(created_at=timezone.now() - datetime.timedelta(days=4))
+        self._mensaje(minutos_atras=2, body='hola')
+        with _borrador_normal() as borrador:
+            agent.generar_sugerencia(TEL)
+        borrador.assert_called_once()
+
+    def test_otro_cliente_no_se_ve_afectado(self):
+        self._canje_iniciado()
+        self._mensaje(minutos_atras=2, body='hola', phone='+56977778888')
+        with _borrador_normal() as borrador:
+            agent.generar_sugerencia('+56977778888')
+        borrador.assert_called_once()
 
 
 class LunaVeLaFotoEnElHistorial(_Base):

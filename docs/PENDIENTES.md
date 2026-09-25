@@ -439,11 +439,18 @@ _Última revisión: 2026-09-24_
     Migración `whatsapp_agent 0014` aplicada por Jorge el 25-09. Verificado en prod
     con 17 fotos reales: 16 bien; en la otra el modelo se comió un carácter (gift
     card 389) → ajuste del mismo día: la tolerancia cuenta también el carácter que
-    falta o sobra (en prod la 389 queda a 1 y la siguiente de 496, a 8). **Deploy 2 (pendiente):** Luna conversa el canje (fecha, hora,
-    disponibilidad según la experiencia; tabla experiencia→servicios armada con los 23
-    canjes, la revisa Deborah) y deja el resumen a Deborah; Luna nunca confirma la
-    reserva. Opcionales: botón «Vender gift card» ligado a la reserva (reemplaza las
-    reservas con fecha de relleno 02/02, caso 6873).
+    falta o sobra (en prod la 389 queda a 1 y la siguiente de 496, a 8). **Deploy 2 · flujo aprobado por Jorge el 25-09, en dos partes** (sin esperar a Deborah).
+    **2a (25-09):** con la foto sola (o con un saludo) de una gift card que se puede usar,
+    Luna prepara la bienvenida de texto fijo (saluda como en el prompt, confirma cuál es,
+    saldo y vencimiento, y pide el día); con fecha, pregunta, audio, otra foto, reserva
+    próxima o gift card usada/vencida/por cobrar, pasa a Deborah como en el deploy 1. Lo
+    que el cliente escriba en los 3 días siguientes, mientras la gift card siga sin usarse,
+    lo ve Deborah («Canje de gift card en curso · …»): el freno va en el código.
+    **2b (pendiente):** Luna busca el horario con la ficha de cada gift card (tabla para
+    Deborah: PDF en el Escritorio, 21 fichas, 12 preguntas; mientras no responda, solo lo
+    que dice la carta y lo demás a Deborah) y deja el resumen a Deborah; Luna nunca
+    confirma la reserva. Opcionales: botón «Vender gift card» ligado a la reserva
+    (reemplaza las reservas con fecha de relleno 02/02, caso 6873).
     **Deudas del modelo encontradas el 24-09 (sin arreglar):** (a) el campo `estado`
     significa dos cosas —«compra sin pagar» (venta por Luna/web) y «vigente con saldo»
     (canje parcial, «Ajustar saldo»)—; la tarjeta ya no lo lee, deriva «¿se pagó?» de

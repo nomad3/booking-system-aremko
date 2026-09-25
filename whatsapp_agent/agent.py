@@ -858,10 +858,65 @@ def _canje_por_foto(phone):
         lecturas = lector_giftcard.fotos_de_canje_pendientes(phone)
         if not lecturas:
             return None
-        return {'motivo': lector_giftcard.motivo_para_deborah(lecturas),
+        return {'motivo': lector_giftcard.motivo_para_deborah(lecturas), 'lecturas': lecturas,
                 'modelo': f'lector de fotos · {lector_giftcard.MODELO_VISION}'}
     except Exception:  # noqa: BLE001 — sin lector, Luna sigue como antes
         logger.exception('[lector] falló la revisión de fotos de %s', phone)
+        return None
+
+
+# Lo que puede traer el turno junto a la foto para que baste la bienvenida.
+_TIPOS_CON_BIENVENIDA = ('text', 'image', 'sticker')
+
+
+def _bienvenida_de_canje(phone, lecturas):
+    """P-52 paso 3, deploy 2a: el borrador de bienvenida al canje, o None si el
+    caso lo tiene que ver Deborah. Hay bienvenida solo si el turno trae UNA foto,
+    de una gift card que se puede usar, sin fechas ni preguntas al lado, y el
+    cliente no tiene una reserva próxima (la gift card podría ser para pagarla)."""
+    try:
+        from ventas.models import GiftCard, WhatsAppMessage
+
+        from . import lector_giftcard
+
+        if len(lecturas) != 1 or lecturas[0]['tipo'] != 'giftcard_aremko':
+            return None
+        gc = GiftCard.objects.filter(pk=lecturas[0]['giftcard_id']).first() \
+            if lecturas[0]['giftcard_id'] else None
+        if gc is None or not lector_giftcard.se_puede_usar(gc):
+            return None
+        turno = list(WhatsAppMessage.objects
+                     .filter(phone=phone, direction='in', requiere_atencion=True)
+                     .exclude(msg_type='reaction').order_by('timestamp'))
+        if (not turno
+                or any((m.msg_type or 'text') not in _TIPOS_CON_BIENVENIDA
+                       and not lector_giftcard.es_foto(m) for m in turno)
+                or sum(1 for m in turno if lector_giftcard.es_foto(m)) != 1
+                or not all(lector_giftcard.texto_neutro(m.body) for m in turno)):
+            return None
+        if _reserva_vigente_del_cliente(phone) is not None:
+            return None
+        saludo_estado, nombre = _contexto_saludo(turno[0])
+        return lector_giftcard.bienvenida_de_canje(gc, saludo_estado, nombre)
+    except Exception:  # noqa: BLE001 — sin bienvenida, el canje pasa a Deborah
+        logger.exception('[lector] no se pudo armar la bienvenida de %s', phone)
+        return None
+
+
+def _canje_en_curso(phone):
+    """Si el cliente mandó hace poco la foto de una gift card que todavía se puede
+    usar, lo que escriba ahora (el día, la hora) lo ve Deborah: el motivo con la
+    gift card identificada, o None. Buscar el horario con la ficha es el deploy 2b."""
+    try:
+        from . import lector_giftcard
+
+        en_curso = lector_giftcard.canje_en_curso(phone)
+        if en_curso is None:
+            return None
+        return {'motivo': f"Canje de gift card en curso · {en_curso['resumen']}",
+                'modelo': 'lector de fotos · canje en curso'}
+    except Exception:  # noqa: BLE001
+        logger.exception('[lector] falló la revisión del canje en curso de %s', phone)
         return None
 
 
@@ -3181,12 +3236,23 @@ def generar_sugerencia(phone, *, forzar=False):
         return None
 
     # P-52 paso 3: el cliente manda la foto de la gift card (a veces sin una
-    # palabra). Se lee y el canje pasa a Deborah con la tarjeta ya identificada:
-    # no le pide el código al cliente. Luna todavía no conversa el canje.
+    # palabra). Se lee y, si se puede usar, Luna saluda, confirma cuál es y pide
+    # el día (bienvenida de texto fijo); si no, el canje pasa a Deborah con la
+    # tarjeta ya identificada. Nunca se le pide el código al cliente.
     canje = _canje_por_foto(phone)
     if canje is not None:
+        bienvenida = _bienvenida_de_canje(phone, canje['lecturas'])
+        if bienvenida:
+            return _guardar(entrante, texto=bienvenida, modo=config.modo,
+                            modelo='lector de fotos · bienvenida')
         return _guardar(entrante, escalar=True, motivo=canje['motivo'], modo=config.modo,
                         modelo=canje['modelo'])
+    # Lo que el cliente escribe después de la foto (el día, la hora) todavía lo
+    # agenda Deborah: el freno va en el código, no en el prompt.
+    en_curso = _canje_en_curso(phone)
+    if en_curso is not None:
+        return _guardar(entrante, escalar=True, motivo=en_curso['motivo'], modo=config.modo,
+                        modelo=en_curso['modelo'])
 
     historial = _historial_texto(phone, entrante.timestamp, config.history_window)
     saludo_estado, saludo_nombre = _contexto_saludo(entrante)
