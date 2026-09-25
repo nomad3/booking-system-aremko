@@ -48,28 +48,55 @@ def codigo_canonico_sql():
     return expr
 
 
-def _distinto(a, b):
-    """Cuántas posiciones difieren entre dos códigos del mismo largo."""
-    return sum(1 for x, y in zip(a, b) if x != y)
+def _distancia(a, b):
+    """Cuántos caracteres hay que cambiar, sacar o poner para pasar de un
+    código al otro (distancia de edición). Cuenta el carácter que el modelo se
+    come al leer una foto, no solo el que lee mal."""
+    anterior = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        actual = [i]
+        for j, y in enumerate(b, 1):
+            actual.append(min(anterior[j] + 1, actual[j - 1] + 1, anterior[j - 1] + (x != y)))
+        anterior = actual
+    return anterior[-1]
 
 
 def caracteres_distintos(texto, codigo):
-    """Cuántos caracteres de lo escrito no calzan con el código (O por 0 e I
-    por 1 no cuentan: son la misma tecla para quien lee)."""
-    return _distinto(forma_canonica(codigo_limpio(texto)), forma_canonica(codigo_limpio(codigo)))
+    """Cuántos caracteres de lo escrito no calzan con el código: distintos, de
+    más o de menos (O por 0 e I por 1 no cuentan: son la misma tecla para quien lee)."""
+    return _distancia(forma_canonica(codigo_limpio(texto)), forma_canonica(codigo_limpio(codigo)))
+
+
+def _la_unica_cercana(canon):
+    """El id de la gift card a 1 o 2 caracteres de lo leído, SOLO si es la única
+    así de cerca (la segunda tiene que quedar al menos 2 más lejos), o None.
+    Los códigos son al azar: en prod (25-09-2026, 496 gift cards) la segunda más
+    parecida a una lectura quedó a 8."""
+    from ventas.models import GiftCard
+
+    cercanas = sorted(
+        (_distancia(canon, forma_canonica((c or '').upper())), pk)
+        for pk, c in GiftCard.objects.values_list('pk', 'codigo')
+        if len(c or '') == LARGO_CODIGO)
+    if cercanas and cercanas[0][0] <= 2 and (
+            len(cercanas) == 1 or cercanas[1][0] >= cercanas[0][0] + 2):
+        return cercanas[0][1]
+    return None
 
 
 def buscar_por_codigo(texto, base=None, limite=6):
     """Las gift cards que calzan con un código dictado, copiado o leído de una foto.
 
     Devuelve (lista, forma), donde forma dice cómo calzó: 'exacto',
-    'o_por_cero' (O=0, I=1), 'tolerancia' (1 o 2 caracteres distintos, SOLO si
-    hay una sola candidata así de cerca: los códigos son al azar y la segunda
-    más parecida queda a 9 o más), 'comienzo' (el cliente dio una parte) o ''.
+    'o_por_cero' (O=0, I=1), 'comienzo' (el cliente dio una parte),
+    'tolerancia' (1 o 2 caracteres de diferencia —distintos, de más o de
+    menos—, SOLO si hay una sola candidata así de cerca) o ''.
 
-    La tolerancia nació de un caso real (20-09-2026): quien regaló un Refugio
-    copió el código a mano en una tarjeta de cumpleaños y la letra manuscrita
-    confundió un carácter; era la gift card 471.
+    La tolerancia nació de casos reales: quien regaló un Refugio copió el
+    código a mano en una tarjeta de cumpleaños y confundió un carácter (gift
+    card 471, 20-09-2026), y al leer una foto el modelo se comió un carácter de
+    los 12 (gift card 389, 25-09-2026). Por eso se mide cuántos caracteres hay
+    que cambiar, sacar o poner, en lecturas de 11 a 13 caracteres.
     """
     from ventas.models import GiftCard
 
@@ -85,19 +112,16 @@ def buscar_por_codigo(texto, base=None, limite=6):
     iguales = list(con_canon.filter(canon=canon)[:limite])
     if iguales:
         return iguales, 'o_por_cero'
-    if len(codigo) == LARGO_CODIGO:
-        cercanas = sorted(
-            (_distinto(canon, forma_canonica((c or '').upper())), pk)
-            for pk, c in GiftCard.objects.values_list('pk', 'codigo')
-            if len(c or '') == LARGO_CODIGO)
-        if cercanas and cercanas[0][0] <= 2 and (
-                len(cercanas) == 1 or cercanas[1][0] >= cercanas[0][0] + 2):
-            elegida = base.filter(pk=cercanas[0][1]).first()
-            if elegida:
-                return [elegida], 'tolerancia'
-        return [], ''
-    comienzo = list(con_canon.filter(canon__startswith=canon).order_by('-id')[:limite])
-    return comienzo, ('comienzo' if comienzo else '')
+    if len(codigo) < LARGO_CODIGO:
+        comienzo = list(con_canon.filter(canon__startswith=canon).order_by('-id')[:limite])
+        if comienzo:
+            return comienzo, 'comienzo'
+    if abs(len(codigo) - LARGO_CODIGO) <= 1:
+        pk = _la_unica_cercana(canon)
+        elegida = base.filter(pk=pk).first() if pk else None
+        if elegida:
+            return [elegida], 'tolerancia'
+    return [], ''
 
 
 # Los vouchers de antes del sistema de gift cards («Nro Voucher: R 5602»): el

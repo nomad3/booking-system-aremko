@@ -121,13 +121,41 @@ class Buscar(_Base):
         self.assertEqual(r.status_code, 200)
         [ficha] = r.json()['giftcards']
         self.assertEqual(ficha['id'], gc.pk)
-        self.assertIn('1 carácter distinto', ficha['calce'])
+        self.assertIn('1 carácter de diferencia', ficha['calce'])
 
     def test_dos_caracteres_mal_tambien(self):
         gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
         [ficha] = self._buscar('N7LTQ4ZX9PBB').json()['giftcards']
         self.assertEqual(ficha['id'], gc.pk)
-        self.assertIn('2 caracteres distintos', ficha['calce'])
+        self.assertIn('2 caracteres de diferencia', ficha['calce'])
+
+    def test_un_caracter_de_menos_la_encuentra(self):
+        # Caso real (25-09-2026): al leer la foto de la gift card 389 el modelo
+        # se comió el 8º carácter y leyó 11 de los 12.
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        [ficha] = self._buscar('N7LTQ4Z9PKA').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+        self.assertIn('1 carácter de diferencia', ficha['calce'])
+
+    def test_un_caracter_de_mas_tambien(self):
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        [ficha] = self._buscar('N7LTQ4ZXX9PKA').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+
+    def test_dos_de_menos_ya_no(self):
+        self._giftcard(codigo='N7LTQ4ZX9PKA')
+        self.assertEqual(self._buscar('N7LTQ4Z9PK').status_code, 404)
+
+    def test_si_a_dos_les_falta_el_mismo_caracter_no_elige(self):
+        self._giftcard(codigo='N7LTQ4ZX9PKA')
+        self._giftcard(codigo='N7LTQ4ZY9PKA')
+        self.assertEqual(self._buscar('N7LTQ4Z9PKA').status_code, 404)
+
+    def test_el_comienzo_de_once_sigue_siendo_comienzo_sin_aviso(self):
+        gc = self._giftcard(codigo='N7LTQ4ZX9PKA')
+        [ficha] = self._buscar('N7LTQ4ZX9PK').json()['giftcards']
+        self.assertEqual(ficha['id'], gc.pk)
+        self.assertNotIn('calce', ficha)
 
     def test_el_calce_exacto_no_trae_aviso(self):
         gc = self._giftcard(codigo='N7LTQ4ZX9PKA')

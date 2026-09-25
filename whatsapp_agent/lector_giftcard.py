@@ -100,16 +100,18 @@ def _estado_con_detalle(gc):
     return estado[:1].lower() + estado[1:], True
 
 
-def describir_giftcard(gc, forma):
+def describir_giftcard(gc, forma, leido=''):
     """«Pausa junto al río · código N7LT… · lista para usar ($90.000) · vence 22-09-2027»."""
     from ventas.services.giftcard_envio import nombre_experiencia
+    from ventas.services.giftcard_estado import caracteres_distintos
 
     estado, usable = _estado_con_detalle(gc)
     partes = [nombre_experiencia(gc), f'código {gc.codigo}', estado]
     if usable and gc.fecha_vencimiento:
         partes.append(f'vence {gc.fecha_vencimiento:%d-%m-%Y}')
     if forma == 'tolerancia':
-        partes.append('la foto se leyó con un carácter distinto')
+        n = caracteres_distintos(leido, gc.codigo) if leido else 1
+        partes.append(f"la foto se leyó con {n} {'carácter' if n == 1 else 'caracteres'} de diferencia")
     return ' · '.join(partes)
 
 
@@ -141,7 +143,8 @@ def _identificar(leido):
             return tipo, '', None, '', None, 'foto de gift card, pero no se alcanza a leer el código'
         encontradas, forma = buscar_por_codigo(codigo)
         if len(encontradas) == 1 and forma:
-            return tipo, codigo, encontradas[0], forma, None, describir_giftcard(encontradas[0], forma)
+            return tipo, codigo, encontradas[0], forma, None, describir_giftcard(encontradas[0], forma,
+                                                                                 codigo)
         return tipo, codigo, None, '', None, f'el código leído ({codigo}) no está en el sistema'
     # Comprobantes y otras fotos: no se guarda nada de lo que dicen.
     return tipo, '', None, '', None, ''

@@ -432,11 +432,14 @@ _Última revisión: 2026-09-24_
     tarjeta ya identificada en el motivo («Canje de gift card · Tina para dos · código
     … · lista para usar ($X) · vence …»), sin gastar el borrador; el historial de Luna
     muestra «(foto: …)» en vez de «(image)». Búsqueda compartida con la tarjeta
-    (`ventas/services/giftcard_estado.py`): exacto, O=0/I=1, 1–2 caracteres mal con
-    una sola candidata (la tarjeta avisa «Lo escrito tiene N carácter distinto»), y
-    «R 5602» avisa que es un voucher antiguo de la reserva #5602. Migración
-    `whatsapp_agent 0014` (tabla nueva): la corre Jorge; sin ella el lector lee igual
-    pero sin guardar. **Deploy 2 (pendiente):** Luna conversa el canje (fecha, hora,
+    (`ventas/services/giftcard_estado.py`): exacto, O=0/I=1, comienzo, y 1–2
+    caracteres de diferencia —distintos, de más o de menos, en lecturas de 11 a 13—
+    con una sola candidata (la tarjeta avisa «Lo escrito tiene N carácter de
+    diferencia»), y «R 5602» avisa que es un voucher antiguo de la reserva #5602.
+    Migración `whatsapp_agent 0014` aplicada por Jorge el 25-09. Verificado en prod
+    con 17 fotos reales: 16 bien; en la otra el modelo se comió un carácter (gift
+    card 389) → ajuste del mismo día: la tolerancia cuenta también el carácter que
+    falta o sobra (en prod la 389 queda a 1 y la siguiente de 496, a 8). **Deploy 2 (pendiente):** Luna conversa el canje (fecha, hora,
     disponibilidad según la experiencia; tabla experiencia→servicios armada con los 23
     canjes, la revisa Deborah) y deja el resumen a Deborah; Luna nunca confirma la
     reserva. Opcionales: botón «Vender gift card» ligado a la reserva (reemplaza las

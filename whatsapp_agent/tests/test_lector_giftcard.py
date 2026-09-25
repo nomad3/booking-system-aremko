@@ -111,7 +111,22 @@ class LeerLaFoto(_Base):
         self.assertEqual(lectura['giftcard_id'], gc.pk)
         self.assertEqual(lectura['forma'], 'tolerancia')
         self.assertIn('código N7LTQ4ZX9PKA', lectura['resumen'])
-        self.assertIn('se leyó con un carácter distinto', lectura['resumen'])
+        self.assertIn('se leyó con 1 carácter de diferencia', lectura['resumen'])
+
+    def test_el_caracter_que_el_modelo_se_comio(self):
+        # Caso real (25-09-2026, gift card 389): leyó 11 de los 12 caracteres.
+        gc = self._giftcard('N7LTQ4ZX9PKA')
+        with _lee(codigo='N7LTQ4Z9PKA'):
+            lectura = lector_giftcard.leer(self._foto())
+        self.assertEqual(lectura['giftcard_id'], gc.pk)
+        self.assertEqual(lectura['forma'], 'tolerancia')
+        self.assertIn('se leyó con 1 carácter de diferencia', lectura['resumen'])
+
+    def test_con_dos_de_diferencia_lo_dice_en_plural(self):
+        self._giftcard('N7LTQ4ZX9PKA')
+        with _lee(codigo='N7LTQ4ZX9PBB'):
+            lectura = lector_giftcard.leer(self._foto())
+        self.assertIn('se leyó con 2 caracteres de diferencia', lectura['resumen'])
 
     def test_tres_caracteres_mal_no_inventa_una(self):
         self._giftcard('N7LTQ4ZX9PKA')

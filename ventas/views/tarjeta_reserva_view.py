@@ -568,13 +568,14 @@ def tarjeta_buscar_giftcard(request, venta_id):
                              'Revisa el código con el cliente.'}, status=404)
     fichas = [_ficha_giftcard(gc, venta) for gc in encontradas]
     if forma == 'tolerancia':
-        # Calzó con 1 o 2 caracteres distintos (letra manuscrita, foto borrosa):
-        # es casi seguro esa, pero quien cobra lo confirma.
+        # Calzó con 1 o 2 caracteres de diferencia —distintos, de más o de menos—
+        # (letra manuscrita, foto borrosa): es casi seguro esa, pero quien cobra
+        # lo confirma.
         for ficha in fichas:
             n = caracteres_distintos(texto, ficha['codigo'])
-            ficha['calce'] = (f'Lo escrito tiene {n} carácter distinto a este código: confírmalo '
-                              'con el cliente.' if n == 1 else
-                              f'Lo escrito tiene {n} caracteres distintos a este código: '
+            ficha['calce'] = (f'Lo escrito tiene {n} carácter de diferencia con este código: '
+                              'confírmalo con el cliente.' if n == 1 else
+                              f'Lo escrito tiene {n} caracteres de diferencia con este código: '
                               'confírmalo con el cliente.')
     return JsonResponse({'ok': True, 'giftcards': fichas})
 
