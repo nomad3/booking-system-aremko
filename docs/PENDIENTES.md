@@ -446,10 +446,16 @@ _Última revisión: 2026-09-24_
     próxima o gift card usada/vencida/por cobrar, pasa a Deborah como en el deploy 1. Lo
     que el cliente escriba en los 3 días siguientes, mientras la gift card siga sin usarse,
     lo ve Deborah («Canje de gift card en curso · …»): el freno va en el código.
-    **2b (pendiente):** Luna busca el horario con la ficha de cada gift card (tabla para
-    Deborah: PDF en el Escritorio, 21 fichas, 12 preguntas; mientras no responda, solo lo
-    que dice la carta y lo demás a Deborah) y deja el resumen a Deborah; Luna nunca
-    confirma la reserva. Opcionales: botón «Vender gift card» ligado a la reserva
+    **2b (25-09, publicado APAGADO):** `whatsapp_agent/canje_giftcard.py`: FICHAS por
+    gift card (tipo del motor de alternativas, personas, tina sin/con hidromasaje, días)
+    con lo que dice la carta mientras Deborah no responda la tabla (PDF en el Escritorio,
+    21 fichas, 12 preguntas); herramienta `horario_canje` (una opción, regla de la casa
+    H-081); durante un canje es la ÚNICA herramienta de Luna y el ejecutor rechaza las
+    de venta; el código arma «Canje listo · …» al confirmar y deriva si el borrador da la
+    reserva por hecha, menciona un precio o el cliente dice «sí» sin confirmar. Monto
+    libre y antiguas sin ficha: Deborah. **PENDIENTE: encender
+    `LUNA_CONVERSA_EL_CANJE = True`** (deploy de una línea + su test) tras la prueba con el
+    modelo real en prod y la primera bienvenida real; apagado, todo sigue como en 2a. Opcionales: botón «Vender gift card» ligado a la reserva
     (reemplaza las reservas con fecha de relleno 02/02, caso 6873).
     **Deudas del modelo encontradas el 24-09 (sin arreglar):** (a) el campo `estado`
     significa dos cosas —«compra sin pagar» (venta por Luna/web) y «vigente con saldo»

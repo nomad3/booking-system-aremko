@@ -684,7 +684,7 @@ _TOOLS = [{
 }]
 
 
-_NOMBRES_DE_TOOLS = {t['function']['name'] for t in _TOOLS}
+_NOMBRES_DE_TOOLS = {t['function']['name'] for t in _TOOLS} | {'horario_canje'}
 
 
 def _nombre_de_tool(name):
@@ -905,19 +905,69 @@ def _bienvenida_de_canje(phone, lecturas):
 
 def _canje_en_curso(phone):
     """Si el cliente mandó hace poco la foto de una gift card que todavía se puede
-    usar, lo que escriba ahora (el día, la hora) lo ve Deborah: el motivo con la
-    gift card identificada, o None. Buscar el horario con la ficha es el deploy 2b."""
+    usar, el canje sigue: dict con la gift card, su ficha (None si Luna no sabe
+    qué incluye: esa la ve Deborah), el motivo para Deborah y el bloque del
+    prompt. None si no hay canje en curso."""
     try:
-        from . import lector_giftcard
+        from . import canje_giftcard, lector_giftcard
 
         en_curso = lector_giftcard.canje_en_curso(phone)
         if en_curso is None:
             return None
-        return {'motivo': f"Canje de gift card en curso · {en_curso['resumen']}",
-                'modelo': 'lector de fotos · canje en curso'}
+        gc = en_curso['giftcard']
+        ficha = canje_giftcard.ficha_de(gc)
+        return {'giftcard': gc, 'ficha': ficha, 'resumen': en_curso['resumen'],
+                'motivo': f"Canje de gift card en curso · {en_curso['resumen']}",
+                'modelo': 'lector de fotos · canje en curso',
+                'bloque': canje_giftcard.bloque_para_luna(gc, ficha) if ficha else ''}
     except Exception:  # noqa: BLE001
         logger.exception('[lector] falló la revisión del canje en curso de %s', phone)
         return None
+
+
+def _luna_conversa_el_canje():
+    from .canje_giftcard import LUNA_CONVERSA_EL_CANJE
+    return LUNA_CONVERSA_EL_CANJE
+
+
+def _tools_del_turno(canje):
+    """Durante un canje de gift card, Luna solo puede buscar el horario de lo que
+    la gift card incluye: sin carrito, cotización ni precios."""
+    if canje and canje.get('ficha'):
+        from .canje_giftcard import TOOL
+        return [TOOL]
+    return _TOOLS
+
+
+def _revisar_turno_de_canje(canje, mensaje, resultado):
+    """El motivo con que el turno pasa a Deborah, o None si el borrador sirve.
+
+    - El cliente aceptó y Luna lo confirmó con la herramienta → «Canje listo ·
+      …» con el resumen que arma el código (no el modelo).
+    - El borrador dice que la reserva quedó hecha, o menciona un precio que la
+      herramienta no dio → Deborah (solo ella confirma; la gift card está pagada).
+    - El cliente dijo «sí» y Luna ni buscó ni confirmó → Deborah, con la gift card.
+    """
+    from .canje_giftcard import afirma_reserva
+
+    llamadas = [tc for tc in (resultado.tool_calls_executed or [])
+                if tc.get('name') == 'horario_canje']
+    for tc in llamadas:
+        res = tc.get('result')
+        if isinstance(res, dict) and res.get('confirmado') and res.get('resumen_para_deborah'):
+            return res['resumen_para_deborah']
+    texto = resultado.text or ''
+    if escalation.parse_escalada(texto)[0]:
+        return None
+    if afirma_reserva(texto):
+        return f"Canje de gift card · el borrador decía que la reserva quedó hecha · {canje['resumen']}"
+    diferencias = [tc['result'].get('diferencia_a_pagar') for tc in llamadas
+                   if isinstance(tc.get('result'), dict)]
+    if '$' in texto and not any(diferencias):
+        return f"Canje de gift card · el borrador mencionaba un precio · {canje['resumen']}"
+    if _es_asentimiento_puro(mensaje) and not llamadas:
+        return f"Canje de gift card · el cliente aceptó · {canje['resumen']}"
+    return None
 
 
 def _estado_estructurado(canal, external_id):
@@ -1720,7 +1770,7 @@ def _tool_alternativas_experiencia(args):
 
 
 def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_nombre='',
-                       datos_cliente=None, phone='', canal='whatsapp'):
+                       datos_cliente=None, phone='', canal='whatsapp', canje=None):
     """Wrapper H-078 sobre `_producir_borrador_inner`: si el turno ESCALA (el texto se
     frena y no llega al cliente), revierte las mutaciones de carrito/propuesta que las
     tools de ese mismo turno alcanzaron a hacer — un turno sin mensaje no deja residuo
@@ -1736,7 +1786,8 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
     try:
         d = _producir_borrador_inner(
             config, mensaje, historial=historial, saludo_estado=saludo_estado,
-            saludo_nombre=saludo_nombre, datos_cliente=datos_cliente, phone=phone, canal=canal)
+            saludo_nombre=saludo_nombre, datos_cliente=datos_cliente, phone=phone, canal=canal,
+            canje=canje)
     except Exception:
         # Turno reventado = tampoco salió mensaje → mismo invariante que escalar.
         if snap is not None and rollback.restaurar_estado_venta(canal, ident, snap):
@@ -1749,7 +1800,7 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
     return d
 
 
-def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp'):
+def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', saludo_nombre='', datos_cliente=None, phone='', canal='whatsapp', canje=None):
     """Genera el borrador para un texto de cliente. SIN DB y SIN gate de `activo`.
 
     Devuelve un dict {escalar, motivo, texto, modelo, error, *tokens}. Lo usan
@@ -1759,6 +1810,8 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                    existe en BD. Luna evita pedir lo que ya tiene.
     phone: E.164 teléfono del cliente (ej. +56958655810) para usar como external_id en PropuestaReserva
     canal: 'whatsapp' o similar (para validación de propuestas)
+    canje: el canje de gift card en curso (ver `_canje_en_curso`), o None. Con
+           canje, Luna solo tiene la herramienta `horario_canje` y no vende nada.
     """
     # 1) Heurística de escalamiento antes de gastar tokens.
     motivo_pre = escalation.pre_escalar(mensaje)
@@ -1798,6 +1851,8 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         # Estado en curso (carrito + cotización vigente) leído de la BD, para que Luna no
         # dependa de la ventana de mensajes ni de "recordar" lo ya armado.
         estado_actual = _estado_estructurado(canal, phone)
+        if canje and canje.get('bloque'):
+            estado_actual = f"{estado_actual}\n\n{canje['bloque']}".strip()
         user_prompt = prompt_mod.build_user_prompt(
             historial, mensaje, datos_cliente=datos_cliente, estado_actual=estado_actual)
     except Exception as exc:  # noqa: BLE001 — nunca romper por el armado del prompt
@@ -1824,6 +1879,23 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         # corrige acá arriba, antes del despacho, para que valga en TODAS las
         # ramas y no solo en la que se cayó.
         name = _nombre_de_tool(name)
+        if canje and canje.get('ficha') and name != 'horario_canje':
+            # Durante un canje no se vende: aunque el modelo pida otra herramienta
+            # (no se le ofreció ninguna otra), no se ejecuta.
+            return {'success': False, 'error': 'no_disponible_en_canje',
+                    'mensaje': 'Durante el canje de una gift card solo existe `horario_canje`. '
+                               'Si el cliente quiere algo más, deriva a Deborah.'}
+        if name == 'horario_canje':
+            if not canje or not canje.get('ficha'):
+                return {'success': False, 'error': 'sin_canje',
+                        'mensaje': 'No hay una gift card en canje. Deriva a Deborah.'}
+            from . import canje_giftcard
+            try:
+                return canje_giftcard.opcion_de_canje(canje['giftcard'], canje['ficha'], args)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception('Agente WA: tool horario_canje falló: %s', exc)
+                return {'success': False, 'error': 'internal_error',
+                        'mensaje': 'No pude revisar la agenda. Deriva a Deborah.'}
         if name == 'consultar_disponibilidad':
             from .availability import disponibilidad
             try:
@@ -3044,7 +3116,7 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt},
             ],
-            tools=_TOOLS,
+            tools=_tools_del_turno(canje),
             tool_executor=_tool_executor_con_contexto,
             model=modelo,
             max_tokens=config.max_tokens,
@@ -3061,9 +3133,17 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return _borrador_escala('modelo no disponible', error=resultado.error[:200],
                                 modelo=modelo, tokens=tokens)
 
+    # 4b) Canje de gift card: el código decide cuándo pasa a Deborah.
+    if canje and canje.get('ficha'):
+        decision = _revisar_turno_de_canje(canje, mensaje, resultado)
+        if decision is not None:
+            return _borrador_escala(decision, modelo=modelo, tokens=tokens)
+
     # 5) ¿El LLM decidió escalar?
     escalar, motivo_llm, texto_limpio = escalation.parse_escalada(resultado.text)
     if escalar:
+        if canje and canje.get('ficha'):
+            motivo_llm = f"Canje de gift card · {motivo_llm} · {canje['resumen']}"
         return _borrador_escala(motivo_llm, modelo=modelo, tokens=tokens)
 
     texto = escalation.sanear_salida(texto_limpio)
@@ -3247,10 +3327,11 @@ def generar_sugerencia(phone, *, forzar=False):
                             modelo='lector de fotos · bienvenida')
         return _guardar(entrante, escalar=True, motivo=canje['motivo'], modo=config.modo,
                         modelo=canje['modelo'])
-    # Lo que el cliente escribe después de la foto (el día, la hora) todavía lo
-    # agenda Deborah: el freno va en el código, no en el prompt.
+    # Lo que el cliente escribe después de la foto (el día, la hora): si Luna
+    # sabe qué incluye la gift card (su ficha), busca el horario con
+    # `horario_canje`; si no (monto libre, gift cards antiguas), lo ve Deborah.
     en_curso = _canje_en_curso(phone)
-    if en_curso is not None:
+    if en_curso is not None and (en_curso['ficha'] is None or not _luna_conversa_el_canje()):
         return _guardar(entrante, escalar=True, motivo=en_curso['motivo'], modo=config.modo,
                         modelo=en_curso['modelo'])
 
@@ -3260,7 +3341,8 @@ def generar_sugerencia(phone, *, forzar=False):
     datos_cliente = _obtener_datos_cliente_por_phone(phone)
     d = _producir_borrador(config, entrante.body, historial,
                            saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
-                           datos_cliente=datos_cliente, phone=phone, canal='whatsapp')
+                           datos_cliente=datos_cliente, phone=phone, canal='whatsapp',
+                           canje=en_curso)
     return _guardar(
         entrante, texto=d['texto'], escalar=d['escalar'], motivo=d['motivo'],
         modo=config.modo, modelo=d['modelo'], error=d['error'],

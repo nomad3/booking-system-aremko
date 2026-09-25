@@ -494,8 +494,9 @@ class LunaDaLaBienvenidaAlCanje(_Base):
 
 
 class DespuesDeLaBienvenida(_Base):
-    """El cliente ya mandó la foto y la bienvenida salió: lo que responda (el
-    día, la hora) lo agenda Deborah, con la gift card identificada."""
+    """El cliente ya mandó la foto y la bienvenida salió. Lo que responda (el
+    día, la hora) lo conversa Luna si sabe qué incluye la gift card (su ficha,
+    deploy 2b: ver test_canje_giftcard); si no, lo ve Deborah."""
 
     def _canje_iniciado(self, **giftcard):
         self._giftcard('N7LTQ4ZX9PKA', **giftcard)
@@ -506,17 +507,30 @@ class DespuesDeLaBienvenida(_Base):
         self._mensaje(minutos_atras=20, direction='out', pendiente=False,
                       body='Recibí tu gift card. ¿Qué día te gustaría venir?')
 
-    def test_lo_que_responde_el_cliente_pasa_a_deborah_con_la_gift_card(self):
-        self._canje_iniciado()
+    def test_sin_ficha_lo_que_responde_el_cliente_pasa_a_deborah(self):
+        self._canje_iniciado(experiencia='')          # monto libre: Luna no sabe qué incluye
         self._mensaje(minutos_atras=2, body='el sábado a las 18 porfa')
         with _lee() as modelo, _borrador_normal() as borrador:
             sug = agent.generar_sugerencia(TEL)
         modelo.assert_not_called()
         borrador.assert_not_called()
         self.assertTrue(sug.escalar)
-        self.assertTrue(sug.motivo_escalar.startswith('Canje de gift card en curso · Tina para dos'),
-                        sug.motivo_escalar)
+        self.assertTrue(sug.motivo_escalar.startswith(
+            'Canje de gift card en curso · Gift card de monto libre'), sug.motivo_escalar)
         self.assertIn('código N7LTQ4ZX9PKA', sug.motivo_escalar)
+
+    def test_con_ficha_luna_conversa_el_canje(self):
+        from whatsapp_agent.canje_giftcard import FICHAS
+        self._canje_iniciado()                        # «Tina para dos»: tiene ficha
+        self._mensaje(minutos_atras=2, body='el sábado a las 18 porfa')
+        with _borrador_normal() as borrador, \
+                mock.patch('whatsapp_agent.canje_giftcard.LUNA_CONVERSA_EL_CANJE', True):
+            sug = agent.generar_sugerencia(TEL)
+        borrador.assert_called_once()
+        canje = borrador.call_args.kwargs['canje']
+        self.assertEqual(canje['ficha'], FICHAS['tina_para_dos'])
+        self.assertIn('CANJE DE GIFT CARD EN CURSO', canje['bloque'])
+        self.assertFalse(sug.escalar)
 
     def test_ya_usada_luna_vuelve_a_lo_normal(self):
         self._canje_iniciado()
