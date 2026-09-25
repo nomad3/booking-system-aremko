@@ -25,12 +25,11 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Encendido gradual (25-09-2026): con False, lo que el cliente escribe después
-# de la bienvenida lo sigue viendo Deborah (deploy 2a) y este módulo solo corre
-# en las pruebas con el modelo real. Se pasa a True —un deploy de una línea—
-# cuando esa prueba salga bien y se haya visto la primera bienvenida real.
-# Anotado en docs/PENDIENTES.md (P-52) para que no quede apagado sin querer.
-LUNA_CONVERSA_EL_CANJE = False
+# Encendido gradual: se publicó apagado (False: lo que el cliente escribe
+# después de la bienvenida lo veía Deborah, como en el deploy 2a), se probó
+# con el modelo real y la agenda real en producción, y Jorge lo encendió el
+# 25-09-2026 («enciéndelo»). Con False se vuelve al deploy 2a sin tocar nada más.
+LUNA_CONVERSA_EL_CANJE = True
 
 
 @dataclass(frozen=True)

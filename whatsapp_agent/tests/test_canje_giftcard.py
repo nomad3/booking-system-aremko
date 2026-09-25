@@ -85,10 +85,9 @@ class LasFichas(TestCase):
             gc = GiftCard(servicio_asociado=clave)
             self.assertIsNone(canje_giftcard.ficha_de(gc), clave)
 
-    def test_el_interruptor_parte_apagado(self):
-        # Se enciende (deploy de una línea, y este test pasa a True) cuando la
-        # prueba con el modelo real salga bien y se vea la primera bienvenida real.
-        self.assertIs(canje_giftcard.LUNA_CONVERSA_EL_CANJE, False)
+    def test_el_interruptor_esta_encendido(self):
+        # Jorge lo encendió el 25-09-2026 tras la prueba con el modelo real.
+        self.assertIs(canje_giftcard.LUNA_CONVERSA_EL_CANJE, True)
 
     def test_mientras_deborah_no_responda_solo_lo_que_dice_la_carta(self):
         self.assertEqual(FICHAS['tinas'].tinas, 'sin_hidro')           # «sin hidromasaje»

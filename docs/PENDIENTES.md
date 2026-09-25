@@ -453,9 +453,10 @@ _Última revisión: 2026-09-24_
     H-081); durante un canje es la ÚNICA herramienta de Luna y el ejecutor rechaza las
     de venta; el código arma «Canje listo · …» al confirmar y deriva si el borrador da la
     reserva por hecha, menciona un precio o el cliente dice «sí» sin confirmar. Monto
-    libre y antiguas sin ficha: Deborah. **PENDIENTE: encender
-    `LUNA_CONVERSA_EL_CANJE = True`** (deploy de una línea + su test) tras la prueba con el
-    modelo real en prod y la primera bienvenida real; apagado, todo sigue como en 2a. Opcionales: botón «Vender gift card» ligado a la reserva
+    libre y antiguas sin ficha: Deborah. Probado con el modelo real y la agenda real en
+    prod (4 conversaciones, todas bien) y **encendido por Jorge el 25-09**
+    (`LUNA_CONVERSA_EL_CANJE = True`; con False vuelve al 2a). Pendiente: las respuestas
+    de Deborah a la tabla (solo cambian las fichas). Opcionales: botón «Vender gift card» ligado a la reserva
     (reemplaza las reservas con fecha de relleno 02/02, caso 6873).
     **Deudas del modelo encontradas el 24-09 (sin arreglar):** (a) el campo `estado`
     significa dos cosas —«compra sin pagar» (venta por Luna/web) y «vigente con saldo»
