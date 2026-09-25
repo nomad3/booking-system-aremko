@@ -81,6 +81,28 @@ def clasificar_saludo(hay_previos, dias_desde_ultimo):
     return 'en_conversacion'
 
 
+def _ejemplo_de_saludo(estado, nombre=''):
+    """El saludo de Luna según el estado, en un solo lugar: es el ejemplo del bloque de
+    saludo y el texto que manda el código cuando el cliente solo saluda."""
+    voc = f', {nombre}' if nombre else ''           # vocativo en el ejemplo
+    if estado == 'primer_contacto':
+        return f'¡Hola{voc}! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.'
+    if estado == 'regreso':
+        return f'¡Hola{voc}! 🌿 Te saluda Luna, de Aremko. ¡Qué gusto tenerte de vuelta!'
+    return ''
+
+
+def saludo_de_luna(estado, nombre=''):
+    """La respuesta a un «hola» solo en la apertura (primer contacto o regreso): el saludo
+    y una pregunta abierta, sin la carta. '' si el estado no es una apertura.
+
+    Jorge, 25-09-2026: «si el cliente solo escribe Hola, debería recibir el saludo de
+    Luna y no el listado de servicios» (la carta es para quien pregunta precios o qué
+    servicios hay)."""
+    saludo = _ejemplo_de_saludo((estado or '').strip(), (nombre or '').strip())
+    return f'{saludo} ¿En qué te puedo ayudar?' if saludo else ''
+
+
 def bloque_saludo(estado, nombre=''):
     """Bloque de instrucción de saludo según el estado (texto, o '' si no aplica).
 
@@ -90,18 +112,17 @@ def bloque_saludo(estado, nombre=''):
     """
     estado = (estado or '').strip()
     nombre = (nombre or '').strip()
-    voc = f', {nombre}' if nombre else ''           # vocativo en el ejemplo
     por_nombre = f' Dirígete a él por su nombre («{nombre}»).' if nombre else ''
 
     if estado == 'primer_contacto':
-        ej = f'¡Hola{voc}! 🌿 Te saluda Luna, tu asistente en Aremko Spa Boutique.'
+        ej = _ejemplo_de_saludo(estado, nombre)
         return ('\n\n# 1b. SALUDO (primer contacto)\n'
                 'Es la PRIMERA vez que este cliente escribe. Empieza presentándote UNA sola '
                 f'vez, cálida y breve, con tu nombre y tu rol.{por_nombre} '
                 f'Ejemplo: «{ej}» Luego responde su consulta y NO vuelvas a presentarte.')
 
     if estado == 'regreso':
-        ej = f'¡Hola{voc}! 🌿 Te saluda Luna, de Aremko. ¡Qué gusto tenerte de vuelta!'
+        ej = _ejemplo_de_saludo(estado, nombre)
         return ('\n\n# 1b. SALUDO (cliente que vuelve)\n'
                 'Este cliente ya había escrito hace tiempo y vuelve ahora. Salúdalo con '
                 'calidez de reencuentro y preséntate de forma BREVE (solo tu nombre, sin el '

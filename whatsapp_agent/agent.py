@@ -1293,6 +1293,25 @@ def _normalizar_txt(s):
     return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
 
 
+_SALUDOS = {'hola', 'holi', 'ola', 'alo', 'hello', 'hi', 'hey', 'saludos', 'buenas', 'buenos',
+            'buena', 'buen'}
+_PALABRAS_DE_SALUDO = _SALUDOS | {'dia', 'dias', 'tarde', 'tardes', 'noche', 'noches', 'que',
+                                  'tal', 'como', 'estas', 'esta', 'estan', 'muy', 'luna', 'aremko'}
+
+
+def es_solo_saludo(texto):
+    """¿El mensaje es SOLO un saludo («hola», «Hola, buenas tardes», «buen día», «hola
+    ¿cómo estás?»)? Con cualquier otra palabra («hola, precios», «hola, quisiera
+    información») no lo es: ahí sí va la carta si es una apertura genérica."""
+    palabras = re.findall(r'[a-z]+', _normalizar_txt(texto))
+
+    def es_saludo(p):
+        return p in _SALUDOS or bool(re.fullmatch(r'hol+a+|ola+', p))
+
+    return (0 < len(palabras) <= 6 and any(es_saludo(p) for p in palabras)
+            and all(es_saludo(p) or p in _PALABRAS_DE_SALUDO for p in palabras))
+
+
 def _palabras_significativas_producto(nombre):
     return [w for w in re.split(r'[^0-9a-zñ]+', _normalizar_txt(nombre))
             if len(w) >= 2 and w not in _STOP_PROD]
@@ -2143,6 +2162,19 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         return {'escalar': False, 'motivo': '', 'texto': confirmacion, 'modelo': 'codigo',
                 'error': '', 'input_tokens': 0, 'output_tokens': 0, 'latency_ms': 0}
 
+    # 1c) Jorge, 25-09-2026: «si el cliente solo escribe Hola, debería recibir el saludo
+    # de Luna y no el listado de servicios» — la carta es para quien pregunta precios o
+    # qué servicios hay. Medido en 60 días: de los que solo saludaron, tras la carta el
+    # 30% no volvió a escribir; tras un saludo, el 17%, y casi la mitad dijo qué quería.
+    # En la apertura el saludo lo escribe el código; con la conversación en curso
+    # responde Luna (puede ser «¿sigues ahí?»), pero sin la carta en el prompt.
+    solo_saludo = es_solo_saludo(mensaje)
+    if solo_saludo and not canje and saludo_estado in ('primer_contacto', 'regreso'):
+        return {'escalar': False, 'motivo': '',
+                'texto': prompt_mod.saludo_de_luna(saludo_estado, saludo_nombre),
+                'modelo': 'codigo', 'error': '', 'input_tokens': 0, 'output_tokens': 0,
+                'latency_ms': 0}
+
     # 2) Catálogo vivo (grounding).
     try:
         catalogo = grounding.catalogo_vivo()
@@ -2159,7 +2191,7 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
         system_prompt = prompt_mod.build_system_prompt(
             config.persona_tono, catalogo, config.link_reserva, config.conocimiento,
             fecha_hoy=_fecha_hoy_texto(), saludo_estado=saludo_estado, saludo_nombre=saludo_nombre,
-            carta=carta_de_precios())
+            carta='' if solo_saludo else carta_de_precios())
         # Estado en curso (carrito + cotización vigente) leído de la BD, para que Luna no
         # dependa de la ventana de mensajes ni de "recordar" lo ya armado.
         estado_actual = _estado_estructurado(canal, phone)
