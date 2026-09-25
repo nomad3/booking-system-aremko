@@ -571,6 +571,11 @@ DPV_LLM_ENABLED = os.getenv("DPV_LLM_ENABLED", "false").lower() == "true"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 DPV_LLM_MODEL = os.getenv("DPV_LLM_MODEL", "anthropic/claude-haiku-4.5")
+# Modelo de decisión (encargo JEV): ruta en ALFA de OpenRouter, misma llave. Vacíos → los
+# valores por defecto de whatsapp_agent/decisiones.py. Se leen en cada llamada.
+DECISIONES_RUTA = os.getenv("DECISIONES_RUTA", "")
+DECISIONES_MODELO = os.getenv("DECISIONES_MODELO", "")
+DECISIONES_ESPERA_SEG = os.getenv("DECISIONES_ESPERA_SEG", "")
 
 # Análisis IA semanal de encuestas de satisfacción (Tarea 1.4 Fase C)
 SURVEY_ANALYSIS_LLM_MODEL = os.getenv(

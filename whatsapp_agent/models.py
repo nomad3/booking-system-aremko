@@ -118,6 +118,15 @@ class WhatsAppAgentConfig(SingletonModel):
                   '0 = sin configurar (el tablero de métricas muestra costo nulo).',
     )
 
+    # Encargo PROMPT_JEV_AREMKO.md (etapa 2): clasificar las correcciones de Deborah con el
+    # modelo de decisión (Jev) en vez del prompt JSON. Va aquí y no en .env porque se
+    # cambia sin desplegar. Apagado, el aprendizaje sigue exactamente como antes.
+    usar_jev_en_aprendizaje = models.BooleanField(
+        default=False,
+        help_text='Clasifica las correcciones con el modelo de decisión (Jev) en vez '
+                  'del prompt JSON. Si se apaga, vuelve al camino anterior.',
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -260,6 +269,37 @@ class SugerenciaAprendizaje(models.Model):
 
     def __str__(self):
         return f'[{self.tipo}/{self.estado}] {self.phone} · {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class DecisionAgente(models.Model):
+    """Lo que un modelo de decisión (Jev) decidió, y con cuánta confianza (encargo JEV, etapa 2).
+
+    Se guarda por dos razones: para poder equivocarse a la vista (qué se preguntó, qué
+    respondió y qué tan seguro estaba, y compararlo con lo que de verdad pasó) y para
+    saber cuánto cuesta (el proveedor devuelve el costo de cada llamada). Portado de
+    Datamatic Hospitality, sin empresa: Aremko no es multi-tenant.
+    """
+
+    uso = models.CharField(max_length=60, db_index=True,
+                           help_text='Para qué se usó, ej. «aprendizaje.correccion».')
+    referencia = models.CharField(max_length=60, blank=True, db_index=True,
+                                  help_text='A qué fila corresponde (ej. el id del feedback).')
+    respuestas = models.JSONField(default=dict, blank=True)
+    confianza = models.FloatField(null=True, blank=True)
+    modelo = models.CharField(max_length=80, blank=True)
+    costo_usd = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    duracion_ms = models.PositiveIntegerField(null=True, blank=True)
+    error = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Decisión del modelo'
+        verbose_name_plural = 'Decisiones del modelo'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['uso', '-created_at'])]
+
+    def __str__(self):
+        return f'{self.uso} · {self.created_at:%d-%m %H:%M}'
 
 
 class AusenciaEnviada(models.Model):

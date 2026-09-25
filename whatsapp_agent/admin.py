@@ -2,7 +2,7 @@ from django.contrib import admin
 from solo.admin import SingletonModelAdmin
 
 from .models import (
-    AgenteFeedback, AusenciaEnviada, PropuestaReserva, RecordatorioLuna,
+    AgenteFeedback, AusenciaEnviada, DecisionAgente, PropuestaReserva, RecordatorioLuna,
     SugerenciaAgenteWhatsApp, SugerenciaAprendizaje, WhatsAppAgentConfig,
 )
 
@@ -47,6 +47,12 @@ class WhatsAppAgentConfigAdmin(SingletonModelAdmin):
                            'tina fría, decoraciones): se agregan a una reserva pero el agente NO '
                            'los ofrece solos ni los lista en disponibilidad.',
         }),
+        ('Aprendizaje (correcciones de Deborah)', {
+            'fields': ('usar_jev_en_aprendizaje',),
+            'description': 'Encendido: las correcciones se clasifican con el modelo de decisión (Jev), '
+                           'que responde con su confianza. Apagado: el camino anterior. Nada llega al '
+                           'Conocimiento sin que una persona apruebe la sugerencia.',
+        }),
         ('Costos / Métricas', {
             'fields': ('tarifa_plantilla_clp',),
             'description': 'Costo por mensaje de plantilla de marketing (WhatsApp), en CLP. Lo usa el '
@@ -70,6 +76,21 @@ class AgenteFeedbackAdmin(admin.ModelAdmin):
     list_filter = ('editado', 'procesado')
     search_fields = ('phone', 'wa_message_id', 'borrador', 'enviado')
     readonly_fields = [f.name for f in AgenteFeedback._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DecisionAgente)
+class DecisionAgenteAdmin(admin.ModelAdmin):
+    """Solo lectura: qué decidió el modelo de decisión (Jev), con qué confianza y a qué costo."""
+    list_display = ('created_at', 'uso', 'referencia', 'confianza', 'costo_usd', 'duracion_ms', 'error')
+    list_filter = ('uso',)
+    search_fields = ('uso', 'referencia', 'error')
+    readonly_fields = [f.name for f in DecisionAgente._meta.fields]
 
     def has_add_permission(self, request):
         return False
