@@ -590,3 +590,58 @@ class UnSoloSaludo(SimpleTestCase):
         self.assertEqual(quitar_saludo('Hola, para el lunes hay una.'), 'Para el lunes hay una.')
         self.assertEqual(quitar_saludo('¡Buenas tardes! A las 14:00.'), 'A las 14:00.')
         self.assertEqual(quitar_saludo('Holanda no queda cerca.'), 'Holanda no queda cerca.')
+
+
+# La prueba de Jorge de las 17:55: con la Hornopiren de las 17:00 recién ofrecida preguntó
+# «hay a las 18:00 horas?» y Luna le repitió la de las 17:00.
+CLASICAS_LUNES = [('Tina Tronador', '14:30'), ('Tina Hornopiren', '17:00'),
+                  ('Tina Hornopiren', '19:30')]
+RESPUESTA_18_REAL = ('Para el lunes, a las 18:00 hrs no tenemos disponibilidad. La tina clásica '
+                     'Hornopiren sigue disponible a las 17:00 hrs para 2 personas, con un valor '
+                     'de $50.000. ¿Te acomoda ese horario?')
+HIST_17 = (HIST_SIN_HIDRO + '\n[Cliente]: mas tarde\n[Aremko]: Para el lunes, tenemos disponible '
+           'una tina clásica Hornopiren a las 17:00 hrs para 2 personas, con un valor de $50.000. '
+           '¿Te gustaría reservar ese horario?')
+
+
+class NoLeRepiteLaQueYaVio(SimpleTestCase):
+    def test_ofrece_la_siguiente_y_recuerda_la_anterior(self):
+        out = MasTardeConCriterio._luna(self, _mixtas(CLASICAS_LUNES), hora='18:00',
+                                        ya_ofrecida='17:00', hidromasaje=False)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 19:30')
+        self.assertEqual(out['sigue_disponible'], '17:00')
+        self.assertIn('sigue en pie', out['instruccion'])
+        self.assertIn('a las 19:30', out['instruccion'])
+
+    def test_sin_una_ofrecida_va_la_mas_cercana(self):
+        out = MasTardeConCriterio._luna(self, _mixtas(CLASICAS_LUNES), hora='18:00',
+                                        hidromasaje=False)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 17:00')
+        self.assertNotIn('sigue_disponible', out)
+
+    def test_si_pide_justo_la_ofrecida_es_esa(self):
+        out = MasTardeConCriterio._luna(self, _mixtas(CLASICAS_LUNES), hora='17:00',
+                                        ya_ofrecida='17:00', hidromasaje=False)
+        self.assertEqual(out['recomendada']['titulo'], 'Tina Hornopiren · 17:00')
+        self.assertNotIn('hora_pedida', out)
+
+    def test_si_igual_repite_la_de_las_17_la_frase_la_escribe_el_codigo(self):
+        res = _res_18()
+        res['recomendada'] = dict(res['recomendada'], titulo='Tina Hornopiren · 19:30',
+                                  itinerario=[{'servicio': 'Tina Hornopiren', 'hora': '19:30'}])
+        res['sigue_disponible'] = '17:00'
+        texto, motivo = _corregir_hora_que_no_existe(RESPUESTA_18_REAL, [{'result': res}])
+        self.assertEqual(motivo, '')
+        self.assertEqual(texto, 'A las 18:00 no tenemos tinas; la siguiente es la tina clásica '
+                                'Hornopiren, a las 19:30: $50.000 para 2 personas. La de las 17:00 '
+                                'sigue disponible si te acomoda más. ¿Te acomoda?')
+
+
+class NoLeRepiteLaQueYaVioEnElTurno(TestCase):
+    def test_la_herramienta_sabe_cual_ya_vio(self):
+        args = SinHidromasajeEnElTurno._args(self, 'hay a las 18:00 horas?', HIST_17,
+                                             {'hora': '18:00'})
+        self.assertEqual(args['hora'], '18:00')
+        self.assertEqual(args['ya_ofrecida'], '17:00')
+        self.assertIs(args['hidromasaje'], False)
+

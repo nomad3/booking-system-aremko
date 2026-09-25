@@ -1924,6 +1924,11 @@ def _mas_tarde_con_criterio(args, mensaje, historial):
     if args.get('hora') and (_pide_mas_tarde(mensaje)
                              or not _RE_HORA_EN_PALABRAS.search(_normalizar_txt(mensaje))):
         args.pop('hora')
+    if args.get('hora') and not args.get('ya_ofrecida'):
+        # Para no repetirle la que acaba de ver si pide una hora que no existe.
+        ya_ofrecida = _ultima_hora_ofrecida(historial)
+        if ya_ofrecida:
+            args['ya_ofrecida'] = ya_ofrecida
     if tipo in ('tina_sola', 'masaje_solo') and _pide_mas_tarde(mensaje):
         args['despues_de'] = _ultima_hora_ofrecida(historial) or args.get('despues_de')
     if not args.get('despues_de'):
@@ -2079,6 +2084,15 @@ def _tool_alternativas_experiencia(args):
     if pedida is not None:
         # El cliente dijo una hora («tipo 19»): la más cercana a esa hora primero.
         alts = sorted(alts, key=lambda a: (abs(_minuto(a) - pedida), _minuto(a)))
+        # Si la más cercana es justo la que ya se le ofreció, va la siguiente más cercana.
+        # Jorge, 25-09-2026: con la de las 17:00 recién ofrecida preguntó «¿hay a las
+        # 18:00?» y Luna le repitió la de las 17:00: quien pregunta eso busca otra cosa.
+        ya = _hhmm_a_min_seguro(args.get('ya_ofrecida'))
+        sigue = ''
+        if (alts and ya is not None and _minuto(alts[0]) == ya != pedida
+                and any(_minuto(a) != ya for a in alts)):
+            alts = [a for a in alts if _minuto(a) != ya] + [a for a in alts if _minuto(a) == ya]
+            sigue = f'{ya // 60:02d}:{ya % 60:02d}'
         if alts and _minuto(alts[0]) != pedida:
             # Jorge, 25-09-2026: pidió «a las 18:00» (no es un horario) y Luna escribió
             # «a las 18:00» con la tina que la herramienta daba a las 17:00. Se le dice
@@ -2088,10 +2102,15 @@ def _tool_alternativas_experiencia(args):
             r_ = _hora_de_la_tina(alts[0])[0]
             no_hay_a_esa_hora = {
                 'hora_pedida': p, 'hay_a_la_hora_pedida': False,
+                **({'sigue_disponible': sigue} if sigue else {}),
                 'aviso': (f'El cliente pidió las {p} y a esa hora NO hay (los horarios son '
-                          f'fijos). Dile en una frase que a las {p} no hay y ofrécele la '
-                          f'`recomendada`, a las {r_}. La hora de la oferta es {r_}: NUNCA '
-                          f'escribas {p} como si hubiera. '),
+                          f'fijos). ' +
+                          (f'La de las {sigue} ya se la ofreciste y sigue disponible: dile que a '
+                           f'las {p} no hay, ofrécele la `recomendada`, a las {r_}, y recuérdale '
+                           f'en la misma frase que la de las {sigue} sigue en pie. ' if sigue else
+                           f'Dile en una frase que a las {p} no hay y ofrécele la `recomendada`, '
+                           f'a las {r_}. ') +
+                          f'La hora de la oferta es {r_}: NUNCA escribas {p} como si hubiera. '),
             }
     elif despues is not None:
         alts = sorted((a for a in alts if _minuto(a) > despues), key=_minuto)
@@ -3869,13 +3888,16 @@ def _frase_hora_mas_cercana(res):
     para = f" para {personas} persona{'s' if personas > 1 else ''}" if personas else ''
     precio = formatear_precio(rec.get('precio_con_descuento') or rec.get('precio_total'))
     tipo = rec.get('tina_tipo') or ''
+    sigue = res.get('sigue_disponible')
+    cercana = 'la siguiente' if sigue else 'la más cercana'
+    y_sigue = f' La de las {sigue} sigue disponible si te acomoda más.' if sigue else ''
     if tipo:
         corto = re.sub(r'(?i)^tina\s+(hidromasaje\s+)?', '', servicio).strip()
         cual = 'clásica' if tipo.startswith('clásica') else 'con hidromasaje'
-        return (f"A las {res['hora_pedida']} no tenemos tinas; la más cercana es la tina {cual} "
-                f"{corto}, a las {hora}: {precio}{para}. ¿Te acomoda?")
-    return (f"A las {res['hora_pedida']} no tenemos horario; lo más cercano es {servicio}, a las "
-            f"{hora}: {precio}{para}. ¿Te acomoda?")
+        return (f"A las {res['hora_pedida']} no tenemos tinas; {cercana} es la tina {cual} "
+                f"{corto}, a las {hora}: {precio}{para}.{y_sigue} ¿Te acomoda?")
+    return (f"A las {res['hora_pedida']} no tenemos horario; {cercana} es {servicio}, a las "
+            f"{hora}: {precio}{para}.{y_sigue} ¿Te acomoda?")
 
 
 def _corregir_hora_que_no_existe(texto, tool_calls):
