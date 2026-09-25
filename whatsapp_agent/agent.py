@@ -3811,6 +3811,46 @@ def quitar_saludo(texto):
     return nuevo[:1].upper() + nuevo[1:]
 
 
+_RE_PREGUNTA_FINAL = re.compile(r'¿[^¿?]*\?\s*$')
+# Cierres de una oferta, intercambiables sin cambiar el sentido (sin género: sirven
+# para una tina, un masaje o una cabaña).
+_CIERRES_DE_OFERTA = ('¿Te acomoda ese horario?', '¿Te sirve ese horario?', '¿Qué te parece?',
+                      '¿Te queda bien ese horario?')
+_RE_CIERRE_DE_OFERTA = re.compile(r'\b(acomoda|sirve|parece|interesa|queda bien|gustaria reservar|'
+                                  r'deseas reservar|gustaria (esa|ese|esta|este))\b')
+
+
+def _pregunta_final(texto):
+    m = _RE_PREGUNTA_FINAL.search((texto or '').rstrip())
+    return m.group(0).strip() if m else ''
+
+
+def _sin_signos(pregunta):
+    return ' '.join(re.findall(r'[a-z]+', _normalizar_txt(pregunta)))
+
+
+def variar_cierre(texto, historial):
+    """Si la pregunta final repite la del mensaje anterior de Luna y es un cierre de
+    oferta («¿Te acomoda ese horario?»), se cambia por otra que no se haya usado en los
+    últimos mensajes. Jorge, 25-09-2026: dos mensajes seguidos cerraban igual. Una
+    pregunta que no es de oferta («¿Te envío la cotización?») no se toca."""
+    final = _pregunta_final(texto)
+    suyos = [linea[len('[Aremko]:'):].strip() for linea in (historial or '').splitlines()
+             if linea.startswith('[Aremko]:')]
+    if not final or not suyos or _sin_signos(final) != _sin_signos(_pregunta_final(suyos[-1])):
+        return texto
+    if not _RE_CIERRE_DE_OFERTA.search(_sin_signos(final)):
+        return texto
+    usadas = {_sin_signos(_pregunta_final(t)) for t in suyos[-3:]}
+    nuevo = next((c for c in _CIERRES_DE_OFERTA if _sin_signos(c) not in usadas), None)
+    if not nuevo:
+        return texto
+    t = texto.rstrip()
+    inicio = _RE_PREGUNTA_FINAL.search(t).start()
+    corte = len(t[:inicio].rstrip())
+    return t[:corte] + (t[corte:inicio] or ' ') + nuevo
+
+
 def _sin_sonar_a_robot(texto, historial, modelo, nombres=(), en_conversacion=False, mensaje=''):
     """(texto, tokens extra). Lo que una persona de Aremko no hace (Jorge, 25-09-2026):
     con la conversación en curso, nombrar al cliente en cada mensaje, volver a saludar
@@ -3827,7 +3867,10 @@ def _sin_sonar_a_robot(texto, historial, modelo, nombres=(), en_conversacion=Fal
             texto = quitar_saludo(texto)
         if _empieza_con_muletilla(texto) and _uso_muletilla_antes(historial):
             texto = quitar_arranque(texto)
-    return _sin_repetir_apertura(texto, historial, modelo, nombres=nombres)
+    texto, extra = _sin_repetir_apertura(texto, historial, modelo, nombres=nombres)
+    if en_conversacion:
+        texto = variar_cierre(texto, historial)
+    return texto, extra
 
 
 def _sin_repetir_apertura(texto, historial, modelo, nombres=()):

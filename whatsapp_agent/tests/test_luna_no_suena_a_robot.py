@@ -27,7 +27,8 @@ from whatsapp_agent.agent import (_con_tipo_de_tina, _corregir_hora_que_no_exist
                                   _sin_repetir_apertura,
                                   _sin_sonar_a_robot, _tool_alternativas_experiencia,
                                   _ultima_hora_ofrecida, _veces_mas_tarde, quitar_arranque,
-                                  quitar_nombre, quitar_saludo, repite_apertura)
+                                  quitar_nombre, quitar_saludo, repite_apertura,
+                                  variar_cierre)
 
 GENERATE = 'destino_puerto_varas.services.llm.openrouter_provider.OpenRouterProvider.generate'
 PROVIDER = ('destino_puerto_varas.services.llm.openrouter_provider.'
@@ -644,4 +645,46 @@ class NoLeRepiteLaQueYaVioEnElTurno(TestCase):
         self.assertEqual(args['hora'], '18:00')
         self.assertEqual(args['ya_ofrecida'], '17:00')
         self.assertIs(args['hidromasaje'], False)
+
+
+# La prueba de Jorge de las 17:53: dos mensajes seguidos cerraban «¿Te acomoda ese horario?».
+OFERTA_14 = ('Para el lunes 28 de septiembre, tenemos disponible una tina con hidromasaje Villarrica '
+             'a las 14:00 hrs para 2 personas, con un valor de $60.000. ¿Te acomoda ese horario?')
+OFERTA_1430 = ('El lunes hay disponibilidad de una tina clásica Tronador a las 14:30 hrs para 2 '
+               'personas, con un valor de $50.000. ¿Te acomoda ese horario?')
+
+
+class CierreVariado(SimpleTestCase):
+    def test_el_caso_real(self):
+        texto = variar_cierre(OFERTA_1430, f'[Cliente]: quiero tina\n[Aremko]: {OFERTA_14}')
+        self.assertEqual(texto, OFERTA_1430.replace('¿Te acomoda ese horario?',
+                                                    '¿Te sirve ese horario?'))
+
+    def test_si_cierra_distinto_no_se_toca(self):
+        historial = f'[Aremko]: {OFERTA_14}'
+        texto = OFERTA_1430.replace('¿Te acomoda ese horario?', '¿Qué te parece?')
+        self.assertEqual(variar_cierre(texto, historial), texto)
+
+    def test_una_pregunta_que_no_es_de_oferta_no_se_toca(self):
+        historial = '[Aremko]: Listo el carrito. ¿Te envío la cotización?'
+        texto = 'Agregué la tabla. ¿Te envío la cotización?'
+        self.assertEqual(variar_cierre(texto, historial), texto)
+
+    def test_no_repite_tampoco_la_de_dos_mensajes_atras(self):
+        historial = ('[Aremko]: A las 14:00 hay una. ¿Te sirve ese horario?\n[Cliente]: mas tarde\n'
+                     '[Aremko]: A las 14:30 hay otra. ¿Te acomoda ese horario?')
+        texto = variar_cierre('A las 17:00 hay otra. ¿Te acomoda ese horario?', historial)
+        self.assertEqual(texto, 'A las 17:00 hay otra. ¿Qué te parece?')
+
+    def test_respeta_el_salto_de_linea(self):
+        texto = variar_cierre('A las 14:30 hay una, $50.000.\n\n¿Te acomoda ese horario?',
+                              f'[Aremko]: {OFERTA_14}')
+        self.assertEqual(texto, 'A las 14:30 hay una, $50.000.\n\n¿Te sirve ese horario?')
+
+    def test_en_el_freno_de_la_conversacion(self):
+        with mock.patch(GENERATE) as gen:
+            texto, _ = _sin_sonar_a_robot(OFERTA_1430, f'[Aremko]: {OFERTA_14}', 'm',
+                                          en_conversacion=True, mensaje='mas tarde')
+        self.assertTrue(texto.endswith('¿Te sirve ese horario?'))
+        gen.assert_not_called()
 
