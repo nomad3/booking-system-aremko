@@ -418,9 +418,14 @@ _Última revisión: 2026-09-24_
     de la gift card 314 (reserva 4448) le llegó a Jorge por WhatsApp. De esa prueba
     salieron dos ajustes, ya en prod: una gift card usada o vencida no ofrece reenvío
     (`011e2064`; el PDF la mostraba vigente) y la búsqueda del canje acepta cero por O
-    y uno por I (`e971f66e`; la fuente de la carta dibuja la O como cero). Falta: **2b ·** que el PDF salga
-    solo por WhatsApp al registrarse el pago si el cliente está conversando (como la
-    boleta) — Jorge: «ok», en un deploy aparte. **Paso 3 ·** Luna ayuda con el canje: pide
+    y uno por I (`e971f66e`; la fuente de la carta dibuja la O como cero). **2b EN PROD 25-09 (commit `a895741a`):** el PDF sale solo por
+    WhatsApp al registrarse el pago (señal de Pago + webhook de Flow, en on_commit),
+    si la venta quedó pagada ENTERA y el comprador conversó en 24 h; una sola vez.
+    Falta verlo en una venta real (buscar «enviada sola por WhatsApp» en los logs).
+    **(d) Hallazgo 25-09:** el email automático de la gift card sale con la venta
+    `pagado` O `parcial` (la señal lo dice «totalmente pagada» pero no lo hace): con un
+    abono parcial la gift card, con su código, ya se envía. Decisión de Jorge pendiente.
+    **Paso 3 ·** Luna ayuda con el canje: pide
     código y fecha, valida y deja el caso listo a Deborah (hoy deriva con
     `[ESCALAR: canje de gift card]`). Opcionales: botón «Vender gift card» ligado a
     la reserva (reemplaza las reservas con fecha de relleno 02/02, caso 6873) y
