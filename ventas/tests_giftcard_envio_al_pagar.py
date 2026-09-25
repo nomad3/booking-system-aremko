@@ -128,6 +128,36 @@ class NuncaTumbaElCobro(_Base):
         self.assertEqual(int(venta.saldo_pendiente), 0)
 
 
+class ElEmailEsperaElPagoCompleto(_Base):
+    """Jorge (25-09-2026): «haz ese cambio». Con un abono parcial, el email ya
+    mandaba la gift card con su código sin estar cobrada entera."""
+
+    def _registrar(self, venta, monto):
+        with mock.patch(EMAIL) as email, mock.patch(ENVIAR, return_value=OK):
+            Pago.objects.create(venta_reserva=venta, monto=monto, metodo_pago='transferencia')
+        return email
+
+    def test_con_un_abono_parcial_no_sale_y_sigue_por_cobrar(self):
+        venta, gc = self._venta()
+        email = self._registrar(venta, 10000)
+        email.assert_not_called()
+        gc.refresh_from_db()
+        self.assertEqual(gc.estado, 'por_cobrar')
+
+    def test_al_completar_el_pago_sale_una_vez(self):
+        venta, gc = self._venta()
+        self._registrar(venta, 10000)
+        email = self._registrar(venta, 100000)
+        email.assert_called_once()
+        gc.refresh_from_db()
+        self.assertEqual(gc.estado, 'cobrado')
+
+    def test_pagada_de_una_sale(self):
+        venta, gc = self._venta()
+        email = self._registrar(venta, 110000)
+        email.assert_called_once()
+
+
 class LaVentaWebTambien(SimpleTestCase):
     """El pago por Flow materializa la venta y manda el email por su cuenta: el
     envío por WhatsApp va justo después (se revisa en la fuente, como en

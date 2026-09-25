@@ -53,11 +53,18 @@ def enviar_giftcards_al_registrar_pago(sender, instance, created, **kwargs):
 
     logger.info(f"Procesando {giftcards_pendientes.count()} GiftCards de VentaReserva #{venta_reserva.id}")
 
-    # Verificar si el pago cubre el total (o al menos una parte significativa)
-    # Si la venta está totalmente pagada, enviar las GiftCards
-    venta_reserva.calcular_total()  # Recalcular por si acaso
+    # La gift card sale SOLO con la venta pagada entera (Jorge, 25-09-2026).
+    # Antes bastaba un abono ('parcial') y la gift card se iba con su código sin
+    # estar cobrada: la misma regla que ya aplican la tarjeta (código oculto) y
+    # el envío por WhatsApp. calcular_total() deja estado_pago al día.
+    venta_reserva.calcular_total()
 
-    if venta_reserva.estado_pago in ['pagado', 'parcial']:
+    if venta_reserva.estado_pago != 'pagado':
+        logger.info(f"VentaReserva #{venta_reserva.id} con saldo por pagar: las GiftCards "
+                    f"salen cuando se complete el pago")
+        return
+
+    if venta_reserva.estado_pago == 'pagado':
         try:
             # Cambiar estado de las GiftCards
             for giftcard in giftcards_pendientes:
