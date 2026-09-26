@@ -486,6 +486,21 @@ _Última revisión: 2026-09-25_
     mensajes seguidos repite las 3 primeras palabras, 14% dice «te gustaría reservar»— y
     el silencio tras un «hola» solo (17% tras el saludo vs 30% tras la carta).
 
+54. **P-54 · Aprendizaje de Luna con Jev (encargo PROMPT_JEV_AREMKO.md)** — Etapas 0 a 4
+    EN PROD 25-09 (commits `b795b384` → `bf1b1f8c`), con el interruptor
+    `usar_jev_en_aprendizaje` APAGADO: medición de la cohorte, regla que separa las
+    correcciones que enseñan, cliente fail-open de Jev con registro (`DecisionAgente`,
+    migración 0015 aplicada), clasificación por «¿qué hizo Deborah?», sin plantillas, sin
+    repetidas y con la redacción validada. Tres corridas en seco de 50 (fichas en el
+    Escritorio): la tercera propuso 3 reglas, todas reales, y ninguna mala. Primera regla
+    aplicada con el OK de Jorge: «la tabla se agrega aparte: no está incluida en la
+    experiencia romántica» (sugerencia #55). **Falta:** (1) decidir el flujo de cierre: las
+    reglas propuestas dicen «al confirmar, pedir nombre, RUT, correo y ciudad e ingresar la
+    reserva» (cómo cierra Deborah), distinto del link de cotización que usa Luna; (2) etapa
+    5: qué hacer con los no concluyentes (7 de cada 10; si no se marcan, el botón de a 50 se
+    queda pegado) y procesar la cohorte de 30 días (471) con el botón manual (Jorge eligió
+    botón, no cron). Respaldo del punto de retorno: `~/Desktop/respaldo-aremko-2026-09-25-antes-jev/`.
+
 ## Asistente de Publicaciones (community manager)
 
 > Este módulo (cola semanal + revisión IA de material + publicar en un clic) se
