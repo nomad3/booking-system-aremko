@@ -67,17 +67,40 @@ def es_desacuerdo_sustantivo(borrador, enviado):
 CONFIANZA_MINIMA = 0.70     # una decisión con 0,55 no es una decisión
 PARECIDO_REPETIDA = 0.75    # desde aquí, dos reglas dicen lo mismo
 PREGUNTAS_CORRECCION = {
+    # Corrida en seco del 25-09-2026 (50 correcciones reales): con solo «¿qué cambió?», 8 de
+    # 9 propuestas eran falsos «hecho_catalogo» —Deborah le ofreció a ESE cliente otra hora
+    # u otra tina— y muchas «correcciones» no corregían nada: Deborah pasaba al paso
+    # siguiente («me indica nombre, RUT, correo y ciudad»). Lo que manda es qué hizo ella.
+    'que_hizo': {
+        'type': 'choice',
+        'instructions': ('Mira la conversación y compara lo que propuso el asistente con lo que '
+                         'la persona del equipo realmente envió al cliente. ¿Qué hizo la persona?'),
+        'criteria': {
+            'corrigio_dato': ('Corrigió algo que el asistente dijo mal: un precio, qué incluye un '
+                              'servicio, si algo existe o se vende, o una condición'),
+            'avanzo_el_proceso': ('Dio el paso siguiente de la venta que el asistente no dio: pedir '
+                                  'los datos para reservar, confirmar, o enviar el pago o los datos '
+                                  'de transferencia'),
+            'otra_opcion_para_ese_cliente': ('Le ofreció a ese cliente otra hora, otra tina, otra '
+                                             'cabaña u otra combinación, según la disponibilidad '
+                                             'de ese momento'),
+            'otra_cosa': ('Respondió otra cosa, saludó, se despidió, o dijo lo mismo con otras '
+                          'palabras'),
+        },
+    },
     'que_cambio': {
         'type': 'choice',
         'instructions': ('Compara el borrador que propuso el asistente con lo que la persona del '
                          'equipo realmente envió al cliente. ¿Qué cambió?'),
         'criteria': {
-            'hecho_catalogo': ('Cambia un precio, una disponibilidad o la existencia de un servicio '
-                               'o producto, y difiere del catálogo entregado'),
-            'regla': ('Cambia una política o el cómo: qué ofrecer, qué no, condiciones, '
-                      'aclaraciones que aplican siempre'),
+            'hecho_catalogo': ('Cambia un PRECIO del catálogo, o que un servicio o producto exista o '
+                               'se venda. NO es esto ofrecerle a ese cliente otra hora, otra tina u '
+                               'otra combinación'),
+            'regla': ('Cambia una política o el cómo: qué ofrecer, qué no, condiciones, qué incluye '
+                      'algo, cuándo pedir los datos o el pago'),
             'tono': 'La misma información, solo mejor redactada, más corta o más cálida',
-            'puntual': 'Algo específico de ese cliente, un saludo, o un typo. No generaliza',
+            'puntual': ('Algo de ese cliente: otra hora, otra tina u otra combinación para él, un '
+                        'saludo o un typo. No generaliza'),
         },
     },
     'generaliza': {
@@ -90,6 +113,21 @@ PREGUNTAS_CORRECCION = {
         'type': 'noul',
         'instructions': '¿Lo que enseña esta corrección ya está dicho en el Conocimiento actual?',
     },
+}
+# Lo único que enseña: corregir un dato mal dicho o dar el paso de venta que Luna no dio.
+ACCIONES_QUE_ENSENAN = {'corrigio_dato', 'avanzo_el_proceso'}
+PISTAS_DE_REDACCION = {
+    ('corrigio_dato', 'hecho_catalogo'): (
+        'la persona corrigió un dato del catálogo que el asistente dijo mal (un precio, o que un '
+        'servicio o producto exista). Describe el cambio en `texto_propuesto` y pon la referencia '
+        'en `ref_catalogo`.'),
+    ('corrigio_dato', 'regla'): (
+        'la persona corrigió algo que el asistente dijo mal (qué incluye un servicio o una '
+        'condición). En `texto_propuesto` escribe la regla GENERAL en una línea, no el caso.'),
+    ('avanzo_el_proceso', 'regla'): (
+        'la persona dio el paso siguiente de la venta que el asistente no dio (pedir los datos, '
+        'confirmar o el pago). En `texto_propuesto` escribe como regla GENERAL, en una línea, '
+        'cuándo y qué hacer; no describas este caso.'),
 }
 
 
@@ -149,10 +187,12 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
     - `contexto`: la conversación hasta la pregunta del cliente (`contexto_de_la_correccion`);
       sin ella Jev clasifica a ciegas y la confianza cae.
     - Jev sin opinión (None) → el clasificador de siempre, tal cual.
-    - Confianza < 0,70 o tipo desconocido → `error` «no concluyente»: queda sin procesar
-      para una persona. Nunca «puntual» en silencio, que es el defecto que se arregla.
-    - tono / puntual, o regla que no generaliza, o que ya está en el Conocimiento → sin
-      sugerencia y sin gastar la redacción.
+    - Manda «¿qué hizo la persona?» (`que_hizo`). Confianza < 0,70 → `error` «no
+      concluyente»: queda sin procesar para una persona. Nunca «puntual» en silencio, que
+      es el defecto que se arregla.
+    - Otra opción para ese cliente u otra cosa → puntual, sin sugerencia. Solo enseñan
+      «corrigió un dato» (catálogo si es un precio o que algo exista; si no, regla) y
+      «avanzó el proceso» (regla), si generalizan y no están ya en el Conocimiento.
     - Si vale la pena, el texto lo redacta el camino de siempre; si repite una línea del
       Conocimiento o una sugerencia anterior, no se propone de nuevo.
     """
@@ -180,14 +220,18 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
                        referencia)
         return clasificar(config, borrador, enviado)
 
-    tipo, confianza = r.opcion('que_cambio'), r.confianza('que_cambio')
+    que_hizo, confianza = r.opcion('que_hizo'), r.confianza('que_hizo')
     base.update(modelo=r.modelo or 'jev', confianza=confianza)
-    if tipo not in TIPOS or confianza is None or confianza < CONFIANZA_MINIMA:
-        base['error'] = f'no concluyente: {tipo or "sin tipo"} con confianza {confianza or 0:.2f}'
+    opciones = PREGUNTAS_CORRECCION['que_hizo']['criteria']
+    if que_hizo not in opciones or confianza is None or confianza < CONFIANZA_MINIMA:
+        base['error'] = f'no concluyente: {que_hizo or "sin respuesta"} con confianza {confianza or 0:.2f}'
         return base
-    base.update(tipo=tipo, motivo=f'{tipo} (confianza {confianza:.2f})')
-    if tipo not in TIPOS_ACCIONABLES:
+    if que_hizo not in ACCIONES_QUE_ENSENAN:
+        base.update(tipo='puntual', motivo=f'{que_hizo} (confianza {confianza:.2f})')
         return base
+    tipo = ('hecho_catalogo' if que_hizo == 'corrigio_dato'
+            and r.opcion('que_cambio') == 'hecho_catalogo' else 'regla')
+    base.update(tipo=tipo, motivo=f'{que_hizo} → {tipo} (confianza {confianza:.2f})')
 
     generaliza, ya_esta = r.si_no('generaliza'), r.si_no('ya_esta')
     if generaliza is not None and generaliza < 0.5:
@@ -197,7 +241,8 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
         base.update(tipo='puntual', motivo=f'ya está en el Conocimiento (p={ya_esta:.2f})')
         return base
 
-    redaccion = clasificar(config, borrador, enviado)   # Jev decide; no escribe
+    # Jev decide; no escribe. La pista le dice al redactor qué se decidió.
+    redaccion = clasificar(config, borrador, enviado, pista=PISTAS_DE_REDACCION[(que_hizo, tipo)])
     if redaccion.get('error'):
         base['error'] = redaccion['error']
         return base
@@ -211,7 +256,7 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
         return base
     base.update(texto_propuesto=texto[:1000],
                 ref_catalogo=(redaccion.get('ref_catalogo') or '')[:200],
-                motivo=(redaccion.get('motivo') or base['motivo'])[:300],
+                motivo=f"{que_hizo}: {redaccion.get('motivo') or base['motivo']}"[:300],
                 modelo=f"{r.modelo or 'jev'} + {redaccion.get('modelo', '')}"[:120])
     return base
 
@@ -251,13 +296,15 @@ Responde SOLO un JSON válido, sin texto adicional ni explicaciones:
 Ante la duda entre regla y puntual, elige "puntual" (no ensuciar el Conocimiento)."""
 
 
-def build_clasificador_user(borrador, enviado):
-    """User prompt del clasificador. Pura."""
+def build_clasificador_user(borrador, enviado, pista=''):
+    """User prompt del clasificador. Pura. `pista` (encargo JEV): lo que ya decidió el modelo
+    de decisión, para que la redacción sea la regla general y no el caso; vacía = idéntico."""
     return (
         'BORRADOR (lo que propuso el agente):\n'
         f'«{(borrador or "").strip()}»\n\n'
         'ENVIADO (lo que la persona realmente mandó al cliente):\n'
         f'«{(enviado or "").strip()}»\n\n'
+        + (f'NOTA: {pista}\n\n' if pista else '') +
         'Clasifica la corrección y responde solo el JSON.'
     )
 
@@ -364,7 +411,7 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
     return {'procesados': procesados, 'creadas': creadas, 'errores': errores, 'detalle': detalle}
 
 
-def clasificar(config, borrador, enviado):
+def clasificar(config, borrador, enviado, pista=''):
     """Clasifica una corrección vía LLM. Devuelve dict (+'modelo','error'). No lanza."""
     from . import grounding
     from .agent import _modelo_efectivo
@@ -383,7 +430,7 @@ def clasificar(config, borrador, enviado):
         catalogo = '(catálogo no disponible)'
 
     system = build_clasificador_system(catalogo, config.conocimiento)
-    user = build_clasificador_user(borrador, enviado)
+    user = build_clasificador_user(borrador, enviado, pista)
     modelo = _modelo_efectivo(config)
 
     try:

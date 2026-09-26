@@ -30,9 +30,11 @@ ENVIADO = 'Los lunes no ofrecemos tinas después de las 19:30 porque cerramos a 
 REGLA = 'Los lunes no se ofrecen tinas después de las 19:30.'
 
 
-def _jev(tipo='regla', confianza=0.9, generaliza=0.8, ya_esta=0.1):
+def _jev(que_hizo='avanzo_el_proceso', confianza=0.9, que_cambio='regla', generaliza=0.8,
+         ya_esta=0.1):
     return Respuesta({'model': 'typesafe/jev-1.13', 'answers': {
-        'que_cambio': {'type': 'choice', 'choice': tipo, 'confidence': confianza},
+        'que_hizo': {'type': 'choice', 'choice': que_hizo, 'confidence': confianza},
+        'que_cambio': {'type': 'choice', 'choice': que_cambio, 'confidence': 0.8},
         'generaliza': {'type': 'noul', 'noul': generaliza},
         'ya_esta': {'type': 'noul', 'noul': ya_esta}}})
 
@@ -58,7 +60,7 @@ class ConJev(TestCase):
         return d, decidir, redactar
 
     def test_la_conversacion_llega_a_jev(self):
-        with mock.patch(DECIDIR, return_value=_jev(tipo='tono')) as decidir:
+        with mock.patch(DECIDIR, return_value=_jev(que_hizo='otra_cosa')) as decidir:
             aprendizaje.clasificar_con_jev(self.config, BORRADOR, ENVIADO,
                                            contexto='[Cliente]: ¿hay tina el lunes a las 20?')
         self.assertEqual(decidir.call_args.args[0]['conversacion_hasta_la_pregunta'],
@@ -73,6 +75,8 @@ class ConJev(TestCase):
         self.assertEqual((estado['borrador'], estado['enviado']), (BORRADOR, ENVIADO))
         self.assertIn('Check-in', estado['conocimiento'])
         redactar.assert_called_once()
+        self.assertIn('paso siguiente', redactar.call_args.kwargs['pista'])
+        self.assertTrue(d['motivo'].startswith('avanzo_el_proceso'))
 
     def test_sin_opinion_de_jev_va_el_clasificador_de_siempre(self):
         d, _, redactar = self._clasificar(None, redaccion=_redaccion())
@@ -84,9 +88,36 @@ class ConJev(TestCase):
         self.assertIn('no concluyente', d['error'])
         redactar.assert_not_called()
 
-    def test_tono_no_gasta_la_redaccion(self):
-        d, _, redactar = self._clasificar(_jev(tipo='tono'))
-        self.assertEqual((d['tipo'], d['error']), ('tono', ''))
+    def test_otra_cosa_no_gasta_la_redaccion(self):
+        d, _, redactar = self._clasificar(_jev(que_hizo='otra_cosa'))
+        self.assertEqual((d['tipo'], d['error']), ('puntual', ''))
+        redactar.assert_not_called()
+
+    def test_otra_opcion_para_ese_cliente_no_es_catalogo(self):
+        # Corrida en seco del 25-09: «Luna: Hornopiren 14:30 → Deborah: Llaima 16:30» salía
+        # como hecho de catálogo con 0,97. Es una decisión para ese cliente.
+        d, _, redactar = self._clasificar(_jev(que_hizo='otra_opcion_para_ese_cliente',
+                                               que_cambio='hecho_catalogo'))
+        self.assertEqual(d['tipo'], 'puntual')
+        self.assertIn('otra_opcion_para_ese_cliente', d['motivo'])
+        redactar.assert_not_called()
+
+    def test_corrigio_un_precio_es_catalogo(self):
+        d, _, redactar = self._clasificar(_jev(que_hizo='corrigio_dato', que_cambio='hecho_catalogo'))
+        self.assertEqual(d['tipo'], 'hecho_catalogo')
+        self.assertIn('catálogo', redactar.call_args.kwargs['pista'])
+
+    def test_corrigio_otra_cosa_es_regla(self):
+        d, _, redactar = self._clasificar(_jev(que_hizo='corrigio_dato', que_cambio='tono'))
+        self.assertEqual(d['tipo'], 'regla')
+        self.assertIn('regla GENERAL', redactar.call_args.kwargs['pista'])
+
+    def test_sin_respuesta_a_que_hizo_no_concluye(self):
+        sin = Respuesta({'model': 'x', 'answers': {'que_cambio': {'type': 'choice',
+                                                                  'choice': 'regla',
+                                                                  'confidence': 0.99}}})
+        d, _, redactar = self._clasificar(sin)
+        self.assertIn('no concluyente', d['error'])
         redactar.assert_not_called()
 
     def test_regla_que_no_generaliza(self):
@@ -120,6 +151,15 @@ class ConJev(TestCase):
         d, _, _ = self._clasificar(_jev(), redaccion=_redaccion(texto='Check-in desde las 16:00 hrs.'))
         self.assertEqual(d['tipo'], 'puntual')
         self.assertEqual(d['motivo'], 'ya está en el Conocimiento')
+
+
+class LaPistaDelRedactor(TestCase):
+    def test_sin_pista_el_prompt_de_siempre(self):
+        antes = aprendizaje.build_clasificador_user(BORRADOR, ENVIADO)
+        self.assertEqual(antes, aprendizaje.build_clasificador_user(BORRADOR, ENVIADO, ''))
+        self.assertNotIn('NOTA:', antes)
+        self.assertIn('NOTA: una pista', aprendizaje.build_clasificador_user(BORRADOR, ENVIADO,
+                                                                            'una pista'))
 
 
 class ElInterruptor(TestCase):
