@@ -139,14 +139,35 @@ def ordenar_cabanas(servicios, fecha):
 _FECHA_ISO = re.compile(r'\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b')
 _FECHA_DMA = re.compile(r'\b(\d{1,2})[-/](\d{1,2})[-/](\d{4}|\d{2})\b')
 _FECHA_DM = re.compile(r'(?<![\d/])(\d{1,2})/(\d{1,2})(?![\d/])')
+# DD-MM sin año (26-09-2026): «03-10» caía al número suelto y daba el 3-9-2027. Pero «2-3»
+# también es un rango: no es fecha si antes dice cuántos son («somos 2-3», «entre 2-3») o
+# si después viene una unidad o un mes («2-3 personas», «2-3 de octubre»).
+_FECHA_DM_GUION = re.compile(r'(?<![\d/-])(\d{1,2})-(\d{1,2})(?![\d/-])')
+_ANTES_DE_UN_RANGO = re.compile(r'\b(somos|seriamos|seremos|entre|para|de|unos|unas|como)\s*$')
+_DESPUES_DE_UN_RANGO = re.compile(
+    r'^\s*(de\s+)?(personas?|pax|adultos?|ninos?|horas?|hrs?|noches?|dias?|anos?|min|minutos?|mil'
+    r'|lucas|km|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre'
+    r'|noviembre|diciembre)\b')
+
+
+def _fecha_dm_con_guion(texto):
+    """El primer «DD-MM» de `texto` que es una fecha y no un rango, o None. Pura."""
+    for m in _FECHA_DM_GUION.finditer(texto):
+        dia, mes = int(m.group(1)), int(m.group(2))
+        if not (1 <= dia <= 31 and 1 <= mes <= 12):
+            continue
+        if _ANTES_DE_UN_RANGO.search(texto[:m.start()]) or _DESPUES_DE_UN_RANGO.search(texto[m.end():]):
+            continue
+        return m
+    return None
 
 
 def _fecha_numerica(texto, hoy):
     """La fecha escrita con números: (fecha, None), (None, error) o None si no hay.
 
-    Formatos: AAAA-MM-DD (o con /), DD/MM/AAAA, DD-MM-AAAA, DD/MM/AA y DD/MM (sin
-    año: este, o el que viene si esa fecha ya pasó). DD-MM sin año NO: se confunde
-    con rangos como «2-3 personas».
+    Formatos: AAAA-MM-DD (o con /), DD/MM/AAAA, DD-MM-AAAA, DD/MM/AA, DD/MM y DD-MM (sin
+    año: este, o el que viene si esa fecha ya pasó). Un DD-MM que es un rango de personas
+    o de días («somos 2-3», «2-3 de octubre») no cuenta como fecha.
     """
     m = _FECHA_ISO.search(texto)
     if m:
@@ -158,7 +179,7 @@ def _fecha_numerica(texto, hoy):
             if año < 100:
                 año += 2000
         else:
-            m = _FECHA_DM.search(texto)
+            m = _FECHA_DM.search(texto) or _fecha_dm_con_guion(texto)
             if not m:
                 return None
             dia, mes, año = int(m.group(1)), int(m.group(2)), None
@@ -247,15 +268,27 @@ def resolver_fecha(expresion_cliente):
         return None
 
     def _fecha_desde_numero(texto_numero):
-        """Busca un número de día-del-mes en `texto_numero`, asumiendo el mes explícito
-        si lo hay o si no el mes actual (rueda al próximo año si el día ya pasó este mes).
-        Devuelve (fecha, None) si hay número válido, (None, error) si el día no existe en
-        el mes, o (None, None) si no hay número en `texto_numero`."""
+        """Busca un número de día-del-mes en `texto_numero`. Con mes explícito, ese mes
+        (el año que viene si ya pasó). Sin mes, el próximo día con ese número: este mes o,
+        si ya pasó o este mes no lo tiene, el que viene — no el año siguiente (26-09-2026:
+        «el 3» dicho el 23-09 daba el 3-9-2027, y así le llegó a un cliente una cotización
+        para el año siguiente). Devuelve (fecha, None) si hay número válido, (None, error)
+        si el día no existe, o (None, None) si no hay número en `texto_numero`."""
         match_numero = re.search(r'\b(\d{1,2})\b', texto_numero)
         if not match_numero:
             return None, None
         dia_numero = int(match_numero.group(1))
-        mes_numero = _mes_explicito() or hoy.month
+        if _mes_explicito() is None:
+            mes_que_viene = (hoy.year + 1, 1) if hoy.month == 12 else (hoy.year, hoy.month + 1)
+            for año, mes in ((hoy.year, hoy.month), mes_que_viene):
+                try:
+                    fecha = datetime(año, mes, dia_numero).date()
+                except ValueError:
+                    continue
+                if fecha >= hoy:
+                    return fecha, None
+            return None, f'fecha inválida (día {dia_numero})'
+        mes_numero = _mes_explicito()
         try:
             año = hoy.year if mes_numero >= hoy.month else hoy.year + 1
             fecha = datetime(año, mes_numero, dia_numero).date()

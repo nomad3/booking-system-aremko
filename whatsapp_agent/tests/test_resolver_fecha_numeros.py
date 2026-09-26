@@ -76,3 +76,27 @@ class FechasConNumeros(SimpleTestCase):
         self.assertEqual(self._iso('sábado 3'), '2026-10-03')
         self.assertEqual(self._iso('26 de octubre'), '2026-10-26')
         self.assertEqual(self._iso('el 30'), '2026-09-30')
+
+    # 26-09-2026 (P-62): «el 3» y «03-10» daban el 3-9-2027 —el número suelto saltaba un
+    # año en vez de un mes— y un grupo recibió una cotización para el año siguiente.
+
+    def test_el_numero_suelto_es_el_proximo_con_ese_numero(self):
+        self.assertEqual(self._iso('el 3'), '2026-10-03')          # antes: 2027-09-03
+        self.assertEqual(self._iso('3'), '2026-10-03')
+        self.assertEqual(self._iso('para el 3'), '2026-10-03')
+        self.assertEqual(self._iso('el 31'), '2026-10-31')         # septiembre no tiene 31
+
+    def test_con_el_mes_nombrado_manda_el_mes(self):
+        self.assertEqual(self._iso('3 de septiembre'), '2027-09-03')
+
+    def test_dd_mm_con_guion(self):
+        self.assertEqual(self._iso('03-10'), '2026-10-03')         # antes: 2027-09-03
+        self.assertEqual(self._iso('el 03-10'), '2026-10-03')
+        self.assertEqual(self._iso('3-11'), '2026-11-03')          # antes: el 3 de octubre
+        self.assertEqual(self._iso('sábado 03-10'), '2026-10-03')
+        self.assertEqual(self._iso('5-1'), '2027-01-05')           # ya pasó este año
+
+    def test_un_rango_con_guion_no_es_fecha(self):
+        for texto in ('somos 2-3', '2-3 personas', 'entre 2-3', 'para 4-5', '2-3 noches'):
+            self.assertIsNone(_fecha_numerica(texto, HOY.date()), texto)
+        self.assertEqual(self._iso('el 2-3 de octubre'), '2026-10-02')
