@@ -1,10 +1,13 @@
 """El carrito abandonado se vacía cuando el cliente vuelve (Jorge, 26-09-2026).
 
-Un cliente armó un carrito en junio y no aprobó la cotización. El carrito solo se vacía al
-crearse la reserva, así que siguió ahí: en septiembre Luna le sumó esos ítems a la cotización
-nueva y le dio totales equivocados. Luna ya no lo veía en su estado (lo oculta pasadas 24
-horas), pero sus herramientas sí lo usaban. Ahora, un carrito con más de 24 horas sin cambios
-(lo mismo que dura una cotización) se vacía en cuanto el cliente vuelve.
+Un cliente reservó en junio desde su carrito, y en septiembre Luna le sumó esa tina de junio a
+la cotización nueva. Dos causas:
+
+- El vaciado que corre al crearse la reserva ponía el total en $0 pero no guardaba los ítems:
+  la tina de junio sobrevivió a esa reserva y a la de septiembre.
+- Un carrito que no llega a reserva nunca se vaciaba. Luna ya no lo veía en su estado (lo
+  oculta pasadas 24 horas), pero sus herramientas sí lo usaban. Ahora, un carrito con más de
+  24 horas sin cambios (lo mismo que dura una cotización) se vacía en cuanto el cliente vuelve.
 
 Ejecutar:
     python manage.py test whatsapp_agent.tests.test_carrito_abandonado
@@ -65,6 +68,13 @@ class ElCarritoAbandonado(TestCase):
             nombre='Tina Tronador', categoria=tinas, tipo_servicio='tina',
             precio_base=Decimal('30000'), duracion=120, activo=True, publicado_web=True,
             slots_disponibles={}, capacidad_minima=1, capacidad_maxima=4)
+
+    def test_el_vaciado_al_crear_la_reserva_queda_guardado(self):
+        _carrito(timedelta(hours=1))
+        CarritoService.vaciar_carrito(CANAL, PHONE)
+        carrito = CarritoReserva.objects.get(canal=CANAL, external_id=PHONE)  # releído de la base
+        self.assertEqual(carrito.items, [])
+        self.assertEqual(carrito.total, 0)
 
     def test_al_volver_se_vacia_y_conserva_el_id(self):
         viejo = _carrito(timedelta(days=100))

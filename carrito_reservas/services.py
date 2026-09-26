@@ -434,8 +434,11 @@ class CarritoService:
         """Vacía el carrito (elimina todos los items)."""
         try:
             carrito = CarritoReserva.obtener_o_crear(canal, external_id)
-            carrito.items = []
-            CarritoService._recalcular_totales(carrito)
+            # Antes: items = [] y `_recalcular_totales`, que guarda los totales pero NO los
+            # ítems. El vaciado nunca llegaba a la base: el carrito quedaba con sus ítems y total
+            # $0, y reaparecía en la compra siguiente (26-09-2026: una tina de junio sobrevivió a
+            # dos reservas creadas desde ese carrito).
+            carrito.vaciar()
             logger.info(f'[Carrito] Vaciado {canal}:{external_id}')
             return {'success': True, 'carrito': carrito}
         except Exception as exc:
