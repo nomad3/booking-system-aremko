@@ -106,3 +106,31 @@ class ElPaseTambien(_Base):
         self.assertEqual(r.context['politicas_cancelacion'], [ALOJAMIENTO, TINAS])
         self.assertContains(r, TITULO)
         self.assertContains(r, 'Por si necesitas anular o cambiar tu reserva')
+
+
+UNICA = ('Si nos avisas con 48 horas o más de anticipación, te devolvemos el 100% o cambiamos la '
+         'fecha sin costo. Con menos de 48 horas, la reserva se pierde.')
+
+
+class UnaSolaReglaParaLosTres(_Base):
+    """Jorge, 26-09-2026: 48 horas para tinas, masajes y cabañas. Con el mismo texto en los
+    dos campos del admin, una noche con tina lo muestra una sola vez."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        config = ConfiguracionResumen.get_solo()
+        config.politica_alojamiento = UNICA
+        config.politica_tinas_masajes = UNICA
+        config.save()
+
+    def test_la_cotizacion_y_el_pase_la_muestran_una_vez(self):
+        self.assertEqual(_politicas_cancelacion(['cabana', 'tina', 'masaje']), [UNICA])
+        v = self._venta((self.torre, self.hoy, '16:00'), (self.tina, self.hoy, '21:30'))
+        self.assertEqual(self._pase(v).content.decode().count(UNICA), 1)
+
+    def test_el_resumen_de_reserva_tambien(self):
+        from ventas.views.resumen_reserva_view import _generar_texto_resumen
+        v = self._venta((self.torre, self.hoy, '16:00'), (self.tina, self.hoy, '21:30'))
+        texto = _generar_texto_resumen(v, ConfiguracionResumen.get_solo())
+        self.assertEqual(texto.count(UNICA), 1)

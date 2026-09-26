@@ -785,7 +785,9 @@ def _politicas_cancelacion(tipos):
         politicas.append(config.politica_alojamiento.strip())
     if presentes & {'tina', 'masaje'} and (config.politica_tinas_masajes or '').strip():
         politicas.append(config.politica_tinas_masajes.strip())
-    return politicas
+    # Jorge, 26-09-2026: la misma regla para los tres (48 h). Con el mismo texto en los dos
+    # campos, una noche con tina lo mostraba dos veces.
+    return list(dict.fromkeys(politicas))
 
 
 def _tipos_desde_payload(servicios_data):
