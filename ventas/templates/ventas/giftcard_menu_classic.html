@@ -1308,7 +1308,6 @@
                             </div>
                         </div>
                     </div>
-                    {% politica_cancelacion as politica %}{% if politica %}
                     <div class="accordion-item">
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
@@ -1318,11 +1317,10 @@
                         </h2>
                         <div id="faqCancelacion" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                             <div class="accordion-body">
-                                La reserva que hagan con la GiftCard tiene la misma política que cualquier reserva: {{ politica }}
+                                {% politica_giftcard %}
                             </div>
                         </div>
                     </div>
-                    {% endif %}
                     <div class="accordion-item">
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"

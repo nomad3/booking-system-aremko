@@ -224,12 +224,17 @@ def _generar_texto_resumen(reserva, config):
 
     # Políticas de cancelación
     lineas.append("Condiciones de Reserva Anular o Cambiar Reserva :")
-    if tiene_alojamiento:
-        lineas.append(config.politica_alojamiento)
-    if (tiene_tinas or tiene_masajes) and not (
-            tiene_alojamiento and config.politica_tinas_masajes == config.politica_alojamiento):
-        # Jorge, 26-09-2026: la misma regla para los tres; si los textos son iguales, una vez.
-        lineas.append(config.politica_tinas_masajes)
+    if ((tiene_alojamiento or tiene_tinas or tiene_masajes)
+            and reserva.pagos.filter(metodo_pago='giftcard').exists()):
+        # Jorge, 26-09-2026: con GiftCard solo se cambia la fecha; no hay devolución de dinero.
+        lineas.append(config.POLITICA_GIFTCARD)
+    else:
+        if tiene_alojamiento:
+            lineas.append(config.politica_alojamiento)
+        if (tiene_tinas or tiene_masajes) and not (
+                tiene_alojamiento and config.politica_tinas_masajes == config.politica_alojamiento):
+            # Jorge, 26-09-2026: la misma regla para los tres; si los textos son iguales, una vez.
+            lineas.append(config.politica_tinas_masajes)
 
     lineas.append("")
 

@@ -407,7 +407,9 @@ def ficha_reserva_cliente(request, token):
         'bebida_sel': bebida_sel,
         'personalizar_bebida_url': reverse('ventas:ficha_personalizar_bebida', kwargs={'token': token}),
         'bebida_guardado': request.GET.get('bebida'),
-        'politicas_cancelacion': [] if solo_giftcards else _politicas_cancelacion(tipos_venta),
+        'politicas_cancelacion': [] if solo_giftcards else _politicas_cancelacion(
+            tipos_venta,
+            pagada_con_giftcard=venta.pagos.filter(metodo_pago='giftcard').exists()),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 
@@ -766,15 +768,20 @@ def _hora_cabana_del_payload(servicios_data):
     return None
 
 
-def _politicas_cancelacion(tipos):
+def _politicas_cancelacion(tipos, pagada_con_giftcard=False):
     """Las condiciones para anular o cambiar que aplican a esos servicios: los mismos textos
     del resumen de reserva (admin → Configuración Resumen), un solo lugar para editarlos.
 
     Jorge, 26-09-2026: el cliente tiene que verlas antes de aprobar y pagar. En la reserva
     #6911 la clienta pagó, anuló el mismo día y nunca las había visto: ni la cotización ni
-    el Pase las mostraban."""
+    el Pase las mostraban.
+
+    Una reserva pagada con GiftCard solo se cambia de fecha; no hay devolución de dinero
+    (Jorge, 26-09-2026). Su Pase muestra esa regla en vez de la general."""
     from ..models import ConfiguracionResumen
     presentes = set(tipos or [])
+    if pagada_con_giftcard and presentes & {'cabana', 'tina', 'masaje'}:
+        return [ConfiguracionResumen.POLITICA_GIFTCARD]
     try:
         config = ConfiguracionResumen.get_solo()
     except Exception:  # noqa: BLE001 — sin la configuración, la ficha igual se muestra

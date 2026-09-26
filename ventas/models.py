@@ -4542,6 +4542,15 @@ No incluye toallas o batas.""",
         help_text="Política de cancelación para tinas y masajes"
     )
 
+    # Jorge, 26-09-2026: quien usa una GiftCard solo puede cambiar la fecha, con el mismo aviso
+    # que cualquier reserva; no hay devolución de dinero (tampoco de una diferencia pagada
+    # aparte). No es un campo del admin porque sería una migración a mano en Render: si
+    # cambian las 48 horas, se cambia aquí además de en los dos campos de arriba.
+    POLITICA_GIFTCARD = (
+        'Las reservas pagadas con GiftCard no tienen devolución de dinero, pero se pueden cambiar '
+        'de fecha sin costo avisando con 48 horas o más de anticipación (en cabañas, las 48 horas '
+        'se cuentan desde el check-in de las 16:00). Con menos de 48 horas, la reserva se pierde.')
+
     # Información adicional para alojamiento
     equipamiento_cabanas = models.TextField(
         default="""Cabaña equipada:*

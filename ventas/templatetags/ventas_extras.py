@@ -452,3 +452,12 @@ def politica_cancelacion():
         return (ConfiguracionResumen.get_solo().politica_tinas_masajes or '').strip()
     except Exception:  # noqa: BLE001 — una página nunca se cae por esto
         return ''
+
+
+@register.simple_tag
+def politica_giftcard():
+    """La regla de las reservas pagadas con GiftCard (Jorge, 26-09-2026): solo cambio de fecha,
+    con el mismo aviso que cualquier reserva, y sin devolución de dinero. Es el mismo texto que
+    ve en su Pase quien reservó con una GiftCard."""
+    from ventas.models import ConfiguracionResumen
+    return ConfiguracionResumen.POLITICA_GIFTCARD

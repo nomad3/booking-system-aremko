@@ -306,12 +306,10 @@
         <p class="faq-a">El saldo queda disponible durante la vigencia para una próxima visita o
            para productos en el lugar (tablas, jugos, ambientaciones).</p>
       </div>
-      {% politica_cancelacion as politica %}{% if politica %}
       <div class="faq-item">
         <p class="faq-q">¿Y si hay que anular o cambiar la reserva?</p>
-        <p class="faq-a">La reserva que hagan con la GiftCard tiene la misma política que cualquier reserva: {{ politica }}</p>
+        <p class="faq-a">{% politica_giftcard %}</p>
       </div>
-      {% endif %}
     </div>
   </section>
 

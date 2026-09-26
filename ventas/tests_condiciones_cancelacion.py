@@ -11,12 +11,13 @@ Ejecutar:
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from ventas.models import ConfiguracionResumen
+from ventas.models import ConfiguracionResumen, GiftCard, Pago
 from ventas.tests_pase_late_checkout import _Base
 from ventas.views.ficha_reserva_view import _politicas_cancelacion, token_para_cotizacion
 from whatsapp_agent.models import PropuestaReserva
@@ -134,3 +135,54 @@ class UnaSolaReglaParaLosTres(_Base):
         v = self._venta((self.torre, self.hoy, '16:00'), (self.tina, self.hoy, '21:30'))
         texto = _generar_texto_resumen(v, ConfiguracionResumen.get_solo())
         self.assertEqual(texto.count(UNICA), 1)
+
+
+GIFTCARD = ConfiguracionResumen.POLITICA_GIFTCARD
+
+
+class ConGiftCardSoloCambioDeFecha(_Base):
+    """Jorge, 26-09-2026: quien reserva con una GiftCard puede cambiar la fecha con el mismo
+    aviso que cualquier reserva, pero no pedir la devolución del dinero. En 12 meses fueron
+    107 reservas, y la mitad pagó además una diferencia: la regla vale para toda la reserva."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        config = ConfiguracionResumen.get_solo()
+        config.politica_alojamiento = UNICA
+        config.politica_tinas_masajes = UNICA
+        config.save()
+
+    def _pagada_con_giftcard(self, *lineas, diferencia=0):
+        v = self._venta(*lineas)
+        gc = GiftCard.objects.create(monto_inicial=Decimal('80000'),
+                                     fecha_vencimiento=self.hoy + datetime.timedelta(days=300))
+        Pago.objects.create(venta_reserva=v, monto=Decimal('80000'), metodo_pago='giftcard',
+                            giftcard=gc)
+        if diferencia:
+            Pago.objects.create(venta_reserva=v, monto=Decimal(diferencia),
+                                metodo_pago='transferencia')
+        return v
+
+    def test_el_pase_muestra_la_regla_de_la_giftcard(self):
+        r = self._pase(self._pagada_con_giftcard((self.tina, self.hoy, '19:00')))
+        self.assertEqual(r.context['politicas_cancelacion'], [GIFTCARD])
+        self.assertContains(r, 'no tienen devolución de dinero')
+        self.assertNotContains(r, 'te devolvemos el 100%')
+
+    def test_aunque_haya_pagado_una_diferencia(self):
+        v = self._pagada_con_giftcard((self.torre, self.hoy, '16:00'),
+                                      (self.tina, self.hoy, '21:30'), diferencia=30000)
+        self.assertEqual(self._pase(v).context['politicas_cancelacion'], [GIFTCARD])
+
+    def test_el_resumen_de_reserva_tambien(self):
+        from ventas.views.resumen_reserva_view import _generar_texto_resumen
+        v = self._pagada_con_giftcard((self.torre, self.hoy, '16:00'))
+        texto = _generar_texto_resumen(v, ConfiguracionResumen.get_solo())
+        self.assertIn(GIFTCARD, texto)
+        self.assertNotIn(UNICA, texto)
+
+    def test_sin_giftcard_sigue_la_general(self):
+        v = self._venta((self.tina, self.hoy, '19:00'))
+        Pago.objects.create(venta_reserva=v, monto=Decimal('25000'), metodo_pago='transferencia')
+        self.assertEqual(self._pase(v).context['politicas_cancelacion'], [UNICA])

@@ -52,9 +52,17 @@ class LaPoliticaEnLasPreguntasFrecuentes(TestCase):
         self.assertIn(PREGUNTA, html)
         self.assertIn(POLITICA, html)
 
-    def test_masajes_garantia_empresas_y_giftcards(self):
-        for nombre in ('masajes', 'garantia', 'empresas', 'ventas:giftcard_menu'):
+    def test_masajes_garantia_y_empresas(self):
+        for nombre in ('masajes', 'garantia', 'empresas'):
             self.assertIn(POLITICA, self._html(reverse(nombre)), nombre)
+
+    def test_giftcards_solo_cambio_de_fecha(self):
+        # Jorge, 26-09-2026: quien usa la GiftCard puede cambiar la fecha con el mismo aviso,
+        # pero no pedir la devolución del dinero.
+        for url in (reverse('ventas:giftcard_menu'), reverse('ventas:giftcard_menu') + '?classic=1'):
+            html = self._html(url)
+            self.assertIn(ConfiguracionResumen.POLITICA_GIFTCARD, html, url)
+            self.assertNotIn('te devolvemos el 100%', html, url)
 
     def test_si_cambia_en_el_admin_cambia_en_la_web(self):
         config = ConfiguracionResumen.get_solo()
