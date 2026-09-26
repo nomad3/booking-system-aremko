@@ -4,6 +4,8 @@ Modelo de CarritoReserva para H-029 FASE 2.
 Un carrito por conversación, acumula servicios + productos, calcula descuentos dinámicamente.
 """
 
+from datetime import timedelta
+
 from django.db import models
 from django.utils import timezone
 from decimal import Decimal
@@ -127,15 +129,50 @@ class CarritoReserva(models.Model):
     def __str__(self):
         return f'Carrito {self.canal} {self.external_id} (estado={self.estado})'
 
+    # Un carrito sin cambios hace más de esto quedó abandonado: el cliente no aprobó la
+    # cotización (que vence a las 24 horas) y el carrito solo se vacía al crearse la reserva.
+    # Jorge, 26-09-2026: el carrito de junio de un cliente seguía ahí en septiembre, y Luna le
+    # sumó esos ítems a la cotización nueva. Se vacía en cuanto el cliente vuelve.
+    VIGENCIA = timedelta(hours=24)
+
     @classmethod
     def obtener_o_crear(cls, canal, external_id):
-        """Obtiene o crea un carrito para una conversación."""
+        """Obtiene o crea un carrito para una conversación. Si estaba abandonado, lo vacía."""
         carrito, creado = cls.objects.get_or_create(
             canal=canal,
             external_id=external_id,
             defaults={'estado': 'activo'}
         )
+        if not creado and carrito.abandonado():
+            carrito.vaciar()
         return carrito
+
+    @classmethod
+    def de_la_conversacion(cls, canal, external_id):
+        """El carrito de la conversación (None si no hay), vaciado si estaba abandonado.
+        A diferencia de `obtener_o_crear`, no crea uno."""
+        carrito = cls.objects.filter(canal=canal, external_id=external_id).first()
+        if carrito is not None and carrito.abandonado():
+            carrito.vaciar()
+        return carrito
+
+    def abandonado(self, ahora=None):
+        """Tiene algo armado y nadie lo toca hace más de VIGENCIA."""
+        if not self.items and self.estado == 'activo':
+            return False
+        ahora = ahora or timezone.now()
+        return self.updated_at is not None and self.updated_at < ahora - self.VIGENCIA
+
+    def vaciar(self):
+        """Lo deja como recién creado: sin ítems, totales en cero y activo. Conserva el id."""
+        self.items = []
+        self.packs_aplicados = []
+        self.subtotal_servicios = self.subtotal_productos = Decimal('0')
+        self.descuento_combo = self.total = Decimal('0')
+        self.estado = 'activo'
+        self.save(update_fields=['items', 'packs_aplicados', 'subtotal_servicios',
+                                 'subtotal_productos', 'descuento_combo', 'total', 'estado',
+                                 'updated_at'])
 
     def esta_vigente(self):
         """Verifica si el carrito sigue vigente (no expirado)."""

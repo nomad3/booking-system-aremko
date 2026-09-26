@@ -192,7 +192,6 @@ def _carrito_en_curso(canal, external_id):
     try:
         from carrito_reservas.models import CarritoReserva
         from whatsapp_agent.models import PropuestaReserva
-        from django.utils import timezone
 
         # Si ya hay cotización vigente, esa manda (no mostrar el carrito en paralelo).
         prop = (PropuestaReserva.objects
@@ -205,7 +204,7 @@ def _carrito_en_curso(canal, external_id):
         if carrito is None or not carrito.items:
             return None
         # Frescura: no mostrar carritos abandonados.
-        if carrito.updated_at is None or carrito.updated_at < timezone.now() - timezone.timedelta(hours=24):
+        if carrito.abandonado():
             return None
 
         servicios = []

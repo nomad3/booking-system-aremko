@@ -996,14 +996,11 @@ def _estado_estructurado(canal, external_id):
     """
     if not external_id:
         return ''
-    from django.utils import timezone
     bloques = []
     try:
         from carrito_reservas.models import CarritoReserva
         carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
-        reciente = (carrito is not None and carrito.updated_at is not None
-                    and carrito.updated_at >= timezone.now() - timezone.timedelta(hours=24))
-        if carrito and carrito.items and reciente:
+        if carrito and carrito.items and not carrito.abandonado():
             lineas = []
             for it in carrito.items:
                 if it.get('tipo') == 'producto':
@@ -1478,7 +1475,8 @@ def _agregar_ambientacion_al_carrito(canal, external_id, servicio_id):
                 break
     else:
         from carrito_reservas.models import CarritoReserva
-        carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+        # La fecha de un carrito abandonado no es la de este pedido.
+        carrito = CarritoReserva.de_la_conversacion(canal, external_id)
         for it in (carrito.items if carrito else None) or []:
             if it.get('tipo') != 'producto' and it.get('fecha'):
                 fecha, hora = it.get('fecha'), it.get('hora')
@@ -1648,7 +1646,7 @@ def _estado_cotizacion_carrito(canal, external_id):
         from carrito_reservas.models import CarritoReserva
         carrito = CarritoReserva.objects.filter(
             canal=canal, external_id=external_id).first()
-        hay_carrito = bool(carrito and (carrito.items or []))
+        hay_carrito = bool(carrito and (carrito.items or []) and not carrito.abandonado())
     except Exception:  # noqa: BLE001
         pass
     return hay_cot, hay_carrito
@@ -2200,6 +2198,14 @@ def _producir_borrador(config, mensaje, historial='', saludo_estado='', saludo_n
     ident = (phone or '').strip()
     snap = None
     if ident:
+        try:
+            # Un carrito abandonado (más de 24 horas sin cambios) se vacía al volver el cliente,
+            # ANTES de la foto: si el turno escala, el rollback no le devuelve los ítems viejos
+            # con fecha de hoy (Jorge, 26-09-2026: un carrito de junio reapareció en septiembre).
+            from carrito_reservas.models import CarritoReserva
+            CarritoReserva.de_la_conversacion(canal, ident)
+        except Exception:  # noqa: BLE001 — igual se produce el borrador
+            logger.exception('[Agente WA] no se pudo revisar el carrito abandonado de %s', ident)
         try:
             snap = rollback.snapshot_estado_venta(canal, ident)
         except Exception:  # noqa: BLE001 — sin snapshot igual se produce el borrador
@@ -2857,7 +2863,9 @@ def _producir_borrador_inner(config, mensaje, historial='', saludo_estado='', sa
                 args = args or {}
                 external_id = phone if phone else '+56912345678'
 
-                carrito = CarritoReserva.objects.filter(canal=canal, external_id=external_id).first()
+                # Un carrito abandonado se vacía: cotizar sus ítems viejos sería venderle al
+                # cliente lo que armó hace meses (Jorge, 26-09-2026).
+                carrito = CarritoReserva.de_la_conversacion(canal, external_id)
                 if carrito is None or not carrito.items:
                     # H-103: con la cotización ya enviada, el carrito vacío NO es
                     # un problema — la venta vive en la PROPUESTA y el cliente la
