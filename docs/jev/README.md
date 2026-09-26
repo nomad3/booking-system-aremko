@@ -63,8 +63,8 @@ Tres tipos de pregunta:
 
 ## Las reglas del juego
 
-Aprendidas en el aprendizaje de Luna (25-09-2026) y en la bandeja de Datamatic
-(21 y 22-09-2026). Valen para cualquier proyecto nuevo.
+Aprendidas en el aprendizaje de Luna (25 y 26-09-2026) y en la bandeja de
+Datamatic (21 y 22-09-2026). Valen para cualquier proyecto nuevo.
 
 1. **Medir primero.** El dato gana, también contra el plan.
 2. **Corrida en seco que Jorge lee** antes de prender nada: Jev decide, se
@@ -82,6 +82,10 @@ Aprendidas en el aprendizaje de Luna (25-09-2026) y en la bandeja de Datamatic
 8. **No repetir.** Lo que ya está o ya se propuso no se vuelve a proponer.
 9. **Nada que vea el cliente cambia sin el OK de Jorge:** ni el conocimiento de
    Luna, ni un precio, ni un mensaje.
+10. **Lo que ya define el código no se aprende.** Cuando Deborah cierra una venta a
+    mano (pide los datos, manda el pago), eso no es una regla para Luna: su cierre
+    es el flujo de la cotización (decisión de Jorge, 26-09-2026). Copiarlo al
+    Conocimiento habría pisado el prompt.
 
 ## Cómo se arranca un proyecto
 
@@ -99,7 +103,7 @@ Aprendidas en el aprendizaje de Luna (25-09-2026) y en la bandeja de Datamatic
 
 | P | Proyecto | Qué decidiría Jev | Cuándo | Estado |
 |---|---|---|---|---|
-| P-54 | Aprendizaje de Luna (en `PENDIENTES.md`) | ¿Qué hizo Deborah al corregir a Luna? ¿Enseña algo? | — | **En producción**, interruptor apagado. Falta la etapa 5 |
+| P-54 | Aprendizaje de Luna (en `PENDIENTES.md`) | ¿Qué hizo Deborah al corregir a Luna? ¿Enseña algo? | — | **En producción** (etapas 0 a 5), interruptor apagado. Falta prenderlo y apretar el botón |
 | P-55 | [Bandeja ordenada](P-55_bandeja_ordenada.md) | ¿En qué quedó la conversación? ¿Falta responder algo? | Primero | Listo para medir. Datamatic ya lo usa, como etiqueta |
 | P-56 | [Pagos y transferencias](P-56_pagos_y_transferencias.md) | ¿A qué reserva corresponde este pago dudoso? | Primero | Espera una respuesta de Deborah (P-23) |
 | P-57 | [Rescate de conversaciones](P-57_rescate_de_conversaciones.md) | ¿Vale la pena un seguimiento? ¿Cuál? | Después | Antes, re-medir el efecto de la carta (P-34a) |
