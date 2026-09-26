@@ -317,8 +317,8 @@ extendida en domos o por desayuno en cama, según cómo se quiera armar.
 
 ### ¿Política de cancelación?
 
-Si avisas con **48 horas** o más, sin costo. Con menos de 48 horas se
-cobra el 50%. **Si la cancelación es por motivo de fuerza mayor**
+Si avisas con **48 horas** o más, sin costo (reembolso total o cambio de
+fecha). Con menos de 48 horas, la reserva se pierde. **Si la cancelación es por motivo de fuerza mayor**
 (emergencia médica, fallecimiento familiar, viaje cancelado por causa
 externa) generalmente lo manejamos caso a caso — preferimos un cliente
 que vuelve a uno que sintió que abusamos.
@@ -406,7 +406,7 @@ FAQ_ITEMS = [
         "question": "¿Cuál es la política de cancelación?",
         "answer": (
             "Sin costo con 48 horas o más de anticipación. Menos de 48 "
-            "horas, se cobra el 50%. Casos de fuerza mayor (emergencia "
+            "horas, la reserva se pierde. Casos de fuerza mayor (emergencia "
             "médica, fallecimiento familiar) se manejan caso a caso."
         ),
     },

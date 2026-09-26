@@ -407,6 +407,7 @@ def ficha_reserva_cliente(request, token):
         'bebida_sel': bebida_sel,
         'personalizar_bebida_url': reverse('ventas:ficha_personalizar_bebida', kwargs={'token': token}),
         'bebida_guardado': request.GET.get('bebida'),
+        'politicas_cancelacion': [] if solo_giftcards else _politicas_cancelacion(tipos_venta),
     }
     return render(request, 'ventas/ficha_reserva_cliente.html', context)
 
@@ -765,6 +766,28 @@ def _hora_cabana_del_payload(servicios_data):
     return None
 
 
+def _politicas_cancelacion(tipos):
+    """Las condiciones para anular o cambiar que aplican a esos servicios: los mismos textos
+    del resumen de reserva (admin → Configuración Resumen), un solo lugar para editarlos.
+
+    Jorge, 26-09-2026: el cliente tiene que verlas antes de aprobar y pagar. En la reserva
+    #6911 la clienta pagó, anuló el mismo día y nunca las había visto: ni la cotización ni
+    el Pase las mostraban."""
+    from ..models import ConfiguracionResumen
+    presentes = set(tipos or [])
+    try:
+        config = ConfiguracionResumen.get_solo()
+    except Exception:  # noqa: BLE001 — sin la configuración, la ficha igual se muestra
+        logger.exception('[ficha] no se pudieron leer las condiciones de cancelación')
+        return []
+    politicas = []
+    if 'cabana' in presentes and (config.politica_alojamiento or '').strip():
+        politicas.append(config.politica_alojamiento.strip())
+    if presentes & {'tina', 'masaje'} and (config.politica_tinas_masajes or '').strip():
+        politicas.append(config.politica_tinas_masajes.strip())
+    return politicas
+
+
 def _tipos_desde_payload(servicios_data):
     """Lista de tipo_servicio de los servicios del payload (con duplicados, p.ej. cabaña 2 veces
     en el Refugio → para distinguir Ritual de Refugio)."""
@@ -927,6 +950,8 @@ def cotizacion_cliente(request, token):
         'solo_giftcards': solo_gc,
         'vigente': propuesta.esta_vigente(),
         'aprobar_url': reverse('ventas:aprobar_cotizacion', kwargs={'token': token}),
+        'politicas_cancelacion': [] if solo_gc else _politicas_cancelacion(
+            _tipos_desde_payload(payload.get('servicios', []))),
     }
     problemas = _datos_por_corregir(cliente_data)
     context['faltan_datos'] = sorted(problemas)

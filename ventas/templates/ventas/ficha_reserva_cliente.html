@@ -411,6 +411,21 @@
         </details>
         {% endif %}
 
+        {% if politicas_cancelacion %}
+        <details{% if es_cotizacion %} open{% endif %}>
+          <summary>
+            <span class="ic i-tip">📄</span>
+            <span><span class="s-tt">Condiciones para anular o cambiar</span><br><span class="s-sub">{% if es_cotizacion %}Léelas antes de aprobar{% else %}Por si necesitas anular o cambiar tu reserva{% endif %}</span></span>
+            <span class="chev">▾</span>
+          </summary>
+          <div class="acc-bd">
+            {% for politica in politicas_cancelacion %}
+              <p class="pago-texto">{{ politica }}</p>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+
         {% if es_cotizacion %}
           <form method="post" action="{{ aprobar_url }}" style="margin-top:14px"
                 onsubmit="if(this.dataset.sent){return false;} this.dataset.sent='1';
@@ -447,7 +462,7 @@
             {% endif %}
             <button type="submit" class="btn" style="background:#3D6B4A">Aprobar cotización</button>
           </form>
-          <div class="com-note">{% if solo_giftcards %}Al aprobar, te enviamos los datos de transferencia; con el pago confirmado, las gift cards llegan a tu email.{% else %}Al aprobar, generamos tu reserva al instante.{% endif %}</div>
+          <div class="com-note">{% if solo_giftcards %}Al aprobar, te enviamos los datos de transferencia; con el pago confirmado, las gift cards llegan a tu email.{% else %}Al aprobar, generamos tu reserva al instante{% if politicas_cancelacion %} y aceptas las condiciones para anular o cambiar{% endif %}.{% endif %}</div>
         {% endif %}
 
         {% if not es_cotizacion %}
