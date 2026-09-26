@@ -527,7 +527,7 @@
                     Código ingresado: <strong>{{ codigo_invalido }}</strong>
                 </p>
                 {% endif %}
-                <a href="/giftcards/" class="btn-home">Volver al Inicio</a>
+                <a href="{% url 'ventas:giftcard_menu' %}" class="btn-home">Volver al Inicio</a>
             </div>
         </div>
         {% else %}

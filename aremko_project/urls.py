@@ -186,6 +186,11 @@ urlpatterns = [
     path('empresas/', empresas_view, name='empresas'),
     path('empresas/presentacion/', empresas_presentacion_view, name='empresas_presentacion'),
     path('empresas/solicitar-cotizacion/', solicitar_cotizacion_empresa, name='solicitar_cotizacion_empresa'),
+    # /giftcards/ daba 404: la vitrina vive en /ventas/giftcards/, y ahí llevaban el correo de la
+    # campaña de invierno 2026 y el botón «Volver al Inicio» de un código inválido (26-09-2026).
+    # Conserva el query string: los utm del correo y el ?classic=1.
+    path('giftcards/', RedirectView.as_view(pattern_name='ventas:giftcard_menu', permanent=True,
+                                            query_string=True)),
     # Flow.cl payment callbacks at root (sin prefix /ventas/)
     # Las settings FLOW_CONFIRMATION_URL y FLOW_RETURN_URL apuntan a estas
     # rutas root, asi que Flow llama a aremko.cl/payment/* directamente.
