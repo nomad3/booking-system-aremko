@@ -543,6 +543,17 @@ _Última revisión: 2026-09-25_
     corrigieron a mano. En 90 días, 3 de 378 cotizaciones con fecha a más de 180 días; la
     venta #6227 está para el 7-7-2027 (revisar si es el mismo error o una prueba).
 
+63. **P-63 · Los procesos automáticos de Render pueden seguir usando la dirección externa de la base de datos** —
+    El 26-09 Jorge cambió la `DATABASE_URL` del servicio web a la dirección interna: cada consulta bajó
+    de 50 ms a 0,5 ms y las alternativas del Refugio de 12 s (la bandeja las cortaba) a 0,95 s. Los crons y
+    otros servicios de Render tienen su propia `DATABASE_URL` y probablemente siguen con la externa:
+    aremko-reminders, aremko-surveys, aremko-reactivation (corren la rama `dev` de nov-2025),
+    recordatorios_luna, revisar pagos, sincronizar-calendarios-ota y cron-mail-empresas-frio, entre otros.
+    Revisar uno por uno cuál se conecta a la base de Aremko por la externa y cambiarla por la «Internal
+    Database URL» (misma base, misma región Oregon). Lo hace Jorge en el panel, paso a paso, para que la
+    contraseña no pase por Claude; al editar, apretar «Save changes» y desplegar. Detalle en
+    `[[reference-aremko-bd-conexion-externa]]`.
+
 ## Jev: proyectos para cuando haya tiempo
 
 > Índice, reglas del juego y orden sugerido en `docs/jev/README.md`. Cada línea apunta
