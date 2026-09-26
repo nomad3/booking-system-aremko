@@ -231,6 +231,20 @@ def _habla_del_cierre(texto):
     return bool(_RE_CIERRE.search(_normalizado(texto)))
 
 
+# El botón, 26-09-2026: el redactor escribió «No aplica, ya que no hay un catálogo de gift
+# cards explícito…» y en otra explicó que era «un detalle puntual de la reserva», y las dos
+# se propusieron igual, porque el tipo lo decide Jev. Si quien redacta ve que no hay regla,
+# no la hay.
+_RE_NO_APLICA = re.compile(r'^\W*(no aplica|no corresponde|n/a)\b')
+
+
+def _el_redactor_dice_que_no(tipo_del_redactor, texto):
+    """True si el redactor clasificó el caso como tono o puntual, o su texto empieza con
+    «No aplica». Pura."""
+    return (tipo_del_redactor not in TIPOS_ACCIONABLES
+            or bool(_RE_NO_APLICA.search(_normalizado(texto))))
+
+
 def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya_propuestas=()):
     """Como `clasificar()` —el mismo dict, más `confianza`—, pero el tipo lo decide Jev.
 
@@ -246,8 +260,9 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya
       cotización) u otra cosa → puntual, sin sugerencia. Solo enseña «corrigió un dato»
       (catálogo si es un precio o que algo exista; si no, regla), si generaliza y no está
       ya en el Conocimiento.
-    - Si vale la pena, el texto lo redacta el camino de siempre. No se propone si habla de
-      cómo cerrar la venta, ni si repite una línea del Conocimiento o una sugerencia anterior.
+    - Si vale la pena, el texto lo redacta el camino de siempre. No se propone si el
+      redactor lo ve puntual o dice «no aplica», si habla de cómo cerrar la venta, ni si
+      repite una línea del Conocimiento o una sugerencia anterior.
     """
     from . import grounding
     from .decisiones import decidir
@@ -305,6 +320,10 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya
     texto = (redaccion.get('texto_propuesto') or '').strip()
     if not texto:
         base['error'] = f'{tipo} sin texto propuesto: que lo mire una persona'
+        return base
+    if _el_redactor_dice_que_no(redaccion.get('tipo'), texto):
+        base.update(tipo='puntual', motivo=f"el redactor lo ve {redaccion.get('tipo')}: "
+                                           f"{redaccion.get('motivo') or texto}"[:300])
         return base
     if not _parece_una_regla(texto):
         base['error'] = f'{tipo}: la redacción no parece una regla de una línea; que la mire una persona'

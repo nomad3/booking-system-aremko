@@ -100,6 +100,29 @@ class ConJev(TestCase):
         self.assertEqual((d['tipo'], d['texto_propuesto']), ('puntual', ''))
         self.assertIn('cerrar la venta', d['motivo'])
 
+    def test_si_el_redactor_lo_ve_puntual_no_se_propone(self):
+        # El botón, 26-09: se propuso aunque el redactor explicó «un detalle puntual de la
+        # reserva y no una regla general».
+        d, _, _ = self._clasificar(_jev(), redaccion=dict(
+            _redaccion(texto='El horario de las 19:15 hrs para el miércoles 16 de septiembre no '
+                             'está disponible para el masaje para 3 personas.'),
+            tipo='puntual', motivo='un detalle puntual de la reserva y no una regla general'))
+        self.assertEqual((d['tipo'], d['texto_propuesto'], d['error']), ('puntual', '', ''))
+        self.assertIn('el redactor lo ve puntual', d['motivo'])
+
+    def test_si_el_redactor_dice_no_aplica_no_se_propone(self):
+        d, _, _ = self._clasificar(_jev(que_cambio='hecho_catalogo'), redaccion=dict(
+            _redaccion(texto='No aplica, ya que no hay un catálogo de gift cards explícito. La '
+                             'corrección se refiere a la denominación de una experiencia.'),
+            tipo='hecho_catalogo'))
+        self.assertEqual((d['tipo'], d['texto_propuesto']), ('puntual', ''))
+        self.assertIn('el redactor lo ve hecho_catalogo', d['motivo'])
+
+    def test_si_el_redactor_no_escribe_nada_sigue_siendo_un_error(self):
+        # Un JSON ilegible también llega como «puntual»: eso se reintenta, no se descarta.
+        d, _, _ = self._clasificar(_jev(), redaccion=dict(_redaccion(texto=''), tipo='puntual'))
+        self.assertIn('sin texto propuesto', d['error'])
+
     def test_poca_confianza_no_se_marca_puntual_en_silencio(self):
         d, _, redactar = self._clasificar(_jev(confianza=0.55))
         self.assertIn('no concluyente', d['error'])
@@ -333,6 +356,20 @@ class ElCierreEsLaCotizacion(SimpleTestCase):
                       'Las gift cards llegan por correo el mismo día del pago.',
                       'Los lunes no se ofrecen tinas después de las 19:30.'):
             self.assertFalse(aprendizaje._habla_del_cierre(texto), texto)
+
+
+class ElRedactorTambienOpina(SimpleTestCase):
+    def test_lo_que_el_redactor_descarta(self):
+        self.assertTrue(aprendizaje._el_redactor_dice_que_no('regla', 'No aplica: es un caso.'))
+        self.assertTrue(aprendizaje._el_redactor_dice_que_no('regla', '  N/A'))
+        self.assertTrue(aprendizaje._el_redactor_dice_que_no('tono', 'Responder más cálido.'))
+
+    def test_lo_que_si_es_una_regla(self):
+        self.assertFalse(aprendizaje._el_redactor_dice_que_no(
+            'regla', 'La temperatura del agua de las tinas es de 38 a 40 grados.'))
+        # «no aplica» en medio de la frase es parte de la regla.
+        self.assertFalse(aprendizaje._el_redactor_dice_que_no(
+            'regla', 'El descuento de la gift card no aplica a los masajes del sábado.'))
 
 
 @override_settings(LUNA_API_KEY='clave-de-prueba')
