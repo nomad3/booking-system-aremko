@@ -521,7 +521,27 @@ _Última revisión: 2026-09-25_
     no estaba disponible; (c) ofreció dos tinas sin hidromasaje separadas a las 19:30 del
     5-09 y no había; (d) mezcló la tina con hidromasaje con la de $50.000. No se arregla
     con reglas en el Conocimiento: hay que ver qué consultó Luna en cada caso (herramientas
-    y lo que devolvieron) antes de tocar nada. Sin empezar: espera el OK de Jorge.
+    y lo que devolvieron) antes de tocar nada.
+    **Diagnóstico 26-09** (Luna no guarda qué herramientas llamó: se reconstruyó con la
+    conversación, las cotizaciones y repitiendo la consulta):
+    (a) **Capacidad del catálogo:** la Tina Osorno figura para 5-6 personas y ninguna tina
+    para 8; la herramienta filtra estricto por capacidad (repetido hoy para el 3-10: con 8
+    da vacío). Deborah la ofreció igual. Luna además sugirió «otro día», cuando el problema
+    era la cantidad. **Criterio de Jorge (26-09): más de 6 personas → derivar a una
+    persona** (son pocos casos y muy distintos: una despedida quiere una sola tina, una
+    empresa puede repartirse en varias).
+    (b) **Masajes simultáneos:** `alternativas._masaje_solo` revisa el horario con 1
+    persona («a nivel de 1 masajista») aunque sean 3: basta una masajista libre para
+    ofrecer 3 masajes a la misma hora. El servicio figura para 1-2.
+    (c) **Varias tinas a la vez:** ninguna herramienta revisa «dos tinas a la misma hora»;
+    la herramienta devuelve una recomendación y Luna armó el par por su cuenta.
+    (d) **No era disponibilidad:** la clienta preguntó qué tina era y Luna le pidió el RUT.
+    (e) **Hallazgo aparte, fecha con guion:** `availability.resolver_fecha('03-10')` da
+    2027-09-03 (toma el día del mes en curso y, como ya pasó, salta al año siguiente);
+    con barra («03/10») funciona. El grupo de (a) recibió una cotización «Tina Osorno
+    (2027-09-03 14:30)» que aprobó; la reserva #6899 quedó bien (3-10-2026, pagada), la
+    corrigieron a mano. En 90 días, 3 de 378 cotizaciones con fecha a más de 180 días; la
+    venta #6227 está para el 7-7-2027 (revisar si es el mismo error o una prueba).
 
 ## Jev: proyectos para cuando haya tiempo
 
