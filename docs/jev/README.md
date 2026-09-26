@@ -107,7 +107,7 @@ Datamatic (21 y 22-09-2026). Valen para cualquier proyecto nuevo.
 
 | P | Proyecto | Qué decidiría Jev | Cuándo | Estado |
 |---|---|---|---|---|
-| P-54 | Aprendizaje de Luna (en `PENDIENTES.md`) | ¿Qué hizo Deborah al corregir a Luna? ¿Enseña algo? | — | **En producción** (etapas 0 a 5), interruptor apagado. Falta prenderlo y apretar el botón |
+| P-54 | Aprendizaje de Luna (en `PENDIENTES.md`) | ¿Qué hizo Deborah al corregir a Luna? ¿Enseña algo? | — | **Hecho 26-09**: interruptor prendido, 472 correcciones procesadas, 5 reglas aprobadas. Rutina: el botón una vez por semana |
 | P-55 | [Bandeja ordenada](P-55_bandeja_ordenada.md) | ¿En qué quedó la conversación? ¿Falta responder algo? | Primero | Listo para medir. Datamatic ya lo usa, como etiqueta |
 | P-56 | [Pagos y transferencias](P-56_pagos_y_transferencias.md) | ¿A qué reserva corresponde este pago dudoso? | Primero | Espera una respuesta de Deborah (P-23) |
 | P-57 | [Rescate de conversaciones](P-57_rescate_de_conversaciones.md) | ¿Vale la pena un seguimiento? ¿Cuál? | Después | Antes, re-medir el efecto de la carta (P-34a) |

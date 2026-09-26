@@ -486,9 +486,18 @@ _Última revisión: 2026-09-25_
     mensajes seguidos repite las 3 primeras palabras, 14% dice «te gustaría reservar»— y
     el silencio tras un «hola» solo (17% tras el saludo vs 30% tras la carta).
 
-54. **P-54 · Aprendizaje de Luna con Jev (encargo PROMPT_JEV_AREMKO.md)** — Etapas 0 a 5
-    EN PROD 25 y 26-09 (commits `b795b384` → `a4876e38`), con el interruptor
-    `usar_jev_en_aprendizaje` todavía APAGADO: medición de la cohorte, regla que separa las
+54. **P-54 · Aprendizaje de Luna con Jev (encargo PROMPT_JEV_AREMKO.md)** — ✅ **HECHO
+    26-09: Jorge prendió el interruptor y procesó los 30 días con el botón** (10 lotes, 472
+    correcciones vistas, US$0,10 en Jev). 13 sugerencias: 5 aprobadas (23 km del centro;
+    se puede llevar algo para beber a la tina, sin vidrio; toallas y batas para tinas se
+    traen o arriendan y las cabañas traen las suyas; agua de 38 a 40 grados igual en todas;
+    ropa interior para el masaje) y 8 descartadas (casos puntuales, fechas, generalidades y
+    el vino: Aremko no tiene patente de alcoholes, `[[project-aremko-alcohol-sin-patente]]`). Más una regla de Jorge: el alcohol no se ofrece
+    por escrito, se deriva. Conocimiento: 23 líneas. Ajuste del mismo día (`0a692f4a`): si
+    el redactor lo ve puntual o dice «no aplica», no se propone (frenó 2 de 6 malas).
+    **Rutina:** una vez por semana, apretar el botón hasta que diga «Procesados 0» (~2-3
+    veces). Historia de las etapas: EN PROD 25 y 26-09 (commits `b795b384` → `0a692f4a`):
+    medición de la cohorte, regla que separa las
     correcciones que enseñan, cliente fail-open de Jev con registro (`DecisionAgente`,
     migración 0015 aplicada), clasificación por «¿qué hizo Deborah?», sin plantillas, sin
     repetidas y con la redacción validada. Primera regla aplicada con el OK de Jorge: «la
@@ -502,9 +511,17 @@ _Última revisión: 2026-09-25_
     30 días. Cuarta corrida en seco (26-09, en prod, 50 correcciones): 0 propuestas, 8
     cierres a mano descartados (incluidas las 3 reglas de la tercera), la tabla ya está en
     el Conocimiento, 35 no concluyentes y 1 Jev lento (2 s). Lectura: el aprendizaje quedó
-    limpio pero rinde poco, 1 lección real en unas 100 correcciones. **Falta:** que Jorge
-    prenda el interruptor y apriete el botón hasta vaciar los 30 días (~10 veces). Respaldo
-    del punto de retorno: `~/Desktop/respaldo-aremko-2026-09-25-antes-jev/`.
+    limpio pero rinde poco, 1 lección real en unas 100 correcciones. Respaldo del punto de
+    retorno: `~/Desktop/respaldo-aremko-2026-09-25-antes-jev/`.
+
+62. **P-62 · Luna se equivoca con la disponibilidad de grupos y de varias unidades** —
+    Encontrado el 26-09 al procesar el aprendizaje: cuatro correcciones de Deborah en las
+    que Luna (a) le dijo a un grupo de 8 que no había tinas el sábado 3-10 y había Tina
+    Osorno a las 14:30 y 19:30; (b) ofreció masaje para 3 personas a las 19:15 del 16-09 y
+    no estaba disponible; (c) ofreció dos tinas sin hidromasaje separadas a las 19:30 del
+    5-09 y no había; (d) mezcló la tina con hidromasaje con la de $50.000. No se arregla
+    con reglas en el Conocimiento: hay que ver qué consultó Luna en cada caso (herramientas
+    y lo que devolvieron) antes de tocar nada. Sin empezar: espera el OK de Jorge.
 
 ## Jev: proyectos para cuando haya tiempo
 
