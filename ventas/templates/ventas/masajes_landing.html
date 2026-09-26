@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load ventas_extras %}
 
 {# Landing de Masajes — "Un masaje para los cinco sentidos" (docs/PROPUESTA_LANDING_MASAJES.md). #}
 {# Reemplaza el catálogo como cara de /masajes/ (la versión catálogo sigue en ?classic=1, donde #}
@@ -371,6 +372,12 @@
         <p class="faq-a">Sí, y es parte del circuito: pasarelas de madera que emergen entre el bosque
            nativo conectan la recepción, los domos y el mirador del río. No es un traslado — es un paseo.</p>
       </div>
+      {% politica_cancelacion as politica %}{% if politica %}
+      <div class="faq-item">
+        <p class="faq-q">¿Cuál es la política de cancelación?</p>
+        <p class="faq-a">{{ politica }}</p>
+      </div>
+      {% endif %}
     </div>
   </section>
 

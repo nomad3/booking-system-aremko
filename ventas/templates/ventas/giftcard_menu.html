@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load ventas_extras %}
 
 {# GiftCards — "Regala una experiencia junto al río" (docs/PROPUESTA_GIFTCARDS_EXPERIENCIAS.md). #}
 {# DECISIÓN RADICAL (Jorge 2026-07-05): solo se regalan EXPERIENCIAS — las 4 insignia + la      #}
@@ -305,6 +306,12 @@
         <p class="faq-a">El saldo queda disponible durante la vigencia para una próxima visita o
            para productos en el lugar (tablas, jugos, ambientaciones).</p>
       </div>
+      {% politica_cancelacion as politica %}{% if politica %}
+      <div class="faq-item">
+        <p class="faq-q">¿Y si hay que anular o cambiar la reserva?</p>
+        <p class="faq-a">La reserva que hagan con la GiftCard tiene la misma política que cualquier reserva: {{ politica }}</p>
+      </div>
+      {% endif %}
     </div>
   </section>
 

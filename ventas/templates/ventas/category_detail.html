@@ -139,6 +139,7 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
+        {% politica_cancelacion as politica_ld %}
         {% for faq in seo_content.get_faqs %}
         {
             "@type": "Question",
@@ -147,8 +148,18 @@
                 "@type": "Answer",
                 "text": "{{ faq.respuesta }}"
             }
-        }{% if not forloop.last %},{% endif %}
+        }{% if not forloop.last or politica_ld %},{% endif %}
         {% endfor %}
+        {% if politica_ld %}
+        {
+            "@type": "Question",
+            "name": "¿Cuál es la política de cancelación?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "{{ politica_ld|escapejs }}"
+            }
+        }
+        {% endif %}
     ]
 }
 </script>
@@ -1277,6 +1288,17 @@ html {
                     </div>
                 </div>
                 {% endfor %}
+                {% politica_cancelacion as politica_faq %}
+                {% if politica_faq %}
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>¿Cuál es la política de cancelación?</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>{{ politica_faq }}</p>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -1301,7 +1323,7 @@ html {
                         <span>¿Cuál es la política de cancelación?</span>
                     </div>
                     <div class="faq-answer">
-                        <p>Si nos avisas con 48 horas o más de anticipación, te devolvemos el 100% o cambiamos la fecha sin costo; en cabañas, las 48 horas se cuentan desde el check-in (16:00). Con menos de 48 horas, la reserva se pierde. Vale para tinas, masajes y cabañas.</p>
+                        {% politica_cancelacion as politica_faq_fija %}<p>{{ politica_faq_fija|default:"Escríbenos por WhatsApp y te contamos las condiciones." }}</p>
                     </div>
                 </div>
                 <div class="faq-item">

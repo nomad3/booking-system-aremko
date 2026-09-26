@@ -440,3 +440,15 @@ def hora_llegada(llegadas, reserva_id):
         return (llegadas or {}).get(int(reserva_id)) or ''
     except (TypeError, ValueError):
         return ''
+
+
+@register.simple_tag
+def politica_cancelacion():
+    """La política de cancelación única de Aremko (Jorge, 26-09-2026): el texto del admin
+    (Configuración Resumen), el mismo de la cotización, el Pase y el resumen de reserva. Todas
+    las preguntas frecuentes la leen de acá: se cambia en un solo lugar."""
+    from ventas.models import ConfiguracionResumen
+    try:
+        return (ConfiguracionResumen.get_solo().politica_tinas_masajes or '').strip()
+    except Exception:  # noqa: BLE001 — una página nunca se cae por esto
+        return ''

@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load ventas_extras %}
 {% load humanize %} {# Load humanize template tags #}
 {% load l10n %} {# Para |unlocalize al inyectar números en JavaScript #}
 
@@ -457,8 +458,7 @@ Email para comprobante: ventas@aremko.cl</pre>
                             <div class="trust-line"><i class="fas fa-shield-alt"></i> Tus datos están protegidos</div>
                             <div class="cancellation-note">
                                 <strong><i class="far fa-calendar-check me-1"></i>Política de cancelación:</strong>
-                                Avisa con <strong>48 horas o más</strong> de anticipación y te devolvemos el <strong>100%</strong> o cambiamos la fecha sin costo
-                                (en cabañas, se cuentan desde el check-in de las 16:00). Con menos de 48 horas, la reserva se pierde.
+                                {% politica_cancelacion %}
                             </div>
                         </div>
                     </div>

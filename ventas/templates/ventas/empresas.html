@@ -1,5 +1,6 @@
 {% extends 'ventas/base_public.html' %}
 {% load static %}
+{% load ventas_extras %}
 
 {% block title %}Reuniones Corporativas de Alto Nivel - Aremko Empresas{% endblock %}
 
@@ -1251,9 +1252,7 @@ exclusivas con desayuno gourmet, sala ejecutiva y wellness. Reserva tu espacio V
                 </div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Si nos avisan con 48 horas o más de anticipación, devolvemos el 100% o cambiamos la fecha
-                        sin costo; en cabañas, las 48 horas se cuentan desde el check-in (16:00). Con menos de 48
-                        horas, la reserva se pierde. Vale para tinas, masajes y cabañas.
+                        {% politica_cancelacion %}
                     </div>
                 </div>
             </div>

@@ -1,5 +1,6 @@
 {% extends "ventas/base_public.html" %}
 {% load static %}
+{% load ventas_extras %}
 
 {% block title %}Garantía Aremko: si tu tina llega a 37°C o menos, es gratis - Aremko Spa Boutique{% endblock %}
 
@@ -58,7 +59,15 @@
         "@type": "Answer",
         "text": "No. Todas las tinas de Aremko están totalmente techadas. Ni el viento, ni la lluvia, ni el frío del sur afectan la temperatura del agua. Llueva o brille el sol, la tina llega a 38°C."
       }
-    }
+    }{% politica_cancelacion as politica_ld %}{% if politica_ld %},
+    {
+      "@type": "Question",
+      "name": "¿Cuál es la política de cancelación?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ politica_ld|escapejs }}"
+      }
+    }{% endif %}
   ]
 }
 </script>
@@ -246,6 +255,13 @@
                     <h4>¿El frío, la lluvia o el viento del sur afectan la temperatura del agua?</h4>
                     <p class="mb-0">No. Todas las tinas de Aremko están <strong>totalmente techadas</strong>. Ni el viento, ni la lluvia, ni el frío del sur afectan la temperatura del agua. Llueva o brille el sol, la tina llega a 38°C.</p>
                 </div>
+                {% politica_cancelacion as politica %}{% if politica %}
+
+                <div class="faq-item-g">
+                    <h4>¿Cuál es la política de cancelación?</h4>
+                    <p class="mb-0">{{ politica }}</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
