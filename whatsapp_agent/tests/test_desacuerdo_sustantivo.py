@@ -55,3 +55,25 @@ class LasTildes(SimpleTestCase):
         self.assertFalse(es_desacuerdo_sustantivo(
             'Está disponible la tina clásica el lunes para dos personas, ¿te acomoda?',
             'Esta disponible la tina clasica el lunes para dos personas, ¿te acomoda?'))
+
+
+class LasPlantillasNoSonCorrecciones(SimpleTestCase):
+    """Segunda corrida en seco del 25-09: 9 de 12 propuestas eran el link de la cotización o
+    del Pase que Deborah manda con un botón. En 30 días, 123 de 594 (21%)."""
+
+    def test_el_link_de_la_cotizacion(self):
+        self.assertFalse(es_desacuerdo_sustantivo(
+            '¡Perfecto! Te preparo la cotización (total $140,000) y te la enviamos en un momento.',
+            'Hola 🌿 Te preparamos la cotización de tu experiencia en Aremko. Revísala con calma y, '
+            'si todo está bien, tócala para aprobarla: https://www.aremko.cl/ventas/propuesta/abc123/'))
+
+    def test_el_link_del_pase(self):
+        self.assertFalse(es_desacuerdo_sustantivo(
+            'Perfecto, me alegra saber que todo está listo con el pago.',
+            'Hola, acá está tu Pase para Aremko 🔑 https://www.aremko.cl/ventas/reserva/NjkwNQ:1x/ '
+            'Adentro está el QR que muestras al llegar'))
+
+    def test_otro_link_si_puede_enseñar(self):
+        self.assertTrue(es_desacuerdo_sustantivo(
+            BORRADOR, 'Para llegar usa este mapa https://maps.app.goo.gl/abc y pregunta en recepción.'))
+

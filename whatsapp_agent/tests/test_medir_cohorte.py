@@ -54,8 +54,11 @@ class ElComando(TestCase):
         self._fb(*SUSTANTIVO)                                     # cohorte
         self._fb(*SUSTANTIVO, procesado=True)                     # sustantivo ya procesado
         self._fb(*SUSTANTIVO, dias_atras=40)                      # fuera de 30 días
+        self._fb('Te preparo la cotización.', 'Hola 🌿 tócala para aprobarla: '
+                 'https://www.aremko.cl/ventas/propuesta/abc/')     # plantilla
         salida = self._correr()
-        self.assertIn('4 borradores · 3 editados', salida)
+        self.assertIn('plantillas   1', salida)
+        self.assertIn('5 borradores · 4 editados', salida)
         self.assertIn('sin tocar    1', salida)
         self.assertIn('cortos < 40: 1 · sustantivos: 2', salida)
         self.assertIn('Cohorte a clasificar (sustantivos sin procesar): 1', salida)

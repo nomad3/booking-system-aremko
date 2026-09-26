@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 LARGO_MINIMO = 40          # «ya», «te llamo»: ningún borrador habría ganado
 PARECIDO_RETOQUE = 0.5     # desde aquí, Deborah retocó el borrador, no lo descartó
 _RE_CIFRA = re.compile(r'\b\d{1,2}:\d{2}\b|\$\s?\d[\d.]*\d')
+# Lo que Deborah manda con un botón después del borrador de Luna —el link de la cotización
+# («…tócala para aprobarla») o el del Pase— no corrige nada: es el paso siguiente del
+# sistema. Segunda corrida en seco del 25-09: 9 de 12 propuestas eran esto (21% de la cohorte).
+_RE_PLANTILLA = re.compile(r'/ventas/(propuesta|reserva)/')
 
 
 def _normalizado(texto):
@@ -37,15 +41,18 @@ def _cifras(texto):
 
 
 def grupo_de_la_correccion(borrador, enviado):
-    """'vacio', 'corto', 'retoque_cifra', 'retoque_parecido' o 'sustantivo'. Pura.
+    """'vacio', 'plantilla', 'corto', 'retoque_cifra', 'retoque_parecido' o 'sustantivo'. Pura.
 
-    Los criterios del encargo, en su orden: los dos textos con algo; lo enviado de al
+    Los criterios del encargo, en su orden: los dos textos con algo; que lo enviado no sea
+    una plantilla con link (cotización o Pase); lo enviado de al
     menos 40 caracteres; si el borrador traía una hora o un precio y lo enviado repite
     alguna de esas cifras, Luna acertó (retoque); si se parecen ≥ 0,5, también es un
     retoque. Lo que queda es un desacuerdo sustantivo: Deborah descartó el borrador y
     escribió otra cosa con contenido. Medido el 25-09: 2.281 de 4.839 en 90 días."""
     if not (borrador or '').strip() or not (enviado or '').strip():
         return 'vacio'
+    if _RE_PLANTILLA.search(enviado):
+        return 'plantilla'
     if len(enviado.strip()) < LARGO_MINIMO:
         return 'corto'
     cifras = _cifras(borrador)
@@ -163,14 +170,18 @@ def contexto_de_la_correccion(fb, mensajes=MENSAJES_DE_CONTEXTO):
     return '\n'.join(lineas)
 
 
-def _repetida(texto, conocimiento):
-    """Qué dice lo mismo que `texto`: una línea del Conocimiento o una sugerencia anterior
-    (pendiente, aprobada o descartada), o '' si nada. Una descartada tampoco se repite."""
+def _repetida(texto, conocimiento, ya_propuestas=()):
+    """Qué dice lo mismo que `texto`: una línea del Conocimiento, una propuesta anterior de
+    esta misma corrida o una sugerencia guardada (pendiente, aprobada o descartada), o '' si
+    nada. Una descartada tampoco se repite."""
     from .models import SugerenciaAprendizaje
 
     t = _normalizado(texto)
     if not t:
         return ''
+    for anterior in ya_propuestas or ():
+        if SequenceMatcher(None, t, _normalizado(anterior)).ratio() >= PARECIDO_REPETIDA:
+            return 'repite una propuesta de esta misma corrida'
     for linea in (conocimiento or '').splitlines():
         if linea.strip() and SequenceMatcher(None, t, _normalizado(linea)).ratio() >= PARECIDO_REPETIDA:
             return 'ya está en el Conocimiento'
@@ -181,7 +192,22 @@ def _repetida(texto, conocimiento):
     return ''
 
 
-def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
+# Lo que el redactor copia del prompt no es una regla. Segunda corrida en seco del 25-09:
+# para «la tabla no está incluida en la experiencia romántica» escribió «Si el cliente
+# pregunta QUÉ INCLUYE… responde con el detalle… en PROSA (nunca como lista con viñetas…».
+LARGO_MAXIMO_REGLA = 280
+_RE_INSTRUCCION_COPIADA = re.compile(r'`|\bprosa\b|\bviñetas?\b|\basteriscos?\b|\bherramienta'
+                                     r'|\bresponde con\b|\bdile\b|\bsecci[oó]n\b', re.IGNORECASE)
+
+
+def _parece_una_regla(texto):
+    """Una línea, de largo razonable y sin instrucciones copiadas del prompt. Pura."""
+    t = (texto or '').strip()
+    return (15 <= len(t) <= LARGO_MAXIMO_REGLA and '\n' not in t
+            and not _RE_INSTRUCCION_COPIADA.search(t))
+
+
+def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya_propuestas=()):
     """Como `clasificar()` —el mismo dict, más `confianza`—, pero el tipo lo decide Jev.
 
     - `contexto`: la conversación hasta la pregunta del cliente (`contexto_de_la_correccion`);
@@ -250,7 +276,10 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto=''):
     if not texto:
         base['error'] = f'{tipo} sin texto propuesto: que lo mire una persona'
         return base
-    repetida = _repetida(texto, config.conocimiento)
+    if not _parece_una_regla(texto):
+        base['error'] = f'{tipo}: la redacción no parece una regla de una línea; que la mire una persona'
+        return base
+    repetida = _repetida(texto, config.conocimiento, ya_propuestas)
     if repetida:
         base.update(tipo='puntual', motivo=repetida[:300])
         return base
@@ -375,9 +404,11 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
     detalle = []
     # Encargo JEV: con el interruptor apagado, exactamente el camino de siempre.
     usar_jev = forzar_jev or bool(getattr(config, 'usar_jev_en_aprendizaje', False))
+    propuestas = []   # para no proponer dos veces lo mismo en una corrida (sobre todo en seco)
     for fb in pendientes:
         d = (clasificar_con_jev(config, fb.borrador, fb.enviado, referencia=fb.id,
-                                contexto=contexto_de_la_correccion(fb)) if usar_jev
+                                contexto=contexto_de_la_correccion(fb),
+                                ya_propuestas=propuestas) if usar_jev
              else clasificar(config, fb.borrador, fb.enviado))
         fila = {'feedback_id': fb.id}
         if en_seco:
@@ -389,6 +420,7 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
             detalle.append(dict(fila, estado='error', error=d['error']))
             continue  # NO marcar procesado → se reintenta (o lo mira una persona)
         if d['tipo'] in TIPOS_ACCIONABLES:
+            propuestas.append(d['texto_propuesto'])
             if not en_seco:
                 SugerenciaAprendizaje.objects.create(
                     feedback=fb, phone=fb.phone, tipo=d['tipo'],

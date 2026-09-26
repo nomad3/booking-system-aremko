@@ -61,6 +61,8 @@ class Command(BaseCommand):
                f'parecido ≥ {PARECIDO_RETOQUE}: {grupos["retoque_parecido"]})')
         salida(f'  descartado   {descartados}  (cortos < {LARGO_MINIMO}: {grupos["corto"]} · '
                f'sustantivos: {grupos["sustantivo"]})')
+        salida(f'  plantillas   {grupos["plantilla"]}  (link de cotización o del Pase: el paso '
+               f'siguiente, no una corrección)')
         if grupos['vacio']:
             salida(f'  vacíos       {grupos["vacio"]}')
         salida(self.style.MIGRATE_HEADING(

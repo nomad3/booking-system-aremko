@@ -153,6 +153,46 @@ class ConJev(TestCase):
         self.assertEqual(d['motivo'], 'ya está en el Conocimiento')
 
 
+class LaRedaccionTieneQueSerUnaRegla(TestCase):
+    """Segunda corrida en seco del 25-09: el redactor copió una instrucción del prompt."""
+    COPIADA = ('Si el cliente pregunta QUÉ INCLUYE o QUÉ CONTIENE una ambientación, responde con el '
+               'detalle que acompaña a su nombre en esta lista, redactado natural y en PROSA (nunca '
+               'como lista con viñetas ni asteriscos); si esa ambientación no trae detalle acá, dile '
+               'con calidez que le confirmas los detalles con el equipo.')
+
+    def setUp(self):
+        self.config = WhatsAppAgentConfig.get_solo()
+        parche = mock.patch(CATALOGO, return_value='CATÁLOGO')
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def test_lo_copiado_del_prompt_no_se_propone(self):
+        self.assertFalse(aprendizaje._parece_una_regla(self.COPIADA))
+        with mock.patch(DECIDIR, return_value=_jev()), \
+                mock.patch(CLASIFICAR, return_value=_redaccion(texto=self.COPIADA)):
+            d = aprendizaje.clasificar_con_jev(self.config, BORRADOR, ENVIADO)
+        self.assertIn('no parece una regla', d['error'])
+
+    def test_una_regla_de_verdad_si(self):
+        self.assertTrue(aprendizaje._parece_una_regla(
+            'La tabla se agrega aparte: no está incluida en la experiencia romántica.'))
+        self.assertFalse(aprendizaje._parece_una_regla('corta'))
+        self.assertFalse(aprendizaje._parece_una_regla('Primera línea.\nSegunda línea larga aquí.'))
+
+
+class SinRepetirEnLaMismaCorrida(TestCase):
+    def test_la_segunda_igual_no_se_propone(self):
+        for _ in range(2):
+            AgenteFeedback.objects.create(phone='+56911112222', borrador=BORRADOR,
+                                          enviado=ENVIADO, editado=True)
+        with mock.patch(CATALOGO, return_value='CATÁLOGO'), \
+                mock.patch(DECIDIR, return_value=_jev()), \
+                mock.patch(CLASIFICAR, return_value=_redaccion()):
+            res = aprendizaje.procesar_pendientes(10, en_seco=True, forzar_jev=True)
+        self.assertEqual(res['creadas'], 1)
+        self.assertEqual(res['detalle'][1]['tipo'], 'puntual')
+
+
 class LaPistaDelRedactor(TestCase):
     def test_sin_pista_el_prompt_de_siempre(self):
         antes = aprendizaje.build_clasificador_user(BORRADOR, ENVIADO)
