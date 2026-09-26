@@ -501,6 +501,44 @@ _Última revisión: 2026-09-25_
     queda pegado) y procesar la cohorte de 30 días (471) con el botón manual (Jorge eligió
     botón, no cron). Respaldo del punto de retorno: `~/Desktop/respaldo-aremko-2026-09-25-antes-jev/`.
 
+## Jev: proyectos para cuando haya tiempo
+
+> Índice, reglas del juego y orden sugerido en `docs/jev/README.md`. Cada línea apunta
+> a su ficha de una página. Se arrancan diciendo «vamos con el P-5x»: se lee la ficha,
+> se mide lo que pide y recién ahí se escribe el plan.
+
+55. **P-55 · Jev: bandeja ordenada por lo que falta responder** — Primero. Hoy
+    «pendiente» es solo la marca `requiere_atencion`, que se borra al responder o al
+    marcar atendido. En Datamatic, Jev contradijo a la bandeja en 5 de 15 conversaciones
+    y Jorge validó los 5. Primero solo etiqueta; si acierta 8 de cada 10 en una semana,
+    ordena. Ficha: `docs/jev/P-55_bandeja_ordenada.md`.
+56. **P-56 · Jev: decidir los pagos dudosos del Conciliador** — Primero, pero espera el
+    P-23 (qué significa «ignorar»: el 76% de la plata de julio). Jev elige la reserva de
+    los movimientos en «revisar»; si coincide con la regla fija con 0,90 o más, es el
+    camino al auto-aplicar (P-07). Ficha: `docs/jev/P-56_pagos_y_transferencias.md`.
+57. **P-57 · Jev: rescate de conversaciones que mueren después del precio** — Después.
+    El 52% de las que no cotizan (unas 249 al mes) muere tras recibir precio o
+    información, y los recordatorios de Luna no las cubren (solo cotizaciones y pagos).
+    Seguimiento como borrador para Deborah dentro de la ventana de 24 h, con grupo de
+    comparación. Antes, el P-34a. Ficha: `docs/jev/P-57_rescate_de_conversaciones.md`.
+58. **P-58 · Jev: que la queja de una encuesta se vea el mismo día** — Después, y el más
+    chico. `evaluar_followup()` ya tiene el criterio «texto marcado por IA como urgente»,
+    pero nadie llena `analisis_ia`: una queja escrita con buen NPS espera al análisis de
+    los lunes. Jev llena el campo al llegar la encuesta. Ficha:
+    `docs/jev/P-58_encuestas_y_resenas.md`.
+59. **P-59 · Jev: medir el tono de Luna cada semana** — Después de re-medir el P-53.
+    Termómetro semanal (100 borradores: natural, rígido o robot), calibrado primero
+    contra el criterio de Jorge; puede terminar en «no sirve». Ficha:
+    `docs/jev/P-59_tono_de_luna.md`.
+60. **P-60 · Jev en Telar: que una pieza no contradiga los datos del negocio** —
+    Después, y se construye en Datamatic. El revisor de Telar no compara lo que la pieza
+    afirma contra los datos exactos (el caso del martes, 15-09); Jev agregaría una
+    observación, sin bloquear. Ficha: `docs/jev/P-60_telar_datos_exactos.md`.
+61. **P-61 · Jev: el control antes de que Luna responda sola** — Al final, y solo el día
+    que `modo` pase a `auto_info` (hoy nada en Django lo implementa). Tres preguntas al
+    borrador: si salen bien con 0,90, sale solo; si no, queda para Deborah. Ficha:
+    `docs/jev/P-61_control_antes_de_enviar.md`.
+
 ## Asistente de Publicaciones (community manager)
 
 > Este módulo (cola semanal + revisión IA de material + publicar en un clic) se
