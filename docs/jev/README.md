@@ -16,7 +16,8 @@ conversación, un pago, una encuesta) y una o varias preguntas con sus opciones.
 Devuelve la opción elegida y **qué tan seguro está**, de 0 a 1.
 
 - No conversa ni redacta: para eso está el modelo de Luna.
-- Cuesta unos US$0,00002 por decisión y responde en 0,1 a 0,2 segundos.
+- Cuesta de US$0,00002 a US$0,0002 por decisión, según cuánto hay que mostrarle, y
+  responde en 0,1 a 0,2 segundos.
 - Es de TypeSafe (`typesafe/jev-1.13`) y se llama por una ruta **en alfa** de
   OpenRouter, con la misma llave que ya usa Aremko. El nombre y la dirección
   pueden cambiar; por eso se cambian sin tocar código (ver abajo).
@@ -54,8 +55,11 @@ Tres tipos de pregunta:
 
 ## Lo que cuesta de verdad
 
-- **Aprendizaje de Luna:** unos US$0,00002 por corrección clasificada. Procesar
-  todas las correcciones de un mes cuesta unos US$0,05.
+- **Aprendizaje de Luna:** unos US$0,0002 por corrección, porque Jev lee el
+  catálogo, el Conocimiento y la conversación completos (medido el 26-09: 100
+  decisiones, US$0,019, 150 ms de mediana). Las ~470 correcciones que enseñan en
+  un mes cuestan menos de US$0,10. Una pregunta corta, sin catálogo, cuesta diez
+  veces menos (US$0,00002, la prueba del 25-09).
 - **Bandeja de Datamatic:** 24 conversaciones completas costaron US$0,00095 en
   total, con 192 ms de mediana.
 - **Ninguno de los siete proyectos pasa de un dólar al mes.** El costo no es lo
