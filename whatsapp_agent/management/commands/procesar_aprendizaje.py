@@ -16,6 +16,9 @@ Encargo JEV, etapa 4 — la corrida en seco que Jorge lee antes de procesar nada
   --dias N            solo las de los últimos N días
   --en-seco           clasifica e imprime, SIN crear sugerencias y SIN marcar procesado
   --jev               usa Jev aunque el interruptor de la configuración esté apagado
+
+Etapa 5: con el interruptor prendido, el botón de la página Agente IA procesa lo mismo que
+`--solo-sustantivos --dias 30`, y los no concluyentes se marcan vistos.
 """
 
 from collections import Counter
@@ -50,13 +53,15 @@ class Command(BaseCommand):
             if d.get('estado') == 'error':
                 self.stdout.write(self.style.ERROR(
                     f'  fb#{d["feedback_id"]}: error ({d["error"]}) — se reintentará'))
+            elif d.get('estado') == 'no_concluyente':
+                self.stdout.write(f'  fb#{d["feedback_id"]}: {d["error"]} — marcada vista')
             elif d.get('texto'):
                 self.stdout.write(self.style.SUCCESS(f'  fb#{d["feedback_id"]} → {d["tipo"]}: {d["texto"]}'))
             else:
                 self.stdout.write(f'  fb#{d["feedback_id"]} → {d["tipo"]} (sin sugerencia)')
         self.stdout.write(self.style.MIGRATE_HEADING(
             f'\nProcesados: {res["procesados"]} · Sugerencias creadas: {res["creadas"]} '
-            f'· Errores: {res["errores"]}'))
+            f'· No concluyentes: {res["no_concluyentes"]} · Errores: {res["errores"]}'))
 
     def _en_seco(self, res):
         """Una ficha por corrección: qué propuso Luna, qué envió Deborah y qué decidió el
@@ -66,9 +71,8 @@ class Command(BaseCommand):
         for d in res['detalle']:
             conf = d.get('confianza')
             conf_txt = f' · confianza {conf:.2f}' if conf is not None else ''
-            if d.get('estado') == 'error':
-                resultado = ('NO CONCLUYENTE' if 'no concluyente' in d['error']
-                             else 'ERROR')
+            if d.get('estado') in ('error', 'no_concluyente'):
+                resultado = 'NO CONCLUYENTE' if d['estado'] == 'no_concluyente' else 'ERROR'
                 detalle = d['error']
             elif d.get('texto'):
                 resultado = f'PROPONDRÍA {d["tipo"].upper()}'

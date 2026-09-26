@@ -929,7 +929,8 @@ def agente_procesar_aprendizaje(request):
 
     Procesa un lote acotado (~50) de `AgenteFeedback` editados sin procesar y crea las
     `SugerenciaAprendizaje` accionables. Idempotente; pensado para un botón manual. Si
-    queda backlog, se vuelve a llamar. Devuelve conteos.
+    queda backlog, se vuelve a llamar. Devuelve conteos. Con Jev prendido, solo las
+    correcciones que enseñan algo de los últimos 30 días (`opciones_del_boton`).
     """
     err = _check_luna_key(request)
     if err:
@@ -937,17 +938,18 @@ def agente_procesar_aprendizaje(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
     try:
-        from whatsapp_agent.aprendizaje import procesar_pendientes
+        from whatsapp_agent.aprendizaje import opciones_del_boton, procesar_pendientes
         try:
             data = json.loads(request.body or b'{}')
         except (ValueError, UnicodeDecodeError):
             data = {}
         limite = data.get('limite') or 50
-        res = procesar_pendientes(limite)
+        res = procesar_pendientes(limite, **opciones_del_boton())
         return JsonResponse({
             'ok': True,
             'procesados': res['procesados'],
             'creadas': res['creadas'],
+            'no_concluyentes': res['no_concluyentes'],
             'errores': res['errores'],
             'resumen': res['detalle'],
         })

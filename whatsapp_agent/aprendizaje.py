@@ -121,8 +121,14 @@ PREGUNTAS_CORRECCION = {
         'instructions': '¿Lo que enseña esta corrección ya está dicho en el Conocimiento actual?',
     },
 }
-# Lo único que enseña: corregir un dato mal dicho o dar el paso de venta que Luna no dio.
-ACCIONES_QUE_ENSENAN = {'corrigio_dato', 'avanzo_el_proceso'}
+# Lo único que enseña: corregir un dato mal dicho.
+# Jorge, 26-09-2026: Luna cierra con el link de la cotización. Cuando Deborah «avanzó el
+# proceso» (pidió los datos, ingresó la reserva, mandó los datos de pago) estaba cerrando a
+# mano: eso no es una regla para Luna, cuyo cierre ya lo define el prompt (verificar el
+# cliente, pedir SOLO lo que falta, cotización). La tercera corrida en seco propuso justo
+# esas tres reglas, y con el Conocimiento mandando sobre el prompt, Luna le habría pedido
+# los datos también a quien ya los tiene.
+ACCIONES_QUE_ENSENAN = {'corrigio_dato'}
 PISTAS_DE_REDACCION = {
     ('corrigio_dato', 'hecho_catalogo'): (
         'la persona corrigió un dato del catálogo que el asistente dijo mal (un precio, o que un '
@@ -131,11 +137,10 @@ PISTAS_DE_REDACCION = {
     ('corrigio_dato', 'regla'): (
         'la persona corrigió algo que el asistente dijo mal (qué incluye un servicio o una '
         'condición). En `texto_propuesto` escribe la regla GENERAL en una línea, no el caso.'),
-    ('avanzo_el_proceso', 'regla'): (
-        'la persona dio el paso siguiente de la venta que el asistente no dio (pedir los datos, '
-        'confirmar o el pago). En `texto_propuesto` escribe como regla GENERAL, en una línea, '
-        'cuándo y qué hacer; no describas este caso.'),
 }
+# El botón (H-013) procesa lo que Jorge eligió el 25-09-2026: botón manual, no cron, y solo
+# los últimos 30 días.
+DIAS_DEL_BOTON = 30
 
 
 MENSAJES_DE_CONTEXTO = 6
@@ -207,20 +212,42 @@ def _parece_una_regla(texto):
             and not _RE_INSTRUCCION_COPIADA.search(t))
 
 
+# Jorge, 26-09-2026: cómo se cierra la venta (qué datos pedir, cuándo, y el pago) lo define
+# el flujo de la cotización, no el Conocimiento. Se mira el texto ya sin tildes. «pide» y
+# «solicita» solo cuentan pegados al dato: «si el cliente pide precio» no es cerrar.
+_RE_CIERRE = re.compile(
+    r'\b(pedir|pedirle|pedirles|solicitar|solicitarle|solicitarles)\b[^.;:]{0,60}?'
+    r'\b(nombre|rut|correo|email|mail|comuna|ciudad|datos)\b'
+    r'|\b(pide|pida|solicita)\s+(al cliente\s+)?(su |sus |el |la |los )?'
+    r'(nombre|rut|correo|email|mail|comuna|ciudad|datos)\b'
+    r'|\b(ingresar|registrar) (la|una) reserva\b'
+    r'|\b(datos|informacion) (de|del|para) (la |el )?(transferencia|pago)\b'
+    r'|\bdatos bancarios\b')
+
+
+def _habla_del_cierre(texto):
+    """True si la regla dice cómo cerrar la venta a mano: pedir los datos, ingresar la
+    reserva o mandar los datos de pago. Pura."""
+    return bool(_RE_CIERRE.search(_normalizado(texto)))
+
+
 def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya_propuestas=()):
     """Como `clasificar()` —el mismo dict, más `confianza`—, pero el tipo lo decide Jev.
 
     - `contexto`: la conversación hasta la pregunta del cliente (`contexto_de_la_correccion`);
       sin ella Jev clasifica a ciegas y la confianza cae.
-    - Jev sin opinión (None) → el clasificador de siempre, tal cual.
+    - Jev sin opinión (None) → `error`: queda sin procesar para la próxima pasada. No va
+      el clasificador de siempre: es el que proponía la misma regla 7 veces, y con el
+      interruptor prendido se espera lo que decide Jev.
     - Manda «¿qué hizo la persona?» (`que_hizo`). Confianza < 0,70 → `error` «no
-      concluyente»: queda sin procesar para una persona. Nunca «puntual» en silencio, que
-      es el defecto que se arregla.
-    - Otra opción para ese cliente u otra cosa → puntual, sin sugerencia. Solo enseñan
-      «corrigió un dato» (catálogo si es un precio o que algo exista; si no, regla) y
-      «avanzó el proceso» (regla), si generalizan y no están ya en el Conocimiento.
-    - Si vale la pena, el texto lo redacta el camino de siempre; si repite una línea del
-      Conocimiento o una sugerencia anterior, no se propone de nuevo.
+      concluyente» (el lote lo marca visto; la decisión queda en `DecisionAgente`). Nunca
+      «puntual» en silencio, que es el defecto que se arregla.
+    - Otra opción para ese cliente, avanzar el proceso (cerrar a mano: Luna cierra con la
+      cotización) u otra cosa → puntual, sin sugerencia. Solo enseña «corrigió un dato»
+      (catálogo si es un precio o que algo exista; si no, regla), si generaliza y no está
+      ya en el Conocimiento.
+    - Si vale la pena, el texto lo redacta el camino de siempre. No se propone si habla de
+      cómo cerrar la venta, ni si repite una línea del Conocimiento o una sugerencia anterior.
     """
     from . import grounding
     from .decisiones import decidir
@@ -242,9 +269,10 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya
     r = decidir(estado, PREGUNTAS_CORRECCION, uso='aprendizaje.correccion',
                 referencia=str(referencia or ''))
     if r is None:
-        logger.warning('Aprendizaje: Jev sin opinión (feedback %s); va el clasificador de siempre',
+        logger.warning('Aprendizaje: Jev no respondió (feedback %s); queda para la próxima pasada',
                        referencia)
-        return clasificar(config, borrador, enviado)
+        base['error'] = 'Jev no respondió: queda para la próxima pasada'
+        return base
 
     que_hizo, confianza = r.opcion('que_hizo'), r.confianza('que_hizo')
     base.update(modelo=r.modelo or 'jev', confianza=confianza)
@@ -253,10 +281,12 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya
         base['error'] = f'no concluyente: {que_hizo or "sin respuesta"} con confianza {confianza or 0:.2f}'
         return base
     if que_hizo not in ACCIONES_QUE_ENSENAN:
-        base.update(tipo='puntual', motivo=f'{que_hizo} (confianza {confianza:.2f})')
+        motivo = f'{que_hizo} (confianza {confianza:.2f})'
+        if que_hizo == 'avanzo_el_proceso':
+            motivo += ': cerró a mano; Luna cierra con el link de la cotización'
+        base.update(tipo='puntual', motivo=motivo)
         return base
-    tipo = ('hecho_catalogo' if que_hizo == 'corrigio_dato'
-            and r.opcion('que_cambio') == 'hecho_catalogo' else 'regla')
+    tipo = 'hecho_catalogo' if r.opcion('que_cambio') == 'hecho_catalogo' else 'regla'
     base.update(tipo=tipo, motivo=f'{que_hizo} → {tipo} (confianza {confianza:.2f})')
 
     generaliza, ya_esta = r.si_no('generaliza'), r.si_no('ya_esta')
@@ -278,6 +308,10 @@ def clasificar_con_jev(config, borrador, enviado, referencia='', contexto='', ya
         return base
     if not _parece_una_regla(texto):
         base['error'] = f'{tipo}: la redacción no parece una regla de una línea; que la mire una persona'
+        return base
+    if _habla_del_cierre(texto):
+        base.update(tipo='puntual', motivo=f'{tipo} sobre cómo cerrar la venta: eso lo define '
+                                           f'el flujo de la cotización')
         return base
     repetida = _repetida(texto, config.conocimiento, ya_propuestas)
     if repetida:
@@ -366,8 +400,9 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
     """Clasifica el feedback editado sin procesar y crea las sugerencias accionables.
 
     Lo usan el comando `procesar_aprendizaje` y el endpoint (H-013). Idempotente:
-    marca `procesado=True` salvo en error del LLM (para reintentar). Lote acotado.
-    Devuelve {procesados, creadas, errores, detalle:[...]}.
+    marca `procesado=True` salvo en error (Jev que no responde, redacción que falla), para
+    reintentar. Los no concluyentes sí se marcan: son una respuesta, no una falla. Lote
+    acotado. Devuelve {procesados, creadas, no_concluyentes, errores, detalle:[...]}.
 
     Encargo JEV, etapa 4 (sin argumentos, todo igual que antes):
     - `solo_sustantivos`: solo las correcciones que enseñan algo
@@ -400,7 +435,7 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
         pendientes = elegidos
     else:
         pendientes = list(pendientes.order_by('created_at')[:limite])
-    procesados = creadas = errores = 0
+    procesados = creadas = errores = no_concluyentes = 0
     detalle = []
     # Encargo JEV: con el interruptor apagado, exactamente el camino de siempre.
     usar_jev = forzar_jev or bool(getattr(config, 'usar_jev_en_aprendizaje', False))
@@ -416,10 +451,16 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
                         enviado=(fb.enviado or '')[:220], confianza=d.get('confianza'),
                         motivo=d.get('motivo', ''))
         if d.get('error'):
-            errores += 1
-            detalle.append(dict(fila, estado='error', error=d['error']))
-            continue  # NO marcar procesado → se reintenta (o lo mira una persona)
-        if d['tipo'] in TIPOS_ACCIONABLES:
+            if not d['error'].startswith('no concluyente'):
+                errores += 1
+                detalle.append(dict(fila, estado='error', error=d['error']))
+                continue  # NO marcar procesado → se reintenta (o lo mira una persona)
+            # Jev no sabe qué hizo Deborah: 7 de cada 10 en las corridas en seco. Se marca
+            # vista, porque si no el botón de a 50 se queda pegado en las mismas. Su decisión,
+            # con la confianza, queda en Decisiones del modelo (DecisionAgente).
+            no_concluyentes += 1
+            detalle.append(dict(fila, estado='no_concluyente', error=d['error']))
+        elif d['tipo'] in TIPOS_ACCIONABLES:
             propuestas.append(d['texto_propuesto'])
             if not en_seco:
                 SugerenciaAprendizaje.objects.create(
@@ -438,9 +479,22 @@ def procesar_pendientes(limite=50, *, solo_sustantivos=False, en_seco=False, dia
             fb.procesado = True
             fb.save(update_fields=['procesado'])
         procesados += 1
-    logger.info('Aprendizaje: %s procesados, %s sugerencias, %s sin concluir o con error '
-                '(en seco=%s, jev=%s)', procesados, creadas, errores, en_seco, usar_jev)
-    return {'procesados': procesados, 'creadas': creadas, 'errores': errores, 'detalle': detalle}
+    logger.info('Aprendizaje: %s procesados (%s no concluyentes), %s sugerencias, %s con error '
+                '(en seco=%s, jev=%s)', procesados, no_concluyentes, creadas, errores, en_seco,
+                usar_jev)
+    return {'procesados': procesados, 'creadas': creadas, 'no_concluyentes': no_concluyentes,
+            'errores': errores, 'detalle': detalle}
+
+
+def opciones_del_boton():
+    """Lo que procesa el botón. Con Jev prendido, lo que eligió Jorge: solo las correcciones
+    que enseñan algo, de los últimos 30 días y las más recientes primero. Apagado, todo
+    como siempre."""
+    from .agent import get_config
+
+    if getattr(get_config(), 'usar_jev_en_aprendizaje', False):
+        return {'solo_sustantivos': True, 'dias': DIAS_DEL_BOTON}
+    return {}
 
 
 def clasificar(config, borrador, enviado, pista=''):

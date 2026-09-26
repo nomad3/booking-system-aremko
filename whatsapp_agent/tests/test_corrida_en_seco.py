@@ -109,3 +109,47 @@ class LaCorridaEnSeco(TestCase):
         self.assertIn('Deborah: Para esa fecha no quedan tinas', salida)
         self.assertIn('EN SECO (nada se guardó) · 2 correcciones', salida)
         self.assertEqual(SugerenciaAprendizaje.objects.count(), 0)
+
+
+NO_CONCLUYENTE = dict(_regla(), error='no concluyente: otra_cosa con confianza 0.42', confianza=0.42)
+
+
+class LosNoConcluyentes(TestCase):
+    """Etapa 5: 7 de cada 10 son no concluyentes. Si no se marcan vistos, el botón de a 50
+    se queda pegado en los mismos para siempre."""
+
+    def setUp(self):
+        self.fb = AgenteFeedback.objects.create(phone='+56911112222', borrador=SUSTANTIVO[0],
+                                                enviado=SUSTANTIVO[1], editado=True)
+
+    def test_se_marcan_vistos(self):
+        with mock.patch(JEV, return_value=NO_CONCLUYENTE):
+            res = aprendizaje.procesar_pendientes(10, forzar_jev=True)
+        self.fb.refresh_from_db()
+        self.assertTrue(self.fb.procesado)
+        self.assertEqual((res['procesados'], res['no_concluyentes'], res['errores'],
+                          res['creadas']), (1, 1, 0, 0))
+        self.assertEqual(res['detalle'][0]['estado'], 'no_concluyente')
+
+    def test_en_seco_no_se_marca_nada(self):
+        with mock.patch(JEV, return_value=NO_CONCLUYENTE):
+            res = aprendizaje.procesar_pendientes(10, en_seco=True, forzar_jev=True)
+        self.fb.refresh_from_db()
+        self.assertFalse(self.fb.procesado)
+        self.assertEqual(res['no_concluyentes'], 1)
+
+    def test_un_error_de_verdad_queda_para_la_proxima(self):
+        caido = dict(_regla(), error='Jev no respondió: queda para la próxima pasada',
+                     confianza=None)
+        with mock.patch(JEV, return_value=caido):
+            res = aprendizaje.procesar_pendientes(10, forzar_jev=True)
+        self.fb.refresh_from_db()
+        self.assertFalse(self.fb.procesado)
+        self.assertEqual((res['procesados'], res['no_concluyentes'], res['errores']), (0, 0, 1))
+
+    def test_el_comando_los_cuenta(self):
+        out = StringIO()
+        with mock.patch(JEV, return_value=NO_CONCLUYENTE):
+            call_command('procesar_aprendizaje', jev=True, stdout=out)
+        self.assertIn('no concluyente: otra_cosa con confianza 0.42 — marcada vista', out.getvalue())
+        self.assertIn('No concluyentes: 1 · Errores: 0', out.getvalue())

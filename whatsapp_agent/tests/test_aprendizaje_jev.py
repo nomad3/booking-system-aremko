@@ -13,7 +13,8 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest import mock
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from ventas.models import WhatsAppMessage
@@ -30,7 +31,7 @@ ENVIADO = 'Los lunes no ofrecemos tinas después de las 19:30 porque cerramos a 
 REGLA = 'Los lunes no se ofrecen tinas después de las 19:30.'
 
 
-def _jev(que_hizo='avanzo_el_proceso', confianza=0.9, que_cambio='regla', generaliza=0.8,
+def _jev(que_hizo='corrigio_dato', confianza=0.9, que_cambio='regla', generaliza=0.8,
          ya_esta=0.1):
     return Respuesta({'model': 'typesafe/jev-1.13', 'answers': {
         'que_hizo': {'type': 'choice', 'choice': que_hizo, 'confidence': confianza},
@@ -75,13 +76,29 @@ class ConJev(TestCase):
         self.assertEqual((estado['borrador'], estado['enviado']), (BORRADOR, ENVIADO))
         self.assertIn('Check-in', estado['conocimiento'])
         redactar.assert_called_once()
-        self.assertIn('paso siguiente', redactar.call_args.kwargs['pista'])
-        self.assertTrue(d['motivo'].startswith('avanzo_el_proceso'))
+        self.assertIn('regla GENERAL', redactar.call_args.kwargs['pista'])
+        self.assertTrue(d['motivo'].startswith('corrigio_dato'))
 
-    def test_sin_opinion_de_jev_va_el_clasificador_de_siempre(self):
+    def test_sin_opinion_de_jev_queda_para_la_proxima(self):
+        # Antes iba el clasificador de siempre: el que proponía la misma regla 7 veces.
         d, _, redactar = self._clasificar(None, redaccion=_redaccion())
-        self.assertEqual(d, _redaccion())
-        redactar.assert_called_once()
+        self.assertIn('Jev no respondió', d['error'])
+        redactar.assert_not_called()
+
+    def test_avanzar_el_proceso_no_es_una_regla(self):
+        # Jorge, 26-09: Luna cierra con el link de la cotización. Deborah pidiendo los datos o
+        # mandando el pago es su cierre a mano, no algo que Luna deba copiar.
+        d, _, redactar = self._clasificar(_jev(que_hizo='avanzo_el_proceso', confianza=0.95))
+        self.assertEqual((d['tipo'], d['texto_propuesto'], d['error']), ('puntual', '', ''))
+        self.assertIn('link de la cotización', d['motivo'])
+        redactar.assert_not_called()
+
+    def test_una_regla_sobre_el_cierre_no_se_propone(self):
+        d, _, _ = self._clasificar(_jev(), redaccion=_redaccion(texto=(
+            'Después de confirmar los servicios, solicitar al cliente nombre completo, RUT, '
+            'correo electrónico y ciudad de residencia para continuar con la reserva.')))
+        self.assertEqual((d['tipo'], d['texto_propuesto']), ('puntual', ''))
+        self.assertIn('cerrar la venta', d['motivo'])
 
     def test_poca_confianza_no_se_marca_puntual_en_silencio(self):
         d, _, redactar = self._clasificar(_jev(confianza=0.55))
@@ -225,10 +242,10 @@ class ElInterruptor(TestCase):
             res = aprendizaje.procesar_pendientes(10)
         self.assertEqual(jev.call_args.kwargs['referencia'], self.fb.id)
         self.fb.refresh_from_db()
-        self.assertFalse(self.fb.procesado)       # no concluyente: lo mira una persona
-        self.assertEqual((res['errores'], res['creadas']), (1, 0))
+        self.assertTrue(self.fb.procesado)        # no concluyente: vista, o el botón se pega
+        self.assertEqual((res['no_concluyentes'], res['errores'], res['creadas']), (1, 0, 0))
 
-    def test_prendido_y_red_caida_igual_que_hoy(self):
+    def test_prendido_y_jev_caido_queda_para_la_proxima(self):
         config = WhatsAppAgentConfig.get_solo()
         config.usar_jev_en_aprendizaje = True
         config.save()
@@ -236,8 +253,10 @@ class ElInterruptor(TestCase):
                 mock.patch(DECIDIR, return_value=None), \
                 mock.patch(CLASIFICAR, return_value=_redaccion()) as viejo:
             res = aprendizaje.procesar_pendientes(10)
-        viejo.assert_called_once()
-        self.assertEqual((res['procesados'], res['creadas']), (1, 1))
+        viejo.assert_not_called()
+        self.fb.refresh_from_db()
+        self.assertFalse(self.fb.procesado)
+        self.assertEqual((res['errores'], res['creadas']), (1, 0))
 
 
 class ElContexto(TestCase):
@@ -284,4 +303,66 @@ class ElContexto(TestCase):
                         return_value=dict(_redaccion(), tipo='tono')) as jev:
             aprendizaje.procesar_pendientes(10)
         self.assertEqual(jev.call_args.kwargs['contexto'], '[Cliente]: ¿hay tina el lunes a las 20?')
+
+
+class ElCierreEsLaCotizacion(SimpleTestCase):
+    """Jorge, 26-09: Luna cierra con el link de la cotización. Las tres propuestas de la
+    tercera corrida en seco decían cómo cierra Deborah a mano."""
+    TERCERA_CORRIDA = (
+        'Cuando el cliente confirma un servicio, se debe proceder a ingresar la reserva y enviar '
+        'la información para el pago.',
+        'Cuando el cliente confirma la reserva, se deben solicitar los datos personales (nombre '
+        'completo, rut, correo y ciudad de residencia) para proceder con la reserva.',
+        'Después de confirmar los servicios, solicitar al cliente nombre completo, RUT, correo '
+        'electrónico y ciudad de residencia para continuar con la reserva.',
+    )
+
+    def test_las_tres_de_la_tercera_corrida(self):
+        for texto in self.TERCERA_CORRIDA:
+            self.assertTrue(aprendizaje._habla_del_cierre(texto), texto)
+
+    def test_pide_pegado_al_dato_tambien(self):
+        self.assertTrue(aprendizaje._habla_del_cierre('Pide el RUT y el correo antes de cotizar.'))
+        self.assertTrue(aprendizaje._habla_del_cierre('Enviar los datos de transferencia al confirmar.'))
+
+    def test_lo_que_no_es_cerrar(self):
+        for texto in ('La tabla se agrega aparte: no está incluida en la experiencia romántica.',
+                      'Si el cliente pide precio, dar el precio por persona y el nombre del servicio.',
+                      'La cotización no asegura la reserva.',
+                      'Para reservar se abona el 50% por transferencia.',
+                      'Las gift cards llegan por correo el mismo día del pago.',
+                      'Los lunes no se ofrecen tinas después de las 19:30.'):
+            self.assertFalse(aprendizaje._habla_del_cierre(texto), texto)
+
+
+@override_settings(LUNA_API_KEY='clave-de-prueba')
+class ElBoton(TestCase):
+    """El botón de la página Agente IA (H-013). Jorge, 25-09: manual y últimos 30 días."""
+    RES = {'procesados': 3, 'creadas': 1, 'no_concluyentes': 2, 'errores': 0, 'detalle': []}
+
+    def _prender(self):
+        config = WhatsAppAgentConfig.get_solo()
+        config.usar_jev_en_aprendizaje = True
+        config.save()
+
+    def _apretar(self):
+        with mock.patch('whatsapp_agent.aprendizaje.procesar_pendientes',
+                        return_value=self.RES) as procesar:
+            resp = self.client.post(reverse('whatsapp_agente_procesar_aprendizaje'), data='{}',
+                                    content_type='application/json',
+                                    HTTP_X_API_KEY='clave-de-prueba')
+        return resp, procesar
+
+    def test_apagado_todo_como_siempre(self):
+        self.assertEqual(aprendizaje.opciones_del_boton(), {})
+        resp, procesar = self._apretar()
+        self.assertEqual(resp.status_code, 200)
+        procesar.assert_called_once_with(50)
+
+    def test_prendido_lo_que_eligio_jorge(self):
+        self._prender()
+        self.assertEqual(aprendizaje.opciones_del_boton(), {'solo_sustantivos': True, 'dias': 30})
+        resp, procesar = self._apretar()
+        procesar.assert_called_once_with(50, solo_sustantivos=True, dias=30)
+        self.assertEqual(resp.json()['no_concluyentes'], 2)
 
