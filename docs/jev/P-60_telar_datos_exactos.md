@@ -25,7 +25,7 @@ Se le muestran el texto de la pieza y los datos exactos del negocio.
 
 | Pregunta | Tipo | Opciones |
 |---|---|---|
-| ¿La pieza afirma algo que contradice los datos exactos? | `choice` sí/no | sí · no |
+| ¿La pieza afirma algo que contradice los datos exactos? | `noul` | probabilidad de que sí, de 0 a 1 |
 | ¿Qué dato? | `choice` | precio · día u horario · duración · temperatura · un servicio que no existe · ninguno |
 
 ## Qué hace el sistema con la respuesta

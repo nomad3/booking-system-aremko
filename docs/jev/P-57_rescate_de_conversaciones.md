@@ -28,7 +28,7 @@ Se le muestra la conversación completa.
 
 | Pregunta | Tipo | Opciones |
 |---|---|---|
-| ¿Mostró interés concreto (fecha, personas o servicio) y quedó sin decidir? | `choice` sí/no | sí · no |
+| ¿Mostró interés concreto (fecha, personas o servicio) y quedó sin decidir? | `noul` | probabilidad de que sí, de 0 a 1 |
 | ¿Qué lo frena? | `choice` | precio · fecha u horario · tiene que consultarlo · no se sabe |
 | ¿Qué seguimiento le sirve? | `choice` | recordarle su fecha · una alternativa más económica · otra fecha u hora · gift card, si es para regalar · ninguno |
 

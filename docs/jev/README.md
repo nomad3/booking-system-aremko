@@ -21,11 +21,16 @@ Devuelve la opción elegida y **qué tan seguro está**, de 0 a 1.
   OpenRouter, con la misma llave que ya usa Aremko. El nombre y la dirección
   pueden cambiar; por eso se cambian sin tocar código (ver abajo).
 
-Tres tipos de pregunta: `choice` (una opción de una lista), `score` (un punto de
-una escala, por ejemplo «puede esperar / hoy / ahora mismo») y `noul` (sí o no).
-**`choice` trae confianza y `noul` no** (comprobado el 25-09; `score` no se ha
-revisado). Si la decisión necesita confianza, un sí/no se pregunta como `choice`
-con dos opciones.
+Tres tipos de pregunta:
+
+- **`choice`:** una opción de una lista, con su confianza.
+- **`noul`:** un sí o no, que llega como **la probabilidad de que sea sí**, de 0
+  a 1. Esa probabilidad hace de confianza: 0,95 es un sí seguro, 0,05 un no
+  seguro y 0,5 es no saber. Se decide «sí» por encima del umbral y «no» por
+  debajo de su espejo (con 0,70: sí sobre 0,70, no bajo 0,30); lo del medio es
+  dudoso.
+- **`score`:** un punto de una escala, por ejemplo «puede esperar / hoy / ahora
+  mismo». Todavía no se ha revisado si trae confianza.
 
 ## Cómo quedó instalado (25-09-2026)
 

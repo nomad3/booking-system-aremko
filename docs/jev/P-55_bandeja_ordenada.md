@@ -31,8 +31,8 @@ Datamatic:
 | Pregunta | Tipo | Opciones |
 |---|---|---|
 | ¿En qué quedó? | `choice` | espera respuesta · espera al cliente · por pagar · cerrada · perdida · no es cliente |
-| ¿Hay algo concreto que Aremko dejó sin responder? | `choice` sí/no | (en Datamatic es `noul` y no trae confianza; acá conviene `choice`) |
-| ¿Está cerca de convertirse en una reserva pagada? | `noul` | sí · no |
+| ¿Hay algo concreto que Aremko dejó sin responder? | `noul` | probabilidad de que sí, de 0 a 1 |
+| ¿Está cerca de convertirse en una reserva pagada? | `noul` | probabilidad de que sí, de 0 a 1 |
 | ¿Qué tan pronto hay que contestar? | `score` | puede esperar · hoy · ahora mismo |
 
 ## Qué hace el sistema con la respuesta

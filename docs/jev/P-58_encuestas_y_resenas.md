@@ -28,7 +28,7 @@ Se le muestran los tres textos y las notas.
 | Pregunta | Tipo | Opciones |
 |---|---|---|
 | ¿De qué habla? | `choice` | tina · masaje · cabaña · limpieza · atención · precio · reserva o pago · otro · nada que reclamar |
-| ¿Es una queja? | `choice` sí/no | sí · no |
+| ¿Es una queja? | `noul` | probabilidad de que sí, de 0 a 1 |
 | ¿Qué tan urgente es? | `choice` | baja · media · alta |
 
 `urgencia` va como `choice` para que traiga confianza y calce directo con lo

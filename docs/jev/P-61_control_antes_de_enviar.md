@@ -27,18 +27,19 @@ Se le muestran la conversación y el borrador de Luna.
 
 | Pregunta | Tipo | Opciones |
 |---|---|---|
-| ¿El borrador solo informa, sin comprometer una reserva, un pago, un cambio ni una excepción? | `choice` sí/no | sí · no |
-| ¿Responde lo que el cliente preguntó? | `choice` sí/no | sí · no |
-| ¿Ofrece algo que no existe (un servicio, una hora o un precio fuera del catálogo)? | `choice` sí/no | sí · no |
+| ¿El borrador solo informa, sin comprometer una reserva, un pago, un cambio ni una excepción? | `noul` | probabilidad de que sí, de 0 a 1 |
+| ¿Responde lo que el cliente preguntó? | `noul` | probabilidad de que sí, de 0 a 1 |
+| ¿Ofrece algo que no existe (un servicio, una hora o un precio fuera del catálogo)? | `noul` | probabilidad de que sí, de 0 a 1 |
 
 Se suma a los frenos que ya están en el código, como el que impide ofrecer una
 hora que no existe. No los reemplaza.
 
 ## Qué hace el sistema con la respuesta
 
-Si las tres respuestas salen bien y con confianza de 0,90 o más, el mensaje sale
-solo. Si no, queda como borrador para Deborah, como hoy. **Nunca bloquea:** en el
-peor caso, Deborah lo ve, que es lo normal hoy.
+El mensaje sale solo únicamente si Jev está seguro de las tres: 0,90 o más de
+que solo informa y de que responde lo preguntado, y 0,10 o menos de que ofrezca
+algo que no existe. Si no, queda como borrador para Deborah, como hoy. **Nunca
+bloquea:** en el peor caso, Deborah lo ve, que es lo normal hoy.
 
 ## Quién revisa lo dudoso
 
@@ -53,15 +54,17 @@ Deborah, en la bandeja, como hoy.
 
 ## Costo
 
-Tres preguntas por mensaje de Luna: aun con 5.000 mensajes al mes, menos de un
-dólar. Suma unos 0,2 segundos a cada respuesta.
+Luna escribe unos 3.000 borradores al mes (3.046 en 30 días, medido el
+25-09-2026). Con tres preguntas cada uno, menos de un dólar al mes. Suma unos
+0,2 segundos a cada respuesta.
 
 ## Qué medir antes de empezar
 
-1. **Qué porcentaje de borradores envía Deborah sin editar**, por tipo de
-   pregunta. La curva semanal ya existe en las métricas de Luna (H-021). Es el
-   techo de lo que podría salir solo.
-2. De esos, cuántos son solo información.
+1. **Qué borradores envía Deborah sin editar, por tipo de pregunta.** En total
+   ya se sabe: de 3.046 en 30 días editó 1.245, así que **el 59% sale tal
+   cual** (medido el 25-09). Ese es el techo de lo que podría salir solo. La
+   curva semanal está en las métricas de Luna (H-021).
+2. De los que salen tal cual, cuántos son solo información.
 3. Cómo les fue a P-55 y P-54: si Jev acertó con los datos de Aremko.
 
 ## Para quien lo construya
